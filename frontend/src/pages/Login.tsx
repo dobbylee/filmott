@@ -1,8 +1,41 @@
-import React from 'react';
-import { Mail, Lock, Eye, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Mail, Lock, Eye, ArrowRight, EyeOff } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { api } from '../api';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Please fill in all fields.');
+      return;
+    }
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await api.post('/auth/login', {
+        email, 
+        password,
+      });
+      login(response.data.access_token, response.data.user);
+      navigate('/'); // Redirect to dashboard when implemented
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <div className="w-full max-w-md flex flex-col items-center">
       {/* Footer Text for small screens (usually inside Layout but we keep the main card here) */}
@@ -12,7 +45,13 @@ const Login: React.FC = () => {
           Log in to access your learning dashboard and continue your progress.
         </p>
 
-        <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          {error && (
+            <div className="bg-red-50 text-red-500 p-3 rounded-lg text-sm text-center font-medium">
+              {error}
+            </div>
+          )}
+
           {/* Email */}
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-slate-900 block" htmlFor="email">
@@ -24,9 +63,12 @@ const Login: React.FC = () => {
               </div>
               <input
                 id="email"
-                type="email"
+                type="text"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
                 className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-shadow"
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -47,15 +89,20 @@ const Login: React.FC = () => {
               </div>
               <input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-shadow tracking-widest"
+                disabled={isLoading}
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
               >
-                <Eye className="h-4 w-4" />
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
@@ -63,9 +110,10 @@ const Login: React.FC = () => {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full flex justify-center items-center py-3 px-4 mt-2 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            disabled={isLoading}
+            className="w-full flex justify-center items-center py-3 px-4 mt-2 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-70"
           >
-            Log In <ArrowRight className="ml-2 h-4 w-4" />
+            {isLoading ? 'Logging in...' : 'Log In'} <ArrowRight className="ml-2 h-4 w-4" />
           </button>
         </form>
 
