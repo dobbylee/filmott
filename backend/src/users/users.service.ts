@@ -49,7 +49,7 @@ export class UsersService {
     this.users.push(newUser);
 
     // Return user without password
-    const { password, ...result } = newUser;
+    const { password: _pw, ...result } = newUser;
     return result as User;
   }
 }
