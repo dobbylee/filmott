@@ -9,7 +9,7 @@ import { CreateUserDto } from '../users/dto/create-user.dto';
 export class AuthService {
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
   ) {}
 
   async validateUser(username: string, pass: string): Promise<any> {
@@ -35,7 +35,7 @@ export class AuthService {
         id: user.id,
         username: user.username,
         email: user.email,
-      }
+      },
     };
   }
 
@@ -48,7 +48,7 @@ export class AuthService {
         id: user.id,
         username: user.username,
         email: user.email,
-      }
+      },
     };
   }
 }

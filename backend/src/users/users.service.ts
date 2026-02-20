@@ -2,7 +2,12 @@ import { Injectable, ConflictException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 
-export type User = any; // In real DB, it will be Entity
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  password?: string; // Optional since we remove it before returning
+}
 
 @Injectable()
 export class UsersService {
@@ -10,11 +15,11 @@ export class UsersService {
   private readonly users: User[] = [];
 
   async findOne(username: string): Promise<User | undefined> {
-    return this.users.find(user => user.username === username);
+    return this.users.find((user) => user.username === username);
   }
 
   async findByEmail(email: string): Promise<User | undefined> {
-    return this.users.find(user => user.email === email);
+    return this.users.find((user) => user.email === email);
   }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -44,7 +49,7 @@ export class UsersService {
     this.users.push(newUser);
 
     // Return user without password
-    const { password: _, ...result } = newUser;
-    return result;
+    const { password, ...result } = newUser;
+    return result as User;
   }
 }
