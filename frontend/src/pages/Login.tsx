@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, ArrowRight, EyeOff } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,7 +12,6 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   const { login } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +28,7 @@ const Login: React.FC = () => {
         password,
       });
       login(response.data.access_token, response.data.user);
-      navigate('/'); // Redirect to dashboard when implemented
+      // Removed navigate('/') to let App.tsx handle redirect based on state
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
     } finally {
