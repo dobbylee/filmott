@@ -11,6 +11,7 @@ const SignUp: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   const navigate = useNavigate();
@@ -23,6 +24,10 @@ const SignUp: React.FC = () => {
     }
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
+      return;
+    }
+    if (!agreeTerms) {
+      setError('You must agree to the Terms of Service and Privacy Policy.');
       return;
     }
     setError('');
@@ -166,7 +171,9 @@ const SignUp: React.FC = () => {
               <input
                 id="terms"
                 type="checkbox"
-                className="w-4 h-4 text-blue-500 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2"
+                checked={agreeTerms}
+                onChange={(e) => setAgreeTerms(e.target.checked)}
+                className="w-4 h-4 text-blue-500 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
               />
             </div>
             <div className="ml-2.5 text-xs text-slate-600">
