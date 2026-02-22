@@ -1,25 +1,23 @@
 import { Injectable, ConflictException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  password?: string; // Optional since we remove it before returning
-}
-
 @Injectable()
 export class UsersService {
-  // Mock In-Memory Repository
-  private readonly users: User[] = [];
+  constructor(
+    @InjectRepository(User)
+    private readonly usersRepo: Repository<User>,
+  ) {}
 
-  async findOne(username: string): Promise<User | undefined> {
-    return this.users.find((user) => user.username === username);
+  async findOne(username: string): Promise<User | null> {
+    return this.usersRepo.findOne({ where: { username } });
   }
 
-  async findByEmail(email: string): Promise<User | undefined> {
-    return this.users.find((user) => user.email === email);
+  async findByEmail(email: string): Promise<User | null> {
+    return this.usersRepo.findOne({ where: { email } });
   }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -39,17 +37,16 @@ export class UsersService {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    const newUser = {
-      id: this.users.length + 1,
+    const newUser = this.usersRepo.create({
       username,
       email,
       password: hashedPassword,
-    };
+    });
 
-    this.users.push(newUser);
+    const savedUser = await this.usersRepo.save(newUser);
 
     // Return user without password
-    const { password: _pw, ...result } = newUser;
+    const { password: _pw, ...result } = savedUser;
     return result as User;
   }
 }
