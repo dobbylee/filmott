@@ -14,3 +14,6 @@ export class User {
   @Column()
   password!: string;
 }
+
+// User without password - safe to return to client
+export type SafeUser = Omit<User, 'password'>;

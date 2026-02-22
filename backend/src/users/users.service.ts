@@ -1,7 +1,7 @@
 import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './user.entity';
+import { User, SafeUser } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -20,7 +20,7 @@ export class UsersService {
     return this.usersRepo.findOne({ where: { email } });
   }
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(createUserDto: CreateUserDto): Promise<SafeUser> {
     const { username, email, password } = createUserDto;
 
     // Check if user already exists
@@ -47,6 +47,6 @@ export class UsersService {
 
     // Return user without password
     const { password: _pw, ...result } = savedUser;
-    return result as User;
+    return result;
   }
 }
