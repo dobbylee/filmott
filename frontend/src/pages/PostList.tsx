@@ -35,28 +35,25 @@ const getAvatarColor = (name: string) => {
   return `hsl(${hue}, 55%, 55%)`;
 };
 
-// Relative time
-const timeAgo = (date: string) => {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-  const intervals = [
-    { label: 'year', seconds: 31536000 },
-    { label: 'month', seconds: 2592000 },
-    { label: 'week', seconds: 604800 },
-    { label: 'day', seconds: 86400 },
-    { label: 'hour', seconds: 3600 },
-    { label: 'minute', seconds: 60 },
-  ];
-  for (const interval of intervals) {
-    const count = Math.floor(seconds / interval.seconds);
-    if (count >= 1) {
-      return count === 1
-        ? interval.label === 'day'
-          ? 'Yesterday'
-          : `${count} ${interval.label} ago`
-        : `${count} ${interval.label}s ago`;
-    }
-  }
-  return 'Just now';
+const timeAgo = (dateStr: string) => {
+  // Convert UTC string from DB to Date object, then to KST
+  const date = new Date(dateStr);
+  const now = new Date();
+  
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (seconds < 60) return '방금 전';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}분 전`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}시간 전`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}일 전`;
+  
+  // Example result: '2023. 10. 25.'
+  return date.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
 };
 
 const PostList: React.FC = () => {
@@ -135,29 +132,43 @@ const PostList: React.FC = () => {
 
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-1">Discussion Board</h1>
-          <p className="text-slate-500">Join the conversation, share knowledge, and learn from others.</p>
-        </div>
-
-        {/* Actions Row */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2">
-            <button className="px-4 py-1.5 text-sm font-semibold text-blue-600 bg-blue-50 rounded-full">All Posts</button>
-            <button className="px-4 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-full transition-colors hidden sm:block">Popular</button>
+        {/* Title & Top Actions */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-1">Discussion Board</h1>
+            <p className="text-slate-500 border-none">Join the conversation, share knowledge, and learn from others.</p>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-slate-500 hidden sm:inline-block">
-              Showing <span className="font-semibold text-slate-700">{posts.length}</span> posts
-            </span>
+          <div className="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
+            {/* Search Bar Placeholder */}
+            <div className="relative w-full md:w-64 hidden sm:block">
+              <input 
+                type="text" 
+                placeholder="Search discussions..." 
+                className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-shadow"
+                disabled
+              />
+              <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+            
             {isAuthenticated && (
-              <Link to="/posts/new">
-                <button className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm shadow-blue-500/20">
+              <Link to="/posts/new" className="shrink-0 flex-1 sm:flex-none">
+                <button className="w-full flex justify-center items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm shadow-blue-500/20">
                   <PenSquare className="w-4 h-4" />
                   Write Post
                 </button>
               </Link>
             )}
+          </div>
+        </div>
+
+        {/* Filters & Count Row */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center bg-white p-1 rounded-full border border-slate-200 shadow-sm">
+            <button className="px-4 py-1.5 text-sm font-semibold text-blue-600 bg-blue-50 rounded-full">All Posts</button>
+            <button className="px-4 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-full transition-colors">Popular</button>
+          </div>
+          <div className="text-sm text-slate-500">
+            Showing <span className="font-bold text-slate-700">1-{posts.length}</span> of <span className="font-bold text-slate-700">{posts.length}</span> posts
           </div>
         </div>
 

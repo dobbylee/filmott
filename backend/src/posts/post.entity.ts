@@ -22,10 +22,10 @@ export class Post {
   @Column({ default: 0 })
   views!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 
   @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })

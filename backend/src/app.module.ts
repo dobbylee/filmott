@@ -24,6 +24,9 @@ import { PostsModule } from './posts/posts.module';
       database: process.env.DB_NAME,
       entities: [User, Post],
       synchronize: true, // Dev only: auto-create tables from entities
+      extra: {
+        options: '-c timezone=Asia/Seoul',
+      },
     }),
 
     UsersModule,
