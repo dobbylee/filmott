@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, PenSquare, Layers } from 'lucide-react';
+import { Eye, PenSquare, Layers, LogOut } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -62,7 +62,8 @@ const timeAgo = (date: string) => {
 const PostList: React.FC = () => {
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { isAuthenticated } = useAuth();
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const { isAuthenticated, user, logout } = useAuth();
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -87,12 +88,44 @@ const PostList: React.FC = () => {
             <Layers className="text-blue-500 w-7 h-7 fill-blue-500" />
             <span>PostBoard</span>
           </Link>
-          <div className="flex items-center gap-3">
-            {isAuthenticated && (
-              <Link to="/posts/new">
-                <button className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm shadow-blue-500/20">
-                  <PenSquare className="w-4 h-4" />
-                  Write Post
+          <div className="flex items-center gap-3 relative">
+            {isAuthenticated && user ? (
+              <div
+                className="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+              >
+                <div className="flex flex-col items-end mr-1 hidden sm:flex">
+                  <span className="text-sm font-bold text-slate-800 leading-tight">{user.username}</span>
+                  <span className="text-xs text-slate-500">Member</span>
+                </div>
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm"
+                  style={{ backgroundColor: getAvatarColor(user.username) }}
+                >
+                  {getInitials(user.username)}
+                </div>
+
+                {/* Dropdown Menu */}
+                {showProfileMenu && (
+                  <div className="absolute top-12 right-0 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-2 z-10 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-4 py-2 border-b border-slate-50 mb-1 sm:hidden">
+                      <p className="text-sm font-bold text-slate-800 truncate">{user.username}</p>
+                      <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                    </div>
+                    <button
+                      onClick={logout}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Log Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link to="/login">
+                <button className="text-sm font-semibold text-blue-500 hover:text-blue-600 px-4 py-2.5 rounded-lg hover:bg-blue-50 transition-colors">
+                  Log In
                 </button>
               </Link>
             )}
@@ -107,11 +140,25 @@ const PostList: React.FC = () => {
           <p className="text-slate-500">Join the conversation, share knowledge, and learn from others.</p>
         </div>
 
-        {/* Post count */}
-        <div className="flex justify-end mb-4">
-          <span className="text-sm text-slate-500">
-            Showing <span className="font-semibold text-slate-700">{posts.length}</span> posts
-          </span>
+        {/* Actions Row */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <button className="px-4 py-1.5 text-sm font-semibold text-blue-600 bg-blue-50 rounded-full">All Posts</button>
+            <button className="px-4 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-full transition-colors hidden sm:block">Popular</button>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-slate-500 hidden sm:inline-block">
+              Showing <span className="font-semibold text-slate-700">{posts.length}</span> posts
+            </span>
+            {isAuthenticated && (
+              <Link to="/posts/new">
+                <button className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm shadow-blue-500/20">
+                  <PenSquare className="w-4 h-4" />
+                  Write Post
+                </button>
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Posts Table */}

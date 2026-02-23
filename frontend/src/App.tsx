@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AuthLayout from './components/AuthLayout';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
-import Dashboard from './pages/Dashboard';
 import PostList from './pages/PostList';
 import PostDetail from './pages/PostDetail';
 import PostForm from './pages/PostForm';
@@ -23,8 +22,7 @@ const App: React.FC = () => {
         <Route path="/posts/new" element={isAuthenticated ? <PostForm /> : <Navigate to="/login" replace />} />
         <Route path="/posts/:id/edit" element={isAuthenticated ? <PostForm /> : <Navigate to="/login" replace />} />
 
-        {/* Dashboard */}
-        <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} />
+
 
         {/* Auth routes */}
         <Route element={<AuthLayout />}>

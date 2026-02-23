@@ -33,9 +33,8 @@ export class PostsService {
   }
 
   async findOneAndIncrementViews(id: number): Promise<Post> {
-    const post = await this.findOne(id);
-    post.views += 1;
-    return this.postsRepo.save(post);
+    await this.postsRepo.increment({ id }, 'views', 1);
+    return this.findOne(id);
   }
 
   async create(createPostDto: CreatePostDto, author: JwtPayload): Promise<Post> {

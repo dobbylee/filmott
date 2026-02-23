@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Pencil, Trash2, Eye, Calendar, User as UserIcon } from 'lucide-react';
 import { api } from '../api';
@@ -35,8 +35,12 @@ const PostDetailPage: React.FC = () => {
   const { user } = useAuth();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
     const fetchPost = async () => {
       try {
         const response = await api.get<PostDetail>(`/posts/${id}`);
