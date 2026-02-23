@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Mail, EyeOff, GraduationCap, Eye } from 'lucide-react';
+import { User, Mail, EyeOff, Eye } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
@@ -51,9 +51,7 @@ const SignUp: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full p-8 md:p-10 border-b-[6px] border-b-blue-200/50">
         {/* Header Icon */}
         <div className="flex justify-center mb-6">
-          <div className="bg-blue-500 p-3 rounded-xl shadow-md shadow-blue-500/20">
-            <GraduationCap className="h-7 w-7 text-white" strokeWidth={2.5} />
-          </div>
+          <img src="/logo.png" alt="PostBoard Logo" className="w-20 h-20 drop-shadow-sm" />
         </div>
 
         <div className="text-center mb-8">
@@ -206,7 +204,7 @@ const SignUp: React.FC = () => {
       </div>
 
       <div className="mt-10 text-[11px] font-medium text-slate-400">
-        © 2024 Learning Board. All rights reserved.
+        © 2024 PostBoard. All rights reserved.
       </div>
     </div>
   );

@@ -152,7 +152,7 @@ const Login: React.FC = () => {
       </div>
 
       <div className="mt-10 text-xs font-medium text-slate-400">
-        © 2024 Learning Board Inc. All rights reserved.
+        © 2024 PostBoard Inc. All rights reserved.
       </div>
     </div>
   );
