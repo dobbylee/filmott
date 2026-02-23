@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { User } from './users/user.entity';
+import { Post } from './posts/post.entity';
+import { PostsModule } from './posts/posts.module';
 
 @Module({
   imports: [
@@ -20,12 +22,13 @@ import { User } from './users/user.entity';
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      entities: [User],
+      entities: [User, Post],
       synchronize: true, // Dev only: auto-create tables from entities
     }),
 
     UsersModule,
     AuthModule,
+    PostsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
