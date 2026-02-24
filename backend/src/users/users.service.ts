@@ -32,7 +32,6 @@ export class UsersService {
   async findById(id: number): Promise<SafeUser | null> {
     const user = await this.usersRepo.findOne({ where: { id } });
     if (!user) return null;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...result } = user;
     return result;
   }
@@ -101,8 +100,7 @@ export class UsersService {
     }
 
     const savedUser = await this.usersRepo.save(user);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _pw, ...result } = savedUser;
+    const { password, ...result } = savedUser;
     return result;
   }
 

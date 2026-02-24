@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Eye, PenSquare, LogOut, Settings } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { timeAgo } from '../utils/timeAgo';
 
 interface PostItem {
   id: number;
@@ -33,27 +34,6 @@ const getAvatarColor = (name: string) => {
   }
   const hue = Math.abs(hash) % 360;
   return `hsl(${hue}, 55%, 55%)`;
-};
-
-const timeAgo = (dateStr: string) => {
-  // Convert UTC string from DB to Date object, then to KST
-  const date = new Date(dateStr);
-  const now = new Date();
-  
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
-  if (seconds < 60) return '방금 전';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}분 전`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}시간 전`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}일 전`;
-  
-  // Example result: '2023. 10. 25.'
-  return date.toLocaleDateString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
 };
 
 const PostList: React.FC = () => {
@@ -227,7 +207,7 @@ const PostList: React.FC = () => {
                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-200 text-slate-400 text-xs font-bold shrink-0">
                       ?
                     </div>
-                    <span className="text-sm text-slate-400 italic truncate">탈퇴한 사용자</span>
+                    <span className="text-sm text-slate-400 italic truncate">Deleted User</span>
                   </>
                 )}
               </div>
