@@ -33,7 +33,10 @@ export class UsersController {
   // Update current user's profile
   @UseGuards(JwtAuthGuard)
   @Patch('me')
-  update(@CurrentUser() user: JwtPayload, @Body() updateUserDto: UpdateUserDto) {
+  update(
+    @CurrentUser() user: JwtPayload,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
     return this.usersService.update(user.id, updateUserDto);
   }
 

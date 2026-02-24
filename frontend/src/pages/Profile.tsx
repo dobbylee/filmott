@@ -103,7 +103,7 @@ const Profile: React.FC = () => {
       await api.delete('/users/me');
       logout();
       navigate('/login');
-    } catch (err) {
+    } catch {
       alert('Failed to delete account');
     }
   };

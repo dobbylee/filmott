@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, SafeUser } from './user.entity';
@@ -27,7 +32,8 @@ export class UsersService {
   async findById(id: number): Promise<SafeUser | null> {
     const user = await this.usersRepo.findOne({ where: { id } });
     if (!user) return null;
-    const { password: _pw, ...result } = user;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...result } = user;
     return result;
   }
 
@@ -57,6 +63,7 @@ export class UsersService {
     const savedUser = await this.usersRepo.save(newUser);
 
     // Return user without password
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _pw, ...result } = savedUser;
     return result;
   }
@@ -79,9 +86,14 @@ export class UsersService {
     // Handle password change
     if (updateUserDto.newPassword) {
       if (!updateUserDto.currentPassword) {
-        throw new BadRequestException('Current password is required to change password');
+        throw new BadRequestException(
+          'Current password is required to change password',
+        );
       }
-      const isMatch = await bcrypt.compare(updateUserDto.currentPassword, user.password);
+      const isMatch = await bcrypt.compare(
+        updateUserDto.currentPassword,
+        user.password,
+      );
       if (!isMatch) {
         throw new BadRequestException('Current password is incorrect');
       }
@@ -89,6 +101,7 @@ export class UsersService {
     }
 
     const savedUser = await this.usersRepo.save(user);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _pw, ...result } = savedUser;
     return result;
   }

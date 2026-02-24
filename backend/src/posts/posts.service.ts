@@ -37,7 +37,10 @@ export class PostsService {
     return this.findOne(id);
   }
 
-  async create(createPostDto: CreatePostDto, author: JwtPayload): Promise<Post> {
+  async create(
+    createPostDto: CreatePostDto,
+    author: JwtPayload,
+  ): Promise<Post> {
     const post = this.postsRepo.create({
       ...createPostDto,
       author: { id: author.id } as User,

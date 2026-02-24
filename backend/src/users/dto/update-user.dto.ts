@@ -8,7 +8,9 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(8, { message: 'Current password must be at least 8 characters long.' })
+  @MinLength(8, {
+    message: 'Current password must be at least 8 characters long.',
+  })
   currentPassword?: string;
 
   @IsOptional()

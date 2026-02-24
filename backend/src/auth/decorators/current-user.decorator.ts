@@ -5,8 +5,10 @@ import { Request } from 'express';
 // Usage: @CurrentUser() user: JwtPayload
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
-    const request = ctx.switchToHttp().getRequest<Request>();
-    return (request as any).user;
+    const request = ctx
+      .switchToHttp()
+      .getRequest<Request & { user: JwtPayload }>();
+    return request.user;
   },
 );
 
