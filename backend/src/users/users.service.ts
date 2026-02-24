@@ -2,6 +2,7 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, SafeUser } from './user.entity';
+import { Post } from '../posts/post.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
@@ -11,6 +12,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
+    @InjectRepository(Post)
+    private readonly postsRepo: Repository<Post>,
   ) {}
 
   async findOne(username: string): Promise<User | null> {
@@ -73,7 +76,6 @@ export class UsersService {
       user.username = updateUserDto.username;
     }
 
-
     // Handle password change
     if (updateUserDto.newPassword) {
       if (!updateUserDto.currentPassword) {
@@ -96,7 +98,16 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    // Nullify author on all posts by this user (ON DELETE SET NULL doesn't fire on soft delete)
+    await this.postsRepo.update({ author: { id } }, { author: null });
+
+    // Anonymize to release unique constraints
+    const timestamp = Date.now();
+    user.username = `deleted_${user.id}_${timestamp}`;
+    user.email = `deleted_${user.id}_${timestamp}@deleted.local`;
+    await this.usersRepo.save(user);
+
     await this.usersRepo.softDelete(id);
   }
 }
-

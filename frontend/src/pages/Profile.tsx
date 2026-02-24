@@ -63,8 +63,8 @@ const Profile: React.FC = () => {
       return;
     }
 
-    if (newPassword && newPassword.length < 6) {
-      setError('New password must be at least 6 characters long');
+    if (newPassword && newPassword.length < 8) {
+      setError('New password must be at least 8 characters long');
       return;
     }
 

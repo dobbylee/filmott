@@ -203,10 +203,6 @@ const SignUp: React.FC = () => {
           </Link>
         </p>
       </div>
-
-      <div className="mt-10 text-[11px] font-medium text-slate-400">
-        © 2024 PostBoard. All rights reserved.
-      </div>
     </div>
   );
 };

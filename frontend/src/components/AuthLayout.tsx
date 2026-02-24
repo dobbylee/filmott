@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Link } from 'react-router-dom';
 
 const AuthLayout: React.FC = () => {
   return (
@@ -11,14 +11,14 @@ const AuthLayout: React.FC = () => {
       </div>
 
       {/* Header (Mostly visible on Login page, but we keep it generic or page-specific) */}
-      <header className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10 hidden md:flex">
-        <div className="flex items-center gap-2 text-slate-900 font-bold text-xl">
+      <header className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-20 hidden md:flex">
+        <Link to="/" className="flex items-center gap-2 text-slate-900 font-bold text-xl hover:opacity-80 transition-opacity">
           <img src="/logo.png" alt="PostBoard Logo" className="w-11 h-11" />
           <span>PostBoard</span>
-        </div>
-        <a href="#" className="text-sm text-slate-500 hover:text-slate-800 font-medium">
-          Need help?
-        </a>
+        </Link>
+        <Link to="/" className="text-sm text-slate-500 hover:text-blue-600 font-medium transition-colors">
+          ← Browse Posts
+        </Link>
       </header>
 
       {/* Main Content Area */}
