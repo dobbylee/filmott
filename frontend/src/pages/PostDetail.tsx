@@ -15,7 +15,7 @@ interface PostDetail {
     id: number;
     username: string;
     email: string;
-  };
+  } | null;
 }
 
 const timeAgo = (dateStr: string) => {
@@ -83,7 +83,7 @@ const PostDetailPage: React.FC = () => {
 
   if (!post) return null;
 
-  const isAuthor = user?.id === post.author.id;
+  const isAuthor = post.author && user?.id === post.author.id;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -128,7 +128,9 @@ const PostDetailPage: React.FC = () => {
           <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-100">
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <UserIcon className="w-4 h-4" />
-              <span className="font-semibold text-slate-700">{post.author.username}</span>
+              <span className="font-semibold text-slate-700">
+                {post.author ? post.author.username : '탈퇴한 사용자'}
+              </span>
             </div>
             <div className="flex items-center gap-1.5 text-sm text-slate-400">
               <Calendar className="w-4 h-4" />

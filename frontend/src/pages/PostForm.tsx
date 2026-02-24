@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Send } from 'lucide-react';
 import { api } from '../api';
+import { getErrorMessage } from '../utils/error';
 
 const PostForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -52,8 +53,8 @@ const PostForm: React.FC = () => {
         const response = await api.post('/posts', { title, content });
         navigate(`/posts/${response.data.id}`);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save post.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to save post.'));
     } finally {
       setIsLoading(false);
     }

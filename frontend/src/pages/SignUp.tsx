@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, Mail, EyeOff, Eye } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { getErrorMessage } from '../utils/error';
 
 const SignUp: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -40,8 +41,8 @@ const SignUp: React.FC = () => {
         password,
       });
       navigate('/login'); // Redirect to login on successful signup
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create account. Username or email might be taken.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to create account. Username or email might be taken.'));
     } finally {
       setIsLoading(false);
     }

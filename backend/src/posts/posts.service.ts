@@ -52,7 +52,7 @@ export class PostsService {
   ): Promise<Post> {
     const post = await this.findOne(id);
 
-    if (post.author.id !== currentUser.id) {
+    if (!post.author || post.author.id !== currentUser.id) {
       throw new ForbiddenException('You can only edit your own posts.');
     }
 
@@ -63,7 +63,7 @@ export class PostsService {
   async remove(id: number, currentUser: JwtPayload): Promise<void> {
     const post = await this.findOne(id);
 
-    if (post.author.id !== currentUser.id) {
+    if (!post.author || post.author.id !== currentUser.id) {
       throw new ForbiddenException('You can only delete your own posts.');
     }
 

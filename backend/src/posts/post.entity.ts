@@ -28,6 +28,6 @@ export class Post {
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 
-  @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })
-  author!: User;
+  @ManyToOne(() => User, { eager: true, nullable: true, onDelete: 'SET NULL' })
+  author!: User | null;
 }

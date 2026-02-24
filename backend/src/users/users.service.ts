@@ -1,8 +1,9 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, SafeUser } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -18,6 +19,13 @@ export class UsersService {
 
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepo.findOne({ where: { email } });
+  }
+
+  async findById(id: number): Promise<SafeUser | null> {
+    const user = await this.usersRepo.findOne({ where: { id } });
+    if (!user) return null;
+    const { password: _pw, ...result } = user;
+    return result;
   }
 
   async create(createUserDto: CreateUserDto): Promise<SafeUser> {
@@ -49,4 +57,46 @@ export class UsersService {
     const { password: _pw, ...result } = savedUser;
     return result;
   }
+
+  async update(id: number, updateUserDto: UpdateUserDto): Promise<SafeUser> {
+    const user = await this.usersRepo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Handle username change
+    if (updateUserDto.username && updateUserDto.username !== user.username) {
+      const existing = await this.findOne(updateUserDto.username);
+      if (existing) {
+        throw new ConflictException('Username is already taken');
+      }
+      user.username = updateUserDto.username;
+    }
+
+
+    // Handle password change
+    if (updateUserDto.newPassword) {
+      if (!updateUserDto.currentPassword) {
+        throw new BadRequestException('Current password is required to change password');
+      }
+      const isMatch = await bcrypt.compare(updateUserDto.currentPassword, user.password);
+      if (!isMatch) {
+        throw new BadRequestException('Current password is incorrect');
+      }
+      user.password = await bcrypt.hash(updateUserDto.newPassword, 10);
+    }
+
+    const savedUser = await this.usersRepo.save(user);
+    const { password: _pw, ...result } = savedUser;
+    return result;
+  }
+
+  async softRemove(id: number): Promise<void> {
+    const user = await this.usersRepo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    await this.usersRepo.softDelete(id);
+  }
 }
+

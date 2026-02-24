@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const token = localStorage.getItem('access_token');
     if (token) {
       try {
-        const response = await api.get<User>('/auth/profile');
+        const response = await api.get<User>('/users/me');
         setUser(response.data);
         setIsAuthenticated(true);
       } catch (error) {

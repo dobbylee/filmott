@@ -6,6 +6,7 @@ import SignUp from './pages/SignUp';
 import PostList from './pages/PostList';
 import PostDetail from './pages/PostDetail';
 import PostForm from './pages/PostForm';
+import Profile from './pages/Profile';
 import { useAuth } from './contexts/AuthContext';
 
 const App: React.FC = () => {
@@ -21,6 +22,9 @@ const App: React.FC = () => {
         <Route path="/posts/:id" element={<PostDetail />} />
         <Route path="/posts/new" element={isAuthenticated ? <PostForm /> : <Navigate to="/login" replace />} />
         <Route path="/posts/:id/edit" element={isAuthenticated ? <PostForm /> : <Navigate to="/login" replace />} />
+        
+        {/* Profile routes */}
+        <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" replace />} />
 
 
 

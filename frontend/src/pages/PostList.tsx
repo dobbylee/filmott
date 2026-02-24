@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, PenSquare, LogOut } from 'lucide-react';
+import { Eye, PenSquare, LogOut, Settings } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -109,9 +109,16 @@ const PostList: React.FC = () => {
                       <p className="text-sm font-bold text-slate-800 truncate">{user.username}</p>
                       <p className="text-xs text-slate-500 truncate">{user.email}</p>
                     </div>
+                    <Link
+                      to="/profile"
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Edit Profile
+                    </Link>
                     <button
                       onClick={logout}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                       Log Out
@@ -205,13 +212,24 @@ const PostList: React.FC = () => {
               <span className="text-sm text-slate-400 font-medium">{post.id}</span>
               <span className="text-sm font-semibold text-slate-800 truncate">{post.title}</span>
               <div className="flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                  style={{ backgroundColor: getAvatarColor(post.author.username) }}
-                >
-                  {getInitials(post.author.username)}
-                </div>
-                <span className="text-sm text-slate-600 truncate">{post.author.username}</span>
+                {post.author ? (
+                  <>
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                      style={{ backgroundColor: getAvatarColor(post.author.username) }}
+                    >
+                      {getInitials(post.author.username)}
+                    </div>
+                    <span className="text-sm text-slate-600 truncate">{post.author.username}</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-200 text-slate-400 text-xs font-bold shrink-0">
+                      ?
+                    </div>
+                    <span className="text-sm text-slate-400 italic truncate">탈퇴한 사용자</span>
+                  </>
+                )}
               </div>
               <span className="text-sm text-slate-400">{timeAgo(post.createdAt)}</span>
               <div className="flex items-center justify-end gap-1.5 text-sm text-slate-400">

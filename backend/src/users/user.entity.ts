@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, DeleteDateColumn } from 'typeorm';
 
 @Entity('users')
 export class User {
@@ -13,6 +13,9 @@ export class User {
 
   @Column()
   password!: string;
+
+  @DeleteDateColumn({ type: 'timestamptz' })
+  deletedAt?: Date;
 }
 
 // User without password - safe to return to client

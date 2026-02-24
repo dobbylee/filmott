@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, Eye, ArrowRight, EyeOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import { getErrorMessage } from '../utils/error';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
@@ -29,8 +30,8 @@ const Login: React.FC = () => {
       });
       login(response.data.access_token, response.data.user);
       // Removed navigate('/') to let App.tsx handle redirect based on state
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to login. Please check your credentials.'));
     } finally {
       setIsLoading(false);
     }
