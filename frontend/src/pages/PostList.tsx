@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, PenSquare, LogOut, Settings } from 'lucide-react';
+import { Eye, PenSquare, LogOut, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { timeAgo } from '../utils/timeAgo';
+
+const LIMIT = 20;
 
 interface PostItem {
   id: number;
@@ -14,6 +16,14 @@ interface PostItem {
     id: number;
     username: string;
   };
+}
+
+interface PaginatedPosts {
+  data: PostItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 // Generate initials from username
@@ -40,13 +50,22 @@ const PostList: React.FC = () => {
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const { isAuthenticated, user, logout } = useAuth();
 
   useEffect(() => {
     const fetchPosts = async () => {
+      setIsLoading(true);
       try {
-        const response = await api.get<PostItem[]>('/posts');
-        setPosts(response.data);
+        const response = await api.get<PaginatedPosts>('/posts', {
+          params: { page: currentPage, limit: LIMIT },
+        });
+        const { data, total: t, totalPages: tp } = response.data;
+        setPosts(data);
+        setTotal(t);
+        setTotalPages(tp);
       } catch (error) {
         console.error('Failed to fetch posts', error);
       } finally {
@@ -54,7 +73,10 @@ const PostList: React.FC = () => {
       }
     };
     fetchPosts();
-  }, []);
+  }, [currentPage]);
+
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * LIMIT + 1;
+  const rangeEnd = Math.min(currentPage * LIMIT, total);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -128,15 +150,15 @@ const PostList: React.FC = () => {
           <div className="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
             {/* Search Bar Placeholder */}
             <div className="relative w-full md:w-64 hidden sm:block">
-              <input 
-                type="text" 
-                placeholder="Search discussions..." 
+              <input
+                type="text"
+                placeholder="Search discussions..."
                 className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-shadow"
                 disabled
               />
               <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             </div>
-            
+
             {isAuthenticated && (
               <Link to="/posts/new" className="shrink-0 flex-1 sm:flex-none">
                 <button className="w-full flex justify-center items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm shadow-blue-500/20">
@@ -155,7 +177,10 @@ const PostList: React.FC = () => {
             <button className="px-4 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-full transition-colors">Popular</button>
           </div>
           <div className="text-sm text-slate-500">
-            Showing <span className="font-bold text-slate-700">1-{posts.length}</span> of <span className="font-bold text-slate-700">{posts.length}</span> posts
+            Showing{' '}
+            <span className="font-bold text-slate-700">{rangeStart === 0 ? 0 : `${rangeStart}-${rangeEnd}`}</span>
+            {' '}of{' '}
+            <span className="font-bold text-slate-700">{total}</span> posts
           </div>
         </div>
 
@@ -219,6 +244,36 @@ const PostList: React.FC = () => {
             </Link>
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <button
+              onClick={() => setCurrentPage((p) => p - 1)}
+              disabled={currentPage === 1}
+              aria-label="Previous"
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </button>
+
+            <span className="px-4 py-2 text-sm text-slate-500">
+              Page <span className="font-bold text-slate-700">{currentPage}</span> of{' '}
+              <span className="font-bold text-slate-700">{totalPages}</span>
+            </span>
+
+            <button
+              onClick={() => setCurrentPage((p) => p + 1)}
+              disabled={currentPage === totalPages}
+              aria-label="Next"
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );

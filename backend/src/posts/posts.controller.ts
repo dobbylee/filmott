@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   UseGuards,
   HttpCode,
@@ -14,6 +15,7 @@ import {
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/decorators/current-user.decorator';
@@ -22,10 +24,10 @@ import type { JwtPayload } from '../auth/decorators/current-user.decorator';
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
-  // Public: anyone can view posts
+  // Public: anyone can view posts (paginated)
   @Get()
-  findAll() {
-    return this.postsService.findAll();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.postsService.findAll(query);
   }
 
   // Public: anyone can view a post (increments view count)

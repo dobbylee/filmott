@@ -8,8 +8,17 @@ import { Repository } from 'typeorm';
 import { Post } from './post.entity';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { PaginationQueryDto } from './dto/pagination-query.dto';
 import type { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { User } from '../users/user.entity';
+
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
 @Injectable()
 export class PostsService {
@@ -18,10 +27,23 @@ export class PostsService {
     private readonly postsRepo: Repository<Post>,
   ) {}
 
-  async findAll(): Promise<Post[]> {
-    return this.postsRepo.find({
+  async findAll(query: PaginationQueryDto): Promise<PaginatedResult<Post>> {
+    const { page, limit } = query;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.postsRepo.findAndCount({
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: number): Promise<Post> {

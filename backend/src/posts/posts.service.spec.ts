@@ -9,6 +9,7 @@ describe('PostsService', () => {
 
   const mockPostsRepo = {
     find: jest.fn(),
+    findAndCount: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
@@ -29,6 +30,58 @@ describe('PostsService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('findAll', () => {
+    it('should return paginated result with data, total, page, limit, totalPages', async () => {
+      const mockPosts = [
+        { id: 2, title: 'Post 2' },
+        { id: 1, title: 'Post 1' },
+      ];
+      mockPostsRepo.findAndCount.mockResolvedValue([mockPosts, 2]);
+
+      const result = await service.findAll({ page: 1, limit: 20 });
+
+      expect(result).toEqual({
+        data: mockPosts,
+        total: 2,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+      });
+      expect(mockPostsRepo.findAndCount).toHaveBeenCalledWith({
+        order: { createdAt: 'DESC' },
+        skip: 0,
+        take: 20,
+      });
+    });
+
+    it('should calculate skip as (page - 1) * limit', async () => {
+      mockPostsRepo.findAndCount.mockResolvedValue([[], 50]);
+
+      await service.findAll({ page: 3, limit: 10 });
+
+      expect(mockPostsRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 10 }),
+      );
+    });
+
+    it('should calculate totalPages correctly using Math.ceil', async () => {
+      mockPostsRepo.findAndCount.mockResolvedValue([[], 25]);
+
+      const result = await service.findAll({ page: 1, limit: 10 });
+
+      expect(result.totalPages).toBe(3);
+    });
+
+    it('should return totalPages of 0 when there are no posts', async () => {
+      mockPostsRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      const result = await service.findAll({ page: 1, limit: 20 });
+
+      expect(result.total).toBe(0);
+      expect(result.totalPages).toBe(0);
+    });
   });
 
   describe('update', () => {
