@@ -81,6 +81,6 @@ describe('AuthContext', () => {
       expect(window.localStorage.getItem('access_token')).toBeNull();
     });
     expect(result.current.isAuthenticated).toBe(false);
-    expect(localStorage.getItem('token')).toBeNull();
+    expect(localStorage.getItem('access_token')).toBeNull();
   });
 });
