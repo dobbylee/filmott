@@ -85,4 +85,3 @@ dist-ssr
 
 # Claude Code agent settings
 .claude/
-CLAUDE.md
