@@ -53,15 +53,30 @@ const PostList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const { isAuthenticated, user, logout } = useAuth();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     const fetchPosts = async () => {
       setIsLoading(true);
       try {
-        const response = await api.get<PaginatedPosts>('/posts', {
-          params: { page: currentPage, limit: LIMIT },
-        });
+        const params: Record<string, string | number> = { page: currentPage, limit: LIMIT };
+        if (debouncedSearch) {
+          params.search = debouncedSearch;
+        }
+        const response = await api.get<PaginatedPosts>('/posts', { params });
         const { data, total: t, totalPages: tp } = response.data;
         setPosts(data);
         setTotal(t);
@@ -73,7 +88,7 @@ const PostList: React.FC = () => {
       }
     };
     fetchPosts();
-  }, [currentPage]);
+  }, [currentPage, debouncedSearch]);
 
   const rangeStart = total === 0 ? 0 : (currentPage - 1) * LIMIT + 1;
   const rangeEnd = Math.min(currentPage * LIMIT, total);
@@ -148,13 +163,14 @@ const PostList: React.FC = () => {
             <p className="text-slate-500 border-none">Join the conversation, share knowledge, and learn from others.</p>
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
-            {/* Search Bar Placeholder */}
-            <div className="relative w-full md:w-64 hidden sm:block">
+            {/* Search Bar */}
+            <div className="relative w-full md:w-64">
               <input
                 type="text"
                 placeholder="Search discussions..."
                 className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-shadow"
-                disabled
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
               <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             </div>
