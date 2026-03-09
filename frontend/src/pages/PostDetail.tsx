@@ -46,7 +46,7 @@ const PostDetailPage: React.FC = () => {
   }, [id, navigate]);
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    if (!window.confirm('정말로 이 게시글을 삭제하시겠습니까?')) return;
     try {
       await api.delete(`/posts/${id}`);
       navigate('/posts');
@@ -58,7 +58,7 @@ const PostDetailPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-slate-400">Loading post...</p>
+        <p className="text-slate-400">게시글을 불러오는 중...</p>
       </div>
     );
   }
@@ -76,7 +76,7 @@ const PostDetailPage: React.FC = () => {
           className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-500 mb-6 font-medium transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Discussions
+          목록으로
         </Link>
 
         {/* Post card */}
@@ -93,14 +93,14 @@ const PostDetailPage: React.FC = () => {
                   className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-blue-500 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
                 >
                   <Pencil className="w-4 h-4" />
-                  Edit
+                  수정
                 </button>
                 <button
                   onClick={handleDelete}
                   className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete
+                  삭제
                 </button>
               </div>
             )}
@@ -111,7 +111,7 @@ const PostDetailPage: React.FC = () => {
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <UserIcon className="w-4 h-4" />
               <span className="font-semibold text-slate-700">
-                {post.author ? post.author.username : 'Deleted User'}
+                {post.author ? post.author.username : '탈퇴한 사용자'}
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-sm text-slate-400">
@@ -120,7 +120,7 @@ const PostDetailPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5 text-sm text-slate-400">
               <Eye className="w-4 h-4" />
-              <span>{post.views} views</span>
+              <span>조회수 {post.views}</span>
             </div>
           </div>
 

@@ -17,7 +17,7 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      setError('Please fill in all fields.');
+      setError('모든 항목을 입력해주세요.');
       return;
     }
     setError('');
@@ -31,7 +31,7 @@ const Login: React.FC = () => {
       login(response.data.access_token, response.data.user);
       // Removed navigate('/') to let App.tsx handle redirect based on state
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to login. Please check your credentials.'));
+      setError(getErrorMessage(err, '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.'));
     } finally {
       setIsLoading(false);
     }
@@ -40,9 +40,9 @@ const Login: React.FC = () => {
     <div className="w-full max-w-md flex flex-col items-center">
       {/* Footer Text for small screens (usually inside Layout but we keep the main card here) */}
       <div className="bg-white rounded-2xl shadow-xl w-full p-8 md:p-10 border border-slate-100/50">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h1>
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">다시 오셨군요</h1>
         <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-          Log in to access your learning dashboard and continue your progress.
+          로그인하고 게시판을 이용해보세요.
         </p>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
@@ -55,7 +55,7 @@ const Login: React.FC = () => {
           {/* Email */}
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-slate-900 block" htmlFor="email">
-              Email address
+              이메일
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -77,10 +77,10 @@ const Login: React.FC = () => {
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <label className="text-sm font-semibold text-slate-900 block" htmlFor="password">
-                Password
+                비밀번호
               </label>
               <a href="#" className="text-xs font-semibold text-blue-500 hover:text-blue-600">
-                Forgot password?
+                비밀번호를 잊으셨나요?
               </a>
             </div>
             <div className="relative">
@@ -113,7 +113,7 @@ const Login: React.FC = () => {
             disabled={isLoading}
             className="w-full flex justify-center items-center py-3 px-4 mt-2 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-70"
           >
-            {isLoading ? 'Logging in...' : 'Log In'} <ArrowRight className="ml-2 h-4 w-4" />
+            {isLoading ? '로그인 중...' : '로그인'} <ArrowRight className="ml-2 h-4 w-4" />
           </button>
         </form>
 
@@ -124,7 +124,7 @@ const Login: React.FC = () => {
           </div>
           <div className="relative flex justify-center text-xs">
             <span className="px-2 bg-white text-slate-500 font-medium tracking-wide">
-              or continue with
+              또는 소셜 로그인
             </span>
           </div>
         </div>
@@ -145,9 +145,9 @@ const Login: React.FC = () => {
 
         {/* Footer Link */}
         <p className="mt-8 text-center text-sm text-slate-500 font-medium">
-          Don't have an account?{' '}
+          계정이 없으신가요?{' '}
           <Link to="/signup" className="text-blue-500 hover:text-blue-600 font-bold tracking-wide">
-            Sign Up
+            회원가입
           </Link>
         </p>
       </div>

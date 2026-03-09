@@ -34,11 +34,11 @@ const PostForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) {
-      setError('Please fill in both the title and content.');
+      setError('제목과 내용을 모두 입력해주세요.');
       return;
     }
     if (content.trim().length < 10) {
-      setError('Content must be at least 10 characters long.');
+      setError('내용은 최소 10자 이상 입력해주세요.');
       return;
     }
 
@@ -54,7 +54,7 @@ const PostForm: React.FC = () => {
         navigate(`/posts/${response.data.id}`);
       }
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to save post.'));
+      setError(getErrorMessage(err, '게시글 저장에 실패했습니다.'));
     } finally {
       setIsLoading(false);
     }
@@ -67,21 +67,21 @@ const PostForm: React.FC = () => {
         <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
           <Link to="/posts" className="hover:text-blue-500 transition-colors flex items-center gap-1.5">
             <ArrowLeft className="w-4 h-4" />
-            Back to Feed
+            목록으로
           </Link>
           <span className="text-slate-300">/</span>
           <span className="text-slate-700 font-medium">
-            {isEditMode ? 'Edit Post' : 'Create Post'}
+            {isEditMode ? '게시글 수정' : '새 글 작성'}
           </span>
         </div>
 
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-900 mb-1">
-            {isEditMode ? 'Edit your post' : 'Create a new post'}
+            {isEditMode ? '게시글 수정' : '새 글 작성'}
           </h1>
           <p className="text-slate-500">
-            Share your knowledge with the developer community.
+            커뮤니티에 지식을 공유해보세요.
           </p>
         </div>
 
@@ -99,7 +99,7 @@ const PostForm: React.FC = () => {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter a captivating title..."
+              placeholder="제목을 입력해주세요..."
               className="w-full text-2xl font-bold text-slate-900 placeholder:text-slate-300 placeholder:font-normal border-none outline-none mb-6 bg-transparent"
               disabled={isLoading}
             />
@@ -110,7 +110,7 @@ const PostForm: React.FC = () => {
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Write your thoughts here... Explain your idea, tutorial, or question in detail."
+              placeholder="내용을 입력해주세요... 아이디어, 튜토리얼, 질문 등을 자세히 적어보세요."
               rows={16}
               className="w-full text-sm text-slate-700 placeholder:text-slate-400 border-none outline-none resize-y leading-relaxed bg-transparent"
               disabled={isLoading}
@@ -125,7 +125,7 @@ const PostForm: React.FC = () => {
               className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               disabled={isLoading}
             >
-              Cancel
+              취소
             </button>
             <button
               type="submit"
@@ -134,10 +134,10 @@ const PostForm: React.FC = () => {
             >
               <Send className="w-4 h-4" />
               {isLoading
-                ? 'Saving...'
+                ? '저장 중...'
                 : isEditMode
-                  ? 'Update Post'
-                  : 'Publish Post'}
+                  ? '수정하기'
+                  : '게시하기'}
             </button>
           </div>
         </form>
