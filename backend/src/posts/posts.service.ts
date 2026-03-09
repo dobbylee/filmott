@@ -39,9 +39,10 @@ export class PostsService {
       .take(limit);
 
     if (search) {
+      const escaped = search.replace(/[%_\\]/g, '\\$&');
       qb.where(
         'post.title ILIKE :search OR post.content ILIKE :search',
-        { search: `%${search}%` },
+        { search: `%${escaped}%` },
       );
     }
 
@@ -57,7 +58,7 @@ export class PostsService {
   }
 
   async findOne(id: number): Promise<Post> {
-    const post = await this.postsRepo.findOne({ where: { id } });
+    const post = await this.postsRepo.findOne({ where: { id }, relations: ['author'] });
     if (!post) {
       throw new NotFoundException(`Post #${id} not found`);
     }

@@ -46,6 +46,12 @@ const Profile: React.FC = () => {
       return;
     }
 
+    // confirmPassword only — missing new password
+    if (confirmPassword && !newPassword) {
+      setError('새 비밀번호를 입력해주세요.');
+      return;
+    }
+
     // currentPassword only — missing new password
     if (currentPassword && !newPassword) {
       setError('새 비밀번호를 입력해주세요.');

@@ -1,7 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import React from 'react';
 import PostList from './PostList';
 import { api } from '../api';
 
@@ -48,6 +47,63 @@ const renderPostList = () =>
       <PostList />
     </MemoryRouter>,
   );
+
+describe('PostList - Search', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sends search param to API after debounce', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: makePaginatedResponse(2, 1),
+    });
+
+    renderPostList();
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/posts', {
+        params: { page: 1, limit: LIMIT },
+      });
+    });
+
+    const input = screen.getByPlaceholderText('게시글 검색...');
+    fireEvent.change(input, { target: { value: '테스트' } });
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/posts', {
+        params: { page: 1, limit: LIMIT, search: '테스트' },
+      });
+    }, { timeout: 1000 });
+  });
+
+  it('resets to page 1 when search term changes', async () => {
+    (api.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ data: makePaginatedResponse(25, 1) })
+      .mockResolvedValueOnce({ data: makePaginatedResponse(25, 2) })
+      .mockResolvedValue({ data: makePaginatedResponse(2, 1) });
+
+    renderPostList();
+
+    await waitFor(() => screen.getByText('Post 1'));
+
+    fireEvent.click(screen.getByRole('button', { name: /다음/i }));
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/posts', {
+        params: { page: 2, limit: LIMIT },
+      });
+    });
+
+    const input = screen.getByPlaceholderText('게시글 검색...');
+    fireEvent.change(input, { target: { value: '영화' } });
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/posts', {
+        params: { page: 1, limit: LIMIT, search: '영화' },
+      });
+    }, { timeout: 1000 });
+  });
+});
 
 describe('PostList - Pagination', () => {
   beforeEach(() => {

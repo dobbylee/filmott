@@ -64,15 +64,21 @@ const PostList: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearch]);
+  const prevDebouncedSearchRef = React.useRef(debouncedSearch);
 
   useEffect(() => {
+    const searchChanged = prevDebouncedSearchRef.current !== debouncedSearch;
+    prevDebouncedSearchRef.current = debouncedSearch;
+
+    const page = searchChanged ? 1 : currentPage;
+    if (searchChanged) {
+      setCurrentPage(1);
+    }
+
     const fetchPosts = async () => {
       setIsLoading(true);
       try {
-        const params: Record<string, string | number> = { page: currentPage, limit: LIMIT };
+        const params: Record<string, string | number> = { page, limit: LIMIT };
         if (debouncedSearch) {
           params.search = debouncedSearch;
         }
@@ -110,7 +116,7 @@ const PostList: React.FC = () => {
               >
                 <div className="flex flex-col items-end mr-1 hidden sm:flex">
                   <span className="text-sm font-bold text-slate-800 leading-tight">{user.username}</span>
-                  <span className="text-xs text-slate-500">Member</span>
+                  <span className="text-xs text-slate-500">회원</span>
                 </div>
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm"
@@ -131,14 +137,14 @@ const PostList: React.FC = () => {
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
                     >
                       <Settings className="w-4 h-4" />
-                      Edit Profile
+                      프로필 수정
                     </Link>
                     <button
                       onClick={logout}
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
-                      Log Out
+                      로그아웃
                     </button>
                   </div>
                 )}
@@ -146,7 +152,7 @@ const PostList: React.FC = () => {
             ) : (
               <Link to="/login">
                 <button className="text-sm font-semibold text-blue-500 hover:text-blue-600 px-4 py-2.5 rounded-lg hover:bg-blue-50 transition-colors">
-                  Log In
+                  로그인
                 </button>
               </Link>
             )}
@@ -159,15 +165,15 @@ const PostList: React.FC = () => {
         {/* Title & Top Actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-1">Discussion Board</h1>
-            <p className="text-slate-500 border-none">Join the conversation, share knowledge, and learn from others.</p>
+            <h1 className="text-3xl font-bold text-slate-900 mb-1">게시판</h1>
+            <p className="text-slate-500 border-none">자유롭게 소통하고 지식을 나눠보세요.</p>
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
             {/* Search Bar */}
             <div className="relative w-full md:w-64">
               <input
                 type="text"
-                placeholder="Search discussions..."
+                placeholder="게시글 검색..."
                 className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-shadow"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -179,7 +185,7 @@ const PostList: React.FC = () => {
               <Link to="/posts/new" className="shrink-0 flex-1 sm:flex-none">
                 <button className="w-full flex justify-center items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm shadow-blue-500/20">
                   <PenSquare className="w-4 h-4" />
-                  Write Post
+                  새 글 쓰기
                 </button>
               </Link>
             )}
@@ -189,14 +195,13 @@ const PostList: React.FC = () => {
         {/* Filters & Count Row */}
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center bg-white p-1 rounded-full border border-slate-200 shadow-sm">
-            <button className="px-4 py-1.5 text-sm font-semibold text-blue-600 bg-blue-50 rounded-full">All Posts</button>
-            <button className="px-4 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-full transition-colors">Popular</button>
+            <button className="px-4 py-1.5 text-sm font-semibold text-blue-600 bg-blue-50 rounded-full">전체 글</button>
+            <button className="px-4 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-full transition-colors">인기 글</button>
           </div>
           <div className="text-sm text-slate-500">
-            Showing{' '}
             <span className="font-bold text-slate-700">{rangeStart === 0 ? 0 : `${rangeStart}-${rangeEnd}`}</span>
-            {' '}of{' '}
-            <span className="font-bold text-slate-700">{total}</span> posts
+            {' '}/ {' '}
+            <span className="font-bold text-slate-700">{total}</span>개 게시글
           </div>
         </div>
 
@@ -205,21 +210,21 @@ const PostList: React.FC = () => {
           {/* Table Header */}
           <div className="grid grid-cols-[60px_1fr_180px_120px_80px] gap-4 px-6 py-3 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider">
             <span>No.</span>
-            <span>Title</span>
-            <span>Author</span>
-            <span>Date</span>
-            <span className="text-right">Views</span>
+            <span>제목</span>
+            <span>작성자</span>
+            <span>날짜</span>
+            <span className="text-right">조회수</span>
           </div>
 
           {/* Loading */}
           {isLoading && (
-            <div className="px-6 py-16 text-center text-slate-400 text-sm">Loading posts...</div>
+            <div className="px-6 py-16 text-center text-slate-400 text-sm">게시글을 불러오는 중...</div>
           )}
 
           {/* Empty State */}
           {!isLoading && posts.length === 0 && (
             <div className="px-6 py-16 text-center text-slate-400 text-sm">
-              No posts yet. Be the first to write one!
+              게시글이 없습니다. 첫 번째 글을 작성해보세요!
             </div>
           )}
 
@@ -248,7 +253,7 @@ const PostList: React.FC = () => {
                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-200 text-slate-400 text-xs font-bold shrink-0">
                       ?
                     </div>
-                    <span className="text-sm text-slate-400 italic truncate">Deleted User</span>
+                    <span className="text-sm text-slate-400 italic truncate">탈퇴한 사용자</span>
                   </>
                 )}
               </div>
@@ -267,25 +272,25 @@ const PostList: React.FC = () => {
             <button
               onClick={() => setCurrentPage((p) => p - 1)}
               disabled={currentPage === 1}
-              aria-label="Previous"
+              aria-label="이전"
               className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
-              Previous
+              이전
             </button>
 
             <span className="px-4 py-2 text-sm text-slate-500">
-              Page <span className="font-bold text-slate-700">{currentPage}</span> of{' '}
-              <span className="font-bold text-slate-700">{totalPages}</span>
+              <span className="font-bold text-slate-700">{currentPage}</span>{' '}
+              / <span className="font-bold text-slate-700">{totalPages}</span> 페이지
             </span>
 
             <button
               onClick={() => setCurrentPage((p) => p + 1)}
               disabled={currentPage === totalPages}
-              aria-label="Next"
+              aria-label="다음"
               className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              Next
+              다음
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
