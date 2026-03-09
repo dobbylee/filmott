@@ -89,8 +89,8 @@ describe('PostList - Pagination', () => {
     renderPostList();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /previous/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /이전/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /다음/i })).toBeInTheDocument();
     });
   });
 
@@ -102,8 +102,8 @@ describe('PostList - Pagination', () => {
     renderPostList();
 
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /previous/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /next/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /이전/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /다음/i })).not.toBeInTheDocument();
     });
   });
 
@@ -115,7 +115,7 @@ describe('PostList - Pagination', () => {
     renderPostList();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /이전/i })).toBeDisabled();
     });
   });
 
@@ -127,13 +127,13 @@ describe('PostList - Pagination', () => {
     renderPostList();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /다음/i })).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /next/i }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /다음/i })).toBeDisabled();
     });
   });
 
@@ -148,7 +148,7 @@ describe('PostList - Pagination', () => {
       expect(screen.getByText('Post 1')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /next/i }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/i }));
 
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/posts', {
@@ -167,10 +167,10 @@ describe('PostList - Pagination', () => {
 
     await waitFor(() => screen.getByText('Post 1'));
 
-    fireEvent.click(screen.getByRole('button', { name: /next/i }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/i }));
     await waitFor(() => screen.getByText('Post 21'));
 
-    fireEvent.click(screen.getByRole('button', { name: /previous/i }));
+    fireEvent.click(screen.getByRole('button', { name: /이전/i }));
 
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/posts', {

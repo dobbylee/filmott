@@ -20,15 +20,15 @@ const SignUp: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !email || !password || !confirmPassword) {
-      setError('Please fill in all fields.');
+      setError('모든 항목을 입력해주세요.');
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError('비밀번호가 일치하지 않습니다.');
       return;
     }
     if (!agreeTerms) {
-      setError('You must agree to the Terms of Service and Privacy Policy.');
+      setError('이용약관 및 개인정보처리방침에 동의해주세요.');
       return;
     }
     setError('');
@@ -42,7 +42,7 @@ const SignUp: React.FC = () => {
       });
       navigate('/login'); // Redirect to login on successful signup
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to create account. Username or email might be taken.'));
+      setError(getErrorMessage(err, '계정 생성에 실패했습니다. 이미 사용 중인 사용자명 또는 이메일일 수 있습니다.'));
     } finally {
       setIsLoading(false);
     }
@@ -56,9 +56,9 @@ const SignUp: React.FC = () => {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 mb-1.5">Join the Board</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1.5">회원가입</h1>
           <p className="text-slate-500 text-sm">
-            Start your learning journey today.
+            지금 바로 커뮤니티에 참여하세요.
           </p>
         </div>
 
@@ -72,7 +72,7 @@ const SignUp: React.FC = () => {
           {/* Username */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-800 tracking-wide block" htmlFor="username">
-              Username
+              사용자명
             </label>
             <div className="relative">
               <input
@@ -80,7 +80,7 @@ const SignUp: React.FC = () => {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Choose a username"
+                placeholder="사용자명을 입력해주세요"
                 className="block w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-shadow"
                 disabled={isLoading}
               />
@@ -93,7 +93,7 @@ const SignUp: React.FC = () => {
           {/* Email */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-800 tracking-wide block" htmlFor="email">
-              Email
+              이메일
             </label>
             <div className="relative">
               <input
@@ -101,7 +101,7 @@ const SignUp: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                placeholder="이메일을 입력해주세요"
                 className="block w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-shadow"
                 disabled={isLoading}
               />
@@ -115,7 +115,7 @@ const SignUp: React.FC = () => {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-800 tracking-wide block" htmlFor="password">
-                Password
+                비밀번호
               </label>
               <div className="relative">
                 <input
@@ -140,7 +140,7 @@ const SignUp: React.FC = () => {
             
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-800 tracking-wide block" htmlFor="confirm">
-                Confirm
+                비밀번호 확인
               </label>
               <div className="relative">
                 <input
@@ -177,10 +177,9 @@ const SignUp: React.FC = () => {
             </div>
             <div className="ml-2.5 text-xs text-slate-600">
               <label htmlFor="terms" className="font-medium">
-                I agree to the {' '}
-                <a href="#" className="font-bold text-blue-500 hover:text-blue-600 hover:underline">Terms of Service</a>
-                {' '}and{' '}
-                <a href="#" className="font-bold text-blue-500 hover:text-blue-600 hover:underline">Privacy Policy</a>.
+                <a href="#" className="font-bold text-blue-500 hover:text-blue-600 hover:underline">이용약관</a>
+                {' '}및{' '}
+                <a href="#" className="font-bold text-blue-500 hover:text-blue-600 hover:underline">개인정보처리방침</a>에 동의합니다.
               </label>
             </div>
           </div>
@@ -191,15 +190,15 @@ const SignUp: React.FC = () => {
             disabled={isLoading}
             className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm shadow-blue-500/30 text-sm font-bold text-white bg-[color:var(--color-primary-500)] hover:bg-[color:var(--color-primary-600)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors mt-2 disabled:opacity-70"
           >
-            {isLoading ? 'Creating Account...' : 'Create Account'}
+            {isLoading ? '계정 생성 중...' : '계정 만들기'}
           </button>
         </form>
 
         {/* Footer Link */}
         <p className="mt-8 text-center text-sm text-slate-500 font-medium">
-          Already have an account?{' '}
+          이미 계정이 있으신가요?{' '}
           <Link to="/login" className="text-blue-500 hover:text-blue-600 font-bold tracking-wide">
-            Log in
+            로그인
           </Link>
         </p>
       </div>

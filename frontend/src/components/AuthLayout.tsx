@@ -17,7 +17,7 @@ const AuthLayout: React.FC = () => {
           <span>PostBoard</span>
         </Link>
         <Link to="/" className="text-sm text-slate-500 hover:text-blue-600 font-medium transition-colors">
-          ← Browse Posts
+          ← 게시판 둘러보기
         </Link>
       </header>
 

@@ -28,31 +28,31 @@ describe('Profile Page Form Validation', () => {
     renderProfile();
 
     // Fill new password but leave current blank
-    const newPasswordInput = screen.getByPlaceholderText(/^new password$/i);
+    const newPasswordInput = screen.getByPlaceholderText(/^새 비밀번호$/i);
     fireEvent.change(newPasswordInput, { target: { value: 'newpass123' } });
 
     // Submit form
-    const saveButton = screen.getByText(/save changes/i);
+    const saveButton = screen.getByText(/^저장$/i);
     fireEvent.click(saveButton);
 
-    expect(await screen.findByText(/Current password is required to change password/i)).toBeInTheDocument();
+    expect(await screen.findByText(/비밀번호 변경을 위해 현재 비밀번호를 입력해주세요/i)).toBeInTheDocument();
   });
 
   it('should display error if new passwords do not match', async () => {
     renderProfile();
 
-    const currentPassInput = screen.getByPlaceholderText(/leave blank if not changing/i);
-    const newPassInput = screen.getByPlaceholderText(/^new password$/i);
-    const confirmPassInput = screen.getByPlaceholderText(/confirm new password/i);
+    const currentPassInput = screen.getByPlaceholderText(/변경하지 않을 경우 비워두세요/i);
+    const newPassInput = screen.getByPlaceholderText(/^새 비밀번호$/i);
+    const confirmPassInput = screen.getByPlaceholderText(/새 비밀번호 확인/i);
 
     fireEvent.change(currentPassInput, { target: { value: 'oldpass123' } });
     fireEvent.change(newPassInput, { target: { value: 'newpass123' } });
     fireEvent.change(confirmPassInput, { target: { value: 'mismatch123' } });
 
-    const saveButton = screen.getByText(/save changes/i);
+    const saveButton = screen.getByText(/^저장$/i);
     fireEvent.click(saveButton);
 
-    expect(await screen.findByText(/New passwords do not match/i)).toBeInTheDocument();
+    expect(await screen.findByText(/새 비밀번호가 일치하지 않습니다/i)).toBeInTheDocument();
   });
 
   it('should render email field as disabled/read-only', () => {
