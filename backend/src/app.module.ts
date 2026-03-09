@@ -26,7 +26,8 @@ import { PostsModule } from './posts/posts.module';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
         entities: [User, Post],
-        synchronize: true, // Dev only: auto-create tables from entities
+        synchronize: false,
+        migrations: [__dirname + '/migrations/*{.ts,.js}'],
         extra: {
           options: '-c timezone=Asia/Seoul',
         },
