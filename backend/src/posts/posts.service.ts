@@ -28,14 +28,24 @@ export class PostsService {
   ) {}
 
   async findAll(query: PaginationQueryDto): Promise<PaginatedResult<Post>> {
-    const { page, limit } = query;
+    const { page, limit, search } = query;
     const skip = (page - 1) * limit;
 
-    const [data, total] = await this.postsRepo.findAndCount({
-      order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
-    });
+    const qb = this.postsRepo
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .orderBy('post.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    if (search) {
+      qb.where(
+        'post.title ILIKE :search OR post.content ILIKE :search',
+        { search: `%${search}%` },
+      );
+    }
+
+    const [data, total] = await qb.getManyAndCount();
 
     return {
       data,

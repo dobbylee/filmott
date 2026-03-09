@@ -7,14 +7,30 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 describe('PostsService', () => {
   let service: PostsService;
 
+  const mockQueryBuilder = {
+    leftJoinAndSelect: jest.fn(),
+    orderBy: jest.fn(),
+    skip: jest.fn(),
+    take: jest.fn(),
+    where: jest.fn(),
+    getManyAndCount: jest.fn(),
+  };
+
+  // 각 메서드가 자기 자신을 반환해 체이닝이 가능하도록 설정
+  mockQueryBuilder.leftJoinAndSelect.mockReturnValue(mockQueryBuilder);
+  mockQueryBuilder.orderBy.mockReturnValue(mockQueryBuilder);
+  mockQueryBuilder.skip.mockReturnValue(mockQueryBuilder);
+  mockQueryBuilder.take.mockReturnValue(mockQueryBuilder);
+  mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
+
   const mockPostsRepo = {
     find: jest.fn(),
-    findAndCount: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
     increment: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
   };
 
   beforeEach(async () => {
@@ -38,7 +54,7 @@ describe('PostsService', () => {
         { id: 2, title: 'Post 2' },
         { id: 1, title: 'Post 1' },
       ];
-      mockPostsRepo.findAndCount.mockResolvedValue([mockPosts, 2]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([mockPosts, 2]);
 
       const result = await service.findAll({ page: 1, limit: 20 });
 
@@ -49,25 +65,25 @@ describe('PostsService', () => {
         limit: 20,
         totalPages: 1,
       });
-      expect(mockPostsRepo.findAndCount).toHaveBeenCalledWith({
-        order: { createdAt: 'DESC' },
-        skip: 0,
-        take: 20,
-      });
+      expect(mockPostsRepo.createQueryBuilder).toHaveBeenCalledWith('post');
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('post.author', 'author');
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('post.createdAt', 'DESC');
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
+      expect(mockQueryBuilder.getManyAndCount).toHaveBeenCalled();
     });
 
     it('should calculate skip as (page - 1) * limit', async () => {
-      mockPostsRepo.findAndCount.mockResolvedValue([[], 50]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 50]);
 
       await service.findAll({ page: 3, limit: 10 });
 
-      expect(mockPostsRepo.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 20, take: 10 }),
-      );
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(20);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
     });
 
     it('should calculate totalPages correctly using Math.ceil', async () => {
-      mockPostsRepo.findAndCount.mockResolvedValue([[], 25]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 25]);
 
       const result = await service.findAll({ page: 1, limit: 10 });
 
@@ -75,12 +91,31 @@ describe('PostsService', () => {
     });
 
     it('should return totalPages of 0 when there are no posts', async () => {
-      mockPostsRepo.findAndCount.mockResolvedValue([[], 0]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
       const result = await service.findAll({ page: 1, limit: 20 });
 
       expect(result.total).toBe(0);
       expect(result.totalPages).toBe(0);
+    });
+
+    it('should call where with search condition when search param is provided', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAll({ page: 1, limit: 20, search: '영화' });
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'post.title ILIKE :search OR post.content ILIKE :search',
+        { search: '%영화%' },
+      );
+    });
+
+    it('should not call where when search param is not provided', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAll({ page: 1, limit: 20 });
+
+      expect(mockQueryBuilder.where).not.toHaveBeenCalled();
     });
   });
 
