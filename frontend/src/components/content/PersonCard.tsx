@@ -64,7 +64,7 @@ export default function PersonCard({ person }: PersonCardProps) {
             </span>
           )}
           {knownForTitles && (
-            <p className="mt-1.5 line-clamp-2 text-xs text-white/50">
+            <p className="mt-1.5 line-clamp-1 text-xs text-white/50">
               {knownForTitles}
             </p>
           )}
