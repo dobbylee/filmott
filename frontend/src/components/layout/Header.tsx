@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Search, User, LogOut, Compass, Film, Tv, Home, Menu, X } from 'lucide-react';
+import { Search, LogOut, Compass, Menu, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Header() {
@@ -70,10 +70,8 @@ export default function Header() {
         {/* 데스크톱 네비게이션 & 검색창 */}
         <div className="hidden md:flex flex-1 items-center justify-center gap-10">
           <nav className="flex items-center gap-6">
-            <Link href="/" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">홈</Link>
             <Link href="/discover?type=movie" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">영화</Link>
-            <Link href="/discover?type=tv" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">시리즈</Link>
-            <Link href="/discover" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">탐색</Link>
+            <Link href="/discover?type=tv" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">TV</Link>
           </nav>
           
           <form onSubmit={handleSearch} className="relative w-64 group">
@@ -82,7 +80,7 @@ export default function Header() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="제목, 인물 검색..."
+              placeholder=""
               className="w-full rounded-full border border-white/10 bg-white/5 py-2 pl-9 pr-4 text-sm text-white placeholder-white/40 outline-none focus:border-white/30 focus:bg-white/10 transition-all"
             />
           </form>
@@ -144,17 +142,11 @@ export default function Header() {
       {showMobileMenu && (
         <nav className="absolute top-full left-0 right-0 border-b border-white/10 bg-[#050505]/95 backdrop-blur-xl px-4 py-4 md:hidden shadow-2xl">
           <div className="flex flex-col gap-2">
-            <Link href="/" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-              <Home className="h-5 w-5" /> 홈
-            </Link>
             <Link href="/discover?type=movie" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-              <Film className="h-5 w-5" /> 영화
+              <Compass className="h-5 w-5" /> 영화
             </Link>
             <Link href="/discover?type=tv" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-              <Tv className="h-5 w-5" /> 시리즈
-            </Link>
-            <Link href="/discover" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-              <Compass className="h-5 w-5" /> 탐색
+              <Compass className="h-5 w-5" /> TV
             </Link>
             
             <form onSubmit={(e) => { handleSearch(e); setShowMobileMenu(false); }} className="mt-2 px-2">
@@ -164,7 +156,7 @@ export default function Header() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="작품을 검색해보세요..."
+                  placeholder=""
                   className="w-full rounded-full border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-white/40 outline-none focus:border-white/30"
                 />
               </div>

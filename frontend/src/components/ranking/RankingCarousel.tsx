@@ -1,35 +1,64 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import RankingCard from './RankingCard';
 import type { RankingItem } from './RankingCard';
 
-interface RankingCarouselProps {
-  title: string;
+interface Tab {
+  label: string;
   items: RankingItem[];
 }
 
-export default function RankingCarousel({ title, items }: RankingCarouselProps) {
+interface RankingCarouselProps {
+  title: string;
+  items?: RankingItem[];
+  tabs?: Tab[];
+}
+
+export default function RankingCarousel({ title, items, tabs }: RankingCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState(0);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return;
-    const scrollAmount = 600; // Increased scroll amount for larger cards
     scrollRef.current.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      left: direction === 'left' ? -600 : 600,
       behavior: 'smooth',
     });
   };
 
-  if (items.length === 0) return null;
+  const currentItems = tabs ? tabs[activeTab].items : (items ?? []);
+  if (currentItems.length === 0 && !tabs) return null;
 
   return (
     <section className="relative group/carousel">
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight text-white">{title}</h2>
-        
-        {/* 데스크톱용 외부 화살표 네비게이션 */}
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold tracking-tight text-white">{title}</h2>
+
+          {tabs && (
+            <div className="flex rounded-full bg-white/5 border border-white/10 p-0.5">
+              {tabs.map((tab, i) => (
+                <button
+                  key={tab.label}
+                  onClick={() => {
+                    setActiveTab(i);
+                    scrollRef.current?.scrollTo({ left: 0 });
+                  }}
+                  className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full transition-all duration-200 ${
+                    activeTab === i
+                      ? 'bg-white/15 text-white'
+                      : 'text-white/40 hover:text-white/70'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="hidden sm:flex gap-2 opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-300">
           <button
             onClick={() => scroll('left')}
@@ -47,22 +76,20 @@ export default function RankingCarousel({ title, items }: RankingCarouselProps) 
           </button>
         </div>
       </div>
-      
-      {/* 캐러셀 컨테이너 */}
+
       <div className="relative">
         <div
           ref={scrollRef}
           className="flex gap-4 overflow-x-auto scrollbar-hide pb-6 snap-x snap-mandatory"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          {items.map((item) => (
+          {currentItems.map((item) => (
             <div key={item.id} className="snap-start">
               <RankingCard item={item} />
             </div>
           ))}
         </div>
-        
-        {/* 양끝 그라디언트 마스크 (옵션) */}
+
         <div className="absolute top-0 bottom-6 right-0 w-24 bg-gradient-to-l from-[#050505] to-transparent pointer-events-none hidden sm:block z-10" />
       </div>
     </section>

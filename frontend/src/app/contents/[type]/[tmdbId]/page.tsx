@@ -4,10 +4,10 @@ import Image from 'next/image';
 import { Star, Clock, Calendar } from 'lucide-react';
 import { fetchApi } from '@/lib/fetcher';
 import CastCarousel from '@/components/content/CastCarousel';
-import WatchProviders from '@/components/content/WatchProviders';
 import ReviewList from '@/components/review/ReviewList';
 import ReviewFormWrapper from '@/components/review/ReviewFormWrapper';
-import type { ContentDetail } from '@/types/content';
+import type { ContentDetail, WatchProviderData } from '@/types/content';
+import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { ReviewsResponse, ContentStats } from '@/types/review';
 
 interface ContentDetailPageProps {
@@ -130,19 +130,19 @@ export default async function ContentDetailPage({
     : [];
 
   return (
-    <div>
+    <div className="-mt-20">
       {/* 상단: 백드롭 + 포스터 + 기본 정보 */}
       <div className="relative">
         {/* 백드롭 */}
         {content.backdropUrl && (
-          <div className="relative h-[400px] w-full md:h-[500px]">
+          <div className="relative h-[300px] w-full md:h-[380px]">
             <Image
               src={content.backdropUrl}
               alt={content.title}
               fill
               priority
               sizes="100vw"
-              className="object-cover"
+              className="object-cover object-top"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
           </div>
@@ -156,7 +156,7 @@ export default async function ContentDetailPage({
             }`}
           >
             {/* 포스터 */}
-            <div className="hidden flex-shrink-0 md:block">
+            <div className="hidden flex-shrink-0 md:block -mt-8">
               <div className="relative h-[270px] w-[180px] overflow-hidden rounded-lg shadow-xl md:h-[330px] md:w-[220px]">
                 {content.posterUrl ? (
                   <Image
@@ -221,13 +221,45 @@ export default async function ContentDetailPage({
                   ))}
                 </div>
               )}
+
+              {/* OTT 플랫폼 로고 */}
+              {content.watchProviders && (() => {
+                const providers = (content.watchProviders as WatchProviderData);
+                const all = [
+                  ...(providers.flatrate ?? []),
+                  ...(providers.rent ?? []),
+                  ...(providers.buy ?? []),
+                ];
+                const unique = all
+                  .filter((p, i, arr) => arr.findIndex((x) => x.provider_id === p.provider_id) === i)
+                  .filter((p, i, arr) => !arr.slice(0, i).some((prev) => p.provider_name.startsWith(prev.provider_name)));
+                if (unique.length === 0) return null;
+                return (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {unique.map((p) => (
+                      <div key={p.provider_id} className="group relative">
+                        <Image
+                          src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
+                          alt={p.provider_name}
+                          width={32}
+                          height={32}
+                          className="rounded-md"
+                        />
+                        <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/80 px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                          {p.provider_name}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
       </div>
 
       {/* 중단: 줄거리, 출연진, OTT */}
-      <div className="mx-auto max-w-7xl px-4 py-8 space-y-8">
+      <div className="mx-auto max-w-7xl px-4 pt-20 pb-8 space-y-16">
         {/* 줄거리 */}
         {content.overview && (
           <section>
@@ -243,14 +275,6 @@ export default async function ContentDetailPage({
           <section>
             <h2 className="mb-3 text-lg font-bold">출연진</h2>
             <CastCarousel cast={content.credits} />
-          </section>
-        )}
-
-        {/* OTT 제공 정보 */}
-        {content.watchProviders && (
-          <section>
-            <h2 className="mb-3 text-lg font-bold">시청 가능한 곳</h2>
-            <WatchProviders data={content.watchProviders} />
           </section>
         )}
 

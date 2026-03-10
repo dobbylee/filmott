@@ -49,14 +49,8 @@ export default function FilterBar({
   };
 
   const toggleProvider = (providerId: number) => {
-    const next = selectedProviders.includes(providerId)
-      ? selectedProviders.filter((id) => id !== providerId)
-      : [...selectedProviders, providerId];
-    updateParams({ providers: next.length > 0 ? next.join(',') : undefined });
-  };
-
-  const handleTypeChange = (newType: string) => {
-    updateParams({ type: newType, genres: undefined });
+    const isSelected = selectedProviders.includes(providerId);
+    updateParams({ providers: isSelected ? undefined : String(providerId) });
   };
 
   const handleYearChange = (year: string) => {
@@ -65,30 +59,6 @@ export default function FilterBar({
 
   return (
     <div className="space-y-4">
-      {/* 타입 선택 */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => handleTypeChange('movie')}
-          className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-            type === 'movie'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-          }`}
-        >
-          영화
-        </button>
-        <button
-          onClick={() => handleTypeChange('tv')}
-          className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-            type === 'tv'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-          }`}
-        >
-          TV 프로그램
-        </button>
-      </div>
-
       {/* 장르 필터 */}
       <div>
         <h3 className="mb-2 text-sm font-medium text-muted-foreground">장르</h3>
@@ -99,8 +69,8 @@ export default function FilterBar({
               onClick={() => toggleGenre(genre.id)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 selectedGenres.includes(genre.id)
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  ? 'bg-white/15 text-white'
+                  : 'bg-white/5 text-white/40 hover:text-white/70'
               }`}
             >
               {genre.name}
@@ -119,8 +89,8 @@ export default function FilterBar({
               onClick={() => toggleProvider(provider.id)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 selectedProviders.includes(provider.id)
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  ? 'bg-white/15 text-white'
+                  : 'bg-white/5 text-white/40 hover:text-white/70'
               }`}
             >
               {provider.name}
@@ -135,7 +105,7 @@ export default function FilterBar({
         <select
           value={selectedYear ?? ''}
           onChange={(e) => handleYearChange(e.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-primary"
+          className="appearance-none w-20 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-center outline-none focus:border-primary cursor-pointer"
         >
           <option value="">전체</option>
           {years.map((year) => (

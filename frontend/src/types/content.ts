@@ -145,6 +145,5 @@ export const OTT_PROVIDERS = [
   { id: 97, name: '왓챠', logo: '/t/p/original/681L3YVSY7FVjAufGKoagM17VEh.jpg' },
   { id: 350, name: '애플 TV+', logo: '/t/p/original/6uhKBfmtzFqOcLousHwZuzcrScK.jpg' },
   { id: 119, name: '아마존 프라임', logo: '/t/p/original/emthp39XA2YScoYL1p0sdbAH2WA.jpg' },
-  { id: 1796, name: '쿠팡플레이', logo: '/t/p/original/rRn4jCxJjn7WiGpnOxNPR3jDEMR.jpg' },
-  { id: 2100, name: '티빙', logo: '/t/p/original/cNi4Nv5EPsnvf5WmgkyT1DDho3u.jpg' },
+  { id: 1883, name: '티빙', logo: '/t/p/original/cNi4Nv5EPsnvf5WmgkyT1DDho3u.jpg' },
 ];

@@ -32,7 +32,7 @@ export default function RankingCard({ item }: RankingCardProps) {
   return (
     <Link
       href={href}
-      className="group relative flex-shrink-0 w-[130px] sm:w-[150px] hover:-translate-y-2 transition-all duration-300"
+      className="group block relative flex-shrink-0 w-[160px] sm:w-[220px] hover:-translate-y-2 transition-all duration-300"
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-white/5 border border-white/5 shadow-lg">
         {posterUrl ? (

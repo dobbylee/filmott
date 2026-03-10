@@ -73,6 +73,58 @@ export class RankingsService {
   }
 
   /**
+   * KOBIS 주간 박스오피스를 가져와 rankings에 저장
+   * 매주 월요일 오전 10시 실행 (전주 데이터)
+   */
+  @Cron('0 10 * * 1', { name: 'weekly-box-office', timeZone: 'Asia/Seoul' })
+  async fetchWeeklyBoxOffice(): Promise<Ranking[]> {
+    const lastWeek = this.getLastWeekDate();
+    const targetDate = this.formatDateWithDashes(lastWeek);
+    this.logger.log(`Fetching weekly box office for ${lastWeek}`);
+
+    try {
+      const boxOfficeItems = await this.kobisService.getWeeklyBoxOffice(lastWeek);
+      const fetchedAt = new Date();
+
+      const matchResults = await Promise.allSettled(
+        boxOfficeItems.map((item) => this.matchKobisToTmdb(item.movieNm, item.openDt)),
+      );
+
+      const rankingsToUpsert: Ranking[] = boxOfficeItems.map((item, idx) => {
+        const ranking = this.rankingRepo.create({
+          source: 'kobis',
+          category: 'weekly-box-office',
+          rank: parseInt(item.rank, 10),
+          title: item.movieNm,
+          targetDate,
+          fetchedAt,
+        });
+
+        const result = matchResults[idx];
+        if (result.status === 'fulfilled' && result.value) {
+          ranking.contentId = result.value.id;
+          ranking.posterUrl = result.value.posterUrl;
+        }
+
+        return ranking;
+      });
+
+      await this.rankingRepo.upsert(rankingsToUpsert, [
+        'source',
+        'category',
+        'rank',
+        'targetDate',
+      ]);
+
+      this.logger.log(`Saved ${rankingsToUpsert.length} weekly box office rankings`);
+      return rankingsToUpsert;
+    } catch (error) {
+      this.logger.error('Failed to fetch weekly box office', error);
+      throw error;
+    }
+  }
+
+  /**
    * TMDB 트렌딩을 가져와 rankings에 저장
    * 매일 오전 6시 실행: 모든 trending 카테고리 갱신
    */
@@ -254,6 +306,12 @@ export class RankingsService {
       return parseInt(cleaned.substring(0, 4), 10);
     }
     return null;
+  }
+
+  private getLastWeekDate(): string {
+    const date = new Date();
+    date.setDate(date.getDate() - 7);
+    return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }).replace(/-/g, '');
   }
 
   private getYesterdayDate(): string {

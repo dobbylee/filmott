@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, ArrowRight, Play, Info } from 'lucide-react';
+import { Star, ArrowRight } from 'lucide-react';
 import { fetchApi } from '@/lib/fetcher';
 import RankingCarousel from '@/components/ranking/RankingCarousel';
 import type { RankingItem } from '@/components/ranking/RankingCard';
@@ -11,110 +11,57 @@ import { TMDB_IMAGE_BASE } from '@/types/content';
 
 /* ---- Data Fetchers ---- */
 
-async function fetchBoxOffice(): Promise<RankingItem[]> {
-  return fetchApi<RankingItem[]>('/rankings?source=kobis&category=daily-box-office&limit=10', { cache: 'no-store' });
+async function fetchBoxOffice(category: 'daily-box-office' | 'weekly-box-office'): Promise<RankingItem[]> {
+  return fetchApi<RankingItem[]>(`/rankings?source=kobis&category=${category}&limit=10`, { cache: 'no-store' });
 }
 
-async function fetchTrending(): Promise<RankingItem[]> {
-  return fetchApi<RankingItem[]>('/rankings?source=tmdb&category=trending-all-day&limit=20', { cache: 'no-store' });
+async function fetchTrending(category: 'trending-all-day' | 'trending-all-week'): Promise<RankingItem[]> {
+  return fetchApi<RankingItem[]>(`/rankings?source=tmdb&category=${category}&limit=20`, { cache: 'no-store' });
 }
 
 async function fetchRecentReviews(): Promise<Review[]> {
   return fetchApi<Review[]>('/reviews/recent?limit=10', { cache: 'no-store' });
 }
 
-/* ---- Cinematic Hero Section ---- */
-
-async function HeroSection() {
-  let heroItem: RankingItem | null = null;
-  try {
-    const items = await fetchTrending();
-    if (items.length > 0) heroItem = items[0];
-  } catch {
-    return null;
-  }
-
-  if (!heroItem || !heroItem.content) return null;
-  const content = heroItem.content;
-  const imageUrl = content.posterUrl ? `${TMDB_IMAGE_BASE}/original${content.posterUrl}` : '';
-  const href = `/contents/${content.contentType}/${content.tmdbId}`;
-
-  return (
-    <div className="relative w-full h-[70vh] min-h-[500px] max-h-[800px] flex items-end pb-20 pt-32 -mt-20">
-      {/* Background with Gradient Overlays */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        {imageUrl && (
-          <Image
-            src={imageUrl}
-            alt={content.title}
-            fill
-            className="object-cover object-top opacity-50 contrast-125 saturate-150"
-            priority
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/70 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/50 to-transparent" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(192,38,211,0.15),transparent_50%)]" />
-      </div>
-
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4">
-        <div className="max-w-3xl">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="px-3 py-1 text-xs font-bold tracking-wider text-black bg-white rounded-full">
-              TRENDING #1
-            </span>
-            {content.voteAverage && (
-              <span className="flex items-center gap-1 text-yellow-400 font-medium">
-                <Star className="w-4 h-4 fill-current" />
-                {content.voteAverage.toFixed(1)}
-              </span>
-            )}
-          </div>
-          
-          <h1 className="text-5xl sm:text-7xl font-black mb-4 leading-tight tracking-tighter text-white drop-shadow-2xl">
-            {content.title}
-          </h1>
-          
-          <div className="flex items-center gap-4 mt-8">
-            <Link 
-              href={href}
-              className="flex items-center gap-2 px-8 py-3.5 bg-white text-black rounded-full font-bold hover:scale-105 transition-transform hover:bg-gray-200"
-            >
-              <Play className="w-5 h-5 fill-current" />
-              재생
-            </Link>
-            <Link 
-              href={href}
-              className="flex items-center gap-2 px-8 py-3.5 bg-white/20 text-white rounded-full font-bold backdrop-blur-md hover:bg-white/30 transition-colors border border-white/10"
-            >
-              <Info className="w-5 h-5" />
-              상세 정보
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ---- Sections ---- */
 
 async function BoxOfficeSection() {
   try {
-    const items = await fetchBoxOffice();
-    return <RankingCarousel title="국내 박스오피스 TOP 10" items={items} />;
+    const [daily, weekly] = await Promise.all([
+      fetchBoxOffice('daily-box-office'),
+      fetchBoxOffice('weekly-box-office'),
+    ]);
+    return (
+      <RankingCarousel
+        title="박스오피스"
+        tabs={[
+          { label: '일간', items: daily },
+          { label: '주간', items: weekly },
+        ]}
+      />
+    );
   } catch {
-    return <SectionError title="국내 박스오피스 TOP 10" />;
+    return <SectionError title="박스오피스" />;
   }
 }
 
 async function TrendingSection() {
   try {
-    const items = await fetchTrending();
-    // Use items from 1 onwards since item 0 is in the hero
-    return <RankingCarousel title="지금 뜨고 있는 인기작" items={items.slice(1)} />;
+    const [day, week] = await Promise.all([
+      fetchTrending('trending-all-day'),
+      fetchTrending('trending-all-week'),
+    ]);
+    return (
+      <RankingCarousel
+        title="TMDB 트렌드"
+        tabs={[
+          { label: '일간', items: day },
+          { label: '주간', items: week },
+        ]}
+      />
+    );
   } catch {
-    return <SectionError title="지금 뜨고 있는 인기작" />;
+    return <SectionError title="TMDB 트렌드" />;
   }
 }
 
@@ -160,13 +107,13 @@ function RecentReviewItem({ review }: { review: Review }) {
             {formatDate(review.createdAt)}
           </span>
         </div>
-        
+
         {content && (
           <Link href={href} className="text-base font-bold text-white hover:text-fuchsia-400 transition-colors truncate block mb-2">
             {content.title}
           </Link>
         )}
-        
+
         {review.comment && (
           <p className="text-sm leading-relaxed text-white/70 line-clamp-2">
             {review.hasSpoiler ? <span className="text-red-400/80 italic">스포일러가 포함된 리뷰입니다.</span> : review.comment}
@@ -184,7 +131,7 @@ async function RecentReviewsSection() {
 
     return (
       <section>
-        <div className="mb-6 flex items-center justify-between mt-8">
+        <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold tracking-tight">실시간 생생한 한줄평</h2>
           <Link href="/discover" className="flex items-center gap-1 text-sm font-medium text-white/50 hover:text-white transition-colors">
             더보기 <ArrowRight className="h-4 w-4" />
@@ -241,32 +188,22 @@ function ReviewSkeleton() {
   );
 }
 
-function HeroSkeleton() {
-  return <div className="w-full h-[70vh] min-h-[500px] animate-pulse bg-white/5" />;
-}
-
 /* ---- Page ---- */
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-screen pb-20">
-      <Suspense fallback={<HeroSkeleton />}>
-        <HeroSection />
+    <div className="mx-auto w-full max-w-7xl px-4 space-y-16 pt-8 pb-20">
+      <Suspense fallback={<SectionSkeleton title="박스오피스" />}>
+        <BoxOfficeSection />
       </Suspense>
 
-      <div className="mx-auto w-full max-w-7xl px-4 space-y-16 -mt-12 relative z-20">
-        <Suspense fallback={<SectionSkeleton title="국내 박스오피스 TOP 10" />}>
-          <BoxOfficeSection />
-        </Suspense>
+      <Suspense fallback={<SectionSkeleton title="TMDB 트렌드" />}>
+        <TrendingSection />
+      </Suspense>
 
-        <Suspense fallback={<SectionSkeleton title="지금 뜨고 있는 인기작" />}>
-          <TrendingSection />
-        </Suspense>
-
-        <Suspense fallback={<ReviewSkeleton />}>
-          <RecentReviewsSection />
-        </Suspense>
-      </div>
+      <Suspense fallback={<ReviewSkeleton />}>
+        <RecentReviewsSection />
+      </Suspense>
     </div>
   );
 }

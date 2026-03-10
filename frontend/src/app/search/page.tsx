@@ -68,7 +68,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const page = params.page ? parseInt(params.page, 10) : 1;
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4">
+    <div className="mx-auto w-full max-w-7xl px-4 pt-8">
       <h1 className="mb-6 text-2xl font-bold">
         {query ? `"${query}" 검색 결과` : '작품 검색'}
       </h1>

@@ -10,6 +10,7 @@ export class RankingsController {
   private static readonly VALID_SOURCES = ['kobis', 'tmdb'];
   private static readonly VALID_CATEGORIES = [
     'daily-box-office',
+    'weekly-box-office',
     'trending-all-day',
     'trending-movie-day',
     'trending-tv-day',
@@ -47,6 +48,8 @@ export class RankingsController {
     switch (category) {
       case 'daily-box-office':
         return this.rankingsService.fetchDailyBoxOffice();
+      case 'weekly-box-office':
+        return this.rankingsService.fetchWeeklyBoxOffice();
       case 'trending-all-day':
         return this.rankingsService.fetchTrending('all', 'day');
       case 'trending-movie-day':
