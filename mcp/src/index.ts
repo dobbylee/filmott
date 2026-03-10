@@ -15,7 +15,7 @@ if (!process.env.KOBIS_API_KEY) {
 }
 
 const server = new McpServer({
-  name: 'board-mcp',
+  name: 'filmott-mcp',
   version: '1.0.0',
 });
 

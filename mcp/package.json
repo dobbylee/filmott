@@ -1,5 +1,5 @@
 {
-  "name": "board-mcp-server",
+  "name": "filmott-mcp-server",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
