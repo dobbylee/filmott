@@ -13,7 +13,10 @@ export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 헤더 스크롤 배경 변경
   useEffect(() => {
@@ -36,12 +39,31 @@ export default function Header() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showUserMenu]);
 
+  // 검색창 외부 클릭 시 닫기
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setIsSearchOpen(false);
+        setSearchQuery('');
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isSearchOpen]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery('');
+      setIsSearchOpen(false);
     }
+  };
+
+  const openSearch = () => {
+    setIsSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
   };
 
   const handleLogout = () => {
@@ -58,35 +80,56 @@ export default function Header() {
           : 'bg-transparent border-transparent py-5'
       }`}
     >
-      <div className="mx-auto flex w-full max-w-7xl px-4 items-center justify-between">
-        <Link
-          href="/"
-          className="text-2xl font-black tracking-tight text-white hover-glow transition-all duration-300"
-          style={{ letterSpacing: '-0.05em' }}
-        >
-          film<span className="text-gradient">ott</span>
-        </Link>
-
-        {/* 데스크톱 네비게이션 & 검색창 */}
-        <div className="hidden md:flex flex-1 items-center justify-center gap-10">
-          <nav className="flex items-center gap-6">
-            <Link href="/discover?type=movie" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">영화</Link>
-            <Link href="/discover?type=tv" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">TV</Link>
-          </nav>
-          
-          <form onSubmit={handleSearch} className="relative w-64 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-white/80 transition-colors" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder=""
-              className="w-full rounded-full border border-white/10 bg-white/5 py-2 pl-9 pr-4 text-sm text-white placeholder-white/40 outline-none focus:border-white/30 focus:bg-white/10 transition-all"
-            />
-          </form>
+      <div className="mx-auto flex w-full max-w-7xl px-4 items-center">
+        {/* 왼쪽: 로고 */}
+        <div className="flex-1">
+          <Link
+            href="/"
+            className="text-3xl font-black tracking-tight text-white hover-glow transition-all duration-300"
+            style={{ letterSpacing: '-0.05em' }}
+          >
+            film<span className="text-gradient">ott</span>
+          </Link>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* 중앙: 네비게이션 */}
+        <nav className="hidden md:flex items-center gap-6">
+          <Link href="/discover?type=movie" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">영화</Link>
+          <Link href="/discover?type=tv" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">TV</Link>
+        </nav>
+
+        {/* 오른쪽: 검색창 + 유저 */}
+        <div className="flex-1 flex items-center justify-end gap-5">
+          {/* 데스크톱 검색 */}
+          <div ref={searchRef} className="relative hidden md:flex items-center">
+            <form
+              onSubmit={handleSearch}
+              className={`flex items-center overflow-hidden rounded-full border transition-all duration-300 ${
+                isSearchOpen
+                  ? 'w-56 border-white/30 bg-white/10'
+                  : 'w-0 border-transparent'
+              }`}
+            >
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Escape' && (setIsSearchOpen(false), setSearchQuery(''))}
+                className="w-full bg-transparent py-2 pl-4 pr-9 text-sm text-white outline-none placeholder-white/40"
+                placeholder="검색..."
+              />
+            </form>
+            <button
+              onClick={isSearchOpen ? handleSearch : openSearch}
+              aria-label="검색"
+              className={`absolute right-0 flex items-center justify-center rounded-full p-2 text-white/60 hover:text-white transition-colors ${
+                isSearchOpen ? 'hover:bg-white/10' : ''
+              }`}
+            >
+              <Search className="w-5 h-5" />
+            </button>
+          </div>
           {/* 모바일 메뉴 토글 */}
           <button
             onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -130,7 +173,7 @@ export default function Header() {
           ) : (
             <Link
               href="/login"
-              className="rounded-full bg-white px-5 py-2 text-sm font-bold text-black hover:bg-gray-200 transition-colors"
+              className="rounded-full bg-gradient-to-br from-fuchsia-600 to-indigo-600 px-4 py-1.5 text-sm font-bold text-white shadow-[0_0_15px_rgba(192,38,211,0.5)] hover:shadow-[0_0_25px_rgba(192,38,211,0.7)] transition-all duration-300"
             >
               로그인
             </Link>

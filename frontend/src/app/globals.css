@@ -80,7 +80,7 @@ body {
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 20px rgba(192, 38, 211, 0.3);
+  text-shadow: 0 0 15px rgba(192, 38, 211, 0.9), 0 0 35px rgba(192, 38, 211, 0.4);
 }
 
 /* scrollbar-hide */
