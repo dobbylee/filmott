@@ -92,6 +92,7 @@ export class ContentsService {
       genres?: string;
       providers?: string;
       year?: number;
+      sort?: string;
       page?: number;
     } = {},
   ) {
@@ -99,6 +100,7 @@ export class ContentsService {
       genres: options.genres,
       watchProviders: options.providers,
       year: options.year,
+      sort: options.sort,
       page: options.page,
     });
   }

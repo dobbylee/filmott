@@ -192,7 +192,7 @@ function ReviewSkeleton() {
 
 export default function HomePage() {
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 space-y-16 pt-8 pb-20">
+    <div className="mx-auto w-full max-w-7xl px-4 space-y-12 pt-8 pb-20">
       <Suspense fallback={<SectionSkeleton title="박스오피스" />}>
         <BoxOfficeSection />
       </Suspense>

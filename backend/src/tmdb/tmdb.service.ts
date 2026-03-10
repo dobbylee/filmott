@@ -216,16 +216,27 @@ export class TmdbService {
       genres?: string;
       watchProviders?: string;
       year?: number;
+      sort?: string;
       region?: string;
       page?: number;
     } = {},
   ): Promise<TmdbSearchResult> {
+    let sortBy = options.sort ?? 'popularity.desc';
+    if (type === 'tv' && sortBy === 'primary_release_date.desc') {
+      sortBy = 'first_air_date.desc';
+    }
+
     const params: Record<string, string | number> = {
       language: 'ko-KR',
       watch_region: options.region ?? 'KR',
+      with_watch_monetization_types: 'flatrate|rent|buy|free|ads',
       page: options.page ?? 1,
-      sort_by: 'popularity.desc',
+      sort_by: sortBy,
     };
+
+    if (options.sort === 'vote_average.desc') {
+      params['vote_count.gte'] = 50;
+    }
 
     if (options.genres) {
       params.with_genres = options.genres;

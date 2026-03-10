@@ -17,6 +17,7 @@ interface DiscoverPageProps {
     genres?: string;
     providers?: string;
     year?: string;
+    sort?: string;
     page?: string;
   }>;
 }
@@ -26,12 +27,14 @@ async function DiscoverResults({
   genres,
   providers,
   year,
+  sort,
   page,
 }: {
   type: string;
   genres?: string;
   providers?: string;
   year?: string;
+  sort?: string;
   page: number;
 }) {
   const params = new URLSearchParams();
@@ -40,15 +43,16 @@ async function DiscoverResults({
   if (genres) params.set('genres', genres);
   if (providers) params.set('providers', providers);
   if (year) params.set('year', year);
+  if (sort) params.set('sort', sort);
 
   const data = await fetchApi<TmdbSearchResult>(
     `/contents/discover?${params.toString()}`,
-    { next: { revalidate: 300 } },
+    { cache: 'no-store' },
   );
 
   return (
     <>
-      <p className="mb-4 text-sm text-muted-foreground">
+      <p className="mb-4 pl-2 text-sm text-muted-foreground">
         총 {data.total_results.toLocaleString()}개의 작품
       </p>
       <ContentGrid
@@ -69,6 +73,7 @@ export default async function DiscoverPage({ searchParams }: DiscoverPageProps) 
   const genres = params.genres;
   const providers = params.providers;
   const year = params.year;
+  const sort = params.sort;
   const page = params.page ? parseInt(params.page, 10) : 1;
 
   const selectedGenres = genres
@@ -89,6 +94,7 @@ export default async function DiscoverPage({ searchParams }: DiscoverPageProps) 
           selectedGenres={selectedGenres}
           selectedProviders={selectedProviders}
           selectedYear={selectedYear}
+          selectedSort={sort}
         />
       </div>
 
@@ -104,6 +110,7 @@ export default async function DiscoverPage({ searchParams }: DiscoverPageProps) 
           genres={genres}
           providers={providers}
           year={year}
+          sort={sort}
           page={page}
         />
       </Suspense>

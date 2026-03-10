@@ -8,9 +8,10 @@ export default function Footer() {
           <div>
             <Link
               href="/"
-              className="text-lg font-bold text-primary"
+              className="text-lg font-black tracking-tight text-white hover-glow transition-all duration-300"
+              style={{ letterSpacing: '-0.05em' }}
             >
-              filmott
+              film<span className="text-gradient">ott</span>
             </Link>
             <p className="mt-1 text-xs text-muted-foreground">
               영화, 드라마 한줄평과 별점을 남기고 공유하세요.

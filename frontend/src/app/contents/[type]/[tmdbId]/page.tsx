@@ -134,7 +134,7 @@ export default async function ContentDetailPage({
       {/* 상단: 백드롭 + 포스터 + 기본 정보 */}
       <div className="relative">
         {/* 백드롭 */}
-        {content.backdropUrl && (
+        {content.backdropUrl ? (
           <div className="relative h-[300px] w-full md:h-[380px]">
             <Image
               src={content.backdropUrl}
@@ -146,6 +146,8 @@ export default async function ContentDetailPage({
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
           </div>
+        ) : (
+          <div className="h-[200px] w-full bg-gradient-to-b from-white/5 to-transparent md:h-[280px]" />
         )}
 
         {/* 포스터 + 메타 정보 */}
@@ -273,7 +275,6 @@ export default async function ContentDetailPage({
         {/* 출연진 */}
         {content.credits.length > 0 && (
           <section>
-            <h2 className="mb-3 text-lg font-bold">출연진</h2>
             <CastCarousel cast={content.credits} />
           </section>
         )}

@@ -117,7 +117,7 @@ export default function Header() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Escape' && (setIsSearchOpen(false), setSearchQuery(''))}
                 className="w-full bg-transparent py-2 pl-4 pr-9 text-sm text-white outline-none placeholder-white/40"
-                placeholder="검색..."
+                placeholder="작품 / 인물"
               />
             </form>
             <button

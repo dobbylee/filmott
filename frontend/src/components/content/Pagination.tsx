@@ -21,13 +21,12 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
   };
 
   const getVisiblePages = (): number[] => {
-    const pages: number[] = [];
-    const start = Math.max(1, currentPage - 2);
-    const end = Math.min(totalPages, currentPage + 2);
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
+    if (currentPage <= 3) {
+      const end = Math.min(totalPages, 4);
+      return Array.from({ length: end }, (_, i) => i + 1);
     }
-    return pages;
+    const pages = [currentPage - 1, currentPage, currentPage + 1, currentPage + 2];
+    return pages.filter((p) => p >= 1 && p <= totalPages);
   };
 
   return (
@@ -35,7 +34,7 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
       <button
         onClick={() => goToPage(currentPage - 1)}
         disabled={currentPage <= 1}
-        className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-sm disabled:opacity-30"
+        className="mr-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white/70"
         aria-label="이전 페이지"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -69,24 +68,11 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
         </button>
       ))}
 
-      {getVisiblePages()[getVisiblePages().length - 1] < totalPages && (
-        <>
-          {getVisiblePages()[getVisiblePages().length - 1] < totalPages - 1 && (
-            <span className="px-1 text-muted-foreground">...</span>
-          )}
-          <button
-            onClick={() => goToPage(totalPages)}
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-sm"
-          >
-            {totalPages}
-          </button>
-        </>
-      )}
 
       <button
         onClick={() => goToPage(currentPage + 1)}
         disabled={currentPage >= totalPages}
-        className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-sm disabled:opacity-30"
+        className="ml-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white/70"
         aria-label="다음 페이지"
       >
         <ChevronRight className="h-4 w-4" />

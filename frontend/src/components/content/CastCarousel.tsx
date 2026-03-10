@@ -26,14 +26,26 @@ export default function CastCarousel({ cast }: CastCarouselProps) {
   };
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => scroll('left')}
-        className="absolute -left-3 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-border bg-background p-1.5 shadow-md md:flex"
-        aria-label="이전"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </button>
+    <div className="group/cast">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-bold">출연진</h2>
+        <div className="hidden sm:flex gap-2 opacity-0 group-hover/cast:opacity-100 transition-opacity duration-300">
+          <button
+            onClick={() => scroll('left')}
+            aria-label="이전"
+            className="rounded-full p-2 bg-white/5 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all backdrop-blur-sm"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => scroll('right')}
+            aria-label="다음"
+            className="rounded-full p-2 bg-white/5 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all backdrop-blur-sm"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
 
       <div
         ref={scrollRef}
@@ -70,14 +82,6 @@ export default function CastCarousel({ cast }: CastCarouselProps) {
           </Link>
         ))}
       </div>
-
-      <button
-        onClick={() => scroll('right')}
-        className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-border bg-background p-1.5 shadow-md md:flex"
-        aria-label="다음"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </button>
     </div>
   );
 }

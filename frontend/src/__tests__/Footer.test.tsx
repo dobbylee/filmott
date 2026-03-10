@@ -5,7 +5,7 @@ import Footer from '@/components/layout/Footer';
 describe('Footer', () => {
   it('로고와 설명을 렌더링한다', () => {
     render(<Footer />);
-    expect(screen.getByText('filmott')).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.textContent === 'filmott')).toBeInTheDocument();
     expect(
       screen.getByText('영화, 드라마 한줄평과 별점을 남기고 공유하세요.'),
     ).toBeInTheDocument();

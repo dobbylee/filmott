@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import { Calendar, User } from 'lucide-react';
 import { fetchApi } from '@/lib/fetcher';
-import ContentGrid from '@/components/content/ContentGrid';
+import FilmographyGrid from './FilmographyGrid';
 import {
   TMDB_IMAGE_BASE,
   type PersonDetail,
@@ -199,7 +199,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
             ({items.length}작품)
           </span>
         </h2>
-        <ContentGrid items={items} emptyMessage="출연작 정보가 없습니다." />
+        <FilmographyGrid items={items} />
       </section>
     </div>
   );

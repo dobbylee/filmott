@@ -4,11 +4,19 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 import { MOVIE_GENRES, TV_GENRES, OTT_PROVIDERS } from '@/types/content';
 
+const SORT_OPTIONS = [
+  { value: 'popularity.desc', label: '인기순' },
+  { value: 'primary_release_date.desc', label: '최신순' },
+  { value: 'vote_average.desc', label: '평점순' },
+  { value: 'revenue.desc', label: '수익순', movieOnly: true },
+] as const;
+
 interface FilterBarProps {
   type: string;
   selectedGenres: number[];
   selectedProviders: number[];
   selectedYear?: number;
+  selectedSort?: string;
 }
 
 export default function FilterBar({
@@ -16,6 +24,7 @@ export default function FilterBar({
   selectedGenres,
   selectedProviders,
   selectedYear,
+  selectedSort,
 }: FilterBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,8 +78,8 @@ export default function FilterBar({
               onClick={() => toggleGenre(genre.id)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 selectedGenres.includes(genre.id)
-                  ? 'bg-white/15 text-white'
-                  : 'bg-white/5 text-white/40 hover:text-white/70'
+                  ? 'bg-fuchsia-600/20 text-fuchsia-400 border border-fuchsia-600/30'
+                  : 'bg-white/5 text-white/80 hover:text-white'
               }`}
             >
               {genre.name}
@@ -89,8 +98,8 @@ export default function FilterBar({
               onClick={() => toggleProvider(provider.id)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 selectedProviders.includes(provider.id)
-                  ? 'bg-white/15 text-white'
-                  : 'bg-white/5 text-white/40 hover:text-white/70'
+                  ? 'bg-fuchsia-600/20 text-fuchsia-400 border border-fuchsia-600/30'
+                  : 'bg-white/5 text-white/80 hover:text-white'
               }`}
             >
               {provider.name}
@@ -99,21 +108,44 @@ export default function FilterBar({
         </div>
       </div>
 
-      {/* 연도 필터 */}
-      <div>
-        <h3 className="mb-2 text-sm font-medium text-muted-foreground">연도</h3>
-        <select
-          value={selectedYear ?? ''}
-          onChange={(e) => handleYearChange(e.target.value)}
-          className="appearance-none w-20 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-center outline-none focus:border-primary cursor-pointer"
-        >
-          <option value="">전체</option>
-          {years.map((year) => (
-            <option key={year} value={year}>
-              {year}
-            </option>
-          ))}
-        </select>
+      {/* 정렬 + 연도 */}
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">정렬</h3>
+          <div className="flex gap-1.5">
+            {SORT_OPTIONS.filter((option) => !('movieOnly' in option && option.movieOnly) || type === 'movie').map((option) => (
+              <button
+                key={option.value}
+                onClick={() => updateParams({
+                  sort: option.value === 'popularity.desc' ? undefined : option.value,
+                })}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  (selectedSort ?? 'popularity.desc') === option.value
+                    ? 'bg-fuchsia-600/20 text-fuchsia-400 border border-fuchsia-600/30'
+                    : 'bg-white/5 text-white/80 hover:text-white'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">연도</h3>
+          <select
+            value={selectedYear ?? ''}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className="appearance-none w-20 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-white/80 text-center outline-none focus:border-primary cursor-pointer"
+          >
+            <option value="">전체</option>
+            {years.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );

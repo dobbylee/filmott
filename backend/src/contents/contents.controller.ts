@@ -23,6 +23,7 @@ export class ContentsController {
       genres: dto.genres,
       providers: dto.providers,
       year,
+      sort: dto.sort,
       page,
     });
   }

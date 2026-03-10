@@ -37,7 +37,7 @@ describe('Header', () => {
   it('should render logo and login button when not authenticated', () => {
     render(<Header />);
 
-    expect(screen.getByText('filmott')).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.textContent === 'filmott')).toBeInTheDocument();
     expect(screen.getByText('로그인')).toBeInTheDocument();
   });
 
@@ -66,7 +66,11 @@ describe('Header', () => {
 
     render(<Header />);
 
-    const searchInput = screen.getByPlaceholderText('작품을 검색해보세요...');
+    // 검색 아이콘 클릭으로 검색창 열기
+    const searchButton = screen.getByLabelText('검색');
+    await user.click(searchButton);
+
+    const searchInput = screen.getByPlaceholderText('작품 / 인물');
     await user.type(searchInput, '인셉션{enter}');
 
     expect(mockPush).toHaveBeenCalledWith('/search?q=%EC%9D%B8%EC%85%89%EC%85%98');

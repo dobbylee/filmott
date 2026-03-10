@@ -28,9 +28,11 @@ export default function RootLayout({
       <body className="antialiased min-h-screen bg-background text-foreground selection:bg-primary/30">
         <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark">
           <AuthProvider>
-            <Header />
-            <main className="w-full pb-10 pt-20">{children}</main>
-            <Footer />
+            <div className="flex min-h-screen flex-col">
+              <Header />
+              <main className="w-full flex-1 pb-10 pt-20">{children}</main>
+              <Footer />
+            </div>
           </AuthProvider>
         </ThemeProvider>
       </body>

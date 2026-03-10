@@ -29,10 +29,15 @@ export default function RankingCard({ item }: RankingCardProps) {
   const posterUrl = content?.posterUrl;
   const rating = content?.voteAverage != null ? Number(content.voteAverage).toFixed(1) : null;
 
+  const Wrapper = content ? Link : 'div';
+  const wrapperProps = content ? { href } : {};
+
   return (
-    <Link
-      href={href}
-      className="group block relative flex-shrink-0 w-[160px] sm:w-[220px] hover:-translate-y-2 transition-all duration-300"
+    <Wrapper
+      {...wrapperProps}
+      className={`group block relative flex-shrink-0 w-[160px] sm:w-[220px] transition-all duration-300 ${
+        content ? 'hover:-translate-y-2 cursor-pointer' : 'opacity-60'
+      }`}
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-white/5 border border-white/5 shadow-lg">
         {posterUrl ? (
@@ -45,7 +50,7 @@ export default function RankingCard({ item }: RankingCardProps) {
           />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-white/40 bg-zinc-900">
-            포스터 없음
+            데이터 없음
           </div>
         )}
         
@@ -77,6 +82,6 @@ export default function RankingCard({ item }: RankingCardProps) {
           )}
         </div>
       </div>
-    </Link>
+    </Wrapper>
   );
 }

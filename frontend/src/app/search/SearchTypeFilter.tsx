@@ -37,8 +37,8 @@ export default function SearchTypeFilter({ currentType }: SearchTypeFilterProps)
           className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
             currentType === value ||
             (value === undefined && !currentType)
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              ? 'bg-fuchsia-600/20 text-fuchsia-400 border border-fuchsia-600/30'
+              : 'bg-white/5 text-white/40 hover:text-white/70'
           }`}
         >
           {label}

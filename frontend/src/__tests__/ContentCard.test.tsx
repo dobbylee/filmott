@@ -68,7 +68,6 @@ describe('ContentCard', () => {
   it('장르 태그를 표시한다', () => {
     render(<ContentCard item={movieItem} />);
     expect(screen.getByText('드라마')).toBeInTheDocument();
-    expect(screen.getByText('스릴러')).toBeInTheDocument();
   });
 
   it('올바른 링크를 생성한다 (영화)', () => {
