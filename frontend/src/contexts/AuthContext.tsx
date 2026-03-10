@@ -1,72 +1,102 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
-import type { User } from '../types/auth';
-import { api } from '../api';
+'use client';
+
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from 'react';
+import api from '@/lib/api';
+import type {
+  User,
+  AuthResponse,
+  LoginRequest,
+  SignupRequest,
+} from '@/types/auth';
 
 interface AuthContextType {
   user: User | null;
-  isAuthenticated: boolean;
-  login: (token: string, user: User) => void;
+  token: string | null;
+  isLoading: boolean;
+  login: (data: LoginRequest) => Promise<void>;
+  signup: (data: SignupRequest) => Promise<void>;
   logout: () => void;
-  checkAuth: () => Promise<void>;
+  updateUser: (user: User) => void;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Function to save token and user state
-  const login = (token: string, userData: User) => {
-    localStorage.setItem('access_token', token);
-    setUser(userData);
-    setIsAuthenticated(true);
-  };
+  useEffect(() => {
+    const storedToken = localStorage.getItem('access_token');
+    const storedUser = localStorage.getItem('user');
 
-  // Function to clear token and state
-  const logout = () => {
-    localStorage.removeItem('access_token');
-    setUser(null);
-    setIsAuthenticated(false);
-  };
-
-  // Verify token on initial load
-  const checkAuth = async () => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
+    if (storedToken && storedUser) {
+      setToken(storedToken);
       try {
-        const response = await api.get<User>('/users/me');
-        setUser(response.data);
-        setIsAuthenticated(true);
-      } catch (error) {
-        console.error('Invalid token', error);
-        logout();
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem('user');
       }
     }
-  };
+    setIsLoading(false);
+  }, []);
 
-  // Run on mount
-  useEffect(() => {
-    checkAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
-  // checkAuth is defined outside or via useCallback, but typically empty array is fine for mount-only
-  // We'll leave it empty to avoid infinite loops, but we can suppress the warning safely here
+  const handleAuthResponse = useCallback((response: AuthResponse) => {
+    const { access_token, user: userData } = response;
+    setToken(access_token);
+    setUser(userData);
+    localStorage.setItem('access_token', access_token);
+    localStorage.setItem('user', JSON.stringify(userData));
+  }, []);
+
+  const login = useCallback(
+    async (data: LoginRequest) => {
+      const response = await api.post<AuthResponse>('/auth/login', data);
+      handleAuthResponse(response.data);
+    },
+    [handleAuthResponse],
+  );
+
+  const signup = useCallback(
+    async (data: SignupRequest) => {
+      const response = await api.post<AuthResponse>('/auth/signup', data);
+      handleAuthResponse(response.data);
+    },
+    [handleAuthResponse],
+  );
+
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+  }, []);
+
+  const updateUser = useCallback((updatedUser: User) => {
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, logout, checkAuth }}>
+    <AuthContext.Provider
+      value={{ user, token, isLoading, login, signup, logout, updateUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}
