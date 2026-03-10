@@ -58,6 +58,35 @@ export interface TmdbProvider {
   logo_path: string;
 }
 
+export interface TmdbPersonDetail {
+  id: number;
+  name: string;
+  profile_path: string | null;
+  biography: string;
+  birthday: string | null;
+  place_of_birth: string | null;
+  known_for_department: string;
+}
+
+export interface TmdbPersonCredit {
+  id: number;
+  media_type: string;
+  title?: string;
+  name?: string;
+  poster_path: string | null;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average: number;
+  character?: string;
+  job?: string;
+  episode_count?: number;
+}
+
+export interface TmdbPersonCreditsResult {
+  cast: TmdbPersonCredit[];
+  crew: TmdbPersonCredit[];
+}
+
 @Injectable()
 export class TmdbService {
   private readonly logger = new Logger(TmdbService.name);
@@ -70,9 +99,12 @@ export class TmdbService {
         params: { query, page, language: 'ko-KR', region: 'KR' },
       }),
     );
-    // movie/tv만 필터링
+    // movie/tv/person 필터링 (기타 media_type 제외)
     data.results = data.results.filter(
-      (item) => item.media_type === 'movie' || item.media_type === 'tv',
+      (item) =>
+        item.media_type === 'movie' ||
+        item.media_type === 'tv' ||
+        item.media_type === 'person',
     );
     return data;
   }
@@ -153,6 +185,29 @@ export class TmdbService {
       ),
     );
     return data.results?.KR ?? null;
+  }
+
+  async getPersonDetail(personId: number): Promise<TmdbPersonDetail> {
+    const { data } = await firstValueFrom(
+      this.httpService.get<TmdbPersonDetail>(`/person/${personId}`, {
+        params: { language: 'ko-KR' },
+      }),
+    );
+    return data;
+  }
+
+  async getPersonCredits(
+    personId: number,
+  ): Promise<TmdbPersonCreditsResult> {
+    const { data } = await firstValueFrom(
+      this.httpService.get<TmdbPersonCreditsResult>(
+        `/person/${personId}/combined_credits`,
+        {
+          params: { language: 'ko-KR' },
+        },
+      ),
+    );
+    return data;
   }
 
   async discoverByFilters(

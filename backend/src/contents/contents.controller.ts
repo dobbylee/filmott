@@ -27,6 +27,20 @@ export class ContentsController {
     });
   }
 
+  @Get('person/:personId')
+  async getPersonDetail(
+    @Param('personId', ParseIntPipe) personId: number,
+  ) {
+    return this.contentsService.getPersonDetail(personId);
+  }
+
+  @Get('person/:personId/credits')
+  async getPersonCredits(
+    @Param('personId', ParseIntPipe) personId: number,
+  ) {
+    return this.contentsService.getPersonCredits(personId);
+  }
+
   @Get(':type/:tmdbId')
   async getDetail(
     @Param('type') type: string,

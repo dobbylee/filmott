@@ -5,8 +5,8 @@ export class SearchContentsDto {
   q!: string;
 
   @IsOptional()
-  @IsIn(['movie', 'tv'])
-  type?: 'movie' | 'tv';
+  @IsIn(['movie', 'tv', 'person'])
+  type?: 'movie' | 'tv' | 'person';
 
   @IsOptional()
   @IsNumberString()

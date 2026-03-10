@@ -2,7 +2,12 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Content } from './content.entity';
-import { TmdbService, TmdbItem } from '../tmdb/tmdb.service';
+import {
+  TmdbService,
+  TmdbItem,
+  TmdbPersonDetail,
+  TmdbPersonCredit,
+} from '../tmdb/tmdb.service';
 
 const IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
@@ -38,11 +43,17 @@ export class ContentsService {
   /**
    * 검색: TMDB API 호출 후 결과 반환 (캐싱은 하지 않음, 목록은 가볍게)
    */
-  async searchContents(query: string, type?: 'movie' | 'tv', page = 1) {
-    if (type) {
+  async searchContents(query: string, type?: 'movie' | 'tv' | 'person', page = 1) {
+    if (type === 'movie' || type === 'tv') {
       return this.tmdbService.searchByType(query, type, page);
     }
-    return this.tmdbService.searchMulti(query, page);
+    const result = await this.tmdbService.searchMulti(query, page);
+    if (type === 'person') {
+      result.results = result.results.filter(
+        (item) => item.media_type === 'person',
+      );
+    }
+    return result;
   }
 
   /**
@@ -90,6 +101,44 @@ export class ContentsService {
       year: options.year,
       page: options.page,
     });
+  }
+
+  /**
+   * 인물 상세 정보
+   */
+  async getPersonDetail(personId: number): Promise<TmdbPersonDetail> {
+    return this.tmdbService.getPersonDetail(personId);
+  }
+
+  /**
+   * 인물 필모그래피 (movie/tv만, 최신순 정렬)
+   */
+  async getPersonCredits(personId: number): Promise<{
+    cast: TmdbPersonCredit[];
+    crew: TmdbPersonCredit[];
+  }> {
+    const credits = await this.tmdbService.getPersonCredits(personId);
+
+    const filterAndSort = (items: TmdbPersonCredit[]) => {
+      return items
+        .filter(
+          (item) =>
+            item.media_type === 'movie' || item.media_type === 'tv',
+        )
+        .sort((a, b) => {
+          const dateA = a.release_date || a.first_air_date || '';
+          const dateB = b.release_date || b.first_air_date || '';
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+          return dateB.localeCompare(dateA);
+        });
+    };
+
+    return {
+      cast: filterAndSort(credits.cast),
+      crew: filterAndSort(credits.crew),
+    };
   }
 
   /**

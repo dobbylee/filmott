@@ -37,24 +37,28 @@ describe('TmdbService', () => {
   });
 
   describe('searchMulti', () => {
-    it('should filter results to only movie and tv', async () => {
+    it('should filter results to movie, tv, and person', async () => {
       const mockData = {
         page: 1,
         total_pages: 1,
-        total_results: 3,
+        total_results: 4,
         results: [
           { id: 1, media_type: 'movie', title: 'Movie 1' },
           { id: 2, media_type: 'tv', name: 'TV Show 1' },
           { id: 3, media_type: 'person', name: 'Person 1' },
+          { id: 4, media_type: 'collection', name: 'Collection 1' },
         ],
       };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
       const result = await service.searchMulti('test');
 
-      expect(result.results).toHaveLength(2);
+      expect(result.results).toHaveLength(3);
       expect(result.results.every(
-        (r) => r.media_type === 'movie' || r.media_type === 'tv',
+        (r) =>
+          r.media_type === 'movie' ||
+          r.media_type === 'tv' ||
+          r.media_type === 'person',
       )).toBe(true);
       expect(mockHttpService.get).toHaveBeenCalledWith('/search/multi', {
         params: { query: 'test', page: 1, language: 'ko-KR', region: 'KR' },
@@ -162,6 +166,50 @@ describe('TmdbService', () => {
       const result = await service.getWatchProviders(123, 'movie');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('getPersonDetail', () => {
+    it('should fetch person detail with ko-KR language', async () => {
+      const mockData = {
+        id: 17419,
+        name: 'Bryan Cranston',
+        profile_path: '/profile.jpg',
+        biography: 'An actor.',
+        birthday: '1956-03-07',
+        place_of_birth: 'Hollywood, California, USA',
+        known_for_department: 'Acting',
+      };
+      mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
+
+      const result = await service.getPersonDetail(17419);
+
+      expect(result).toEqual(mockData);
+      expect(mockHttpService.get).toHaveBeenCalledWith('/person/17419', {
+        params: { language: 'ko-KR' },
+      });
+    });
+  });
+
+  describe('getPersonCredits', () => {
+    it('should fetch person combined credits with ko-KR language', async () => {
+      const mockData = {
+        cast: [
+          { id: 1396, media_type: 'tv', name: 'Breaking Bad', character: 'Walter White' },
+        ],
+        crew: [
+          { id: 100, media_type: 'movie', title: 'Some Movie', job: 'Director' },
+        ],
+      };
+      mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
+
+      const result = await service.getPersonCredits(17419);
+
+      expect(result).toEqual(mockData);
+      expect(mockHttpService.get).toHaveBeenCalledWith(
+        '/person/17419/combined_credits',
+        { params: { language: 'ko-KR' } },
+      );
     });
   });
 

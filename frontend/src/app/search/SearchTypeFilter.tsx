@@ -25,6 +25,7 @@ export default function SearchTypeFilter({ currentType }: SearchTypeFilterProps)
     { value: undefined, label: '전체' },
     { value: 'movie', label: '영화' },
     { value: 'tv', label: 'TV' },
+    { value: 'person', label: '인물' },
   ];
 
   return (

@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { TMDB_IMAGE_BASE } from '@/types/content';
@@ -40,11 +41,12 @@ export default function CastCarousel({ cast }: CastCarouselProps) {
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {cast.map((member) => (
-          <div
+          <Link
             key={member.id}
-            className="flex w-[100px] flex-shrink-0 flex-col items-center text-center"
+            href={`/person/${member.id}`}
+            className="group flex w-[100px] flex-shrink-0 flex-col items-center text-center"
           >
-            <div className="relative h-[100px] w-[100px] overflow-hidden rounded-full bg-muted">
+            <div className="relative h-[100px] w-[100px] overflow-hidden rounded-full bg-muted transition-transform duration-200 group-hover:scale-105">
               {member.profile_path ? (
                 <Image
                   src={`${TMDB_IMAGE_BASE}/w185${member.profile_path}`}
@@ -59,13 +61,13 @@ export default function CastCarousel({ cast }: CastCarouselProps) {
                 </div>
               )}
             </div>
-            <p className="mt-2 w-full truncate text-xs font-medium">
+            <p className="mt-2 w-full truncate text-xs font-medium group-hover:text-primary group-hover:underline">
               {member.name}
             </p>
             <p className="w-full truncate text-[10px] text-muted-foreground">
               {member.character}
             </p>
-          </div>
+          </Link>
         ))}
       </div>
 

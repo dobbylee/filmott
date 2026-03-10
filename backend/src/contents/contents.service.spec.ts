@@ -20,6 +20,8 @@ describe('ContentsService', () => {
     searchMulti: jest.fn(),
     searchByType: jest.fn(),
     discoverByFilters: jest.fn(),
+    getPersonDetail: jest.fn(),
+    getPersonCredits: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -271,6 +273,70 @@ describe('ContentsService', () => {
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ runtime: 30 }),
       );
+    });
+  });
+
+  describe('getPersonDetail', () => {
+    it('should delegate to tmdbService.getPersonDetail', async () => {
+      const personData = {
+        id: 17419,
+        name: 'Bryan Cranston',
+        profile_path: '/profile.jpg',
+        biography: 'An actor.',
+        birthday: '1956-03-07',
+        place_of_birth: 'Hollywood, California, USA',
+        known_for_department: 'Acting',
+      };
+      mockTmdbService.getPersonDetail.mockResolvedValue(personData);
+
+      const result = await service.getPersonDetail(17419);
+
+      expect(mockTmdbService.getPersonDetail).toHaveBeenCalledWith(17419);
+      expect(result).toEqual(personData);
+    });
+  });
+
+  describe('getPersonCredits', () => {
+    it('should filter to movie/tv and sort by date descending', async () => {
+      const creditsData = {
+        cast: [
+          { id: 1, media_type: 'movie', title: 'Old Movie', release_date: '2010-05-01', vote_average: 7.0 },
+          { id: 2, media_type: 'tv', name: 'New Show', first_air_date: '2024-01-15', vote_average: 8.5 },
+          { id: 3, media_type: 'movie', title: 'No Date Movie', vote_average: 6.0 },
+        ],
+        crew: [
+          { id: 4, media_type: 'movie', title: 'Directed Movie', release_date: '2020-06-01', job: 'Director', vote_average: 7.5 },
+        ],
+      };
+      mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
+
+      const result = await service.getPersonCredits(17419);
+
+      expect(mockTmdbService.getPersonCredits).toHaveBeenCalledWith(17419);
+      // cast should be sorted: 2024 > 2010 > no date
+      expect(result.cast).toHaveLength(3);
+      expect(result.cast[0].id).toBe(2); // 2024
+      expect(result.cast[1].id).toBe(1); // 2010
+      expect(result.cast[2].id).toBe(3); // no date (last)
+      // crew
+      expect(result.crew).toHaveLength(1);
+      expect(result.crew[0].id).toBe(4);
+    });
+
+    it('should exclude non-movie/tv media types from credits', async () => {
+      const creditsData = {
+        cast: [
+          { id: 1, media_type: 'movie', title: 'A Movie', release_date: '2020-01-01', vote_average: 7.0 },
+          { id: 2, media_type: 'person', name: 'Someone', vote_average: 0 },
+        ],
+        crew: [],
+      };
+      mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
+
+      const result = await service.getPersonCredits(100);
+
+      expect(result.cast).toHaveLength(1);
+      expect(result.cast[0].media_type).toBe('movie');
     });
   });
 

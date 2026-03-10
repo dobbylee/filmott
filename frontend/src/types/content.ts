@@ -20,6 +20,13 @@ export interface ContentItem {
   updatedAt: string;
 }
 
+export interface TmdbKnownForItem {
+  id: number;
+  media_type: string;
+  title?: string;
+  name?: string;
+}
+
 export interface TmdbSearchItem {
   id: number;
   media_type?: string;
@@ -35,6 +42,10 @@ export interface TmdbSearchItem {
   vote_average?: number;
   genre_ids?: number[];
   genres?: Genre[];
+  // person-specific fields (from search/multi)
+  profile_path?: string;
+  known_for_department?: string;
+  known_for?: TmdbKnownForItem[];
 }
 
 export interface TmdbSearchResult {
@@ -63,6 +74,35 @@ export interface WatchProviderData {
   flatrate?: WatchProvider[];
   rent?: WatchProvider[];
   buy?: WatchProvider[];
+}
+
+export interface PersonDetail {
+  id: number;
+  name: string;
+  profile_path?: string;
+  biography?: string;
+  birthday?: string;
+  place_of_birth?: string;
+  known_for_department?: string;
+}
+
+export interface PersonCredit {
+  id: number;
+  media_type: string;
+  title?: string;
+  name?: string;
+  poster_path?: string;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average?: number;
+  character?: string;
+  job?: string;
+  episode_count?: number;
+}
+
+export interface PersonCreditsResult {
+  cast: PersonCredit[];
+  crew: PersonCredit[];
 }
 
 export interface ContentDetail extends ContentItem {

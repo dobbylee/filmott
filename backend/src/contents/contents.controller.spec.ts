@@ -10,6 +10,8 @@ describe('ContentsController', () => {
     searchContents: jest.fn(),
     getContentDetail: jest.fn(),
     discoverContents: jest.fn(),
+    getPersonDetail: jest.fn(),
+    getPersonCredits: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -83,6 +85,41 @@ describe('ContentsController', () => {
         year: undefined,
         page: 1,
       });
+    });
+  });
+
+  describe('getPersonDetail', () => {
+    it('should call getPersonDetail with personId', async () => {
+      const personData = {
+        id: 17419,
+        name: 'Bryan Cranston',
+        profile_path: '/profile.jpg',
+        biography: 'An actor.',
+        birthday: '1956-03-07',
+        place_of_birth: 'Hollywood, California, USA',
+        known_for_department: 'Acting',
+      };
+      mockContentsService.getPersonDetail.mockResolvedValue(personData);
+
+      const result = await controller.getPersonDetail(17419);
+
+      expect(mockContentsService.getPersonDetail).toHaveBeenCalledWith(17419);
+      expect(result).toEqual(personData);
+    });
+  });
+
+  describe('getPersonCredits', () => {
+    it('should call getPersonCredits with personId', async () => {
+      const creditsData = {
+        cast: [{ id: 1, media_type: 'movie', title: 'Movie 1' }],
+        crew: [],
+      };
+      mockContentsService.getPersonCredits.mockResolvedValue(creditsData);
+
+      const result = await controller.getPersonCredits(17419);
+
+      expect(mockContentsService.getPersonCredits).toHaveBeenCalledWith(17419);
+      expect(result).toEqual(creditsData);
     });
   });
 
