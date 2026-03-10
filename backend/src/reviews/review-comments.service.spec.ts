@@ -101,6 +101,35 @@ describe('ReviewCommentsService', () => {
       expect(result.totalPages).toBe(1);
     });
 
+    it('should sanitize user and remove password field', async () => {
+      const comments = [
+        {
+          id: 1,
+          reviewId: 1,
+          userId: 1,
+          content: 'Comment 1',
+          user: { id: 1, nickname: 'user1', password: 'hashed' },
+        },
+      ];
+      mockCommentRepo.findAndCount.mockResolvedValue([comments, 1]);
+
+      const result = await service.findByReview(1, 1);
+
+      expect(result.data[0].user).not.toHaveProperty('password');
+      expect(result.data[0].user.nickname).toBe('user1');
+    });
+
+    it('should handle comments without user relation', async () => {
+      const comments = [
+        { id: 1, reviewId: 1, userId: 1, content: 'No user loaded', user: null },
+      ];
+      mockCommentRepo.findAndCount.mockResolvedValue([comments, 1]);
+
+      const result = await service.findByReview(1, 1);
+
+      expect(result.data).toHaveLength(1);
+    });
+
     it('should calculate totalPages correctly', async () => {
       mockCommentRepo.findAndCount.mockResolvedValue([[], 25]);
 

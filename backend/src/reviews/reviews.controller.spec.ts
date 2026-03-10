@@ -163,6 +163,20 @@ describe('ReviewsController', () => {
     });
   });
 
+  describe('GET /api/reviews/:id/stats', () => {
+    it('should return content stats', async () => {
+      mockReviewsService.getContentStats.mockResolvedValue({
+        averageRating: 7.5,
+        reviewCount: 10,
+      });
+
+      const result = await controller.getStats(1);
+
+      expect(mockReviewsService.getContentStats).toHaveBeenCalledWith(1);
+      expect(result).toEqual({ averageRating: 7.5, reviewCount: 10 });
+    });
+  });
+
   describe('GET /api/reviews/:id/comments', () => {
     it('should return comments with default page', async () => {
       mockCommentsService.findByReview.mockResolvedValue({ data: [], total: 0, page: 1, totalPages: 0 });
@@ -170,6 +184,14 @@ describe('ReviewsController', () => {
       await controller.getComments(1);
 
       expect(mockCommentsService.findByReview).toHaveBeenCalledWith(1, 1);
+    });
+
+    it('should pass custom page parameter', async () => {
+      mockCommentsService.findByReview.mockResolvedValue({ data: [], total: 0, page: 2, totalPages: 1 });
+
+      await controller.getComments(1, '2');
+
+      expect(mockCommentsService.findByReview).toHaveBeenCalledWith(1, 2);
     });
   });
 });

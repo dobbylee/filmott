@@ -259,6 +259,24 @@ describe('RankingsService', () => {
     });
   });
 
+  describe('fetchDailyBoxOffice - error handling', () => {
+    it('should throw error when KOBIS service fails', async () => {
+      const error = new Error('KOBIS API error');
+      mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
+
+      await expect(service.fetchDailyBoxOffice()).rejects.toThrow('KOBIS API error');
+    });
+  });
+
+  describe('fetchTrending - error handling', () => {
+    it('should throw error when TMDB getTrending fails', async () => {
+      const error = new Error('TMDB API error');
+      mockTmdbService.getTrending.mockRejectedValue(error);
+
+      await expect(service.fetchTrending('all', 'day')).rejects.toThrow('TMDB API error');
+    });
+  });
+
   describe('getRankings', () => {
     it('should return latest rankings with content joined', async () => {
       const fetchedAt = new Date('2026-03-09T10:00:00Z');

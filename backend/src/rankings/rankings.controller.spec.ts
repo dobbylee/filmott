@@ -92,6 +92,28 @@ describe('RankingsController', () => {
       );
     });
 
+    it('should call fetchTrending with tv type', async () => {
+      mockRankingsService.fetchTrending.mockResolvedValue([]);
+
+      await controller.refresh('trending-tv-day');
+
+      expect(mockRankingsService.fetchTrending).toHaveBeenCalledWith(
+        'tv',
+        'day',
+      );
+    });
+
+    it('should call fetchTrending with all type and week window', async () => {
+      mockRankingsService.fetchTrending.mockResolvedValue([]);
+
+      await controller.refresh('trending-all-week');
+
+      expect(mockRankingsService.fetchTrending).toHaveBeenCalledWith(
+        'all',
+        'week',
+      );
+    });
+
     it('should return message for unknown category', async () => {
       const result = await controller.refresh('unknown');
 

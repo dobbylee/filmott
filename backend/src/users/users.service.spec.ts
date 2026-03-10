@@ -32,6 +32,31 @@ describe('UsersService', () => {
     jest.clearAllMocks();
   });
 
+  describe('findById', () => {
+    it('should return SafeUser without password when user exists', async () => {
+      mockUsersRepo.findOne.mockResolvedValue({
+        id: 1,
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'hashed',
+      });
+
+      const result = await service.findById(1);
+
+      expect(result).not.toBeNull();
+      expect(result).not.toHaveProperty('password');
+      expect(result!.nickname).toBe('test');
+    });
+
+    it('should return null when user does not exist', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.findById(999);
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('create', () => {
     it('should throw ConflictException if nickname is already taken', async () => {
       mockUsersRepo.findOne.mockResolvedValueOnce({ id: 1, nickname: 'existing' });
@@ -72,9 +97,69 @@ describe('UsersService', () => {
       mockUsersRepo.findOne.mockResolvedValue({ id: 1, nickname: 'test', password: 'hashed' });
       await expect(service.update(1, { newPassword: 'newpass12' })).rejects.toThrow(BadRequestException);
     });
+
+    it('should throw BadRequestException if currentPassword is incorrect', async () => {
+      mockUsersRepo.findOne.mockResolvedValue({ id: 1, nickname: 'test', password: 'hashed' });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.update(1, { currentPassword: 'wrongpass', newPassword: 'newpass12' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw ConflictException if new nickname is already taken', async () => {
+      mockUsersRepo.findOne
+        .mockResolvedValueOnce({ id: 1, nickname: 'original', password: 'hashed' }) // findOne by id
+        .mockResolvedValueOnce({ id: 2, nickname: 'taken' }); // findOne by new nickname
+
+      await expect(
+        service.update(1, { nickname: 'taken' }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should update nickname successfully', async () => {
+      const mockUser = { id: 1, nickname: 'original', email: 'test@test.com', password: 'hashed' };
+      mockUsersRepo.findOne
+        .mockResolvedValueOnce(mockUser) // findOne by id
+        .mockResolvedValueOnce(null);   // findOne by new nickname (not taken)
+      mockUsersRepo.save.mockImplementation((u: any) => Promise.resolve(u));
+
+      const result = await service.update(1, { nickname: 'updated' });
+
+      expect(result.nickname).toBe('updated');
+      expect(result).not.toHaveProperty('password');
+    });
+
+    it('should update password successfully', async () => {
+      const mockUser = { id: 1, nickname: 'test', email: 'test@test.com', password: 'oldhashed' };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('newhashed');
+      mockUsersRepo.save.mockImplementation((u: any) => Promise.resolve(u));
+
+      const result = await service.update(1, {
+        currentPassword: 'oldpass12',
+        newPassword: 'newpass12',
+      });
+
+      expect(bcrypt.hash).toHaveBeenCalledWith('newpass12', 10);
+      expect(result).not.toHaveProperty('password');
+    });
+
+    it('should skip nickname update if same as current', async () => {
+      const mockUser = { id: 1, nickname: 'same', email: 'test@test.com', password: 'hashed' };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockUsersRepo.save.mockImplementation((u: any) => Promise.resolve(u));
+
+      const result = await service.update(1, { nickname: 'same' });
+
+      // findOne for nickname conflict check should NOT be called (same nickname)
+      expect(mockUsersRepo.findOne).toHaveBeenCalledTimes(1);
+      expect(result.nickname).toBe('same');
+    });
   });
 
-  describe('softRemove (Deletion logic)', () => {
+  describe('softRemove', () => {
     it('should anonymize user before soft deleting', async () => {
       const mockUser = { id: 5, nickname: 'bob', email: 'bob@mail.com' };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
@@ -94,6 +179,12 @@ describe('UsersService', () => {
       expect(mockUsersRepo.softDelete).toHaveBeenCalledWith(5);
 
       jest.restoreAllMocks();
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.softRemove(999)).rejects.toThrow(NotFoundException);
     });
   });
 });

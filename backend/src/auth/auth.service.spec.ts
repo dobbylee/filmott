@@ -87,4 +87,37 @@ describe('AuthService', () => {
       });
     });
   });
+
+  describe('register', () => {
+    it('should create user and return access token and user info', async () => {
+      const createUserDto = { nickname: 'newuser', email: 'new@example.com', password: 'password123' };
+      const createdUser = { id: 2, nickname: 'newuser', email: 'new@example.com' };
+      const token = 'new.jwt.token';
+
+      const mockUsersServiceWithCreate = {
+        ...mockUsersService,
+        create: jest.fn().mockResolvedValue(createdUser),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: UsersService, useValue: mockUsersServiceWithCreate },
+          { provide: JwtService, useValue: mockJwtService },
+        ],
+      }).compile();
+
+      const freshService = module.get<AuthService>(AuthService);
+      mockJwtService.sign.mockReturnValue(token);
+
+      const result = await freshService.register(createUserDto);
+
+      expect(mockUsersServiceWithCreate.create).toHaveBeenCalledWith(createUserDto);
+      expect(mockJwtService.sign).toHaveBeenCalledWith({ nickname: createdUser.nickname, sub: createdUser.id });
+      expect(result).toEqual({
+        access_token: token,
+        user: { id: 2, nickname: 'newuser', email: 'new@example.com' },
+      });
+    });
+  });
 });

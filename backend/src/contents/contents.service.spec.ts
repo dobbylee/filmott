@@ -206,6 +206,74 @@ describe('ContentsService', () => {
     });
   });
 
+  describe('findOrFetchByTmdbId - TV content', () => {
+    it('should map tv content using name and first_air_date', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const tvData = {
+        id: 456,
+        name: 'TV Show',
+        original_name: 'TV Show Original',
+        poster_path: '/show.jpg',
+        backdrop_path: null,
+        overview: 'A TV show',
+        first_air_date: '2023-09-01',
+        vote_average: 7.0,
+        genres: [{ id: 18, name: 'Drama' }],
+        episode_run_time: [45],
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tvData);
+
+      const savedContent = { id: 5, tmdbId: 456, title: 'TV Show', contentType: 'tv' };
+      mockContentRepo.create.mockReturnValue(savedContent);
+      mockContentRepo.save.mockResolvedValue(savedContent);
+
+      const result = await service.findOrFetchByTmdbId(456, 'tv');
+
+      expect(mockContentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tmdbId: 456,
+          contentType: 'tv',
+          title: 'TV Show',
+        }),
+      );
+      expect(result).toEqual(savedContent);
+    });
+
+    it('should use episode_run_time when tv has no direct runtime', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const tvData = {
+        id: 789,
+        name: 'Another Show',
+        original_name: 'Another Show',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        first_air_date: '2022-01-01',
+        vote_average: 6.5,
+        genres: [],
+        runtime: null,
+        episode_run_time: [30, 35],
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tvData);
+
+      const savedContent = { id: 6, tmdbId: 789 };
+      mockContentRepo.create.mockImplementation((data: any) => data);
+      mockContentRepo.save.mockResolvedValue(savedContent);
+
+      await service.findOrFetchByTmdbId(789, 'tv');
+
+      expect(mockContentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ runtime: 30 }),
+      );
+    });
+  });
+
   describe('discoverContents', () => {
     it('should call discoverByFilters with correct parameters', async () => {
       const discoverResult = { page: 1, total_pages: 5, total_results: 100, results: [] };
