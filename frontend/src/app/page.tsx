@@ -1,8 +1,9 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, ArrowRight } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { fetchApi } from '@/lib/fetcher';
+import TimeAgo from '@/components/common/TimeAgo';
 import RankingCarousel from '@/components/ranking/RankingCarousel';
 import type { RankingItem } from '@/components/ranking/RankingCard';
 import type { Review } from '@/types/review';
@@ -65,10 +66,6 @@ async function TrendingSection() {
   }
 }
 
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
-}
 
 function RecentReviewItem({ review }: { review: Review }) {
   const content = review.content as ContentItem | undefined;
@@ -88,34 +85,34 @@ function RecentReviewItem({ review }: { review: Review }) {
         </Link>
       )}
       <div className="flex-1 min-w-0 py-1">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-[10px] font-bold text-white shadow-sm">
-              {review.user?.nickname?.charAt(0) ?? '?'}
-            </div>
-            <span className="text-sm font-medium text-white/90">
-              {review.user?.nickname ?? '익명'}
-            </span>
-            {review.rating != null && (
-              <span className="flex items-center gap-0.5 text-xs font-semibold text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded">
-                <Star className="h-3 w-3 fill-current" />
-                {review.rating}
-              </span>
-            )}
-          </div>
-          <span className="text-xs text-white/40">
-            {formatDate(review.createdAt)}
-          </span>
+        <div className="flex items-center justify-between">
+          {content ? (
+            <p className="text-base font-bold text-white truncate">
+              <Link href={href} className="hover:text-fuchsia-400 transition-colors">
+                {content.title}
+              </Link>
+            </p>
+          ) : <span />}
+          <TimeAgo date={review.createdAt} className="text-xs text-white/40 flex-shrink-0 ml-2" />
         </div>
 
-        {content && (
-          <Link href={href} className="text-base font-bold text-white hover:text-fuchsia-400 transition-colors truncate block mb-2">
-            {content.title}
-          </Link>
-        )}
+        <div className="flex items-center gap-1.5 mt-2 mb-2">
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-[10px] font-bold text-white shadow-sm">
+            {review.user?.nickname?.charAt(0) ?? '?'}
+          </div>
+          <span className="text-sm font-medium text-white/90">
+            {review.user?.nickname ?? '익명'}
+          </span>
+          {review.rating != null && (
+            <div className="flex items-center gap-0.5">
+              <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+              <span className="text-xs font-semibold">{review.rating}</span>
+            </div>
+          )}
+        </div>
 
         {review.comment && (
-          <p className="text-sm leading-relaxed text-white/70 line-clamp-2">
+          <p className="text-sm leading-relaxed text-white/70 line-clamp-2 pl-1">
             {review.comment}
           </p>
         )}
@@ -131,11 +128,8 @@ async function RecentReviewsSection() {
 
     return (
       <section>
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6">
           <h2 className="text-2xl font-bold tracking-tight">실시간 생생한 리뷰</h2>
-          <Link href="/discover" className="flex items-center gap-1 text-sm font-medium text-white/50 hover:text-white transition-colors">
-            더보기 <ArrowRight className="h-4 w-4" />
-          </Link>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {reviews.slice(0, 6).map((review) => (

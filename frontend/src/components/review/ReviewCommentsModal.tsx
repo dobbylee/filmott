@@ -134,7 +134,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
           {/* 리뷰 원문 */}
           <div className="mb-4 rounded-lg bg-white/5 p-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
                 {review.user?.nickname?.charAt(0) ?? '?'}
               </div>
               <span className="text-sm font-medium">{review.user?.nickname ?? '익명'}</span>
@@ -150,6 +150,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
                 {review.comment}
               </p>
             )}
+            <span className="text-[10px] text-muted-foreground mt-2 block">{formatDate(review.createdAt)}</span>
           </div>
 
           {/* 댓글 수 */}
@@ -166,7 +167,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
             <div className="space-y-3">
               {comments.map((c) => (
                 <div key={c.id} className="flex items-start gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[10px] font-medium text-secondary-foreground flex-shrink-0 mt-0.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary flex-shrink-0 mt-0.5">
                     {c.user?.nickname?.charAt(0) ?? '?'}
                   </div>
                   <div className="flex-1 min-w-0">
