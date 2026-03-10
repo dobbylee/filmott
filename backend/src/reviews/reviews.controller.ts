@@ -16,10 +16,8 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { CreateReviewCommentDto } from './dto/create-review-comment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import {
-  CurrentUser,
-  JwtPayload,
-} from '../auth/decorators/current-user.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type{ JwtPayload } from '../auth/decorators/current-user.decorator';
 
 @Controller('reviews')
 export class ReviewsController {
