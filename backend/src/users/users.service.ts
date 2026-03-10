@@ -7,7 +7,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, SafeUser } from './user.entity';
-import { Post } from '../posts/post.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
@@ -17,12 +16,10 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
-    @InjectRepository(Post)
-    private readonly postsRepo: Repository<Post>,
   ) {}
 
-  async findOne(username: string): Promise<User | null> {
-    return this.usersRepo.findOne({ where: { username } });
+  async findOne(nickname: string): Promise<User | null> {
+    return this.usersRepo.findOne({ where: { nickname } });
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -37,12 +34,12 @@ export class UsersService {
   }
 
   async create(createUserDto: CreateUserDto): Promise<SafeUser> {
-    const { username, email, password } = createUserDto;
+    const { nickname, email, password } = createUserDto;
 
     // Check if user already exists
-    const existingUser = await this.findOne(username);
-    if (existingUser) {
-      throw new ConflictException('Username is already taken');
+    const existingNickname = await this.findOne(nickname);
+    if (existingNickname) {
+      throw new ConflictException('Nickname is already taken');
     }
     const existingEmail = await this.findByEmail(email);
     if (existingEmail) {
@@ -54,7 +51,7 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     const newUser = this.usersRepo.create({
-      username,
+      nickname,
       email,
       password: hashedPassword,
     });
@@ -73,13 +70,13 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    // Handle username change
-    if (updateUserDto.username && updateUserDto.username !== user.username) {
-      const existing = await this.findOne(updateUserDto.username);
+    // Handle nickname change
+    if (updateUserDto.nickname && updateUserDto.nickname !== user.nickname) {
+      const existing = await this.findOne(updateUserDto.nickname);
       if (existing) {
-        throw new ConflictException('Username is already taken');
+        throw new ConflictException('Nickname is already taken');
       }
-      user.username = updateUserDto.username;
+      user.nickname = updateUserDto.nickname;
     }
 
     // Handle password change
@@ -110,12 +107,9 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    // Nullify author on all posts by this user (ON DELETE SET NULL doesn't fire on soft delete)
-    await this.postsRepo.update({ author: { id } }, { author: null });
-
     // Anonymize to release unique constraints
     const timestamp = Date.now();
-    user.username = `deleted_${user.id}_${timestamp}`;
+    user.nickname = `deleted_${user.id}_${timestamp}`;
     user.email = `deleted_${user.id}_${timestamp}@deleted.local`;
     await this.usersRepo.save(user);
 

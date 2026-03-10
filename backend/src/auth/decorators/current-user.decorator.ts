@@ -15,5 +15,5 @@ export const CurrentUser = createParamDecorator(
 // Type returned by JwtStrategy.validate()
 export interface JwtPayload {
   id: number;
-  username: string;
+  nickname: string;
 }

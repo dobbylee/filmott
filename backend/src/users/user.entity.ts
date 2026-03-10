@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   DeleteDateColumn,
+  CreateDateColumn,
 } from 'typeorm';
 
 @Entity('users')
@@ -11,7 +12,7 @@ export class User {
   id!: number;
 
   @Column({ unique: true })
-  username!: string;
+  nickname!: string;
 
   @Column({ unique: true })
   email!: string;
@@ -19,7 +20,13 @@ export class User {
   @Column()
   password!: string;
 
-  @DeleteDateColumn({ type: 'timestamptz' })
+  @Column({ name: 'profile_image', nullable: true, type: 'varchar' })
+  profileImage?: string;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt!: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
   deletedAt?: Date;
 }
 

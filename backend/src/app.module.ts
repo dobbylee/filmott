@@ -6,8 +6,11 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { User } from './users/user.entity';
-import { Post } from './posts/post.entity';
-import { PostsModule } from './posts/posts.module';
+import { Content } from './contents/content.entity';
+import { Ranking } from './rankings/ranking.entity';
+import { Review } from './reviews/review.entity';
+import { ReviewLike } from './reviews/review-like.entity';
+import { ReviewComment } from './reviews/review-comment.entity';
 
 @Module({
   imports: [
@@ -25,7 +28,7 @@ import { PostsModule } from './posts/posts.module';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
-        entities: [User, Post],
+        entities: [User, Content, Ranking, Review, ReviewLike, ReviewComment],
         synchronize: false,
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         extra: {
@@ -36,7 +39,6 @@ import { PostsModule } from './posts/posts.module';
 
     UsersModule,
     AuthModule,
-    PostsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
