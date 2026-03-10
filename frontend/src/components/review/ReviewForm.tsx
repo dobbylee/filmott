@@ -14,7 +14,7 @@ interface ReviewFormProps {
 }
 
 export default function ReviewForm({ contentId, existingReview }: ReviewFormProps) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading, openAuthModal } = useAuth();
   const router = useRouter();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -35,14 +35,25 @@ export default function ReviewForm({ contentId, existingReview }: ReviewFormProp
     }
   }, [existingReview]);
 
+  if (authLoading) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-4">
+        <div className="h-5 w-40 rounded bg-white/5 animate-pulse mx-auto" />
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="rounded-lg border border-border bg-card p-4 text-center">
         <p className="text-sm text-muted-foreground">
           한줄평을 남기려면{' '}
-          <a href="/login" className="text-primary hover:underline">
+          <button
+            onClick={() => openAuthModal('login')}
+            className="text-primary hover:underline"
+          >
             로그인
-          </a>
+          </button>
           하세요.
         </p>
       </div>

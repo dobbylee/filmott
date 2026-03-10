@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Heart } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -17,15 +16,14 @@ export default function LikeButton({
   initialCount,
   initialLiked = false,
 }: LikeButtonProps) {
-  const { user } = useAuth();
-  const router = useRouter();
+  const { user, openAuthModal } = useAuth();
   const [liked, setLiked] = useState(initialLiked);
   const [count, setCount] = useState(initialCount);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleToggle = async () => {
     if (!user) {
-      router.push('/login');
+      openAuthModal('login');
       return;
     }
     if (isLoading) return;

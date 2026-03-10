@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Trash2, Send } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -43,8 +42,7 @@ export default function ReviewComments({
   reviewId,
   commentCount = 0,
 }: ReviewCommentsProps) {
-  const { user } = useAuth();
-  const router = useRouter();
+  const { user, isLoading: authLoading, openAuthModal } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [total, setTotal] = useState(commentCount);
@@ -87,7 +85,7 @@ export default function ReviewComments({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      router.push('/login');
+      openAuthModal('login');
       return;
     }
     if (!newComment.trim() || isSubmitting) return;
@@ -142,14 +140,14 @@ export default function ReviewComments({
               type="text"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder={user ? '댓글을 입력하세요' : '로그인 후 댓글 작성'}
-              disabled={!user}
+              placeholder={authLoading ? '' : user ? '댓글을 입력하세요' : '로그인 후 댓글 작성'}
+              disabled={authLoading || !user}
               maxLength={300}
               className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
             />
             <button
               type="submit"
-              disabled={!user || !newComment.trim() || isSubmitting}
+              disabled={authLoading || !user || !newComment.trim() || isSubmitting}
               className="rounded-md bg-primary p-1.5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
               aria-label="댓글 등록"
             >

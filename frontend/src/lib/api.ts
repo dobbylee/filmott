@@ -22,12 +22,11 @@ api.interceptors.response.use(
   (error) => {
     if (
       error.response?.status === 401 &&
-      typeof window !== 'undefined' &&
-      !window.location.pathname.includes('/login')
+      typeof window !== 'undefined'
     ) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      window.dispatchEvent(new CustomEvent('auth:required'));
     }
     return Promise.reject(error);
   },

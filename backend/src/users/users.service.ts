@@ -26,6 +26,17 @@ export class UsersService {
     return this.usersRepo.findOne({ where: { email } });
   }
 
+  async isNicknameAvailable(nickname: string): Promise<boolean> {
+    const existing = await this.findOne(nickname);
+    return !existing;
+  }
+
+  async verifyPassword(id: number, password: string): Promise<boolean> {
+    const user = await this.usersRepo.findOne({ where: { id } });
+    if (!user) return false;
+    return bcrypt.compare(password, user.password);
+  }
+
   async findById(id: number): Promise<SafeUser | null> {
     const user = await this.usersRepo.findOne({ where: { id } });
     if (!user) return null;
@@ -33,17 +44,27 @@ export class UsersService {
     return result;
   }
 
+  private isReservedNickname(nickname: string): boolean {
+    const reserved = ['admin', 'filmott', 'deleted'];
+    const lower = nickname.toLowerCase();
+    return reserved.some((w) => lower.startsWith(w));
+  }
+
   async create(createUserDto: CreateUserDto): Promise<SafeUser> {
     const { nickname, email, password } = createUserDto;
+
+    if (this.isReservedNickname(nickname)) {
+      throw new ConflictException('사용할 수 없는 닉네임입니다.');
+    }
 
     // Check if user already exists
     const existingNickname = await this.findOne(nickname);
     if (existingNickname) {
-      throw new ConflictException('Nickname is already taken');
+      throw new ConflictException('이미 사용 중인 닉네임입니다.');
     }
     const existingEmail = await this.findByEmail(email);
     if (existingEmail) {
-      throw new ConflictException('Email is already taken');
+      throw new ConflictException('이미 사용 중인 이메일입니다.');
     }
 
     // Hash password
@@ -67,14 +88,17 @@ export class UsersService {
   async update(id: number, updateUserDto: UpdateUserDto): Promise<SafeUser> {
     const user = await this.usersRepo.findOne({ where: { id } });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
     // Handle nickname change
     if (updateUserDto.nickname && updateUserDto.nickname !== user.nickname) {
+      if (this.isReservedNickname(updateUserDto.nickname)) {
+        throw new ConflictException('사용할 수 없는 닉네임입니다.');
+      }
       const existing = await this.findOne(updateUserDto.nickname);
       if (existing) {
-        throw new ConflictException('Nickname is already taken');
+        throw new ConflictException('이미 사용 중인 닉네임입니다.');
       }
       user.nickname = updateUserDto.nickname;
     }
@@ -83,7 +107,7 @@ export class UsersService {
     if (updateUserDto.newPassword) {
       if (!updateUserDto.currentPassword) {
         throw new BadRequestException(
-          'Current password is required to change password',
+          '비밀번호 변경을 위해 현재 비밀번호를 입력해주세요.',
         );
       }
       const isMatch = await bcrypt.compare(
@@ -91,7 +115,7 @@ export class UsersService {
         user.password,
       );
       if (!isMatch) {
-        throw new BadRequestException('Current password is incorrect');
+        throw new BadRequestException('현재 비밀번호가 올바르지 않습니다.');
       }
       user.password = await bcrypt.hash(updateUserDto.newPassword, 10);
     }
@@ -104,7 +128,7 @@ export class UsersService {
   async softRemove(id: number): Promise<void> {
     const user = await this.usersRepo.findOne({ where: { id } });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
     // Anonymize to release unique constraints

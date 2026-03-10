@@ -16,12 +16,12 @@ export class AuthService {
   async validateUser(email: string, pass: string): Promise<SafeUser> {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
 
     const isMatch = await bcrypt.compare(pass, user.password || '');
     if (!isMatch) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

@@ -25,6 +25,9 @@ vi.mock('@/contexts/AuthContext', () => ({
     token: null,
     isLoading: false,
     updateUser: vi.fn(),
+    openAuthModal: vi.fn(),
+    closeAuthModal: vi.fn(),
+    authModal: null,
   }),
 }));
 
@@ -37,7 +40,8 @@ describe('Header', () => {
   it('should render logo and login button when not authenticated', () => {
     render(<Header />);
 
-    expect(screen.getByText((_, el) => el?.textContent === 'filmott')).toBeInTheDocument();
+    const logoLinks = screen.getAllByText((_, el) => el?.textContent === 'filmott');
+    expect(logoLinks.length).toBeGreaterThan(0);
     expect(screen.getByText('로그인')).toBeInTheDocument();
   });
 

@@ -7,7 +7,7 @@ import { Search, LogOut, Compass, Menu, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Header() {
-  const { user, logout } = useAuth();
+  const { user, isLoading, logout, openAuthModal } = useAuth();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -139,7 +139,9 @@ export default function Header() {
             {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
 
-          {user ? (
+          {isLoading ? (
+            <div className="h-8 w-20 rounded-full bg-white/5 animate-pulse" />
+          ) : user ? (
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
@@ -171,12 +173,12 @@ export default function Header() {
               )}
             </div>
           ) : (
-            <Link
-              href="/login"
+            <button
+              onClick={() => openAuthModal('login')}
               className="rounded-full bg-gradient-to-br from-fuchsia-600 to-indigo-600 px-4 py-1.5 text-sm font-bold text-white shadow-[0_0_15px_rgba(192,38,211,0.5)] hover:shadow-[0_0_25px_rgba(192,38,211,0.7)] transition-all duration-300"
             >
               로그인
-            </Link>
+            </button>
           )}
         </div>
       </div>

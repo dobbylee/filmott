@@ -8,6 +8,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+const mockOpenAuthModal = vi.fn();
 let mockUser: { id: number; nickname: string } | null = null;
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -18,6 +19,9 @@ vi.mock('@/contexts/AuthContext', () => ({
     token: null,
     isLoading: false,
     updateUser: vi.fn(),
+    openAuthModal: mockOpenAuthModal,
+    closeAuthModal: vi.fn(),
+    authModal: null,
   }),
 }));
 
@@ -38,12 +42,13 @@ describe('LikeButton', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
   });
 
-  it('미로그인 시 클릭하면 로그인 페이지로 이동한다', async () => {
+  it('미로그인 시 클릭하면 인증 모달을 연다', async () => {
     const user = userEvent.setup();
     render(<LikeButton reviewId={1} initialCount={5} />);
 
     await user.click(screen.getByRole('button'));
-    expect(mockPush).toHaveBeenCalledWith('/login');
+    expect(mockOpenAuthModal).toHaveBeenCalledWith('login');
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('로그인 시 클릭하면 낙관적 업데이트를 수행한다', async () => {

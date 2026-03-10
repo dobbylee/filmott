@@ -3,6 +3,7 @@ import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@/contexts/AuthContext';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import AuthModal from '@/components/auth/AuthModal';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default function RootLayout({
               <main className="w-full flex-1 pb-10 pt-20">{children}</main>
               <Footer />
             </div>
+            <AuthModal />
           </AuthProvider>
         </ThemeProvider>
       </body>
