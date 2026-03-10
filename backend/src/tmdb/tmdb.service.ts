@@ -1,0 +1,194 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
+
+export interface TmdbSearchResult {
+  page: number;
+  total_pages: number;
+  total_results: number;
+  results: TmdbItem[];
+}
+
+export interface TmdbItem {
+  id: number;
+  media_type?: string;
+  title?: string;
+  name?: string;
+  original_title?: string;
+  original_name?: string;
+  poster_path?: string;
+  backdrop_path?: string;
+  overview?: string;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average?: number;
+  genre_ids?: number[];
+  genres?: { id: number; name: string }[];
+  runtime?: number;
+  number_of_episodes?: number;
+  episode_run_time?: number[];
+  credits?: {
+    cast: TmdbCast[];
+  };
+  ['watch/providers']?: {
+    results?: {
+      KR?: TmdbWatchProviderCountry;
+    };
+  };
+}
+
+export interface TmdbCast {
+  id: number;
+  name: string;
+  character: string;
+  profile_path?: string;
+  order: number;
+}
+
+export interface TmdbWatchProviderCountry {
+  link?: string;
+  flatrate?: TmdbProvider[];
+  rent?: TmdbProvider[];
+  buy?: TmdbProvider[];
+}
+
+export interface TmdbProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+}
+
+@Injectable()
+export class TmdbService {
+  private readonly logger = new Logger(TmdbService.name);
+
+  constructor(private readonly httpService: HttpService) {}
+
+  async searchMulti(query: string, page = 1): Promise<TmdbSearchResult> {
+    const { data } = await firstValueFrom(
+      this.httpService.get<TmdbSearchResult>('/search/multi', {
+        params: { query, page, language: 'ko-KR', region: 'KR' },
+      }),
+    );
+    // movie/tv만 필터링
+    data.results = data.results.filter(
+      (item) => item.media_type === 'movie' || item.media_type === 'tv',
+    );
+    return data;
+  }
+
+  async searchByType(
+    query: string,
+    type: 'movie' | 'tv',
+    page = 1,
+  ): Promise<TmdbSearchResult> {
+    const { data } = await firstValueFrom(
+      this.httpService.get<TmdbSearchResult>(`/search/${type}`, {
+        params: { query, page, language: 'ko-KR', region: 'KR' },
+      }),
+    );
+    // media_type 주입 (search/{type}은 media_type을 반환하지 않음)
+    data.results = data.results.map((item) => ({
+      ...item,
+      media_type: type,
+    }));
+    return data;
+  }
+
+  async getDetails(tmdbId: number, type: 'movie' | 'tv'): Promise<TmdbItem> {
+    const { data } = await firstValueFrom(
+      this.httpService.get<TmdbItem>(`/${type}/${tmdbId}`, {
+        params: {
+          language: 'ko-KR',
+          append_to_response: 'credits,watch/providers',
+        },
+      }),
+    );
+    return data;
+  }
+
+  async getPopular(
+    type: 'movie' | 'tv',
+    page = 1,
+  ): Promise<TmdbSearchResult> {
+    const { data } = await firstValueFrom(
+      this.httpService.get<TmdbSearchResult>(`/${type}/popular`, {
+        params: { page, language: 'ko-KR', region: 'KR' },
+      }),
+    );
+    return data;
+  }
+
+  async getNowPlaying(page = 1): Promise<TmdbSearchResult> {
+    const { data } = await firstValueFrom(
+      this.httpService.get<TmdbSearchResult>('/movie/now_playing', {
+        params: { page, language: 'ko-KR', region: 'KR' },
+      }),
+    );
+    return data;
+  }
+
+  async getTrending(
+    type: 'movie' | 'tv' | 'all',
+    timeWindow: 'day' | 'week' = 'day',
+  ): Promise<TmdbSearchResult> {
+    const { data } = await firstValueFrom(
+      this.httpService.get<TmdbSearchResult>(
+        `/trending/${type}/${timeWindow}`,
+        {
+          params: { language: 'ko-KR' },
+        },
+      ),
+    );
+    return data;
+  }
+
+  async getWatchProviders(
+    tmdbId: number,
+    type: 'movie' | 'tv',
+  ): Promise<TmdbWatchProviderCountry | null> {
+    const { data } = await firstValueFrom(
+      this.httpService.get<{ results?: { KR?: TmdbWatchProviderCountry } }>(
+        `/${type}/${tmdbId}/watch/providers`,
+      ),
+    );
+    return data.results?.KR ?? null;
+  }
+
+  async discoverByFilters(
+    type: 'movie' | 'tv',
+    options: {
+      genres?: string;
+      watchProviders?: string;
+      year?: number;
+      region?: string;
+      page?: number;
+    } = {},
+  ): Promise<TmdbSearchResult> {
+    const params: Record<string, string | number> = {
+      language: 'ko-KR',
+      watch_region: options.region ?? 'KR',
+      page: options.page ?? 1,
+      sort_by: 'popularity.desc',
+    };
+
+    if (options.genres) {
+      params.with_genres = options.genres;
+    }
+    if (options.watchProviders) {
+      params.with_watch_providers = options.watchProviders;
+    }
+    if (options.year) {
+      if (type === 'movie') {
+        params.primary_release_year = options.year;
+      } else {
+        params.first_air_date_year = options.year;
+      }
+    }
+
+    const { data } = await firstValueFrom(
+      this.httpService.get<TmdbSearchResult>(`/discover/${type}`, { params }),
+    );
+    return data;
+  }
+}
