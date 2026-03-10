@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@/contexts/AuthContext';
 import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -26,7 +27,8 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AuthProvider>
             <Header />
-            <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+            <main className="mx-auto max-w-7xl px-4 py-6 min-h-[calc(100vh-12rem)]">{children}</main>
+            <Footer />
           </AuthProvider>
         </ThemeProvider>
       </body>

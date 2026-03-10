@@ -1,7 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ReviewList from '@/components/review/ReviewList';
 import type { Review } from '@/types/review';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: null,
+    logout: vi.fn(),
+    login: vi.fn(),
+    signup: vi.fn(),
+    token: null,
+    isLoading: false,
+    updateUser: vi.fn(),
+  }),
+}));
 
 describe('ReviewList', () => {
   const reviews: Review[] = [

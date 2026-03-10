@@ -6,6 +6,7 @@ import { fetchApi } from '@/lib/fetcher';
 import CastCarousel from '@/components/content/CastCarousel';
 import WatchProviders from '@/components/content/WatchProviders';
 import ReviewList from '@/components/review/ReviewList';
+import ReviewFormWrapper from '@/components/review/ReviewFormWrapper';
 import type { ContentDetail } from '@/types/content';
 import type { ReviewsResponse, ContentStats } from '@/types/review';
 
@@ -89,6 +90,9 @@ async function ReviewsSection({ contentId }: { contentId: number }) {
               </span>
             </div>
           )}
+        </div>
+        <div className="mb-4">
+          <ReviewFormWrapper contentId={contentId} />
         </div>
         <ReviewList reviews={reviewsData.data} />
       </div>

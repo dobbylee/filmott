@@ -1,8 +1,11 @@
-import { Star, Heart, AlertTriangle } from 'lucide-react';
+import { Star, AlertTriangle } from 'lucide-react';
+import LikeButton from './LikeButton';
+import ReviewComments from './ReviewComments';
 import type { Review } from '@/types/review';
 
 interface ReviewCardProps {
   review: Review;
+  showInteractions?: boolean;
 }
 
 function formatDate(dateStr: string): string {
@@ -14,7 +17,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export default function ReviewCard({ review }: ReviewCardProps) {
+export default function ReviewCard({ review, showInteractions = true }: ReviewCardProps) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-start justify-between">
@@ -60,10 +63,19 @@ export default function ReviewCard({ review }: ReviewCardProps) {
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
-        <Heart className="h-3.5 w-3.5" />
-        <span>{review.likesCount}</span>
-      </div>
+      {showInteractions ? (
+        <div className="mt-3 flex items-center gap-4">
+          <LikeButton
+            reviewId={review.id}
+            initialCount={review.likesCount}
+          />
+          <ReviewComments reviewId={review.id} />
+        </div>
+      ) : (
+        <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
+          <span>{review.likesCount} 좋아요</span>
+        </div>
+      )}
     </div>
   );
 }
