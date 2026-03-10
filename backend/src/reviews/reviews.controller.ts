@@ -66,6 +66,15 @@ export class ReviewsController {
     return this.reviewsService.findMyReview(user.id, contentId);
   }
 
+  @Get('liked-ids')
+  @UseGuards(JwtAuthGuard)
+  async getLikedIds(
+    @CurrentUser() user: JwtPayload,
+    @Query('contentId', ParseIntPipe) contentId: number,
+  ) {
+    return this.reviewsService.getLikedReviewIds(user.id, contentId);
+  }
+
   @Get()
   async findByContent(
     @Query('contentId', ParseIntPipe) contentId: number,

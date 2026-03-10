@@ -7,7 +7,6 @@ export interface Review {
   contentId: number;
   rating?: number;
   comment?: string;
-  hasSpoiler: boolean;
   likesCount: number;
   createdAt: string;
   updatedAt: string;

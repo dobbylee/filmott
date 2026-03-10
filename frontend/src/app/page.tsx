@@ -116,7 +116,7 @@ function RecentReviewItem({ review }: { review: Review }) {
 
         {review.comment && (
           <p className="text-sm leading-relaxed text-white/70 line-clamp-2">
-            {review.hasSpoiler ? <span className="text-red-400/80 italic">스포일러가 포함된 리뷰입니다.</span> : review.comment}
+            {review.comment}
           </p>
         )}
       </div>
@@ -132,7 +132,7 @@ async function RecentReviewsSection() {
     return (
       <section>
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold tracking-tight">실시간 생생한 한줄평</h2>
+          <h2 className="text-2xl font-bold tracking-tight">실시간 생생한 리뷰</h2>
           <Link href="/discover" className="flex items-center gap-1 text-sm font-medium text-white/50 hover:text-white transition-colors">
             더보기 <ArrowRight className="h-4 w-4" />
           </Link>
@@ -145,7 +145,7 @@ async function RecentReviewsSection() {
       </section>
     );
   } catch {
-    return <SectionError title="최근 한줄평" />;
+    return <SectionError title="최근 리뷰" />;
   }
 }
 
@@ -178,7 +178,7 @@ function SectionSkeleton({ title }: { title: string }) {
 function ReviewSkeleton() {
   return (
     <section className="py-8">
-      <h2 className="mb-6 text-2xl font-bold tracking-tight text-white/80">실시간 생생한 한줄평</h2>
+      <h2 className="mb-6 text-2xl font-bold tracking-tight text-white/80">실시간 생생한 리뷰</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="h-[120px] animate-pulse rounded-2xl bg-white/5" />

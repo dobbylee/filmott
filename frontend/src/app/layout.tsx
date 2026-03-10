@@ -8,7 +8,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'filmott - 영화/드라마 리뷰',
-  description: '최고의 프리미엄 시네마틱 경험, 영화/드라마 한줄평과 별점',
+  description: '최고의 프리미엄 시네마틱 경험, 영화/드라마 리뷰과 별점',
 };
 
 export default function RootLayout({

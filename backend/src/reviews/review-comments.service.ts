@@ -27,7 +27,7 @@ export class ReviewCommentsService {
       where: { id: reviewId },
     });
     if (!review) {
-      throw new NotFoundException('한줄평을 찾을 수 없습니다.');
+      throw new NotFoundException('리뷰를 찾을 수 없습니다.');
     }
 
     const comment = this.commentRepo.create({
@@ -58,27 +58,21 @@ export class ReviewCommentsService {
     const take = 20;
     const skip = (page - 1) * take;
 
-    const [comments, total] = await this.commentRepo.findAndCount({
-      where: { reviewId },
-      relations: ['user'],
-      order: { createdAt: 'ASC' },
-      skip,
-      take,
-    });
+    const [comments, total] = await this.commentRepo
+      .createQueryBuilder('comment')
+      .leftJoin('comment.user', 'user')
+      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage'])
+      .where('comment.reviewId = :reviewId', { reviewId })
+      .orderBy('comment.createdAt', 'ASC')
+      .skip(skip)
+      .take(take)
+      .getManyAndCount();
 
     return {
-      data: comments.map((c) => this.sanitizeComment(c)),
+      data: comments,
       total,
       page,
       totalPages: Math.ceil(total / take),
     };
-  }
-
-  private sanitizeComment(comment: ReviewComment) {
-    if (comment.user) {
-      const { password, ...safeUser } = comment.user as any;
-      return { ...comment, user: safeUser };
-    }
-    return comment;
   }
 }

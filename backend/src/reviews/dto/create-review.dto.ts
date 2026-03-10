@@ -2,7 +2,6 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  IsBoolean,
   Min,
   Max,
   MaxLength,
@@ -21,8 +20,4 @@ export class CreateReviewDto {
   @IsString()
   @MaxLength(1000)
   comment?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  hasSpoiler?: boolean;
 }

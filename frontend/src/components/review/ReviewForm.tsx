@@ -2,38 +2,40 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Pencil, Trash2 } from 'lucide-react';
+import { Star, Pencil, Trash2, Plus } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import StarRating from './StarRating';
+import LikeButton from './LikeButton';
+import ReviewFormModal from './ReviewFormModal';
+import ReviewCommentsModal from './ReviewCommentsModal';
 import type { Review } from '@/types/review';
 
 interface ReviewFormProps {
   contentId: number;
   existingReview?: Review | null;
+  initialLiked?: boolean;
+  onMutate?: () => void;
 }
 
-export default function ReviewForm({ contentId, existingReview }: ReviewFormProps) {
+export default function ReviewForm({ contentId, existingReview, initialLiked = false, onMutate }: ReviewFormProps) {
   const { user, isLoading: authLoading, openAuthModal } = useAuth();
   const router = useRouter();
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [hasSpoiler, setHasSpoiler] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showEditWarning, setShowEditWarning] = useState(false);
 
   const hasExisting = existingReview != null;
 
   useEffect(() => {
-    if (existingReview) {
-      setRating(existingReview.rating ?? 0);
-      setComment(existingReview.comment ?? '');
-      setHasSpoiler(existingReview.hasSpoiler);
-    }
-  }, [existingReview]);
+    if (!showDeleteConfirm) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowDeleteConfirm(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [showDeleteConfirm]);
 
   if (authLoading) {
     return (
@@ -47,7 +49,7 @@ export default function ReviewForm({ contentId, existingReview }: ReviewFormProp
     return (
       <div className="rounded-lg border border-border bg-card p-4 text-center">
         <p className="text-sm text-muted-foreground">
-          한줄평을 남기려면{' '}
+          리뷰를 남기려면{' '}
           <button
             onClick={() => openAuthModal('login')}
             className="text-primary hover:underline"
@@ -60,136 +62,21 @@ export default function ReviewForm({ contentId, existingReview }: ReviewFormProp
     );
   }
 
-  if (hasExisting && !isEditing) {
-    return (
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">내 한줄평</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                if (existingReview.likesCount > 0) {
-                  setShowEditWarning(true);
-                } else {
-                  setIsEditing(true);
-                }
-              }}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              <Pencil className="h-3 w-3" />
-              수정
-            </button>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="h-3 w-3" />
-              삭제
-            </button>
-          </div>
-        </div>
-        {existingReview.rating != null && (
-          <div className="mt-2 flex items-center gap-1">
-            {Array.from({ length: existingReview.rating }, (_, i) => (
-              <span key={i} className="text-yellow-400 text-sm">&#9733;</span>
-            ))}
-            <span className="ml-1 text-sm font-semibold">{existingReview.rating}점</span>
-          </div>
-        )}
-        {existingReview.comment && (
-          <p className="mt-2 text-sm text-card-foreground">{existingReview.comment}</p>
-        )}
-
-        {/* 수정 경고 모달 */}
-        {showEditWarning && (
-          <div className="mt-3 rounded-md border border-orange-300 bg-orange-50 p-3 dark:border-orange-700 dark:bg-orange-950">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-500 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
-                  수정하면 받은 좋아요가 모두 초기화됩니다.
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => {
-                      setShowEditWarning(false);
-                      setIsEditing(true);
-                    }}
-                    className="rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700"
-                  >
-                    계속 수정
-                  </button>
-                  <button
-                    onClick={() => setShowEditWarning(false)}
-                    className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary"
-                  >
-                    취소
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 삭제 확인 */}
-        {showDeleteConfirm && (
-          <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
-            <p className="text-sm text-destructive">정말 삭제하시겠습니까?</p>
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={handleDelete}
-                disabled={isSubmitting}
-                className="rounded-md bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-              >
-                삭제
-              </button>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary"
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
+  function handleEditClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!existingReview) return;
+    if (existingReview.likesCount > 0) {
+      const confirmed = window.confirm(
+        `수정하면 받은 좋아요(${existingReview.likesCount}개)가 모두 초기화됩니다.\n계속하시겠습니까?`
+      );
+      if (!confirmed) return;
+    }
+    setShowFormModal(true);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (rating === 0) {
-      setError('별점을 선택해주세요.');
-      return;
-    }
-    setError('');
-    setIsSubmitting(true);
-
-    try {
-      if (hasExisting && isEditing) {
-        await api.patch(`/reviews/${existingReview.id}`, {
-          rating,
-          comment: comment || undefined,
-          hasSpoiler,
-        });
-      } else {
-        await api.post('/reviews', {
-          contentId,
-          rating,
-          comment: comment || undefined,
-          hasSpoiler,
-        });
-      }
-      setIsEditing(false);
-      router.refresh();
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? '한줄평 저장에 실패했습니다.';
-      setError(typeof msg === 'string' ? msg : '한줄평 저장에 실패했습니다.');
-    } finally {
-      setIsSubmitting(false);
-    }
+  function handleDeleteClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    setShowDeleteConfirm(true);
   }
 
   async function handleDelete() {
@@ -197,10 +84,8 @@ export default function ReviewForm({ contentId, existingReview }: ReviewFormProp
     setIsSubmitting(true);
     try {
       await api.delete(`/reviews/${existingReview.id}`);
-      setRating(0);
-      setComment('');
-      setHasSpoiler(false);
       setShowDeleteConfirm(false);
+      onMutate?.();
       router.refresh();
     } catch {
       setError('삭제에 실패했습니다.');
@@ -209,79 +94,136 @@ export default function ReviewForm({ contentId, existingReview }: ReviewFormProp
     }
   }
 
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-lg border border-border bg-card p-4"
-    >
-      <h3 className="mb-3 text-sm font-semibold">
-        {isEditing ? '한줄평 수정' : '한줄평 작성'}
-      </h3>
-
-      <div className="mb-3">
-        <label className="mb-1 block text-xs text-muted-foreground">별점</label>
-        <StarRating value={rating} onChange={setRating} />
-      </div>
-
-      <div className="mb-3">
-        <label className="mb-1 block text-xs text-muted-foreground">
-          코멘트 (선택)
-        </label>
-        <textarea
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="작품에 대한 한마디를 남겨보세요."
-          maxLength={500}
-          rows={3}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none"
-        />
-      </div>
-
-      <div className="mb-4 flex items-center gap-2">
-        <input
-          type="checkbox"
-          id="spoiler-toggle"
-          checked={hasSpoiler}
-          onChange={(e) => setHasSpoiler(e.target.checked)}
-          className="h-4 w-4 rounded border-input accent-primary"
-        />
-        <label
-          htmlFor="spoiler-toggle"
-          className="text-sm text-muted-foreground"
+  // 기존 리뷰 카드
+  if (hasExisting) {
+    return (
+      <>
+        <div
+          onClick={() => setShowComments(true)}
+          className="rounded-lg border border-border bg-card p-4 cursor-pointer hover:bg-white/[0.03] transition-colors"
         >
-          스포일러 포함
-        </label>
-      </div>
+          {/* 상단: 아바타 + 닉네임 + 별점 (왼쪽) / 좋아요 (오른쪽) */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
+                {existingReview.user?.nickname?.charAt(0) ?? user.nickname?.charAt(0) ?? '?'}
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium">
+                    {existingReview.user?.nickname ?? user.nickname}
+                  </span>
+                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">내 리뷰</span>
+                  {existingReview.rating != null && (
+                    <div className="flex items-center gap-0.5 ml-1">
+                      <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                      <span className="text-xs font-semibold">{existingReview.rating}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
-      {error && (
-        <p className="mb-3 text-sm text-destructive">{error}</p>
-      )}
+            <div onClick={(e) => e.stopPropagation()}>
+              <LikeButton
+                reviewId={existingReview.id}
+                initialCount={existingReview.likesCount}
+                initialLiked={initialLiked}
+                size="md"
+              />
+            </div>
+          </div>
 
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={isSubmitting || rating === 0}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {isSubmitting ? '저장 중...' : isEditing ? '수정 완료' : '등록'}
-        </button>
-        {isEditing && (
-          <button
-            type="button"
-            onClick={() => {
-              setIsEditing(false);
-              if (existingReview) {
-                setRating(existingReview.rating ?? 0);
-                setComment(existingReview.comment ?? '');
-                setHasSpoiler(existingReview.hasSpoiler);
-              }
-            }}
-            className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
-          >
-            취소
-          </button>
+          {/* 코멘트 */}
+          {existingReview.comment && (
+            <p className="mt-3 text-sm leading-relaxed text-card-foreground">
+              {existingReview.comment}
+            </p>
+          )}
+
+          {/* 하단: 수정/삭제 */}
+          <div className="mt-3 flex items-center justify-end gap-2 border-t border-border pt-3">
+            <button
+              onClick={handleEditClick}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              <Pencil className="h-3 w-3" />
+              수정
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-3 w-3" />
+              삭제
+            </button>
+          </div>
+
+          {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+
+          {/* 삭제 확인 */}
+          {showDeleteConfirm && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3"
+            >
+              <p className="text-sm text-destructive">정말 삭제하시겠습니까?</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={handleDelete}
+                  disabled={isSubmitting}
+                  className="rounded-md bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+                >
+                  삭제
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(false); }}
+                  className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {showFormModal && (
+          <ReviewFormModal
+            contentId={contentId}
+            existingReview={existingReview}
+            onClose={() => setShowFormModal(false)}
+            onMutate={onMutate}
+          />
         )}
-      </div>
-    </form>
+
+        {showComments && (
+          <ReviewCommentsModal
+            review={existingReview}
+            onClose={() => setShowComments(false)}
+          />
+        )}
+      </>
+    );
+  }
+
+  // 작성 버튼
+  return (
+    <>
+      <button
+        onClick={() => setShowFormModal(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-card p-3 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+      >
+        <Plus className="h-4 w-4" />
+        리뷰 작성
+      </button>
+
+      {showFormModal && (
+        <ReviewFormModal
+          contentId={contentId}
+          onClose={() => setShowFormModal(false)}
+          onMutate={onMutate}
+        />
+      )}
+    </>
   );
 }

@@ -16,7 +16,15 @@ vi.mock('@/contexts/AuthContext', () => ({
     token: null,
     isLoading: false,
     updateUser: vi.fn(),
+    openAuthModal: vi.fn(),
   }),
+}));
+
+vi.mock('@/lib/api', () => ({
+  default: {
+    post: vi.fn().mockResolvedValue({ data: {} }),
+    get: vi.fn().mockResolvedValue({ data: { data: [], total: 0, page: 1, totalPages: 0 } }),
+  },
 }));
 
 describe('ReviewCard', () => {
@@ -26,7 +34,6 @@ describe('ReviewCard', () => {
     contentId: 100,
     rating: 8,
     comment: '정말 좋은 영화입니다!',
-    hasSpoiler: false,
     likesCount: 5,
     createdAt: '2024-12-25T12:00:00Z',
     updatedAt: '2024-12-25T12:00:00Z',
@@ -53,15 +60,14 @@ describe('ReviewCard', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
   });
 
-  it('스포일러 리뷰를 접어서 표시한다', () => {
-    const spoilerReview = { ...review, hasSpoiler: true };
-    render(<ReviewCard review={spoilerReview} />);
-    expect(screen.getByText(/스포일러 포함/)).toBeInTheDocument();
-  });
-
   it('닉네임 첫 글자를 아바타로 표시한다', () => {
     render(<ReviewCard review={review} />);
     expect(screen.getByText('영')).toBeInTheDocument();
+  });
+
+  it('댓글 버튼을 표시한다', () => {
+    render(<ReviewCard review={review} />);
+    expect(screen.getByText('댓글')).toBeInTheDocument();
   });
 
   it('showInteractions=false 시 좋아요 텍스트만 표시한다', () => {

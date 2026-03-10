@@ -14,7 +14,7 @@ export default function Footer() {
               film<span className="text-gradient">ott</span>
             </Link>
             <p className="mt-1 text-xs text-muted-foreground">
-              영화, 드라마 한줄평과 별점을 남기고 공유하세요.
+              영화, 드라마 리뷰과 별점을 남기고 공유하세요.
             </p>
           </div>
           <nav className="flex gap-4 text-sm text-muted-foreground">

@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { Star, Clock, Calendar } from 'lucide-react';
 import { fetchApi } from '@/lib/fetcher';
 import CastCarousel from '@/components/content/CastCarousel';
-import ReviewList from '@/components/review/ReviewList';
+import ReviewListClient from '@/components/review/ReviewListClient';
 import ReviewFormWrapper from '@/components/review/ReviewFormWrapper';
 import type { ContentDetail, WatchProviderData } from '@/types/content';
 import { TMDB_IMAGE_BASE } from '@/types/content';
@@ -78,9 +78,9 @@ async function ReviewsSection({ contentId }: { contentId: number }) {
     ]);
 
     return (
-      <div>
+      <div className="mx-auto w-full max-w-3xl">
         <div className="mb-4 flex items-center gap-4">
-          <h2 className="text-lg font-bold">한줄평</h2>
+          <h2 className="text-lg font-bold">리뷰</h2>
           {stats.averageRating != null && (
             <div className="flex items-center gap-1.5">
               <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
@@ -94,15 +94,15 @@ async function ReviewsSection({ contentId }: { contentId: number }) {
         <div className="mb-4">
           <ReviewFormWrapper contentId={contentId} />
         </div>
-        <ReviewList reviews={reviewsData.data} />
+        <ReviewListClient reviews={reviewsData.data} contentId={contentId} />
       </div>
     );
   } catch {
     return (
       <div>
-        <h2 className="mb-4 text-lg font-bold">한줄평</h2>
+        <h2 className="mb-4 text-lg font-bold">리뷰</h2>
         <p className="text-sm text-muted-foreground">
-          한줄평을 불러올 수 없습니다.
+          리뷰를 불러올 수 없습니다.
         </p>
       </div>
     );
@@ -279,12 +279,12 @@ export default async function ContentDetailPage({
           </section>
         )}
 
-        {/* 하단: 한줄평 목록 */}
+        {/* 하단: 리뷰 목록 */}
         <section>
           <Suspense
             fallback={
               <div className="text-sm text-muted-foreground">
-                한줄평 불러오는 중...
+                리뷰 불러오는 중...
               </div>
             }
           >

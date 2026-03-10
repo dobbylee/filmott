@@ -27,7 +27,7 @@ describe('ReviewList', () => {
       contentId: 100,
       rating: 8,
       comment: '좋은 영화!',
-      hasSpoiler: false,
+
       likesCount: 3,
       createdAt: '2024-12-25T12:00:00Z',
       updatedAt: '2024-12-25T12:00:00Z',
@@ -39,7 +39,7 @@ describe('ReviewList', () => {
       contentId: 100,
       rating: 6,
       comment: '보통이에요.',
-      hasSpoiler: false,
+
       likesCount: 1,
       createdAt: '2024-12-26T12:00:00Z',
       updatedAt: '2024-12-26T12:00:00Z',
@@ -55,7 +55,7 @@ describe('ReviewList', () => {
 
   it('빈 목록일 때 기본 메시지를 표시한다', () => {
     render(<ReviewList reviews={[]} />);
-    expect(screen.getByText('아직 한줄평이 없습니다.')).toBeInTheDocument();
+    expect(screen.getByText('아직 리뷰가 없습니다.')).toBeInTheDocument();
   });
 
   it('빈 목록일 때 커스텀 메시지를 표시한다', () => {

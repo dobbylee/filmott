@@ -27,7 +27,7 @@ export class ReviewsService {
       where: { userId, contentId: dto.contentId },
     });
     if (existing) {
-      throw new ConflictException('이미 이 작품에 한줄평을 작성했습니다.');
+      throw new ConflictException('이미 이 작품에 리뷰를 작성했습니다.');
     }
 
     const review = this.reviewRepo.create({
@@ -35,7 +35,7 @@ export class ReviewsService {
       contentId: dto.contentId,
       rating: dto.rating,
       comment: dto.comment,
-      hasSpoiler: dto.hasSpoiler ?? false,
+      hasSpoiler: false,
     });
 
     return this.reviewRepo.save(review);
@@ -51,10 +51,10 @@ export class ReviewsService {
     });
 
     if (!review) {
-      throw new NotFoundException('한줄평을 찾을 수 없습니다.');
+      throw new NotFoundException('리뷰를 찾을 수 없습니다.');
     }
     if (review.userId !== userId) {
-      throw new ForbiddenException('본인의 한줄평만 수정할 수 있습니다.');
+      throw new ForbiddenException('본인의 리뷰만 수정할 수 있습니다.');
     }
 
     // rating은 null로 변경 불가
@@ -65,8 +65,6 @@ export class ReviewsService {
 
     if (dto.rating !== undefined) review.rating = dto.rating;
     if (dto.comment !== undefined) review.comment = dto.comment;
-    if (dto.hasSpoiler !== undefined) review.hasSpoiler = dto.hasSpoiler;
-
     // 수정 시 likes_count 리셋 + 좋아요 데이터 삭제를 트랜잭션으로 처리
     return this.dataSource.transaction(async (manager) => {
       review.likesCount = 0;
@@ -81,19 +79,23 @@ export class ReviewsService {
     });
 
     if (!review) {
-      throw new NotFoundException('한줄평을 찾을 수 없습니다.');
+      throw new NotFoundException('리뷰를 찾을 수 없습니다.');
     }
     if (review.userId !== userId) {
-      throw new ForbiddenException('본인의 한줄평만 삭제할 수 있습니다.');
+      throw new ForbiddenException('본인의 리뷰만 삭제할 수 있습니다.');
     }
 
     await this.reviewRepo.remove(review);
   }
 
   async findMyReview(userId: number, contentId: number): Promise<Review | null> {
-    return this.reviewRepo.findOne({
-      where: { userId, contentId },
-    });
+    return this.reviewRepo
+      .createQueryBuilder('review')
+      .leftJoin('review.user', 'user')
+      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage'])
+      .where('review.userId = :userId', { userId })
+      .andWhere('review.contentId = :contentId', { contentId })
+      .getOne();
   }
 
   async findByContent(
@@ -106,7 +108,8 @@ export class ReviewsService {
 
     const qb = this.reviewRepo
       .createQueryBuilder('review')
-      .leftJoinAndSelect('review.user', 'user')
+      .leftJoin('review.user', 'user')
+      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage'])
       .where('review.contentId = :contentId', { contentId })
       .skip(skip)
       .take(take);
@@ -151,11 +154,14 @@ export class ReviewsService {
   }
 
   async getRecentReviews(limit = 10) {
-    return this.reviewRepo.find({
-      relations: ['user', 'content'],
-      order: { createdAt: 'DESC' },
-      take: limit,
-    });
+    return this.reviewRepo
+      .createQueryBuilder('review')
+      .leftJoin('review.user', 'user')
+      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage'])
+      .leftJoinAndSelect('review.content', 'content')
+      .orderBy('review.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
   }
 
   async getContentStats(contentId: number) {
@@ -175,6 +181,17 @@ export class ReviewsService {
     };
   }
 
+  async getLikedReviewIds(userId: number, contentId: number): Promise<number[]> {
+    const result = await this.reviewLikeRepo
+      .createQueryBuilder('rl')
+      .innerJoin('rl.review', 'review')
+      .where('rl.userId = :userId', { userId })
+      .andWhere('review.contentId = :contentId', { contentId })
+      .select('rl.reviewId', 'reviewId')
+      .getRawMany();
+    return result.map((r) => r.reviewId);
+  }
+
   async toggleLike(
     userId: number,
     reviewId: number,
@@ -183,7 +200,7 @@ export class ReviewsService {
       where: { id: reviewId },
     });
     if (!review) {
-      throw new NotFoundException('한줄평을 찾을 수 없습니다.');
+      throw new NotFoundException('리뷰를 찾을 수 없습니다.');
     }
 
     const existing = await this.reviewLikeRepo.findOne({

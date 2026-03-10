@@ -8,7 +8,7 @@ interface ReviewListProps {
 
 export default function ReviewList({
   reviews,
-  emptyMessage = '아직 한줄평이 없습니다.',
+  emptyMessage = '아직 리뷰가 없습니다.',
 }: ReviewListProps) {
   if (reviews.length === 0) {
     return (
