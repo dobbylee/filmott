@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Search, User, LogOut } from 'lucide-react';
+import { Search, User, LogOut, Compass } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 
@@ -54,6 +54,13 @@ export default function Header() {
         </form>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/discover"
+            className="hidden items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800 sm:flex"
+          >
+            <Compass className="h-4 w-4" />
+            <span>탐색</span>
+          </Link>
           <ThemeToggle />
 
           {user ? (
