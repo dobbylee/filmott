@@ -37,7 +37,7 @@ describe('Header', () => {
   it('should render logo and login button when not authenticated', () => {
     render(<Header />);
 
-    expect(screen.getByText('Board')).toBeInTheDocument();
+    expect(screen.getByText('filmott')).toBeInTheDocument();
     expect(screen.getByText('로그인')).toBeInTheDocument();
   });
 

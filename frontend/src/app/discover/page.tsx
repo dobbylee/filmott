@@ -7,7 +7,7 @@ import Pagination from '@/components/content/Pagination';
 import type { TmdbSearchResult } from '@/types/content';
 
 export const metadata: Metadata = {
-  title: '탐색 - Board',
+  title: '탐색 - filmott',
   description: '장르, OTT, 연도별로 영화와 드라마를 탐색하세요.',
 };
 

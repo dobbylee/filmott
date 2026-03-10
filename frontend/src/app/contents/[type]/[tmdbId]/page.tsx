@@ -34,7 +34,7 @@ export async function generateMetadata({
   try {
     const content = await fetchContentDetail(type, tmdbId);
     return {
-      title: `${content.title} - Board`,
+      title: `${content.title} - filmott`,
       description: content.overview?.slice(0, 160) ?? `${content.title} 상세 정보`,
       openGraph: {
         title: content.title,
@@ -43,7 +43,7 @@ export async function generateMetadata({
       },
     };
   } catch {
-    return { title: '작품 상세 - Board' };
+    return { title: '작품 상세 - filmott' };
   }
 }
 

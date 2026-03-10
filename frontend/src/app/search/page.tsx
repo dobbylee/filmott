@@ -20,7 +20,7 @@ export async function generateMetadata({
   const params = await searchParams;
   const query = params.q ?? '';
   return {
-    title: query ? `"${query}" 검색 결과 - Board` : '검색 - Board',
+    title: query ? `"${query}" 검색 결과 - filmott` : '검색 - filmott',
   };
 }
 

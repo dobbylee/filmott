@@ -10,7 +10,7 @@ export default function Footer() {
               href="/"
               className="text-lg font-bold text-primary"
             >
-              Board
+              filmott
             </Link>
             <p className="mt-1 text-xs text-muted-foreground">
               영화, 드라마 한줄평과 별점을 남기고 공유하세요.
@@ -32,7 +32,7 @@ export default function Footer() {
           </nav>
         </div>
         <div className="mt-6 border-t border-border pt-4 text-center text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} Board. TMDB API 기반 데이터 제공.
+          &copy; {new Date().getFullYear()} filmott. TMDB API 기반 데이터 제공.
         </div>
       </div>
     </footer>

@@ -50,7 +50,7 @@ export default function Header() {
           href="/"
           className="text-xl font-bold text-indigo-600 dark:text-indigo-400"
         >
-          Board
+          filmott
         </Link>
 
         <form

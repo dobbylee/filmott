@@ -6,7 +6,7 @@ import Footer from '@/components/layout/Footer';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Board - 영화/드라마 한줄평',
+  title: 'filmott - 영화/드라마 한줄평',
   description: '영화, 드라마 한줄평과 별점을 남기고 공유하세요.',
 };
 
