@@ -89,3 +89,8 @@ dist-ssr
 # MCP server build artifacts
 mcp/dist/
 mcp/node_modules/
+
+# Frontend
+frontend/.npm-cache/
+frontend/.next/
+frontend/node_modules/
