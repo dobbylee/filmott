@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { Search, User, LogOut, Compass, Film, Tv, Home, Menu, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import ThemeToggle from '@/components/ui/ThemeToggle';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -13,18 +12,26 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // 헤더 스크롤 배경 변경
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
     if (!showUserMenu) return;
-
     const handleClickOutside = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setShowUserMenu(false);
       }
     };
-
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showUserMenu]);
@@ -44,97 +51,77 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/80 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/80">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+    <header 
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled 
+          ? 'bg-black/80 backdrop-blur-lg border-b border-white/5 py-3' 
+          : 'bg-transparent border-transparent py-5'
+      }`}
+    >
+      <div className="mx-auto flex w-full max-w-7xl px-4 items-center justify-between">
         <Link
           href="/"
-          className="text-xl font-bold text-indigo-600 dark:text-indigo-400"
+          className="text-2xl font-black tracking-tight text-white hover-glow transition-all duration-300"
+          style={{ letterSpacing: '-0.05em' }}
         >
-          filmott
+          film<span className="text-gradient">ott</span>
         </Link>
 
-        <form
-          onSubmit={handleSearch}
-          className="hidden md:flex items-center flex-1 max-w-md mx-8"
-        >
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        {/* 데스크톱 네비게이션 & 검색창 */}
+        <div className="hidden md:flex flex-1 items-center justify-center gap-10">
+          <nav className="flex items-center gap-6">
+            <Link href="/" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">홈</Link>
+            <Link href="/discover?type=movie" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">영화</Link>
+            <Link href="/discover?type=tv" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">시리즈</Link>
+            <Link href="/discover" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">탐색</Link>
+          </nav>
+          
+          <form onSubmit={handleSearch} className="relative w-64 group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-white/80 transition-colors" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="작품을 검색해보세요..."
-              className="w-full rounded-lg border border-gray-300 bg-gray-50 py-2 pl-10 pr-4 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-gray-400"
+              placeholder="제목, 인물 검색..."
+              className="w-full rounded-full border border-white/10 bg-white/5 py-2 pl-9 pr-4 text-sm text-white placeholder-white/40 outline-none focus:border-white/30 focus:bg-white/10 transition-all"
             />
-          </div>
-        </form>
+          </form>
+        </div>
 
-        <div className="flex items-center gap-1 sm:gap-3">
-          {/* 데스크톱 네비게이션 */}
-          <nav className="hidden items-center gap-1 md:flex">
-            <Link
-              href="/"
-              className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800"
-            >
-              <Home className="h-4 w-4" />
-              <span>홈</span>
-            </Link>
-            <Link
-              href="/discover?type=movie"
-              className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800"
-            >
-              <Film className="h-4 w-4" />
-              <span>영화</span>
-            </Link>
-            <Link
-              href="/discover?type=tv"
-              className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800"
-            >
-              <Tv className="h-4 w-4" />
-              <span>TV</span>
-            </Link>
-            <Link
-              href="/discover"
-              className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800"
-            >
-              <Compass className="h-4 w-4" />
-              <span>탐색</span>
-            </Link>
-          </nav>
-
+        <div className="flex items-center gap-3">
           {/* 모바일 메뉴 토글 */}
           <button
             onClick={() => setShowMobileMenu(!showMobileMenu)}
-            className="rounded-lg p-2 text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800 md:hidden"
+            className="md:hidden rounded-full p-2 text-white/80 hover:bg-white/10"
             aria-label="메뉴"
           >
             {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
 
-          <ThemeToggle />
-
           {user ? (
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800"
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
               >
-                <User className="w-4 h-4" />
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-xs">
+                  {user.nickname.charAt(0)}
+                </div>
                 <span className="hidden sm:inline">{user.nickname}</span>
               </button>
 
               {showUserMenu && (
-                <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-[#111] py-1 shadow-2xl overflow-hidden glass-panel">
                   <Link
                     href="/profile"
                     onClick={() => setShowUserMenu(false)}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-700"
+                    className="flex w-full items-center px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors"
                   >
                     프로필 설정
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:text-red-400 dark:hover:bg-slate-700"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
                     로그아웃
@@ -145,7 +132,7 @@ export default function Header() {
           ) : (
             <Link
               href="/login"
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+              className="rounded-full bg-white px-5 py-2 text-sm font-bold text-black hover:bg-gray-200 transition-colors"
             >
               로그인
             </Link>
@@ -155,56 +142,30 @@ export default function Header() {
 
       {/* 모바일 네비게이션 */}
       {showMobileMenu && (
-        <nav className="border-t border-gray-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 md:hidden">
-          <div className="flex flex-col gap-1">
-            <Link
-              href="/"
-              onClick={() => setShowMobileMenu(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800"
-            >
-              <Home className="h-4 w-4" />
-              홈
+        <nav className="absolute top-full left-0 right-0 border-b border-white/10 bg-[#050505]/95 backdrop-blur-xl px-4 py-4 md:hidden shadow-2xl">
+          <div className="flex flex-col gap-2">
+            <Link href="/" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+              <Home className="h-5 w-5" /> 홈
             </Link>
-            <Link
-              href="/discover?type=movie"
-              onClick={() => setShowMobileMenu(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800"
-            >
-              <Film className="h-4 w-4" />
-              영화
+            <Link href="/discover?type=movie" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+              <Film className="h-5 w-5" /> 영화
             </Link>
-            <Link
-              href="/discover?type=tv"
-              onClick={() => setShowMobileMenu(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800"
-            >
-              <Tv className="h-4 w-4" />
-              TV
+            <Link href="/discover?type=tv" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+              <Tv className="h-5 w-5" /> 시리즈
             </Link>
-            <Link
-              href="/discover"
-              onClick={() => setShowMobileMenu(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-slate-800"
-            >
-              <Compass className="h-4 w-4" />
-              탐색
+            <Link href="/discover" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+              <Compass className="h-5 w-5" /> 탐색
             </Link>
-            {/* 모바일 검색 */}
-            <form
-              onSubmit={(e) => {
-                handleSearch(e);
-                setShowMobileMenu(false);
-              }}
-              className="mt-2 flex items-center"
-            >
+            
+            <form onSubmit={(e) => { handleSearch(e); setShowMobileMenu(false); }} className="mt-2 px-2">
               <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="작품을 검색해보세요..."
-                  className="w-full rounded-lg border border-gray-300 bg-gray-50 py-2 pl-10 pr-4 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-gray-400"
+                  className="w-full rounded-full border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-white/40 outline-none focus:border-white/30"
                 />
               </div>
             </form>

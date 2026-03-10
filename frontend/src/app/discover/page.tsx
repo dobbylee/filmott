@@ -80,7 +80,7 @@ export default async function DiscoverPage({ searchParams }: DiscoverPageProps) 
   const selectedYear = year ? parseInt(year, 10) : undefined;
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-7xl px-4">
       <h1 className="mb-6 text-2xl font-bold">작품 탐색</h1>
 
       <div className="mb-6 rounded-lg border border-border bg-card p-4">

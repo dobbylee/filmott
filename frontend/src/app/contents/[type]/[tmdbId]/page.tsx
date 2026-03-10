@@ -130,12 +130,12 @@ export default async function ContentDetailPage({
     : [];
 
   return (
-    <div className="-mx-4 -mt-6">
+    <div>
       {/* 상단: 백드롭 + 포스터 + 기본 정보 */}
       <div className="relative">
         {/* 백드롭 */}
         {content.backdropUrl && (
-          <div className="relative h-[300px] w-full md:h-[400px]">
+          <div className="relative h-[400px] w-full md:h-[500px]">
             <Image
               src={content.backdropUrl}
               alt={content.title}
@@ -144,7 +144,7 @@ export default async function ContentDetailPage({
               sizes="100vw"
               className="object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
           </div>
         )}
 
