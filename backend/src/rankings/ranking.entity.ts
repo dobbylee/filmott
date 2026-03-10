@@ -23,10 +23,16 @@ export class Ranking {
   @Column({ type: 'integer' })
   rank!: number;
 
+  @Column({ length: 500, nullable: true })
+  title?: string;
+
+  @Column({ name: 'poster_url', length: 1000, nullable: true })
+  posterUrl?: string;
+
   @Column({ name: 'content_id', type: 'integer', nullable: true })
   contentId?: number;
 
-  @ManyToOne(() => Content, { nullable: true })
+  @ManyToOne(() => Content, { nullable: true, eager: false })
   @JoinColumn({ name: 'content_id' })
   content?: Content;
 

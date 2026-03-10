@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ContentsModule } from './contents/contents.module';
+import { RankingsModule } from './rankings/rankings.module';
 import { User } from './users/user.entity';
 import { Content } from './contents/content.entity';
 import { Ranking } from './rankings/ranking.entity';
@@ -41,6 +42,7 @@ import { ReviewComment } from './reviews/review-comment.entity';
     UsersModule,
     AuthModule,
     ContentsModule,
+    RankingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
