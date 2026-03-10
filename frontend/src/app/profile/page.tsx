@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
@@ -10,6 +10,13 @@ import type { User } from '@/types/auth';
 export default function ProfilePage() {
   const router = useRouter();
   const { user, updateUser, logout } = useAuth();
+
+  // 클라이언트 측 인증 체크: 로그인하지 않은 사용자는 로그인 페이지로 리다이렉트
+  useEffect(() => {
+    if (user === null) {
+      router.replace('/login?from=/profile');
+    }
+  }, [user, router]);
 
   const [nickname, setNickname] = useState(user?.nickname ?? '');
   const [currentPassword, setCurrentPassword] = useState('');

@@ -35,10 +35,10 @@ describe('RankingsController', () => {
       ];
       mockRankingsService.getRankings.mockResolvedValue(mockRankings);
 
-      const result = await controller.getRankings(
-        'kobis',
-        'daily-box-office',
-      );
+      const result = await controller.getRankings({
+        source: 'kobis',
+        category: 'daily-box-office',
+      });
 
       expect(result).toEqual(mockRankings);
       expect(mockRankingsService.getRankings).toHaveBeenCalledWith(
@@ -51,7 +51,7 @@ describe('RankingsController', () => {
     it('should pass custom limit', async () => {
       mockRankingsService.getRankings.mockResolvedValue([]);
 
-      await controller.getRankings('tmdb', 'trending-all-day', '5');
+      await controller.getRankings({ source: 'tmdb', category: 'trending-all-day', limit: '5' });
 
       expect(mockRankingsService.getRankings).toHaveBeenCalledWith(
         'tmdb',

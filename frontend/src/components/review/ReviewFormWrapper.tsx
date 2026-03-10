@@ -20,13 +20,11 @@ export default function ReviewFormWrapper({ contentId }: ReviewFormWrapperProps)
       return;
     }
 
-    // 사용자의 기존 한줄평 확인
+    // 전용 API로 내 리뷰 조회
     api
-      .get(`/reviews?contentId=${contentId}&page=1&sort=latest`)
+      .get<Review | null>(`/reviews/my?contentId=${contentId}`)
       .then((res) => {
-        const reviews: Review[] = res.data.data;
-        const mine = reviews.find((r) => r.userId === user.id);
-        setExistingReview(mine ?? null);
+        setExistingReview(res.data ?? null);
       })
       .catch(() => {
         setExistingReview(null);

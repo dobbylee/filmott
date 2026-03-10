@@ -13,21 +13,20 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(nicknameOrEmail: string, pass: string): Promise<SafeUser> {
-    const user =
-      (await this.usersService.findOne(nicknameOrEmail)) ||
-      (await this.usersService.findByEmail(nicknameOrEmail));
+  async validateUser(email: string, pass: string): Promise<SafeUser> {
+    const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const isMatch = await bcrypt.compare(pass, user.password || '');
-    if (isMatch) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...result } = user;
-      return result;
+    if (!isMatch) {
+      throw new UnauthorizedException('Invalid credentials');
     }
-    throw new UnauthorizedException('Invalid credentials');
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...result } = user;
+    return result;
   }
 
   async login(loginDto: LoginDto) {

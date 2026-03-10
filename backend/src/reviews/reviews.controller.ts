@@ -57,6 +57,15 @@ export class ReviewsController {
     return { message: '삭제되었습니다.' };
   }
 
+  @Get('my')
+  @UseGuards(JwtAuthGuard)
+  async findMyReview(
+    @CurrentUser() user: JwtPayload,
+    @Query('contentId', ParseIntPipe) contentId: number,
+  ) {
+    return this.reviewsService.findMyReview(user.id, contentId);
+  }
+
   @Get()
   async findByContent(
     @Query('contentId', ParseIntPipe) contentId: number,

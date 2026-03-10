@@ -41,7 +41,7 @@ export class Content {
   voteAverage?: number;
 
   @Column({ type: 'jsonb', default: '[]' })
-  genres!: object;
+  genres!: { id: number; name: string }[];
 
   @Column({ type: 'integer', nullable: true })
   runtime?: number;

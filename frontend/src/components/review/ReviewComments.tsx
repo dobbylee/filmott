@@ -53,9 +53,11 @@ export default function ReviewComments({
   const [isLoading, setIsLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const loadComments = useCallback(async (p: number) => {
     setIsLoading(true);
+    setErrorMessage('');
     try {
       const res = await api.get<CommentsResponse>(
         `/reviews/${reviewId}/comments?page=${p}`,
@@ -68,8 +70,9 @@ export default function ReviewComments({
       setTotal(res.data.total);
       setPage(res.data.page);
       setTotalPages(res.data.totalPages);
-    } catch {
-      // 조용히 실패
+    } catch (err) {
+      console.error('Failed to load comments:', err);
+      setErrorMessage('댓글을 불러오는 데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -98,8 +101,9 @@ export default function ReviewComments({
       setTotal((prev) => prev + 1);
       // 댓글 목록 새로고침
       await loadComments(1);
-    } catch {
-      // 조용히 실패
+    } catch (err) {
+      console.error('Failed to submit comment:', err);
+      setErrorMessage('댓글 등록에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
     }
@@ -110,8 +114,9 @@ export default function ReviewComments({
       await api.delete(`/reviews/comments/${commentId}`);
       setComments((prev) => prev.filter((c) => c.id !== commentId));
       setTotal((prev) => Math.max(0, prev - 1));
-    } catch {
-      // 조용히 실패
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+      setErrorMessage('댓글 삭제에 실패했습니다.');
     }
   };
 
@@ -151,6 +156,11 @@ export default function ReviewComments({
               <Send className="h-3.5 w-3.5" />
             </button>
           </form>
+
+          {/* 에러 메시지 */}
+          {errorMessage && (
+            <p className="text-xs text-destructive py-1">{errorMessage}</p>
+          )}
 
           {/* 댓글 목록 */}
           {isLoading && comments.length === 0 ? (

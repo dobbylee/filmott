@@ -31,10 +31,14 @@ export class RankingsService {
 
     try {
       const boxOfficeItems = await this.kobisService.getDailyBoxOffice(yesterday);
-      const rankingsToUpsert: Ranking[] = [];
       const fetchedAt = new Date();
 
-      for (const item of boxOfficeItems) {
+      // TMDB 매칭을 병렬로 처리
+      const matchResults = await Promise.allSettled(
+        boxOfficeItems.map((item) => this.matchKobisToTmdb(item.movieNm, item.openDt)),
+      );
+
+      const rankingsToUpsert: Ranking[] = boxOfficeItems.map((item, idx) => {
         const ranking = this.rankingRepo.create({
           source: 'kobis',
           category: 'daily-box-office',
@@ -44,15 +48,14 @@ export class RankingsService {
           fetchedAt,
         });
 
-        // KOBIS -> TMDB 매칭 시도
-        const content = await this.matchKobisToTmdb(item.movieNm, item.openDt);
-        if (content) {
-          ranking.contentId = content.id;
-          ranking.posterUrl = content.posterUrl;
+        const result = matchResults[idx];
+        if (result.status === 'fulfilled' && result.value) {
+          ranking.contentId = result.value.id;
+          ranking.posterUrl = result.value.posterUrl;
         }
 
-        rankingsToUpsert.push(ranking);
-      }
+        return ranking;
+      });
 
       await this.rankingRepo.upsert(rankingsToUpsert, [
         'source',
@@ -71,9 +74,26 @@ export class RankingsService {
 
   /**
    * TMDB 트렌딩을 가져와 rankings에 저장
-   * 매일 오전 6시 실행
+   * 매일 오전 6시 실행: 모든 trending 카테고리 갱신
    */
   @Cron('0 6 * * *', { name: 'daily-trending', timeZone: 'Asia/Seoul' })
+  async fetchAllTrending(): Promise<void> {
+    const categories: { type: 'movie' | 'tv' | 'all'; timeWindow: 'day' | 'week' }[] = [
+      { type: 'all', timeWindow: 'day' },
+      { type: 'movie', timeWindow: 'day' },
+      { type: 'tv', timeWindow: 'day' },
+      { type: 'all', timeWindow: 'week' },
+    ];
+
+    for (const { type, timeWindow } of categories) {
+      try {
+        await this.fetchTrending(type, timeWindow);
+      } catch (error) {
+        this.logger.error(`Failed to fetch trending-${type}-${timeWindow}`, error);
+      }
+    }
+  }
+
   async fetchTrending(
     type: 'movie' | 'tv' | 'all' = 'all',
     timeWindow: 'day' | 'week' = 'day',
@@ -84,32 +104,37 @@ export class RankingsService {
 
     try {
       const trendingData = await this.tmdbService.getTrending(type, timeWindow);
-      const rankingsToUpsert: Ranking[] = [];
       const fetchedAt = new Date();
 
-      for (let i = 0; i < trendingData.results.length; i++) {
-        const item = trendingData.results[i];
+      // contents 테이블 캐싱을 병렬 처리
+      const cacheResults = await Promise.allSettled(
+        trendingData.results.map((item) => {
+          const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
+          return this.contentsService.findOrFetchByTmdbId(
+            item.id,
+            mediaType as 'movie' | 'tv',
+          );
+        }),
+      );
+
+      const rankingsToUpsert: Ranking[] = trendingData.results.map((item, i) => {
         const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
         const title = mediaType === 'movie' ? item.title : item.name;
         const posterUrl = item.poster_path
           ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
           : undefined;
 
-        // contents 테이블에 캐싱
         let contentId: number | undefined;
-        try {
-          const content = await this.contentsService.findOrFetchByTmdbId(
-            item.id,
-            mediaType as 'movie' | 'tv',
-          );
-          contentId = content.id;
-        } catch (error) {
+        const cacheResult = cacheResults[i];
+        if (cacheResult.status === 'fulfilled') {
+          contentId = cacheResult.value.id;
+        } else {
           this.logger.warn(
             `Failed to cache trending content: ${title} (tmdb:${item.id})`,
           );
         }
 
-        const ranking = this.rankingRepo.create({
+        return this.rankingRepo.create({
           source: 'tmdb',
           category,
           rank: i + 1,
@@ -119,9 +144,7 @@ export class RankingsService {
           targetDate,
           fetchedAt,
         });
-
-        rankingsToUpsert.push(ranking);
-      }
+      });
 
       await this.rankingRepo.upsert(rankingsToUpsert, [
         'source',
@@ -236,18 +259,13 @@ export class RankingsService {
   private getYesterdayDate(): string {
     const date = new Date();
     date.setDate(date.getDate() - 1);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}${month}${day}`;
+    // Asia/Seoul 기준 YYYYMMDD
+    return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }).replace(/-/g, '');
   }
 
   private getTodayDate(): string {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    // Asia/Seoul 기준 YYYY-MM-DD
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
   }
 
   /**

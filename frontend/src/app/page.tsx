@@ -13,21 +13,21 @@ import type { ContentItem } from '@/types/content';
 async function fetchBoxOffice(): Promise<RankingItem[]> {
   return fetchApi<RankingItem[]>(
     '/rankings?source=kobis&category=daily-box-office&limit=10',
-    { next: { revalidate: 3600 } },
+    { cache: 'no-store' },
   );
 }
 
 async function fetchTrending(): Promise<RankingItem[]> {
   return fetchApi<RankingItem[]>(
     '/rankings?source=tmdb&category=trending-all-day&limit=20',
-    { next: { revalidate: 3600 } },
+    { cache: 'no-store' },
   );
 }
 
 async function fetchRecentReviews(): Promise<Review[]> {
   return fetchApi<Review[]>(
     '/reviews/recent?limit=10',
-    { next: { revalidate: 60 } },
+    { cache: 'no-store' },
   );
 }
 

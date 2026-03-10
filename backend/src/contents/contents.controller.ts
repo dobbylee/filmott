@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, ParseIntPipe, BadRequestException } from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { SearchContentsDto } from './dto/search-contents.dto';
 import { DiscoverContentsDto } from './dto/discover-contents.dto';
@@ -29,12 +29,12 @@ export class ContentsController {
 
   @Get(':type/:tmdbId')
   async getDetail(
-    @Param('type') type: 'movie' | 'tv',
-    @Param('tmdbId') tmdbId: string,
+    @Param('type') type: string,
+    @Param('tmdbId', ParseIntPipe) tmdbId: number,
   ) {
-    return this.contentsService.getContentDetail(
-      parseInt(tmdbId, 10),
-      type,
-    );
+    if (type !== 'movie' && type !== 'tv') {
+      throw new BadRequestException('type must be "movie" or "tv"');
+    }
+    return this.contentsService.getContentDetail(tmdbId, type);
   }
 }

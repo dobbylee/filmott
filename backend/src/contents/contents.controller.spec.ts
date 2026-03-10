@@ -91,7 +91,7 @@ describe('ContentsController', () => {
       const detailResult = { id: 1, tmdbId: 123, title: 'Test' };
       mockContentsService.getContentDetail.mockResolvedValue(detailResult);
 
-      const result = await controller.getDetail('movie', '123');
+      const result = await controller.getDetail('movie', 123);
 
       expect(mockContentsService.getContentDetail).toHaveBeenCalledWith(123, 'movie');
       expect(result).toEqual(detailResult);

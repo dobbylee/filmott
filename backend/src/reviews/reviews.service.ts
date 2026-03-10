@@ -67,13 +67,12 @@ export class ReviewsService {
     if (dto.comment !== undefined) review.comment = dto.comment;
     if (dto.hasSpoiler !== undefined) review.hasSpoiler = dto.hasSpoiler;
 
-    // 수정 시 likes_count 리셋
-    review.likesCount = 0;
-
-    // 기존 좋아요 데이터도 삭제
-    await this.reviewLikeRepo.delete({ reviewId: review.id });
-
-    return this.reviewRepo.save(review);
+    // 수정 시 likes_count 리셋 + 좋아요 데이터 삭제를 트랜잭션으로 처리
+    return this.dataSource.transaction(async (manager) => {
+      review.likesCount = 0;
+      await manager.delete(ReviewLike, { reviewId: review.id });
+      return manager.save(review);
+    });
   }
 
   async delete(userId: number, reviewId: number): Promise<void> {
@@ -89,6 +88,12 @@ export class ReviewsService {
     }
 
     await this.reviewRepo.remove(review);
+  }
+
+  async findMyReview(userId: number, contentId: number): Promise<Review | null> {
+    return this.reviewRepo.findOne({
+      where: { userId, contentId },
+    });
   }
 
   async findByContent(
@@ -118,7 +123,7 @@ export class ReviewsService {
     const [reviews, total] = await qb.getManyAndCount();
 
     return {
-      data: reviews.map((r) => this.sanitizeReview(r)),
+      data: reviews,
       total,
       page,
       totalPages: Math.ceil(total / take),
@@ -146,13 +151,11 @@ export class ReviewsService {
   }
 
   async getRecentReviews(limit = 10) {
-    const reviews = await this.reviewRepo.find({
+    return this.reviewRepo.find({
       relations: ['user', 'content'],
       order: { createdAt: 'DESC' },
       take: limit,
     });
-
-    return reviews.map((r) => this.sanitizeReview(r));
   }
 
   async getContentStats(contentId: number) {
@@ -219,11 +222,4 @@ export class ReviewsService {
     });
   }
 
-  private sanitizeReview(review: Review) {
-    if (review.user) {
-      const { password, ...safeUser } = review.user as any;
-      return { ...review, user: safeUser };
-    }
-    return review;
-  }
 }

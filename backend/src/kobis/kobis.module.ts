@@ -10,7 +10,7 @@ import { KobisService } from './kobis.service';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         baseURL:
-          'http://www.kobis.or.kr/kobisopenapi/webservice/rest',
+          'https://www.kobis.or.kr/kobisopenapi/webservice/rest',
         params: {
           key: configService.get<string>('KOBIS_API_KEY'),
         },

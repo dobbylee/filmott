@@ -1,21 +1,40 @@
-import { Controller, Get, Post, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards, BadRequestException } from '@nestjs/common';
 import { RankingsService } from './rankings.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { GetRankingsDto } from './dto/get-rankings.dto';
 
 @Controller('rankings')
 export class RankingsController {
   constructor(private readonly rankingsService: RankingsService) {}
 
+  private static readonly VALID_SOURCES = ['kobis', 'tmdb'];
+  private static readonly VALID_CATEGORIES = [
+    'daily-box-office',
+    'trending-all-day',
+    'trending-movie-day',
+    'trending-tv-day',
+    'trending-all-week',
+  ];
+
   /**
    * GET /api/rankings?source=kobis&category=daily-box-office&limit=10
    */
   @Get()
-  async getRankings(
-    @Query('source') source: string,
-    @Query('category') category: string,
-    @Query('limit') limit?: string,
-  ) {
-    const parsedLimit = limit ? parseInt(limit, 10) : 10;
-    return this.rankingsService.getRankings(source, category, parsedLimit);
+  async getRankings(@Query() dto: GetRankingsDto) {
+    if (!RankingsController.VALID_SOURCES.includes(dto.source)) {
+      throw new BadRequestException(
+        `Invalid source. Must be one of: ${RankingsController.VALID_SOURCES.join(', ')}`,
+      );
+    }
+    if (!RankingsController.VALID_CATEGORIES.includes(dto.category)) {
+      throw new BadRequestException(
+        `Invalid category. Must be one of: ${RankingsController.VALID_CATEGORIES.join(', ')}`,
+      );
+    }
+
+    const parsedLimit = dto.limit ? parseInt(dto.limit, 10) : 10;
+    const limit = Math.min(Math.max(parsedLimit, 1), 100);
+    return this.rankingsService.getRankings(dto.source, dto.category, limit);
   }
 
   /**
@@ -23,6 +42,7 @@ export class RankingsController {
    * 수동 갱신 (관리용)
    */
   @Post('refresh/:category')
+  @UseGuards(JwtAuthGuard)
   async refresh(@Param('category') category: string) {
     switch (category) {
       case 'daily-box-office':

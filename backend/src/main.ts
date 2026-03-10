@@ -1,6 +1,6 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -17,6 +17,9 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Enable class-transformer serialization (e.g. @Exclude on password)
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+
   // Enable Data Validation
   app.useGlobalPipes(
     new ValidationPipe({
@@ -29,4 +32,7 @@ async function bootstrap() {
   const port = configService.get<number>('PORT', 3001);
   await app.listen(port);
 }
-bootstrap().catch(console.error);
+bootstrap().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
