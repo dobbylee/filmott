@@ -8,6 +8,7 @@ export interface Review {
   rating?: number;
   comment?: string;
   likesCount: number;
+  commentsCount?: number;
   createdAt: string;
   updatedAt: string;
   user?: User;

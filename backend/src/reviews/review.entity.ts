@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -10,6 +11,7 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
+import { ReviewComment } from './review-comment.entity';
 
 @Entity('reviews')
 @Unique(['userId', 'contentId'])
@@ -42,6 +44,9 @@ export class Review {
 
   @Column({ name: 'likes_count', default: 0 })
   likesCount!: number;
+
+  @OneToMany(() => ReviewComment, (comment) => comment.review)
+  comments!: ReviewComment[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

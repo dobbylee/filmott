@@ -88,14 +88,16 @@ export class ReviewsService {
     await this.reviewRepo.remove(review);
   }
 
-  async findMyReview(userId: number, contentId: number): Promise<Review | null> {
-    return this.reviewRepo
+  async findMyReview(userId: number, contentId: number): Promise<(Review & { commentsCount: number }) | null> {
+    const review = await this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
       .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage'])
+      .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .where('review.userId = :userId', { userId })
       .andWhere('review.contentId = :contentId', { contentId })
       .getOne();
+    return review as (Review & { commentsCount: number }) | null;
   }
 
   async findByContent(
@@ -110,6 +112,7 @@ export class ReviewsService {
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
       .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage'])
+      .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .where('review.contentId = :contentId', { contentId })
       .skip(skip)
       .take(take);

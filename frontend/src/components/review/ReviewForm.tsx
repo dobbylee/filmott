@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Star, Pencil, Trash2, Plus } from 'lucide-react';
+import CommentIcon from '@/components/icons/CommentIcon';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import LikeButton from './LikeButton';
@@ -62,20 +63,12 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
     );
   }
 
-  function handleEditClick(e: React.MouseEvent) {
-    e.stopPropagation();
+  function handleEditClick() {
     if (!existingReview) return;
-    if (existingReview.likesCount > 0) {
-      const confirmed = window.confirm(
-        `수정하면 받은 좋아요(${existingReview.likesCount}개)가 모두 초기화됩니다.\n계속하시겠습니까?`
-      );
-      if (!confirmed) return;
-    }
     setShowFormModal(true);
   }
 
-  function handleDeleteClick(e: React.MouseEvent) {
-    e.stopPropagation();
+  function handleDeleteClick() {
     setShowDeleteConfirm(true);
   }
 
@@ -98,40 +91,32 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
   if (hasExisting) {
     return (
       <>
-        <div
-          onClick={() => setShowComments(true)}
-          className="rounded-lg border border-border bg-card p-4 cursor-pointer hover:bg-white/[0.03] transition-colors"
-        >
-          {/* 상단: 아바타 + 닉네임 + 별점 (왼쪽) / 좋아요 (오른쪽) */}
+        <div className="rounded-lg border border-border bg-card p-4">
+          {/* 상단: 내 리뷰 뱃지 + 별점 + 댓글 (왼쪽) / 좋아요 (오른쪽) */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                {existingReview.user?.nickname?.charAt(0) ?? user.nickname?.charAt(0) ?? '?'}
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-medium">
-                    {existingReview.user?.nickname ?? user.nickname}
-                  </span>
-                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">내 리뷰</span>
-                  {existingReview.rating != null && (
-                    <div className="flex items-center gap-0.5 ml-1">
-                      <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                      <span className="text-xs font-semibold">{existingReview.rating}</span>
-                    </div>
-                  )}
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">내 리뷰</span>
+              {existingReview.rating != null && (
+                <div className="flex items-center gap-0.5">
+                  <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                  <span className="text-xs font-semibold">{existingReview.rating}</span>
                 </div>
-              </div>
+              )}
+              <button
+                onClick={() => setShowComments(true)}
+                className="flex items-center gap-1 hover:text-foreground transition-colors"
+              >
+                <CommentIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold">{existingReview.commentsCount ?? 0}</span>
+              </button>
             </div>
 
-            <div onClick={(e) => e.stopPropagation()}>
-              <LikeButton
-                reviewId={existingReview.id}
-                initialCount={existingReview.likesCount}
-                initialLiked={initialLiked}
-                size="md"
-              />
-            </div>
+            <LikeButton
+              reviewId={existingReview.id}
+              initialCount={existingReview.likesCount}
+              initialLiked={initialLiked}
+              size="md"
+            />
           </div>
 
           {/* 코멘트 */}
@@ -142,7 +127,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
           )}
 
           {/* 하단: 수정/삭제 */}
-          <div className="mt-3 flex items-center justify-end gap-2 border-t border-border pt-3">
+          <div className="mt-3 flex items-center justify-end gap-2">
             <button
               onClick={handleEditClick}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -163,10 +148,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
 
           {/* 삭제 확인 */}
           {showDeleteConfirm && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3"
-            >
+            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
               <p className="text-sm text-destructive">정말 삭제하시겠습니까?</p>
               <div className="mt-2 flex gap-2">
                 <button
@@ -177,7 +159,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
                   삭제
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(false); }}
+                  onClick={() => setShowDeleteConfirm(false)}
                   className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary"
                 >
                   취소

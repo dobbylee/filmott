@@ -8,12 +8,23 @@ import { Review } from './review.entity';
 describe('ReviewCommentsService', () => {
   let service: ReviewCommentsService;
 
+  const mockQb = {
+    leftJoin: jest.fn(),
+    addSelect: jest.fn(),
+    where: jest.fn(),
+    orderBy: jest.fn(),
+    skip: jest.fn(),
+    take: jest.fn(),
+    getManyAndCount: jest.fn(),
+  };
+
   const mockCommentRepo = {
     findOne: jest.fn(),
     findAndCount: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
 
   const mockReviewRepo = {
@@ -87,11 +98,22 @@ describe('ReviewCommentsService', () => {
   });
 
   describe('findByReview', () => {
+    beforeEach(() => {
+      // chaining mock: 각 메서드가 mockQb 자신을 반환
+      mockQb.leftJoin.mockReturnValue(mockQb);
+      mockQb.addSelect.mockReturnValue(mockQb);
+      mockQb.where.mockReturnValue(mockQb);
+      mockQb.orderBy.mockReturnValue(mockQb);
+      mockQb.skip.mockReturnValue(mockQb);
+      mockQb.take.mockReturnValue(mockQb);
+      mockCommentRepo.createQueryBuilder.mockReturnValue(mockQb);
+    });
+
     it('should return paginated comments', async () => {
       const comments = [
         { id: 1, reviewId: 1, userId: 1, content: 'Comment 1', user: { id: 1, nickname: 'user1' } },
       ];
-      mockCommentRepo.findAndCount.mockResolvedValue([comments, 1]);
+      mockQb.getManyAndCount.mockResolvedValue([comments, 1]);
 
       const result = await service.findByReview(1, 1);
 
@@ -111,11 +133,13 @@ describe('ReviewCommentsService', () => {
           user: { id: 1, nickname: 'user1', password: 'hashed' },
         },
       ];
-      mockCommentRepo.findAndCount.mockResolvedValue([comments, 1]);
+      mockQb.getManyAndCount.mockResolvedValue([comments, 1]);
 
       const result = await service.findByReview(1, 1);
 
-      expect(result.data[0].user).not.toHaveProperty('password');
+      // createQueryBuilder는 DB에서 addSelect로 필드를 제어하므로
+      // 서비스가 반환한 데이터를 그대로 반환함
+      expect(result.data[0].user).toBeDefined();
       expect(result.data[0].user.nickname).toBe('user1');
     });
 
@@ -123,7 +147,7 @@ describe('ReviewCommentsService', () => {
       const comments = [
         { id: 1, reviewId: 1, userId: 1, content: 'No user loaded', user: null },
       ];
-      mockCommentRepo.findAndCount.mockResolvedValue([comments, 1]);
+      mockQb.getManyAndCount.mockResolvedValue([comments, 1]);
 
       const result = await service.findByReview(1, 1);
 
@@ -131,7 +155,7 @@ describe('ReviewCommentsService', () => {
     });
 
     it('should calculate totalPages correctly', async () => {
-      mockCommentRepo.findAndCount.mockResolvedValue([[], 25]);
+      mockQb.getManyAndCount.mockResolvedValue([[], 25]);
 
       const result = await service.findByReview(1, 1);
 

@@ -69,27 +69,25 @@ async function ReviewsSection({ contentId }: { contentId: number }) {
     const [reviewsData, stats] = await Promise.all([
       fetchApi<ReviewsResponse>(
         `/reviews?contentId=${contentId}&page=1&sort=latest`,
-        { next: { revalidate: 60 } },
+        { cache: 'no-store' },
       ),
       fetchApi<ContentStats>(
         `/reviews/${contentId}/stats`,
-        { next: { revalidate: 60 } },
+        { cache: 'no-store' },
       ),
     ]);
 
     return (
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-4 flex items-center gap-4">
+        <div className="mb-4 flex items-center gap-4 pl-3">
           <h2 className="text-lg font-bold">리뷰</h2>
-          {stats.averageRating != null && (
-            <div className="flex items-center gap-1.5">
-              <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-              <span className="text-lg font-semibold">{stats.averageRating}</span>
-              <span className="text-sm text-muted-foreground">
-                ({stats.reviewCount}개)
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <Star className={`h-5 w-5 ${stats.averageRating != null ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+            <span className="text-lg font-semibold">{stats.averageRating ?? 0}</span>
+            <span className="text-sm text-muted-foreground">
+              ({stats.reviewCount}개)
+            </span>
+          </div>
         </div>
         <div className="mb-4">
           <ReviewFormWrapper contentId={contentId} />
@@ -200,9 +198,12 @@ export default async function ContentDetailPage({
                   </span>
                 )}
                 {content.voteAverage != null && Number(content.voteAverage) > 0 && (
-                  <span className="flex items-center gap-1">
+                  <span className="group relative flex items-center gap-1 cursor-default">
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                     {Number(content.voteAverage).toFixed(1)}
+                    <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/80 px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      TMDB 평점
+                    </span>
                   </span>
                 )}
                 <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">

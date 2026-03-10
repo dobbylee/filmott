@@ -114,14 +114,18 @@ describe('ReviewsService', () => {
         likesCount: 5,
       };
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
-      mockReviewRepo.save.mockImplementation((r: any) => Promise.resolve(r));
-      mockReviewLikeRepo.delete.mockResolvedValue({ affected: 5 });
+
+      const mockManager = {
+        delete: jest.fn().mockResolvedValue({ affected: 5 }),
+        save: jest.fn().mockImplementation((r: any) => Promise.resolve(r)),
+      };
+      mockDataSource.transaction.mockImplementation((cb: any) => cb(mockManager));
 
       const result = await service.update(1, 1, { rating: 9 });
 
       expect(result.rating).toBe(9);
       expect(result.likesCount).toBe(0);
-      expect(mockReviewLikeRepo.delete).toHaveBeenCalledWith({ reviewId: 1 });
+      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
     });
 
     it('should throw NotFoundException when review not found', async () => {
@@ -189,7 +193,9 @@ describe('ReviewsService', () => {
   describe('findByContent', () => {
     it('should return paginated reviews sorted by latest', async () => {
       const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
@@ -212,7 +218,9 @@ describe('ReviewsService', () => {
 
     it('should sort by likes when specified', async () => {
       const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
@@ -244,16 +252,24 @@ describe('ReviewsService', () => {
 
   describe('getRecentReviews', () => {
     it('should return recent reviews with user and content', async () => {
-      mockReviewRepo.find.mockResolvedValue([
+      const mockReviews = [
         { id: 1, userId: 1, user: { id: 1, nickname: 'test' }, content: { id: 1 } },
-      ]);
+      ];
+      const mockQb = {
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockReviews),
+      };
+      mockReviewRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       const result = await service.getRecentReviews(5);
 
       expect(result).toHaveLength(1);
-      expect(mockReviewRepo.find).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 5 }),
-      );
+      expect(mockQb.take).toHaveBeenCalledWith(5);
+      expect(mockQb.orderBy).toHaveBeenCalledWith('review.createdAt', 'DESC');
     });
   });
 

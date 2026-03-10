@@ -77,14 +77,6 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
           {isEditing ? '리뷰 수정' : '리뷰 작성'}
         </h2>
 
-        {/* 수정 시 좋아요 초기화 경고 */}
-        {isEditing && existingReview.likesCount > 0 && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg bg-orange-500/10 px-3 py-2.5 text-xs text-orange-400">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            수정하면 받은 좋아요({existingReview.likesCount}개)가 모두 초기화됩니다.
-          </div>
-        )}
-
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">별점</label>
@@ -109,21 +101,29 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
             <p className="mb-3 text-sm text-destructive">{error}</p>
           )}
 
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={isSubmitting || rating === 0}
-              className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
-              {isSubmitting ? '저장 중...' : isEditing ? '수정' : '등록'}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
-            >
-              취소
-            </button>
+          <div className="flex items-center gap-2">
+            {isEditing && existingReview.likesCount > 0 && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-xs text-red-400">
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                수정 시 좋아요({existingReview.likesCount}개) 초기화
+              </div>
+            )}
+            <div className="ml-auto flex gap-2">
+              <button
+                type="submit"
+                disabled={isSubmitting || rating === 0}
+                className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {isSubmitting ? '저장 중...' : isEditing ? '수정' : '등록'}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
+              >
+                취소
+              </button>
+            </div>
           </div>
         </form>
       </div>

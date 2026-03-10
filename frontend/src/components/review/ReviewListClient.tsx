@@ -4,27 +4,39 @@ import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import ReviewCard from './ReviewCard';
-import type { Review } from '@/types/review';
+import type { Review, ReviewsResponse } from '@/types/review';
 
 interface ReviewListClientProps {
   reviews: Review[];
   contentId: number;
 }
 
-export default function ReviewListClient({ reviews, contentId }: ReviewListClientProps) {
+export default function ReviewListClient({ reviews: initialReviews, contentId }: ReviewListClientProps) {
   const { user } = useAuth();
+  const [reviews, setReviews] = useState(initialReviews);
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!user) {
+      setReviews(initialReviews);
       setLikedIds(new Set());
       return;
     }
-    api
-      .get<number[]>(`/reviews/liked-ids?contentId=${contentId}`)
-      .then((res) => setLikedIds(new Set(res.data)))
-      .catch(() => setLikedIds(new Set()));
-  }, [user, contentId]);
+
+    // 클라이언트에서 최신 리뷰 + liked 상태를 함께 가져옴
+    Promise.all([
+      api.get<ReviewsResponse>(`/reviews?contentId=${contentId}&page=1&sort=latest`),
+      api.get<number[]>(`/reviews/liked-ids?contentId=${contentId}`),
+    ])
+      .then(([reviewsRes, likedRes]) => {
+        setReviews(reviewsRes.data.data);
+        setLikedIds(new Set(likedRes.data));
+      })
+      .catch(() => {
+        setReviews(initialReviews);
+        setLikedIds(new Set());
+      });
+  }, [user, contentId, initialReviews]);
 
   const filtered = user
     ? reviews.filter((r) => r.userId !== user.id)

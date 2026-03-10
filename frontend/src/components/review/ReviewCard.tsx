@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Star } from 'lucide-react';
+import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from './LikeButton';
 import ReviewCommentsModal from './ReviewCommentsModal';
 import type { Review } from '@/types/review';
@@ -26,13 +27,8 @@ export default function ReviewCard({ review, showInteractions = true, initialLik
 
   return (
     <>
-      <div
-        onClick={() => showInteractions && setShowComments(true)}
-        className={`rounded-lg border border-border bg-card p-4 ${
-          showInteractions ? 'cursor-pointer hover:bg-white/[0.03] transition-colors' : ''
-        }`}
-      >
-        {/* 상단: 아바타 + 닉네임 + 별점 (왼쪽) / 좋아요 (오른쪽) */}
+      <div className="rounded-lg border border-border bg-card p-4">
+        {/* 상단: 아바타 + 닉네임 + 별점 + 댓글 (왼쪽) / 좋아요 (오른쪽) */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
@@ -47,20 +43,27 @@ export default function ReviewCard({ review, showInteractions = true, initialLik
                     <span className="text-xs font-semibold">{review.rating}</span>
                   </div>
                 )}
+                {showInteractions && (
+                  <button
+                    onClick={() => setShowComments(true)}
+                    className="flex items-center gap-1 hover:text-foreground transition-colors ml-0.5"
+                  >
+                    <CommentIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold">{review.commentsCount ?? 0}</span>
+                  </button>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">{formatDate(review.createdAt)}</p>
             </div>
           </div>
 
           {showInteractions ? (
-            <div onClick={(e) => e.stopPropagation()}>
-              <LikeButton
-                reviewId={review.id}
-                initialCount={review.likesCount}
-                initialLiked={initialLiked}
-                size="md"
-              />
-            </div>
+            <LikeButton
+              reviewId={review.id}
+              initialCount={review.likesCount}
+              initialLiked={initialLiked}
+              size="md"
+            />
           ) : (
             <span className="text-xs text-muted-foreground">
               {review.likesCount} 좋아요

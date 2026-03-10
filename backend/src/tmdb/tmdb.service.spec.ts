@@ -233,6 +233,7 @@ describe('TmdbService', () => {
           sort_by: 'popularity.desc',
           with_genres: '28,12',
           with_watch_providers: '8',
+          with_watch_monetization_types: 'flatrate|rent|buy|free|ads',
           primary_release_year: 2024,
         },
       });

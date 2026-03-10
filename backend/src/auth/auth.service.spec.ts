@@ -13,8 +13,8 @@ describe('AuthService', () => {
   let jwtService: JwtService;
 
   const mockUsersService = {
-    findOne: jest.fn(),
     findByEmail: jest.fn(),
+    create: jest.fn(),
   };
 
   const mockJwtService = {
@@ -42,10 +42,10 @@ describe('AuthService', () => {
   describe('validateUser', () => {
     it('should return user info without password if valid credentials are provided', async () => {
       const mockUser = { id: 1, nickname: 'testuser', email: 'test@example.com', password: 'hashedpassword' };
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      const result = await service.validateUser('testuser', 'password123');
+      const result = await service.validateUser('test@example.com', 'password123');
 
       expect(result).toEqual({ id: 1, nickname: 'testuser', email: 'test@example.com' });
       expect(bcrypt.compare).toHaveBeenCalledWith('password123', 'hashedpassword');
@@ -53,17 +53,16 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException if password does not match', async () => {
       const mockUser = { id: 1, nickname: 'testuser', email: 'test@example.com', password: 'hashedpassword' };
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.validateUser('testuser', 'wrongpass')).rejects.toThrow(UnauthorizedException);
+      await expect(service.validateUser('test@example.com', 'wrongpass')).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException if user is not found', async () => {
-      mockUsersService.findOne.mockResolvedValue(null);
       mockUsersService.findByEmail.mockResolvedValue(null);
 
-      await expect(service.validateUser('notfound', 'password123')).rejects.toThrow(UnauthorizedException);
+      await expect(service.validateUser('notfound@example.com', 'password123')).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -73,7 +72,6 @@ describe('AuthService', () => {
       const loginDto = { email: 'test@example.com', password: 'password123' };
       const token = 'mocked.jwt.token';
 
-      mockUsersService.findOne.mockResolvedValue(null);
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockJwtService.sign.mockReturnValue(token);

@@ -65,9 +65,9 @@ describe('ReviewCard', () => {
     expect(screen.getByText('영')).toBeInTheDocument();
   });
 
-  it('댓글 버튼을 표시한다', () => {
-    render(<ReviewCard review={review} />);
-    expect(screen.getByText('댓글')).toBeInTheDocument();
+  it('댓글 아이콘과 수를 표시한다', () => {
+    render(<ReviewCard review={{ ...review, commentsCount: 3 }} />);
+    expect(screen.getByText('3')).toBeInTheDocument();
   });
 
   it('showInteractions=false 시 좋아요 텍스트만 표시한다', () => {
