@@ -5,11 +5,18 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
+  Unique,
 } from 'typeorm';
 import { Content } from '../contents/content.entity';
 
 @Entity('rankings')
 @Index('idx_rankings_source_category', ['source', 'category', 'fetchedAt'])
+@Unique('uq_rankings_source_category_rank_target_date', [
+  'source',
+  'category',
+  'rank',
+  'targetDate',
+])
 export class Ranking {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -22,6 +29,9 @@ export class Ranking {
 
   @Column({ type: 'integer' })
   rank!: number;
+
+  @Column({ name: 'target_date', type: 'date' })
+  targetDate!: string;
 
   @Column({ length: 500, nullable: true })
   title?: string;

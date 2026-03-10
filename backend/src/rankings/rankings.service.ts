@@ -26,11 +26,12 @@ export class RankingsService {
   @Cron('0 10 * * *', { name: 'daily-box-office', timeZone: 'Asia/Seoul' })
   async fetchDailyBoxOffice(): Promise<Ranking[]> {
     const yesterday = this.getYesterdayDate();
+    const targetDate = this.formatDateWithDashes(yesterday);
     this.logger.log(`Fetching daily box office for ${yesterday}`);
 
     try {
       const boxOfficeItems = await this.kobisService.getDailyBoxOffice(yesterday);
-      const rankings: Ranking[] = [];
+      const rankingsToUpsert: Ranking[] = [];
       const fetchedAt = new Date();
 
       for (const item of boxOfficeItems) {
@@ -39,6 +40,7 @@ export class RankingsService {
           category: 'daily-box-office',
           rank: parseInt(item.rank, 10),
           title: item.movieNm,
+          targetDate,
           fetchedAt,
         });
 
@@ -49,11 +51,18 @@ export class RankingsService {
           ranking.posterUrl = content.posterUrl;
         }
 
-        rankings.push(await this.rankingRepo.save(ranking));
+        rankingsToUpsert.push(ranking);
       }
 
-      this.logger.log(`Saved ${rankings.length} daily box office rankings`);
-      return rankings;
+      await this.rankingRepo.upsert(rankingsToUpsert, [
+        'source',
+        'category',
+        'rank',
+        'targetDate',
+      ]);
+
+      this.logger.log(`Saved ${rankingsToUpsert.length} daily box office rankings`);
+      return rankingsToUpsert;
     } catch (error) {
       this.logger.error('Failed to fetch daily box office', error);
       throw error;
@@ -70,11 +79,12 @@ export class RankingsService {
     timeWindow: 'day' | 'week' = 'day',
   ): Promise<Ranking[]> {
     const category = `trending-${type}-${timeWindow}`;
+    const targetDate = this.getTodayDate();
     this.logger.log(`Fetching trending: ${category}`);
 
     try {
       const trendingData = await this.tmdbService.getTrending(type, timeWindow);
-      const rankings: Ranking[] = [];
+      const rankingsToUpsert: Ranking[] = [];
       const fetchedAt = new Date();
 
       for (let i = 0; i < trendingData.results.length; i++) {
@@ -106,14 +116,22 @@ export class RankingsService {
           title: title ?? undefined,
           posterUrl,
           contentId,
+          targetDate,
           fetchedAt,
         });
 
-        rankings.push(await this.rankingRepo.save(ranking));
+        rankingsToUpsert.push(ranking);
       }
 
-      this.logger.log(`Saved ${rankings.length} trending rankings for ${category}`);
-      return rankings;
+      await this.rankingRepo.upsert(rankingsToUpsert, [
+        'source',
+        'category',
+        'rank',
+        'targetDate',
+      ]);
+
+      this.logger.log(`Saved ${rankingsToUpsert.length} trending rankings for ${category}`);
+      return rankingsToUpsert;
     } catch (error) {
       this.logger.error(`Failed to fetch trending: ${category}`, error);
       throw error;
@@ -222,5 +240,20 @@ export class RankingsService {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}${month}${day}`;
+  }
+
+  private getTodayDate(): string {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * YYYYMMDD -> YYYY-MM-DD 변환
+   */
+  private formatDateWithDashes(dateStr: string): string {
+    return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
   }
 }

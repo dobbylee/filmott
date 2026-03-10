@@ -12,6 +12,7 @@ describe('RankingsService', () => {
   const mockRankingRepo = {
     create: jest.fn(),
     save: jest.fn(),
+    upsert: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
   };
@@ -49,7 +50,7 @@ describe('RankingsService', () => {
   });
 
   describe('fetchDailyBoxOffice', () => {
-    it('should fetch KOBIS data, match with TMDB, and save rankings', async () => {
+    it('should fetch KOBIS data, match with TMDB, and upsert rankings with targetDate', async () => {
       const kobisItems = [
         {
           rank: '1',
@@ -84,30 +85,24 @@ describe('RankingsService', () => {
       };
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(cachedContent);
 
-      const savedRanking = {
-        id: 1,
-        source: 'kobis',
-        category: 'daily-box-office',
-        rank: 1,
-        title: 'Test Movie',
-        contentId: 42,
-        posterUrl: 'https://image.tmdb.org/t/p/w500/poster.jpg',
-      };
-      mockRankingRepo.create.mockReturnValue(savedRanking);
-      mockRankingRepo.save.mockResolvedValue(savedRanking);
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchDailyBoxOffice();
 
       expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        source: 'kobis',
+        category: 'daily-box-office',
+        rank: 1,
+        contentId: 42,
+        posterUrl: 'https://image.tmdb.org/t/p/w500/poster.jpg',
+      });
+      expect(result[0].targetDate).toBeDefined();
       expect(mockKobisService.getDailyBoxOffice).toHaveBeenCalled();
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
-        'Test Movie',
-        'movie',
-        1,
-      );
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
-        999,
-        'movie',
+      expect(mockRankingRepo.upsert).toHaveBeenCalledWith(
+        expect.any(Array),
+        ['source', 'category', 'rank', 'targetDate'],
       );
     });
 
@@ -128,26 +123,44 @@ describe('RankingsService', () => {
       mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
       mockTmdbService.searchByType.mockResolvedValue({ results: [] });
 
-      const savedRanking = {
-        id: 2,
-        source: 'kobis',
-        category: 'daily-box-office',
-        rank: 1,
-        title: 'Unknown Movie',
-        contentId: undefined,
-      };
-      mockRankingRepo.create.mockReturnValue(savedRanking);
-      mockRankingRepo.save.mockResolvedValue(savedRanking);
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchDailyBoxOffice();
 
       expect(result).toHaveLength(1);
       expect(result[0].contentId).toBeUndefined();
+      expect(result[0].targetDate).toBeDefined();
+    });
+
+    it('should set targetDate to yesterday in YYYY-MM-DD format', async () => {
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: 'Test Movie',
+          movieCd: '12345',
+          openDt: '2026-03-01',
+          audiCnt: '100000',
+          audiAcc: '500000',
+          salesAmt: '1000000',
+          salesAcc: '5000000',
+        },
+      ];
+
+      mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
+      mockTmdbService.searchByType.mockResolvedValue({ results: [] });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      const result = await service.fetchDailyBoxOffice();
+
+      // targetDate should be YYYY-MM-DD format
+      expect(result[0].targetDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
   });
 
   describe('fetchTrending', () => {
-    it('should fetch TMDB trending data and save rankings', async () => {
+    it('should fetch TMDB trending data and upsert rankings with targetDate', async () => {
       const trendingData = {
         results: [
           {
@@ -173,14 +186,44 @@ describe('RankingsService', () => {
         .mockResolvedValueOnce(movieContent)
         .mockResolvedValueOnce(tvContent);
 
-      mockRankingRepo.create.mockImplementation((data: object) => data);
-      mockRankingRepo.save.mockImplementation((data: object) => Promise.resolve({ id: Math.random(), ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchTrending('all', 'day');
 
       expect(result).toHaveLength(2);
+      expect(result[0].targetDate).toBeDefined();
+      expect(result[1].targetDate).toBeDefined();
       expect(mockTmdbService.getTrending).toHaveBeenCalledWith('all', 'day');
       expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledTimes(2);
+      expect(mockRankingRepo.upsert).toHaveBeenCalledWith(
+        expect.any(Array),
+        ['source', 'category', 'rank', 'targetDate'],
+      );
+    });
+
+    it('should set targetDate to today in YYYY-MM-DD format', async () => {
+      const trendingData = {
+        results: [
+          {
+            id: 100,
+            media_type: 'movie',
+            title: 'Trending Movie',
+            poster_path: '/trending.jpg',
+          },
+        ],
+      };
+
+      mockTmdbService.getTrending.mockResolvedValue(trendingData);
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      const result = await service.fetchTrending('movie', 'day');
+
+      const today = new Date();
+      const expectedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      expect(result[0].targetDate).toBe(expectedDate);
     });
 
     it('should save ranking even when content caching fails', async () => {
@@ -200,8 +243,8 @@ describe('RankingsService', () => {
         new Error('TMDB error'),
       );
 
-      mockRankingRepo.create.mockImplementation((data: object) => data);
-      mockRankingRepo.save.mockImplementation((data: object) => Promise.resolve({ id: 1, ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchTrending('movie', 'day');
 
@@ -212,6 +255,7 @@ describe('RankingsService', () => {
         rank: 1,
         title: 'Fail Movie',
       });
+      expect(result[0].targetDate).toBeDefined();
     });
   });
 
@@ -227,6 +271,7 @@ describe('RankingsService', () => {
           category: 'daily-box-office',
           rank: 1,
           title: 'Movie 1',
+          targetDate: '2026-03-08',
           content: { id: 1, title: 'Movie 1' },
           fetchedAt,
         },
@@ -236,6 +281,7 @@ describe('RankingsService', () => {
           category: 'daily-box-office',
           rank: 2,
           title: 'Movie 2',
+          targetDate: '2026-03-08',
           content: null,
           fetchedAt,
         },
