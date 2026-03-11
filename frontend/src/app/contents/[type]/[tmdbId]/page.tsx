@@ -133,7 +133,7 @@ export default async function ContentDetailPage({
       <div className="relative">
         {/* 백드롭 */}
         {content.backdropUrl ? (
-          <div className="relative aspect-video w-full max-h-[560px]">
+          <div className="relative aspect-video w-full max-h-[50vh]">
             <Image
               src={content.backdropUrl}
               alt={content.title}
