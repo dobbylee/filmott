@@ -133,14 +133,14 @@ export default async function ContentDetailPage({
       <div className="relative">
         {/* 백드롭 */}
         {content.backdropUrl ? (
-          <div className="relative h-[300px] w-full md:h-[380px]">
+          <div className="relative aspect-video w-full max-h-[560px]">
             <Image
               src={content.backdropUrl}
               alt={content.title}
               fill
               priority
               sizes="100vw"
-              className="object-cover object-top"
+              className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
           </div>
@@ -152,7 +152,7 @@ export default async function ContentDetailPage({
         <div className="relative mx-auto max-w-7xl px-4">
           <div
             className={`flex gap-6 ${
-              content.backdropUrl ? '-mt-32 md:-mt-48' : 'mt-6'
+              content.backdropUrl ? '-mt-40 md:-mt-52' : 'mt-6'
             }`}
           >
             {/* 포스터 */}
@@ -207,7 +207,7 @@ export default async function ContentDetailPage({
                   </span>
                 )}
                 <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">
-                  {type === 'tv' ? 'TV' : '영화'}
+                  {type === 'tv' ? '시리즈' : '영화'}
                 </span>
               </div>
 

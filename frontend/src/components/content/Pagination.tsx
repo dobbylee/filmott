@@ -34,7 +34,7 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
       <button
         onClick={() => goToPage(currentPage - 1)}
         disabled={currentPage <= 1}
-        className="mr-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white/70"
+        className="mr-2 flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white/70"
         aria-label="이전 페이지"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -44,7 +44,7 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
         <>
           <button
             onClick={() => goToPage(1)}
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-sm"
+            className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-md border border-border text-sm"
           >
             1
           </button>
@@ -58,7 +58,7 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
         <button
           key={page}
           onClick={() => goToPage(page)}
-          className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm ${
+          className={`flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-md border text-sm ${
             page === currentPage
               ? 'border-primary bg-primary text-primary-foreground'
               : 'border-border hover:bg-secondary'
@@ -72,7 +72,7 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
       <button
         onClick={() => goToPage(currentPage + 1)}
         disabled={currentPage >= totalPages}
-        className="ml-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white/70"
+        className="ml-2 flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white/70"
         aria-label="다음 페이지"
       >
         <ChevronRight className="h-4 w-4" />

@@ -15,7 +15,7 @@ describe('Footer', () => {
     render(<Footer />);
     expect(screen.getByText('홈')).toBeInTheDocument();
     expect(screen.getByText('영화')).toBeInTheDocument();
-    expect(screen.getByText('TV')).toBeInTheDocument();
+    expect(screen.getByText('시리즈')).toBeInTheDocument();
     expect(screen.getByText('탐색')).toBeInTheDocument();
   });
 

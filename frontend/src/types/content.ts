@@ -53,6 +53,8 @@ export interface TmdbSearchResult {
   total_pages: number;
   total_results: number;
   results: TmdbSearchItem[];
+  personTotal?: number;
+  contentTotal?: number;
 }
 
 export interface CastMember {

@@ -44,16 +44,24 @@ export class ContentsService {
    * 검색: TMDB API 호출 후 결과 반환 (캐싱은 하지 않음, 목록은 가볍게)
    */
   async searchContents(query: string, type?: 'movie' | 'tv' | 'person', page = 1) {
-    if (type === 'movie' || type === 'tv') {
+    if (type === 'movie' || type === 'tv' || type === 'person') {
       return this.tmdbService.searchByType(query, type, page);
     }
-    const result = await this.tmdbService.searchMulti(query, page);
-    if (type === 'person') {
-      result.results = result.results.filter(
-        (item) => item.media_type === 'person',
-      );
-    }
-    return result;
+    // "전체" 검색: 인물(page 1 고정) + 영화/시리즈(페이징) 각각 호출
+    const [personResult, movieResult, tvResult] = await Promise.all([
+      this.tmdbService.searchByType(query, 'person', 1),
+      this.tmdbService.searchByType(query, 'movie', page),
+      this.tmdbService.searchByType(query, 'tv', page),
+    ]);
+    const contentTotal = movieResult.total_results + tvResult.total_results;
+    return {
+      page,
+      total_pages: Math.max(movieResult.total_pages, tvResult.total_pages),
+      total_results: personResult.total_results + contentTotal,
+      personTotal: personResult.total_results,
+      contentTotal,
+      results: [...personResult.results, ...movieResult.results, ...tvResult.results],
+    };
   }
 
   /**

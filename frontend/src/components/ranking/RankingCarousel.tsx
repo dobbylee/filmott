@@ -90,7 +90,7 @@ export default function RankingCarousel({ title, items, tabs }: RankingCarouselP
           ))}
         </div>
 
-        <div className="absolute top-0 bottom-6 right-0 w-24 bg-gradient-to-l from-[#050505] to-transparent pointer-events-none hidden sm:block z-10" />
+        <div className="absolute top-0 bottom-6 right-0 w-16 sm:w-24 bg-gradient-to-l from-[#050505] to-transparent pointer-events-none z-10" />
       </div>
     </section>
   );

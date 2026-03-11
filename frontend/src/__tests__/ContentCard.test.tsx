@@ -46,11 +46,11 @@ describe('ContentCard', () => {
     expect(screen.getByText('영화')).toBeInTheDocument();
   });
 
-  it('TV 프로그램 제목과 연도를 렌더링한다', () => {
+  it('시리즈 제목과 연도를 렌더링한다', () => {
     render(<ContentCard item={tvItem} />);
     expect(screen.getByText('왕좌의 게임')).toBeInTheDocument();
     expect(screen.getByText('2011')).toBeInTheDocument();
-    expect(screen.getByText('TV')).toBeInTheDocument();
+    expect(screen.getByText('시리즈')).toBeInTheDocument();
   });
 
   it('포스터 이미지를 렌더링한다', () => {

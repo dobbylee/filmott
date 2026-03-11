@@ -47,6 +47,7 @@ export default function CastCarousel({ cast }: CastCarouselProps) {
         </div>
       </div>
 
+      <div className="relative">
       <div
         ref={scrollRef}
         className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide"
@@ -81,6 +82,8 @@ export default function CastCarousel({ cast }: CastCarouselProps) {
             </p>
           </Link>
         ))}
+      </div>
+      <div className="absolute top-0 bottom-2 right-0 w-16 sm:w-24 bg-gradient-to-l from-[#050505] to-transparent pointer-events-none z-10" />
       </div>
     </div>
   );

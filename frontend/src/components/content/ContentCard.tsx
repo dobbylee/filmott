@@ -58,7 +58,7 @@ export default function ContentCard({ item }: ContentCardProps) {
           <div className="mt-1 flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-medium text-white/60">
               {year && <span>{year}</span>}
-              <span className="capitalize">{type === 'tv' ? 'TV' : '영화'}</span>
+              <span>{type === 'tv' ? '시리즈' : '영화'}</span>
             </div>
             {genreNames.length > 0 && (
               <span className="text-[10px] text-white/50 truncate max-w-[60px]">

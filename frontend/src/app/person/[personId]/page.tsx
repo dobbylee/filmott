@@ -194,9 +194,9 @@ export default async function PersonPage({ params }: PersonPageProps) {
       {/* Filmography */}
       <section>
         <h2 className="mb-6 text-xl font-bold">
-          필모그래피
+          작품
           <span className="ml-2 text-sm font-normal text-muted-foreground">
-            ({items.length}작품)
+            {items.length}
           </span>
         </h2>
         <FilmographyGrid items={items} />

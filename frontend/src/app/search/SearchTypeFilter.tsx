@@ -24,7 +24,7 @@ export default function SearchTypeFilter({ currentType }: SearchTypeFilterProps)
   const types = [
     { value: undefined, label: '전체' },
     { value: 'movie', label: '영화' },
-    { value: 'tv', label: 'TV' },
+    { value: 'tv', label: '시리즈' },
     { value: 'person', label: '인물' },
   ];
 

@@ -25,7 +25,7 @@ export default function Footer() {
               영화
             </Link>
             <Link href="/discover?type=tv" className="hover:text-primary transition-colors">
-              TV
+              시리즈
             </Link>
             <Link href="/discover" className="hover:text-primary transition-colors">
               탐색

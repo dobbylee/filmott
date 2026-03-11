@@ -95,7 +95,7 @@ export default function Header() {
         {/* 중앙: 네비게이션 */}
         <nav className="hidden md:flex items-center gap-6">
           <Link href="/discover?type=movie" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">영화</Link>
-          <Link href="/discover?type=tv" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">TV</Link>
+          <Link href="/discover?type=tv" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">시리즈</Link>
         </nav>
 
         {/* 오른쪽: 검색창 + 유저 */}
@@ -191,7 +191,7 @@ export default function Header() {
               <Compass className="h-5 w-5" /> 영화
             </Link>
             <Link href="/discover?type=tv" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-              <Compass className="h-5 w-5" /> TV
+              <Compass className="h-5 w-5" /> 시리즈
             </Link>
             
             <form onSubmit={(e) => { handleSearch(e); setShowMobileMenu(false); }} className="mt-2 px-2">

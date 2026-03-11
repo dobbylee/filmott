@@ -74,45 +74,48 @@ function RecentReviewItem({ review }: { review: Review }) {
   return (
     <div className="group relative flex gap-4 rounded-2xl border border-white/5 bg-white/5 p-4 hover:bg-white/10 transition-colors backdrop-blur-sm">
       {content?.posterUrl && (
-        <Link href={href} className="flex-shrink-0 relative h-[100px] w-[66px] overflow-hidden rounded-lg shadow-lg">
-          <Image
-            src={content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`}
-            alt={content.title}
-            fill
-            sizes="66px"
-            className="object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-        </Link>
-      )}
-      <div className="flex-1 min-w-0 py-1">
-        <div className="flex items-center justify-between">
-          {content ? (
-            <p className="text-base font-bold text-white truncate">
-              <Link href={href} className="hover:text-fuchsia-400 transition-colors">
+        <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
+          <Link href={href} className="relative h-[100px] w-[66px] overflow-hidden rounded-lg shadow-lg">
+            <Image
+              src={content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`}
+              alt={content.title}
+              fill
+              sizes="66px"
+              className="object-cover group-hover:scale-110 transition-transform duration-500"
+            />
+          </Link>
+          {content && (
+            <Link href={href} className="w-[80px] text-center">
+              <p className="text-sm font-medium text-white/90 truncate hover:text-fuchsia-400 transition-colors">
                 {content.title}
-              </Link>
-            </p>
-          ) : <span />}
+              </p>
+            </Link>
+          )}
+        </div>
+      )}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* 유저 + 별점 + 시간 */}
+        <div className="mt-2 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-[10px] font-bold text-white shadow-sm">
+              {review.user?.nickname?.charAt(0) ?? '?'}
+            </div>
+            <span className="text-sm font-medium text-white/90">
+              {review.user?.nickname ?? '익명'}
+            </span>
+            {review.rating != null && (
+              <div className="flex items-center gap-0.5">
+                <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                <span className="text-xs font-semibold">{review.rating}</span>
+              </div>
+            )}
+          </div>
           <TimeAgo date={review.createdAt} className="text-xs text-white/40 flex-shrink-0 ml-2" />
         </div>
 
-        <div className="flex items-center gap-1.5 mt-2 mb-2">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-[10px] font-bold text-white shadow-sm">
-            {review.user?.nickname?.charAt(0) ?? '?'}
-          </div>
-          <span className="text-sm font-medium text-white/90">
-            {review.user?.nickname ?? '익명'}
-          </span>
-          {review.rating != null && (
-            <div className="flex items-center gap-0.5">
-              <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-              <span className="text-xs font-semibold">{review.rating}</span>
-            </div>
-          )}
-        </div>
-
+        {/* 코멘트 */}
         {review.comment && (
-          <p className="text-sm leading-relaxed text-white/70 line-clamp-2 pl-1">
+          <p className="mt-4 px-3 text-sm leading-relaxed text-white/70 line-clamp-2">
             {review.comment}
           </p>
         )}

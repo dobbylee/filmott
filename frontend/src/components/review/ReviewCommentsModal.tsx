@@ -177,10 +177,10 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
                       {user && user.id === c.userId && (
                         <button
                           onClick={() => handleDelete(c.id)}
-                          className="ml-auto text-muted-foreground hover:text-destructive transition-colors"
+                          className="ml-auto p-1.5 sm:p-0 text-muted-foreground hover:text-destructive transition-colors"
                           aria-label="댓글 삭제"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
                         </button>
                       )}
                     </div>
@@ -223,7 +223,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
             <button
               type="submit"
               disabled={authLoading || !user || !newComment.trim() || isSubmitting}
-              className="rounded-lg bg-primary px-3 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="rounded-lg bg-primary px-4 py-3 sm:px-3 sm:py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
               aria-label="댓글 등록"
             >
               <Send className="h-4 w-4" />

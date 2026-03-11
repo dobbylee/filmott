@@ -130,14 +130,14 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
               onClick={handleEditClick}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+              className="flex items-center gap-1 rounded-md px-3 py-2 sm:px-2 sm:py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
             >
               <Pencil className="h-3 w-3" />
               수정
             </button>
             <button
               onClick={handleDeleteClick}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
+              className="flex items-center gap-1 rounded-md px-3 py-2 sm:px-2 sm:py-1 text-xs text-destructive hover:bg-destructive/10"
             >
               <Trash2 className="h-3 w-3" />
               삭제

@@ -111,7 +111,7 @@ export class TmdbService {
 
   async searchByType(
     query: string,
-    type: 'movie' | 'tv',
+    type: 'movie' | 'tv' | 'person',
     page = 1,
   ): Promise<TmdbSearchResult> {
     const { data } = await firstValueFrom(
