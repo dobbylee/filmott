@@ -4,6 +4,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ReviewCommentsService } from './review-comments.service';
 import { ReviewComment } from './review-comment.entity';
 import { Review } from './review.entity';
+import { UserRole } from '../users/enums/user-role.enum';
 
 describe('ReviewCommentsService', () => {
   let service: ReviewCommentsService;
@@ -94,6 +95,24 @@ describe('ReviewCommentsService', () => {
       mockCommentRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
       await expect(service.delete(1, 1)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow ADMIN to delete any comment', async () => {
+      const comment = { id: 1, userId: 2 };
+      mockCommentRepo.findOne.mockResolvedValue(comment);
+      mockCommentRepo.remove.mockResolvedValue(comment);
+
+      await service.delete(1, 1, UserRole.ADMIN);
+
+      expect(mockCommentRepo.remove).toHaveBeenCalledWith(comment);
+    });
+
+    it('should throw ForbiddenException for non-owner with USER role', async () => {
+      mockCommentRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
+
+      await expect(service.delete(1, 1, UserRole.USER)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 

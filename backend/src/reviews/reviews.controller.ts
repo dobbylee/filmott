@@ -53,7 +53,7 @@ export class ReviewsController {
     @CurrentUser() user: JwtPayload,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    await this.reviewsService.delete(user.id, id);
+    await this.reviewsService.delete(user.id, id, user.role);
     return { message: '삭제되었습니다.' };
   }
 
@@ -135,7 +135,7 @@ export class ReviewsController {
     @CurrentUser() user: JwtPayload,
     @Param('commentId', ParseIntPipe) commentId: number,
   ) {
-    await this.reviewCommentsService.delete(user.id, commentId);
+    await this.reviewCommentsService.delete(user.id, commentId, user.role);
     return { message: '댓글이 삭제되었습니다.' };
   }
 

@@ -68,13 +68,24 @@ describe('ReviewsController', () => {
   });
 
   describe('DELETE /api/reviews/:id', () => {
-    it('should delete a review', async () => {
-      const user = { id: 1, nickname: 'test' };
+    it('should delete a review and pass user role', async () => {
+      const user = { id: 1, nickname: 'test', role: 'USER' };
       mockReviewsService.delete.mockResolvedValue(undefined);
 
       const result = await controller.delete(user, 1);
 
       expect(result).toEqual({ message: '삭제되었습니다.' });
+      expect(mockReviewsService.delete).toHaveBeenCalledWith(1, 1, 'USER');
+    });
+
+    it('should pass ADMIN role to service for admin deletion', async () => {
+      const user = { id: 99, nickname: 'admin', role: 'ADMIN' };
+      mockReviewsService.delete.mockResolvedValue(undefined);
+
+      const result = await controller.delete(user, 1);
+
+      expect(result).toEqual({ message: '삭제되었습니다.' });
+      expect(mockReviewsService.delete).toHaveBeenCalledWith(99, 1, 'ADMIN');
     });
   });
 
@@ -153,13 +164,24 @@ describe('ReviewsController', () => {
   });
 
   describe('DELETE /api/reviews/comments/:commentId', () => {
-    it('should delete a comment', async () => {
-      const user = { id: 1, nickname: 'test' };
+    it('should delete a comment and pass user role', async () => {
+      const user = { id: 1, nickname: 'test', role: 'USER' };
       mockCommentsService.delete.mockResolvedValue(undefined);
 
       const result = await controller.deleteComment(user, 1);
 
       expect(result).toEqual({ message: '댓글이 삭제되었습니다.' });
+      expect(mockCommentsService.delete).toHaveBeenCalledWith(1, 1, 'USER');
+    });
+
+    it('should pass ADMIN role to service for admin comment deletion', async () => {
+      const user = { id: 99, nickname: 'admin', role: 'ADMIN' };
+      mockCommentsService.delete.mockResolvedValue(undefined);
+
+      const result = await controller.deleteComment(user, 1);
+
+      expect(result).toEqual({ message: '댓글이 삭제되었습니다.' });
+      expect(mockCommentsService.delete).toHaveBeenCalledWith(99, 1, 'ADMIN');
     });
   });
 

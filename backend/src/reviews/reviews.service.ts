@@ -11,6 +11,7 @@ import { Review } from './review.entity';
 import { ReviewLike } from './review-like.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { UserRole } from '../users/enums/user-role.enum';
 
 @Injectable()
 export class ReviewsService {
@@ -73,7 +74,7 @@ export class ReviewsService {
     });
   }
 
-  async delete(userId: number, reviewId: number): Promise<void> {
+  async delete(userId: number, reviewId: number, userRole?: string): Promise<void> {
     const review = await this.reviewRepo.findOne({
       where: { id: reviewId },
     });
@@ -81,7 +82,7 @@ export class ReviewsService {
     if (!review) {
       throw new NotFoundException('리뷰를 찾을 수 없습니다.');
     }
-    if (review.userId !== userId) {
+    if (review.userId !== userId && userRole !== UserRole.ADMIN) {
       throw new ForbiddenException('본인의 리뷰만 삭제할 수 있습니다.');
     }
 

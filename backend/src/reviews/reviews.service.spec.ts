@@ -10,6 +10,7 @@ import { DataSource } from 'typeorm';
 import { ReviewsService } from './reviews.service';
 import { Review } from './review.entity';
 import { ReviewLike } from './review-like.entity';
+import { UserRole } from '../users/enums/user-role.enum';
 
 describe('ReviewsService', () => {
   let service: ReviewsService;
@@ -187,6 +188,24 @@ describe('ReviewsService', () => {
       mockReviewRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
       await expect(service.delete(1, 1)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow ADMIN to delete any review', async () => {
+      const review = { id: 1, userId: 2 };
+      mockReviewRepo.findOne.mockResolvedValue(review);
+      mockReviewRepo.remove.mockResolvedValue(review);
+
+      await service.delete(1, 1, UserRole.ADMIN);
+
+      expect(mockReviewRepo.remove).toHaveBeenCalledWith(review);
+    });
+
+    it('should throw ForbiddenException for non-owner with USER role', async () => {
+      mockReviewRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
+
+      await expect(service.delete(1, 1, UserRole.USER)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 

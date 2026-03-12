@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { ReviewComment } from './review-comment.entity';
 import { Review } from './review.entity';
 import { CreateReviewCommentDto } from './dto/create-review-comment.dto';
+import { UserRole } from '../users/enums/user-role.enum';
 
 @Injectable()
 export class ReviewCommentsService {
@@ -39,7 +40,7 @@ export class ReviewCommentsService {
     return this.commentRepo.save(comment);
   }
 
-  async delete(userId: number, commentId: number): Promise<void> {
+  async delete(userId: number, commentId: number, userRole?: string): Promise<void> {
     const comment = await this.commentRepo.findOne({
       where: { id: commentId },
     });
@@ -47,7 +48,7 @@ export class ReviewCommentsService {
     if (!comment) {
       throw new NotFoundException('댓글을 찾을 수 없습니다.');
     }
-    if (comment.userId !== userId) {
+    if (comment.userId !== userId && userRole !== UserRole.ADMIN) {
       throw new ForbiddenException('본인의 댓글만 삭제할 수 있습니다.');
     }
 
