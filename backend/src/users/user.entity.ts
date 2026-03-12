@@ -2,10 +2,11 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  DeleteDateColumn,
   CreateDateColumn,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { UserStatus } from './enums/user-status.enum';
+import { UserRole } from './enums/user-role.enum';
 
 @Entity('users')
 export class User {
@@ -25,11 +26,14 @@ export class User {
   @Column({ name: 'profile_image', nullable: true, type: 'varchar' })
   profileImage?: string;
 
+  @Column({ type: 'enum', enum: UserStatus, default: UserStatus.ACTIVE })
+  status!: UserStatus;
+
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  role!: UserRole;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
-
-  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
-  deletedAt?: Date;
 }
 
 // User without password - safe to return to client
