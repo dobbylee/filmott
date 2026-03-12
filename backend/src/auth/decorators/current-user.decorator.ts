@@ -16,4 +16,5 @@ export const CurrentUser = createParamDecorator(
 export interface JwtPayload {
   id: number;
   nickname: string;
+  role: string;
 }

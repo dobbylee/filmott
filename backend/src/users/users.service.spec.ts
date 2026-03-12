@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from './user.entity';
+import { UserStatus } from './enums/user-status.enum';
+import { UserRole } from './enums/user-role.enum';
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 
@@ -14,7 +16,6 @@ describe('UsersService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
-    softDelete: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -32,6 +33,18 @@ describe('UsersService', () => {
     jest.clearAllMocks();
   });
 
+  describe('findOne', () => {
+    it('should query with ACTIVE status condition', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      await service.findOne('test');
+
+      expect(mockUsersRepo.findOne).toHaveBeenCalledWith({
+        where: { nickname: 'test', status: UserStatus.ACTIVE },
+      });
+    });
+  });
+
   describe('findById', () => {
     it('should return SafeUser without password when user exists', async () => {
       mockUsersRepo.findOne.mockResolvedValue({
@@ -39,6 +52,8 @@ describe('UsersService', () => {
         nickname: 'test',
         email: 'test@test.com',
         password: 'hashed',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
       });
 
       const result = await service.findById(1);
@@ -46,6 +61,8 @@ describe('UsersService', () => {
       expect(result).not.toBeNull();
       expect(result).not.toHaveProperty('password');
       expect(result!.nickname).toBe('test');
+      expect(result!.status).toBe(UserStatus.ACTIVE);
+      expect(result!.role).toBe(UserRole.USER);
     });
 
     it('should return null when user does not exist', async () => {
@@ -159,24 +176,56 @@ describe('UsersService', () => {
     });
   });
 
-  describe('softRemove', () => {
-    it('should anonymize user before soft deleting', async () => {
-      const mockUser = { id: 5, nickname: 'bob', email: 'bob@mail.com' };
+  describe('verifyPassword', () => {
+    it('should return false for non-ACTIVE user', async () => {
+      mockUsersRepo.findOne.mockResolvedValue({
+        id: 1,
+        password: 'hashed',
+        status: UserStatus.DELETED,
+      });
+
+      const result = await service.verifyPassword(1, 'password');
+
+      expect(result).toBe(false);
+      expect(bcrypt.compare).not.toHaveBeenCalled();
+    });
+
+    it('should verify password for ACTIVE user', async () => {
+      mockUsersRepo.findOne.mockResolvedValue({
+        id: 1,
+        password: 'hashed',
+        status: UserStatus.ACTIVE,
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.verifyPassword(1, 'password');
+
+      expect(result).toBe(true);
+      expect(bcrypt.compare).toHaveBeenCalledWith('password', 'hashed');
+    });
+  });
+
+  describe('deactivate', () => {
+    it('should anonymize user and set status to DELETED', async () => {
+      const mockUser: Record<string, any> = {
+        id: 5,
+        nickname: 'bob',
+        email: 'bob@mail.com',
+        status: UserStatus.ACTIVE,
+      };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
 
       // Mock Date.now() for predictable timestamp
       const fixedTimestamp = 1740000000000;
       jest.spyOn(Date, 'now').mockReturnValue(fixedTimestamp);
 
-      await service.softRemove(5);
+      await service.deactivate(5);
 
-      // Should anonymize user data and save
+      // Should anonymize user data, set status to DELETED, and save
       expect(mockUser.nickname).toEqual(`deleted_5_${fixedTimestamp}`);
       expect(mockUser.email).toEqual(`deleted_5_${fixedTimestamp}@deleted.local`);
+      expect(mockUser.status).toEqual(UserStatus.DELETED);
       expect(mockUsersRepo.save).toHaveBeenCalledWith(mockUser);
-
-      // Should soft delete
-      expect(mockUsersRepo.softDelete).toHaveBeenCalledWith(5);
 
       jest.restoreAllMocks();
     });
@@ -184,7 +233,7 @@ describe('UsersService', () => {
     it('should throw NotFoundException when user does not exist', async () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.softRemove(999)).rejects.toThrow(NotFoundException);
+      await expect(service.deactivate(999)).rejects.toThrow(NotFoundException);
     });
   });
 });

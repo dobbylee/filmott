@@ -68,11 +68,11 @@ export class UsersController {
     return this.usersService.update(user.id, updateUserDto);
   }
 
-  // Soft delete current user's account
+  // Deactivate current user's account (status -> DELETED)
   @UseGuards(JwtAuthGuard)
   @Delete('me')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@CurrentUser() user: JwtPayload) {
-    await this.usersService.softRemove(user.id);
+  async deactivate(@CurrentUser() user: JwtPayload) {
+    await this.usersService.deactivate(user.id);
   }
 }

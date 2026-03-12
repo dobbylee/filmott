@@ -9,7 +9,7 @@ describe('UsersController', () => {
   const mockUsersService = {
     findById: jest.fn(),
     update: jest.fn(),
-    softRemove: jest.fn(),
+    deactivate: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -61,14 +61,14 @@ describe('UsersController', () => {
     });
   });
 
-  describe('DELETE /users/me (remove)', () => {
-    it('should call softRemove with the current user id', async () => {
+  describe('DELETE /users/me (deactivate)', () => {
+    it('should call deactivate with the current user id', async () => {
       const mockUser = { id: 1, nickname: 'test' };
-      mockUsersService.softRemove.mockResolvedValue(undefined);
+      mockUsersService.deactivate.mockResolvedValue(undefined);
 
-      await controller.remove(mockUser);
+      await controller.deactivate(mockUser);
 
-      expect(mockUsersService.softRemove).toHaveBeenCalledWith(1);
+      expect(mockUsersService.deactivate).toHaveBeenCalledWith(1);
     });
   });
 });

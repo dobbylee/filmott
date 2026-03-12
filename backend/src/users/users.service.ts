@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, SafeUser } from './user.entity';
+import { UserStatus } from './enums/user-status.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
@@ -19,7 +20,9 @@ export class UsersService {
   ) {}
 
   async findOne(nickname: string): Promise<User | null> {
-    return this.usersRepo.findOne({ where: { nickname } });
+    return this.usersRepo.findOne({
+      where: { nickname, status: UserStatus.ACTIVE },
+    });
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -33,7 +36,7 @@ export class UsersService {
 
   async verifyPassword(id: number, password: string): Promise<boolean> {
     const user = await this.usersRepo.findOne({ where: { id } });
-    if (!user) return false;
+    if (!user || user.status !== UserStatus.ACTIVE) return false;
     return bcrypt.compare(password, user.password);
   }
 
@@ -125,7 +128,7 @@ export class UsersService {
     return result;
   }
 
-  async softRemove(id: number): Promise<void> {
+  async deactivate(id: number): Promise<void> {
     const user = await this.usersRepo.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
@@ -135,8 +138,7 @@ export class UsersService {
     const timestamp = Date.now();
     user.nickname = `deleted_${user.id}_${timestamp}`;
     user.email = `deleted_${user.id}_${timestamp}@deleted.local`;
+    user.status = UserStatus.DELETED;
     await this.usersRepo.save(user);
-
-    await this.usersRepo.softDelete(id);
   }
 }
