@@ -155,6 +155,21 @@ export class WatchlistService {
   }
 
   /**
+   * Get all want_to_watch items (no pagination, for poster grid)
+   */
+  async getWantToWatchAll(userId: number) {
+    const items = await this.watchlistRepo
+      .createQueryBuilder('w')
+      .leftJoinAndSelect('w.content', 'content')
+      .where('w.userId = :userId', { userId })
+      .andWhere('w.status = :status', { status: 'want_to_watch' })
+      .orderBy('w.createdAt', 'DESC')
+      .getMany();
+
+    return { items, total: items.length };
+  }
+
+  /**
    * Get counts for watched and want_to_watch
    */
   async getMyWatchlistCounts(userId: number) {
@@ -164,6 +179,87 @@ export class WatchlistService {
     ]);
 
     return { watchedCount, wantToWatchCount };
+  }
+
+  /**
+   * Get distinct years where user has watched content
+   */
+  async getWatchedYears(userId: number): Promise<{ years: number[] }> {
+    const result = await this.watchlistRepo
+      .createQueryBuilder('w')
+      .select('DISTINCT EXTRACT(YEAR FROM COALESCE(w.watched_at, w.updated_at))', 'year')
+      .where('w.user_id = :userId', { userId })
+      .andWhere('w.status = :status', { status: 'watched' })
+      .orderBy('year', 'DESC')
+      .getRawMany();
+
+    const years = result.map((r) => parseInt(r.year, 10));
+    return { years };
+  }
+
+  /**
+   * Get watched items grouped by month for a specific year
+   */
+  async getWatchedByYear(userId: number, year: number) {
+    const startDate = new Date(year, 0, 1); // Jan 1
+    const endDate = new Date(year + 1, 0, 1); // Jan 1 next year
+
+    const qb = this.watchlistRepo
+      .createQueryBuilder('w')
+      .leftJoinAndSelect('w.content', 'content')
+      .leftJoinAndMapOne(
+        'w.review',
+        'Review',
+        'review',
+        'review.userId = w.userId AND review.contentId = w.contentId',
+      )
+      .where('w.userId = :userId', { userId })
+      .andWhere('w.status = :status', { status: 'watched' })
+      .andWhere(
+        'COALESCE(w.watchedAt, w.updatedAt) >= :startDate',
+        { startDate },
+      )
+      .andWhere(
+        'COALESCE(w.watchedAt, w.updatedAt) < :endDate',
+        { endDate },
+      );
+
+    qb.loadRelationCountAndMap(
+      'review.commentsCount',
+      'review.comments',
+    );
+
+    qb.orderBy('COALESCE(w.watchedAt, w.updatedAt)', 'DESC')
+      .addOrderBy('w.id', 'DESC');
+
+    const items = await qb.getMany();
+
+    // Group by month in JS
+    const monthMap = new Map<number, typeof items>();
+    for (const item of items) {
+      const effectiveDate = item.watchedAt ?? item.updatedAt;
+      const d = new Date(effectiveDate);
+      const month = d.getMonth() + 1; // 1~12
+      if (!monthMap.has(month)) {
+        monthMap.set(month, []);
+      }
+      monthMap.get(month)!.push(item);
+    }
+
+    // Build months array sorted 12 -> 1 (newest first)
+    const months = Array.from(monthMap.entries())
+      .sort((a, b) => b[0] - a[0])
+      .map(([month, monthItems]) => ({
+        month,
+        count: monthItems.length,
+        items: monthItems,
+      }));
+
+    return {
+      year,
+      totalCount: items.length,
+      months,
+    };
   }
 
   /**

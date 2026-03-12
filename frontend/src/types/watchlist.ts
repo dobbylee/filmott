@@ -31,3 +31,24 @@ export interface WatchlistPage {
   page: number;
   totalPages: number;
 }
+
+export interface WantToWatchResponse {
+  items: WatchlistItem[];
+  total: number;
+}
+
+export interface WatchedMonthGroup {
+  month: number;
+  count: number;
+  items: WatchlistItem[];
+}
+
+export interface WatchedByYearResponse {
+  year: number;
+  totalCount: number;
+  months: WatchedMonthGroup[];
+}
+
+export interface WatchedYearsResponse {
+  years: number[];
+}

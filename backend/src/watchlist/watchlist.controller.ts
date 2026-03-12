@@ -59,6 +59,32 @@ export class WatchlistController {
     return this.watchlistService.getMyWatchlist(user.id, s, p);
   }
 
+  @Get('me/want-to-watch')
+  async getWantToWatchAll(@CurrentUser() user: JwtPayload) {
+    return this.watchlistService.getWantToWatchAll(user.id);
+  }
+
+  @Get('me/watched-years')
+  async getWatchedYears(@CurrentUser() user: JwtPayload) {
+    return this.watchlistService.getWatchedYears(user.id);
+  }
+
+  @Get('me/watched')
+  async getWatchedByYear(
+    @CurrentUser() user: JwtPayload,
+    @Query('year') yearStr?: string,
+  ) {
+    const currentYear = new Date().getFullYear();
+    let year = currentYear;
+    if (yearStr) {
+      const parsed = parseInt(yearStr, 10);
+      if (!isNaN(parsed) && parsed >= 1900 && parsed <= 2100) {
+        year = parsed;
+      }
+    }
+    return this.watchlistService.getWatchedByYear(user.id, year);
+  }
+
   @Get('me/counts')
   async getMyWatchlistCounts(@CurrentUser() user: JwtPayload) {
     return this.watchlistService.getMyWatchlistCounts(user.id);

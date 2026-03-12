@@ -64,6 +64,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Interactive elements */
+button,
+select,
+[role="button"],
+summary {
+  cursor: pointer;
+}
+
 /* Cinematic Utilities */
 .glass-panel {
   background: rgba(17, 17, 17, 0.6);

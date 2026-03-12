@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, Bookmark, ChevronLeft, ChevronRight } from 'lucide-react';
+import Image from 'next/image';
+import { Eye, Bookmark, ChevronLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
-import WatchlistCard from '@/components/watchlist/WatchlistCard';
-import WatchedDateModal from '@/components/watchlist/WatchedDateModal';
-import type { WatchlistPage, WatchlistStatus } from '@/types/watchlist';
+import YearFilter from '@/components/watchlist/YearFilter';
+import MonthSection from '@/components/watchlist/MonthSection';
+import { TMDB_IMAGE_BASE } from '@/types/content';
+import type { WatchlistStatus, WantToWatchResponse, WatchedByYearResponse, WatchedYearsResponse } from '@/types/watchlist';
 
 export default function WatchlistListPage() {
   const router = useRouter();
@@ -17,13 +19,19 @@ export default function WatchlistListPage() {
 
   const statusParam = searchParams.get('status');
   const activeStatus: WatchlistStatus = statusParam === 'want_to_watch' ? 'want_to_watch' : 'watched';
-  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const yearParam = searchParams.get('year');
 
-  const [data, setData] = useState<WatchlistPage | null>(null);
+  // want_to_watch state
+  const [wtwData, setWtwData] = useState<WantToWatchResponse | null>(null);
+
+  // watched state
+  const [watchedYears, setWatchedYears] = useState<number[]>([]);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [watchedData, setWatchedData] = useState<WatchedByYearResponse | null>(null);
+
+  // shared state
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
-  const [showDateModal, setShowDateModal] = useState(false);
-  const [markWatchedId, setMarkWatchedId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -32,75 +40,109 @@ export default function WatchlistListPage() {
     }
   }, [user, authLoading, router, openAuthModal]);
 
-  const fetchWatchlist = useCallback(async () => {
+  // Fetch liked IDs for a list of items
+  const fetchLikedIds = useCallback(async (items: { review?: { id: number } }[]) => {
+    const reviewIds = items
+      .filter((item) => item.review?.id)
+      .map((item) => item.review!.id);
+    if (reviewIds.length > 0) {
+      const likedRes = await api.get<number[]>(
+        `/reviews/liked-ids?reviewIds=${reviewIds.join(',')}`
+      );
+      setLikedIds(new Set(likedRes.data));
+    } else {
+      setLikedIds(new Set());
+    }
+  }, []);
+
+  // Fetch watched years on mount (when watched tab)
+  const fetchWatchedYears = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await api.get<WatchedYearsResponse>('/watchlist/me/watched-years');
+      setWatchedYears(res.data.years);
+
+      // Determine selected year
+      const currentYear = new Date().getFullYear();
+      const yearFromParam = yearParam ? parseInt(yearParam, 10) : null;
+
+      if (yearFromParam && res.data.years.includes(yearFromParam)) {
+        setSelectedYear(yearFromParam);
+      } else if (res.data.years.includes(currentYear)) {
+        setSelectedYear(currentYear);
+      } else if (res.data.years.length > 0) {
+        setSelectedYear(res.data.years[0]);
+      } else {
+        setSelectedYear(null);
+      }
+    } catch {
+      setWatchedYears([]);
+      setSelectedYear(null);
+    }
+  }, [user, yearParam]);
+
+  // Fetch watched data for selected year
+  const fetchWatchedByYear = useCallback(async () => {
+    if (!user || selectedYear === null) return;
+    setIsLoading(true);
+    try {
+      const res = await api.get<WatchedByYearResponse>(
+        `/watchlist/me/watched?year=${selectedYear}`
+      );
+      setWatchedData(res.data);
+
+      // Collect all items across months for liked IDs
+      const allItems = res.data.months.flatMap((m) => m.items);
+      await fetchLikedIds(allItems);
+    } catch {
+      setWatchedData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, selectedYear, fetchLikedIds]);
+
+  // Fetch want_to_watch list (all items, no pagination)
+  const fetchWantToWatch = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const res = await api.get<WatchlistPage>(
-        `/watchlist/me?status=${activeStatus}&page=${currentPage}`
-      );
-      setData(res.data);
-
-      // Fetch liked status for watched items with reviews
-      if (activeStatus === 'watched') {
-        const reviewIds = res.data.items
-          .filter((item) => item.review?.id)
-          .map((item) => item.review!.id);
-        if (reviewIds.length > 0) {
-          const likedRes = await api.get<number[]>(
-            `/reviews/liked-ids?reviewIds=${reviewIds.join(',')}`
-          );
-          setLikedIds(new Set(likedRes.data));
-        } else {
-          setLikedIds(new Set());
-        }
-      }
+      const res = await api.get<WantToWatchResponse>('/watchlist/me/want-to-watch');
+      setWtwData(res.data);
     } catch {
       // ignore
     } finally {
       setIsLoading(false);
     }
-  }, [user, activeStatus, currentPage]);
+  }, [user]);
 
+  // Main effect: fetch data based on active tab
   useEffect(() => {
-    fetchWatchlist();
-  }, [fetchWatchlist]);
+    if (!user) return;
+    if (activeStatus === 'watched') {
+      fetchWatchedYears();
+    } else {
+      fetchWantToWatch();
+    }
+  }, [user, activeStatus, fetchWatchedYears, fetchWantToWatch]);
+
+  // Fetch watched data when year changes
+  useEffect(() => {
+    if (activeStatus === 'watched' && selectedYear !== null) {
+      fetchWatchedByYear();
+    }
+  }, [activeStatus, selectedYear, fetchWatchedByYear]);
 
   const setTab = (status: WatchlistStatus) => {
-    router.push(`/profile/watchlist?status=${status}`);
-  };
-
-  const goToPage = (page: number) => {
-    router.push(`/profile/watchlist?status=${activeStatus}&page=${page}`);
-  };
-
-  const handleMarkWatched = (id: number) => {
-    setMarkWatchedId(id);
-    setShowDateModal(true);
-  };
-
-  const handleDateConfirm = async (date: string) => {
-    if (!markWatchedId) return;
-    try {
-      await api.patch(`/watchlist/${markWatchedId}`, {
-        status: 'watched',
-        watchedAt: date,
-      });
-      setShowDateModal(false);
-      setMarkWatchedId(null);
-      fetchWatchlist();
-    } catch {
-      // ignore
+    if (status === 'watched') {
+      router.push('/profile/watchlist?status=watched');
+    } else {
+      router.push('/profile/watchlist?status=want_to_watch');
     }
   };
 
-  const handleRemove = async (id: number) => {
-    try {
-      await api.delete(`/watchlist/${id}`);
-      fetchWatchlist();
-    } catch {
-      // ignore
-    }
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    router.push(`/profile/watchlist?status=watched&year=${year}`);
   };
 
   if (authLoading || !user) {
@@ -116,6 +158,9 @@ export default function WatchlistListPage() {
     );
   }
 
+  // Determine watched tab count
+  const watchedTabCount = watchedData?.totalCount ?? null;
+
   return (
     <div className="mx-auto max-w-2xl px-4 pb-12">
       {/* Back link */}
@@ -127,8 +172,6 @@ export default function WatchlistListPage() {
         프로필로 돌아가기
       </Link>
 
-      <h1 className="mb-6 text-2xl font-bold text-white">워치리스트</h1>
-
       {/* Tabs */}
       <div className="mb-6 flex rounded-xl border border-white/10 bg-white/[0.02] p-1">
         <button
@@ -139,10 +182,10 @@ export default function WatchlistListPage() {
               : 'text-white/40 hover:text-white/60'
           }`}
         >
-          <Eye className="h-4 w-4" />
+          <Eye className={`h-4 w-4 ${activeStatus === 'watched' ? 'text-green-400' : ''}`} />
           감상한 작품
-          {data && activeStatus === 'watched' && (
-            <span className="text-xs text-white/30">({data.total})</span>
+          {activeStatus === 'watched' && watchedTabCount !== null && (
+            <span className="text-xs text-white/30">({watchedTabCount})</span>
           )}
         </button>
         <button
@@ -153,98 +196,135 @@ export default function WatchlistListPage() {
               : 'text-white/40 hover:text-white/60'
           }`}
         >
-          <Bookmark className="h-4 w-4" />
+          <Bookmark className={`h-4 w-4 ${activeStatus === 'want_to_watch' ? 'text-yellow-400' : ''}`} />
           감상할 작품
-          {data && activeStatus === 'want_to_watch' && (
-            <span className="text-xs text-white/30">({data.total})</span>
+          {wtwData && activeStatus === 'want_to_watch' && (
+            <span className="text-xs text-white/30">({wtwData.total})</span>
           )}
         </button>
       </div>
 
-      {/* Content */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 rounded-xl bg-white/5 animate-pulse" />
-          ))}
-        </div>
-      ) : !data || data.items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          {activeStatus === 'watched' ? (
-            <Eye className="mb-3 h-10 w-10 text-white/10" />
-          ) : (
-            <Bookmark className="mb-3 h-10 w-10 text-white/10" />
-          )}
-          <p className="text-sm text-white/40">
-            {activeStatus === 'watched'
-              ? '아직 감상한 작품이 없습니다.'
-              : '아직 감상할 작품이 없습니다.'}
-          </p>
-          <Link
-            href="/discover?type=movie"
-            className="mt-4 text-sm text-fuchsia-400 hover:text-fuchsia-300 transition-colors"
-          >
-            작품 둘러보기
-          </Link>
-        </div>
-      ) : (
+      {/* Watched tab content */}
+      {activeStatus === 'watched' && (
         <>
-          <div className="space-y-3">
-            {data.items.map((item) => (
-              <WatchlistCard
-                key={item.id}
-                item={item}
-                initialLiked={item.review ? likedIds.has(item.review.id) : false}
-                onMarkWatched={activeStatus === 'want_to_watch' ? handleMarkWatched : undefined}
-                onRemove={activeStatus === 'want_to_watch' ? handleRemove : undefined}
-              />
-            ))}
-          </div>
+          {/* Year filter */}
+          {watchedYears.length > 0 && selectedYear !== null && (
+            <YearFilter
+              years={watchedYears}
+              selectedYear={selectedYear}
+              onYearChange={handleYearChange}
+            />
+          )}
 
-          {/* Pagination */}
-          {data.totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-center gap-2">
-              <button
-                onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage <= 1}
-                className="rounded-lg border border-white/10 p-2 text-white/60 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => goToPage(page)}
-                  className={`h-9 w-9 rounded-lg text-sm font-medium transition-colors ${
-                    page === currentPage
-                      ? 'bg-white/10 text-white'
-                      : 'text-white/40 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  {page}
-                </button>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-32 rounded-xl bg-white/5 animate-pulse" />
               ))}
-              <button
-                onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage >= data.totalPages}
-                className="rounded-lg border border-white/10 p-2 text-white/60 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+            </div>
+          ) : watchedYears.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Eye className="mb-3 h-10 w-10 text-white/10" />
+              <p className="text-sm text-white/40">
+                아직 감상한 작품이 없습니다.
+              </p>
+              <Link
+                href="/discover?type=movie"
+                className="mt-4 text-sm text-fuchsia-400 hover:text-fuchsia-300 transition-colors"
               >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+                작품 둘러보기
+              </Link>
+            </div>
+          ) : watchedData && watchedData.months.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Eye className="mb-3 h-10 w-10 text-white/10" />
+              <p className="text-sm text-white/40">
+                {selectedYear}년에 감상한 작품이 없습니다.
+              </p>
+            </div>
+          ) : watchedData && (
+            <div>
+              {watchedData.months.map((monthGroup) => (
+                <MonthSection
+                  key={monthGroup.month}
+                  monthGroup={monthGroup}
+                  likedIds={likedIds}
+                  onMutate={fetchWatchedByYear}
+                />
+              ))}
             </div>
           )}
         </>
       )}
 
-      {/* Date modal for mark as watched */}
-      {showDateModal && (
-        <WatchedDateModal
-          onConfirm={handleDateConfirm}
-          onCancel={() => {
-            setShowDateModal(false);
-            setMarkWatchedId(null);
-          }}
-        />
+      {/* Want to watch tab content */}
+      {activeStatus === 'want_to_watch' && (
+        <>
+          {isLoading ? (
+            <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="aspect-[2/3] rounded-2xl bg-white/5 animate-pulse" />
+              ))}
+            </div>
+          ) : !wtwData || wtwData.items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Bookmark className="mb-3 h-10 w-10 text-white/10" />
+              <p className="text-sm text-white/40">
+                아직 감상할 작품이 없습니다.
+              </p>
+              <Link
+                href="/discover?type=movie"
+                className="mt-4 text-sm text-fuchsia-400 hover:text-fuchsia-300 transition-colors"
+              >
+                작품 둘러보기
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
+              {wtwData.items.map((item) => {
+                const { content } = item;
+                const href = `/contents/${content.contentType}/${content.tmdbId}`;
+                const posterSrc = content.posterUrl
+                  ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w500${content.posterUrl}`)
+                  : null;
+
+                return (
+                  <Link
+                    key={item.id}
+                    href={href}
+                    className="group block relative w-full hover:-translate-y-2 transition-all duration-300"
+                  >
+                    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-white/5 border border-white/5 shadow-lg">
+                      {posterSrc ? (
+                        <Image
+                          src={posterSrc}
+                          alt={content.title}
+                          fill
+                          sizes="(max-width: 640px) 33vw, 25vw"
+                          className="object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-white/40 bg-zinc-900">
+                          포스터 없음
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300" />
+                      <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-1 opacity-90 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                        <p className="truncate text-sm font-bold text-white drop-shadow-md">
+                          {content.title}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2 text-xs font-medium text-white/60">
+                          {content.releaseDate && <span>{content.releaseDate.slice(0, 4)}</span>}
+                          <span>{content.contentType === 'tv' ? '시리즈' : '영화'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -3,37 +3,49 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, Check, Trash2, Calendar } from 'lucide-react';
+import { Star, Pencil } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from '@/components/review/LikeButton';
 import ReviewCommentsModal from '@/components/review/ReviewCommentsModal';
+import ReviewFormModal from '@/components/review/ReviewFormModal';
 import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { WatchlistItem } from '@/types/watchlist';
 
 interface WatchlistCardProps {
   item: WatchlistItem;
   initialLiked?: boolean;
-  onMarkWatched?: (id: number) => void;
-  onRemove?: (id: number) => void;
+  onMutate?: () => void;
 }
 
-function formatDate(dateStr: string | null): string {
+function getDay(dateStr: string | null): string {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+  return String(new Date(dateStr).getDate());
 }
 
-export default function WatchlistCard({ item, initialLiked = false, onMarkWatched, onRemove }: WatchlistCardProps) {
-  const { content, status, watchedAt, createdAt, review } = item;
+export default function WatchlistCard({ item, initialLiked = false, onMutate }: WatchlistCardProps) {
+  const { content, status, watchedAt, review } = item;
   const href = `/contents/${content.contentType}/${content.tmdbId}`;
   const posterSrc = content.posterUrl
     ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`)
     : null;
   const [showComments, setShowComments] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   return (
     <>
-      <div className="group relative flex gap-4 rounded-2xl border border-white/5 bg-white/5 p-4 hover:bg-white/10 transition-colors backdrop-blur-sm">
+      <div className="group relative flex gap-4 rounded-2xl border border-white/[0.03] bg-white/[0.02] p-4 hover:bg-white/5 transition-colors">
+        {/* 일(day) 숫자 + 구분선 */}
+        {status === 'watched' && (
+          <>
+            <div className="flex-shrink-0 flex items-center justify-center w-[50px]">
+              <span className="text-3xl font-bold text-white/80">
+                {getDay(watchedAt)}
+              </span>
+            </div>
+            <div className="flex-shrink-0 w-px bg-white/10" />
+          </>
+        )}
+
         {/* Poster + Title */}
         <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
           <Link href={href} className="relative h-[100px] w-[66px] overflow-hidden rounded-lg shadow-lg">
@@ -64,93 +76,62 @@ export default function WatchlistCard({ item, initialLiked = false, onMarkWatche
             <div className="flex gap-3 h-full">
               {/* 왼쪽: 리뷰 정보 */}
               <div className="flex-1 min-w-0 flex flex-col">
-                {/* 내 리뷰 + 별점 + 댓글 */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
-                    내 리뷰
-                  </span>
-                  {review?.rating != null && (
-                    <div className="flex items-center gap-0.5">
-                      <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                      <span className="text-xs font-semibold">{review.rating}</span>
+                {review ? (
+                  <>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                        내 리뷰
+                      </span>
+                      {review.rating != null && (
+                        <div className="flex items-center gap-0.5">
+                          <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                          <span className="text-xs font-semibold">{review.rating}</span>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setShowComments(true)}
+                        className="flex items-center gap-0.5 hover:text-white transition-colors"
+                      >
+                        <CommentIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-xs font-semibold text-muted-foreground">{review.commentsCount ?? 0}</span>
+                      </button>
                     </div>
-                  )}
-                  {review && (
+                    {review.comment && (
+                      <p className="mt-3 px-3 text-sm leading-relaxed text-white/70 line-clamp-2">
+                        {review.comment}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center h-full">
                     <button
-                      onClick={() => setShowComments(true)}
-                      className="flex items-center gap-0.5 hover:text-white transition-colors"
+                      onClick={() => setShowReviewForm(true)}
+                      className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/50 hover:border-primary/30 hover:bg-primary/10 hover:text-primary transition-colors"
                     >
-                      <CommentIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs font-semibold text-muted-foreground">{review.commentsCount ?? 0}</span>
+                      <Pencil className="h-3.5 w-3.5" />
+                      리뷰 작성
                     </button>
-                  )}
-                </div>
-
-                {/* 코멘트 */}
-                {review?.comment && (
-                  <p className="mt-3 px-3 text-sm leading-relaxed text-white/70 line-clamp-2">
-                    {review.comment}
-                  </p>
+                  </div>
                 )}
               </div>
 
-              {/* 오른쪽: 영화·연도 / 좋아요 / 감상일 (수직 배치) */}
+              {/* 오른쪽: 좋아요 / 영화·연도 */}
               <div className="flex flex-col items-end justify-between flex-shrink-0">
-                <span className="text-xs text-white/30">
-                  {content.contentType === 'movie' ? '영화' : '시리즈'}
-                  {content.releaseDate && ` · ${content.releaseDate.slice(0, 4)}`}
-                </span>
                 {review && (
                   <LikeButton
                     reviewId={review.id}
                     initialCount={review.likesCount}
                     initialLiked={initialLiked}
-                    size="sm"
+                    size="md"
                   />
                 )}
-                <div className="flex items-center gap-1 text-xs text-white/40">
-                  <Calendar className="h-3 w-3" />
-                  <span>{formatDate(watchedAt)}</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* 감상할 작품: 추가일 + 타입 */}
-              <div className="mt-2 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5 text-white/40" />
-                  <span className="text-xs text-white/50">추가일 {formatDate(createdAt)}</span>
-                </div>
                 <span className="text-xs text-white/30">
                   {content.contentType === 'movie' ? '영화' : '시리즈'}
                   {content.releaseDate && ` · ${content.releaseDate.slice(0, 4)}`}
                 </span>
               </div>
-
-              {/* Action buttons */}
-              <div className="mt-auto pt-3 flex gap-2">
-                {onMarkWatched && (
-                  <button
-                    onClick={() => onMarkWatched(item.id)}
-                    className="flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors"
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                    감상 완료
-                  </button>
-                )}
-                {onRemove && (
-                  <button
-                    onClick={() => onRemove(item.id)}
-                    className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-white/50 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    제거
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -158,6 +139,14 @@ export default function WatchlistCard({ item, initialLiked = false, onMarkWatche
         <ReviewCommentsModal
           review={review}
           onClose={() => setShowComments(false)}
+        />
+      )}
+
+      {showReviewForm && (
+        <ReviewFormModal
+          contentId={item.contentId}
+          onClose={() => setShowReviewForm(false)}
+          onMutate={onMutate}
         />
       )}
     </>

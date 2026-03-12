@@ -133,7 +133,7 @@ async function RecentReviewsSection() {
     return (
       <section>
         <div className="mb-6">
-          <h2 className="text-2xl font-bold tracking-tight">실시간 생생한 리뷰</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-white">최근 리뷰</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {reviews.slice(0, 6).map((review) => (
@@ -176,7 +176,7 @@ function SectionSkeleton({ title }: { title: string }) {
 function ReviewSkeleton() {
   return (
     <section className="py-8">
-      <h2 className="mb-6 text-2xl font-bold tracking-tight text-white/80">실시간 생생한 리뷰</h2>
+      <h2 className="mb-6 text-2xl font-bold tracking-tight text-white">최근 리뷰</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="h-[120px] animate-pulse rounded-2xl bg-white/5" />

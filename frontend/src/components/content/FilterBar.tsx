@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { MOVIE_GENRES, TV_GENRES, OTT_PROVIDERS } from '@/types/content';
 
 const SORT_OPTIONS = [
@@ -133,18 +134,21 @@ export default function FilterBar({
 
         <div>
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">연도</h3>
-          <select
-            value={selectedYear ?? ''}
-            onChange={(e) => handleYearChange(e.target.value)}
-            className="appearance-none w-20 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-white/80 text-center outline-none focus:border-primary cursor-pointer"
-          >
-            <option value="">전체</option>
-            {years.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
+          <div className="relative inline-block">
+            <select
+              value={selectedYear ?? ''}
+              onChange={(e) => handleYearChange(e.target.value)}
+              className="appearance-none rounded-lg border border-white/10 bg-white/5 py-2 pl-4 pr-9 text-sm font-medium text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-1 focus:ring-white/20"
+            >
+              <option value="" className="bg-[#111] text-white">전체</option>
+              {years.map((year) => (
+                <option key={year} value={year} className="bg-[#111] text-white">
+                  {year}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          </div>
         </div>
       </div>
     </div>
