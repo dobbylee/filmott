@@ -14,6 +14,7 @@ vi.mock('next-themes', () => ({
 }));
 
 const mockLogout = vi.fn();
+const mockOpenAuthModal = vi.fn();
 let mockUser: { nickname: string } | null = null;
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -25,7 +26,7 @@ vi.mock('@/contexts/AuthContext', () => ({
     token: null,
     isLoading: false,
     updateUser: vi.fn(),
-    openAuthModal: vi.fn(),
+    openAuthModal: mockOpenAuthModal,
     closeAuthModal: vi.fn(),
     authModal: null,
   }),
@@ -45,24 +46,27 @@ describe('Header', () => {
     expect(screen.getByText('로그인')).toBeInTheDocument();
   });
 
-  it('should show user nickname when authenticated', () => {
+  it('should show user nickname as a link to /profile when authenticated', () => {
     mockUser = { nickname: 'testuser' };
 
     render(<Header />);
 
     expect(screen.getByText('testuser')).toBeInTheDocument();
     expect(screen.queryByText('로그인')).not.toBeInTheDocument();
+
+    // Avatar/nickname should be a link to /profile, not a button with dropdown
+    const profileLink = screen.getByText('testuser').closest('a');
+    expect(profileLink).toHaveAttribute('href', '/profile');
   });
 
-  it('should show dropdown menu when user button clicked', async () => {
+  it('should not show dropdown menu when user area clicked (link instead)', () => {
     mockUser = { nickname: 'testuser' };
-    const user = userEvent.setup();
 
     render(<Header />);
 
-    await user.click(screen.getByText('testuser'));
-    expect(screen.getByText('프로필 설정')).toBeInTheDocument();
-    expect(screen.getByText('로그아웃')).toBeInTheDocument();
+    // No dropdown elements should exist
+    expect(screen.queryByText('프로필 설정')).not.toBeInTheDocument();
+    expect(screen.queryByText('로그아웃')).not.toBeInTheDocument();
   });
 
   it('should handle search form submission', async () => {

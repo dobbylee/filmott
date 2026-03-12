@@ -3,18 +3,16 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Search, LogOut, Compass, Menu, X } from 'lucide-react';
+import { Search, Compass, Menu, X, User as UserIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Header() {
-  const { user, isLoading, logout, openAuthModal } = useAuth();
+  const { user, isLoading, openAuthModal } = useAuth();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -26,18 +24,6 @@ export default function Header() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // 드롭다운 외부 클릭 시 닫기
-  useEffect(() => {
-    if (!showUserMenu) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setShowUserMenu(false);
-      }
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [showUserMenu]);
 
   // 검색창 외부 클릭 시 닫기
   useEffect(() => {
@@ -66,17 +52,11 @@ export default function Header() {
     setTimeout(() => searchInputRef.current?.focus(), 50);
   };
 
-  const handleLogout = () => {
-    logout();
-    setShowUserMenu(false);
-    router.push('/');
-  };
-
   return (
-    <header 
+    <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled 
-          ? 'bg-black/80 backdrop-blur-lg border-b border-white/5 py-3' 
+        isScrolled
+          ? 'bg-black/80 backdrop-blur-lg border-b border-white/5 py-3'
           : 'bg-transparent border-transparent py-5'
       }`}
     >
@@ -142,36 +122,15 @@ export default function Header() {
           {isLoading ? (
             <div className="h-8 w-20 rounded-full bg-white/5 animate-pulse" />
           ) : user ? (
-            <div className="relative" ref={userMenuRef}>
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
-              >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-xs">
-                  {user.nickname.charAt(0)}
-                </div>
-                <span className="hidden sm:inline">{user.nickname}</span>
-              </button>
-
-              {showUserMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-[#111] py-1 shadow-2xl overflow-hidden glass-panel">
-                  <Link
-                    href="/profile"
-                    onClick={() => setShowUserMenu(false)}
-                    className="flex w-full items-center px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                  >
-                    프로필 설정
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    로그아웃
-                  </button>
-                </div>
-              )}
-            </div>
+            <Link
+              href="/profile"
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-xs">
+                {user.nickname.charAt(0)}
+              </div>
+              <span className="hidden sm:inline">{user.nickname}</span>
+            </Link>
           ) : (
             <button
               onClick={() => openAuthModal('login')}
@@ -193,7 +152,12 @@ export default function Header() {
             <Link href="/discover?type=tv" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
               <Compass className="h-5 w-5" /> 시리즈
             </Link>
-            
+            {user && (
+              <Link href="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+                <UserIcon className="h-5 w-5" /> 프로필
+              </Link>
+            )}
+
             <form onSubmit={(e) => { handleSearch(e); setShowMobileMenu(false); }} className="mt-2 px-2">
               <div className="relative w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
