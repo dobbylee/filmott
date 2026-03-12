@@ -95,14 +95,28 @@ describe('ContentsService', () => {
   });
 
   describe('searchContents', () => {
-    it('should call searchMulti when no type specified', async () => {
-      const searchResult = { page: 1, total_pages: 1, total_results: 1, results: [] };
-      mockTmdbService.searchMulti.mockResolvedValue(searchResult);
+    it('should call searchByType for person, movie, tv when no type specified', async () => {
+      const personResult = { page: 1, total_pages: 1, total_results: 2, results: [{ id: 1, media_type: 'person' }] };
+      const movieResult = { page: 1, total_pages: 2, total_results: 5, results: [{ id: 2, media_type: 'movie' }] };
+      const tvResult = { page: 1, total_pages: 1, total_results: 3, results: [{ id: 3, media_type: 'tv' }] };
+
+      mockTmdbService.searchByType
+        .mockResolvedValueOnce(personResult)
+        .mockResolvedValueOnce(movieResult)
+        .mockResolvedValueOnce(tvResult);
 
       const result = await service.searchContents('test');
 
-      expect(mockTmdbService.searchMulti).toHaveBeenCalledWith('test', 1);
-      expect(result).toEqual(searchResult);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledTimes(3);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'person', 1);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'movie', 1);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'tv', 1);
+      expect(result.page).toBe(1);
+      expect(result.total_pages).toBe(2); // max(2, 1)
+      expect(result.personTotal).toBe(2);
+      expect(result.contentTotal).toBe(8); // 5 + 3
+      expect(result.total_results).toBe(10); // 2 + 5 + 3
+      expect(result.results).toHaveLength(3);
     });
 
     it('should call searchByType when type is specified', async () => {
