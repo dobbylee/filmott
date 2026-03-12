@@ -56,6 +56,34 @@ export class WatchlistService {
   }
 
   /**
+   * Add to watchlist by contentId (used by ReviewsService on review creation)
+   */
+  async addToWatchlistByContentId(
+    userId: number,
+    contentId: number,
+    status: 'watched' | 'want_to_watch',
+  ): Promise<Watchlist> {
+    const existing = await this.watchlistRepo.findOne({
+      where: { userId, contentId },
+    });
+
+    if (existing) {
+      existing.status = status;
+      existing.watchedAt = status === 'watched' ? new Date() : null;
+      return this.watchlistRepo.save(existing);
+    }
+
+    const watchlist = this.watchlistRepo.create({
+      userId,
+      contentId,
+      status,
+      watchedAt: status === 'watched' ? new Date() : null,
+    });
+
+    return this.watchlistRepo.save(watchlist);
+  }
+
+  /**
    * Update watchlist item status
    */
   async updateStatus(

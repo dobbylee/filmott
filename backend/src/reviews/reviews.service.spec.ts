@@ -11,6 +11,7 @@ import { ReviewsService } from './reviews.service';
 import { Review } from './review.entity';
 import { ReviewLike } from './review-like.entity';
 import { UserRole } from '../users/enums/user-role.enum';
+import { WatchlistService } from '../watchlist/watchlist.service';
 
 describe('ReviewsService', () => {
   let service: ReviewsService;
@@ -35,6 +36,11 @@ describe('ReviewsService', () => {
     transaction: jest.fn(),
   };
 
+  const mockWatchlistService = {
+    getWatchlistStatus: jest.fn(),
+    addToWatchlistByContentId: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -42,6 +48,7 @@ describe('ReviewsService', () => {
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
         { provide: getRepositoryToken(ReviewLike), useValue: mockReviewLikeRepo },
         { provide: DataSource, useValue: mockDataSource },
+        { provide: WatchlistService, useValue: mockWatchlistService },
       ],
     }).compile();
 
@@ -59,6 +66,8 @@ describe('ReviewsService', () => {
       const created = { id: 1, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
       mockReviewRepo.create.mockReturnValue(created);
       mockReviewRepo.save.mockResolvedValue(created);
+      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: null, watchlistId: null });
+      mockWatchlistService.addToWatchlistByContentId.mockResolvedValue({});
 
       const result = await service.create(1, dto);
 
@@ -70,6 +79,7 @@ describe('ReviewsService', () => {
         hasSpoiler: false,
       });
       expect(result).toEqual(created);
+      expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched');
     });
 
     it('should create a review with rating only', async () => {
@@ -78,6 +88,8 @@ describe('ReviewsService', () => {
       const created = { id: 2, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
       mockReviewRepo.create.mockReturnValue(created);
       mockReviewRepo.save.mockResolvedValue(created);
+      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: null, watchlistId: null });
+      mockWatchlistService.addToWatchlistByContentId.mockResolvedValue({});
 
       const result = await service.create(1, dto);
       expect(result.id).toBe(2);
@@ -90,9 +102,36 @@ describe('ReviewsService', () => {
       const created = { id: 3, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
       mockReviewRepo.create.mockReturnValue(created);
       mockReviewRepo.save.mockResolvedValue(created);
+      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: null, watchlistId: null });
+      mockWatchlistService.addToWatchlistByContentId.mockResolvedValue({});
 
       const result = await service.create(1, dto);
       expect(result.rating).toBe(5);
+    });
+
+    it('should not add to watchlist if already watched', async () => {
+      const dto = { contentId: 1, rating: 8 };
+      mockReviewRepo.findOne.mockResolvedValue(null);
+      const created = { id: 4, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
+      mockReviewRepo.create.mockReturnValue(created);
+      mockReviewRepo.save.mockResolvedValue(created);
+      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: 'watched', watchlistId: 1 });
+
+      await service.create(1, dto);
+      expect(mockWatchlistService.addToWatchlistByContentId).not.toHaveBeenCalled();
+    });
+
+    it('should convert want_to_watch to watched on review creation', async () => {
+      const dto = { contentId: 1, rating: 9 };
+      mockReviewRepo.findOne.mockResolvedValue(null);
+      const created = { id: 5, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
+      mockReviewRepo.create.mockReturnValue(created);
+      mockReviewRepo.save.mockResolvedValue(created);
+      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: 'want_to_watch', watchlistId: 2 });
+      mockWatchlistService.addToWatchlistByContentId.mockResolvedValue({});
+
+      await service.create(1, dto);
+      expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched');
     });
 
     it('should throw ConflictException when review already exists', async () => {

@@ -12,6 +12,7 @@ import { ReviewLike } from './review-like.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { UserRole } from '../users/enums/user-role.enum';
+import { WatchlistService } from '../watchlist/watchlist.service';
 
 @Injectable()
 export class ReviewsService {
@@ -21,6 +22,7 @@ export class ReviewsService {
     @InjectRepository(ReviewLike)
     private readonly reviewLikeRepo: Repository<ReviewLike>,
     private readonly dataSource: DataSource,
+    private readonly watchlistService: WatchlistService,
   ) {}
 
   async create(userId: number, dto: CreateReviewDto): Promise<Review> {
@@ -39,7 +41,15 @@ export class ReviewsService {
       hasSpoiler: false,
     });
 
-    return this.reviewRepo.save(review);
+    const saved = await this.reviewRepo.save(review);
+
+    // 리뷰 작성 시 감상한 작품에 없으면 자동 추가
+    const { status } = await this.watchlistService.getWatchlistStatus(userId, dto.contentId);
+    if (status !== 'watched') {
+      await this.watchlistService.addToWatchlistByContentId(userId, dto.contentId, 'watched');
+    }
+
+    return saved;
   }
 
   async update(
