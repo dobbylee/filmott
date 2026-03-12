@@ -6,6 +6,7 @@ import { fetchApi } from '@/lib/fetcher';
 import CastCarousel from '@/components/content/CastCarousel';
 import ReviewListClient from '@/components/review/ReviewListClient';
 import ReviewFormWrapper from '@/components/review/ReviewFormWrapper';
+import WatchlistStatusButton from '@/components/watchlist/WatchlistStatusButton';
 import type { ContentDetail, WatchProviderData } from '@/types/content';
 import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { ReviewsResponse, ContentStats } from '@/types/review';
@@ -256,6 +257,14 @@ export default async function ContentDetailPage({
                   </div>
                 );
               })()}
+
+              {/* 워치리스트 버튼 */}
+              <div className="mt-4">
+                <WatchlistStatusButton
+                  tmdbId={Number(tmdbId)}
+                  contentType={type as 'movie' | 'tv'}
+                />
+              </div>
             </div>
           </div>
         </div>
