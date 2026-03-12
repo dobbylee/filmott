@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import api from '@/lib/api';
+import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
 import type {
   User,
   AuthResponse,
@@ -45,12 +46,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 401 응답 시 모달 열기
   useEffect(() => {
     const handleAuthRequired = () => {
+      // api.ts 인터셉터에서 이미 제거하지만, 방어적으로 여기서도 클리어
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
       setUser(null);
       setToken(null);
       setAuthModal({ isOpen: true, mode: 'login' });
     };
-    window.addEventListener('auth:required', handleAuthRequired);
-    return () => window.removeEventListener('auth:required', handleAuthRequired);
+    window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
   }, []);
 
   useEffect(() => {

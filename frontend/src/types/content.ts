@@ -114,6 +114,11 @@ export interface ContentDetail extends ContentItem {
 
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
+/**
+ * TMDB 장르 ID → 한글명 매핑.
+ * 백엔드 contents.service.ts의 GENRE_NAME_MAP과 동기화 필요.
+ * 한쪽을 수정하면 반드시 다른 쪽도 함께 업데이트할 것.
+ */
 export const GENRE_MAP: Record<number, string> = {
   28: '액션',
   12: '모험',

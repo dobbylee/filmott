@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
@@ -26,7 +27,7 @@ api.interceptors.response.use(
     ) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
-      window.dispatchEvent(new CustomEvent('auth:required'));
+      window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
     }
     return Promise.reject(error);
   },
