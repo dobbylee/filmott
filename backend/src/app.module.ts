@@ -14,6 +14,8 @@ import { Ranking } from './rankings/ranking.entity';
 import { Review } from './reviews/review.entity';
 import { ReviewLike } from './reviews/review-like.entity';
 import { ReviewComment } from './reviews/review-comment.entity';
+import { WatchlistModule } from './watchlist/watchlist.module';
+import { Watchlist } from './watchlist/watchlist.entity';
 
 @Module({
   imports: [
@@ -31,7 +33,7 @@ import { ReviewComment } from './reviews/review-comment.entity';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
-        entities: [User, Content, Ranking, Review, ReviewLike, ReviewComment],
+        entities: [User, Content, Ranking, Review, ReviewLike, ReviewComment, Watchlist],
         synchronize: false,
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         extra: {
@@ -45,6 +47,7 @@ import { ReviewComment } from './reviews/review-comment.entity';
     ContentsModule,
     RankingsModule,
     ReviewsModule,
+    WatchlistModule,
   ],
   controllers: [AppController],
   providers: [AppService],
