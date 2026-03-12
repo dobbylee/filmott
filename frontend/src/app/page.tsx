@@ -9,6 +9,7 @@ import type { RankingItem } from '@/components/ranking/RankingCard';
 import type { Review } from '@/types/review';
 import type { ContentItem } from '@/types/content';
 import { TMDB_IMAGE_BASE } from '@/types/content';
+import { getDisplayNickname, isDeletedUser } from '@/utils/user';
 
 /* ---- Data Fetchers ---- */
 
@@ -97,11 +98,11 @@ function RecentReviewItem({ review }: { review: Review }) {
         {/* 유저 + 별점 + 시간 */}
         <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-[10px] font-bold text-white shadow-sm">
-              {review.user?.nickname?.charAt(0) ?? '?'}
+            <div className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shadow-sm ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-white'}`}>
+              {isDeletedUser(review.user) ? '?' : (review.user?.nickname?.charAt(0) ?? '?')}
             </div>
-            <span className="text-sm font-medium text-white/90">
-              {review.user?.nickname ?? '익명'}
+            <span className={`text-sm font-medium ${isDeletedUser(review.user) ? 'text-muted-foreground' : 'text-white/90'}`}>
+              {getDisplayNickname(review.user)}
             </span>
             {review.rating != null && (
               <div className="flex items-center gap-0.5">

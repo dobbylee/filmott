@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Trash2, Send } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { getDisplayNickname, isDeletedUser } from '@/utils/user';
 
 interface Comment {
   id: number;
@@ -13,6 +14,7 @@ interface Comment {
   user?: {
     id: number;
     nickname: string;
+    status?: string;
   };
 }
 
@@ -169,13 +171,13 @@ export default function ReviewComments({
             <>
               {comments.map((c) => (
                 <div key={c.id} className="flex items-start gap-2 py-1.5">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-[10px] font-medium text-secondary-foreground flex-shrink-0">
-                    {c.user?.nickname?.charAt(0) ?? '?'}
+                  <div className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium flex-shrink-0 ${isDeletedUser(c.user) ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground'}`}>
+                    {isDeletedUser(c.user) ? '?' : (c.user?.nickname?.charAt(0) ?? '?')}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium">
-                        {c.user?.nickname ?? '익명'}
+                      <span className={`text-xs font-medium ${isDeletedUser(c.user) ? 'text-muted-foreground' : ''}`}>
+                        {getDisplayNickname(c.user)}
                       </span>
                       <span className="text-[10px] text-muted-foreground">
                         {formatDate(c.createdAt)}

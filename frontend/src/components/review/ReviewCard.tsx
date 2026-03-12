@@ -6,6 +6,7 @@ import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from './LikeButton';
 import ReviewCommentsModal from './ReviewCommentsModal';
 import type { Review } from '@/types/review';
+import { getDisplayNickname, isDeletedUser } from '@/utils/user';
 
 interface ReviewCardProps {
   review: Review;
@@ -31,12 +32,12 @@ export default function ReviewCard({ review, showInteractions = true, initialLik
         {/* 상단: 아바타 + 닉네임 + 별점 + 댓글 (왼쪽) / 좋아요 (오른쪽) */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-              {review.user?.nickname?.charAt(0) ?? '?'}
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
+              {isDeletedUser(review.user) ? '?' : (review.user?.nickname?.charAt(0) ?? '?')}
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium">{review.user?.nickname ?? '익명'}</span>
+                <span className={`text-sm font-medium ${isDeletedUser(review.user) ? 'text-muted-foreground' : ''}`}>{getDisplayNickname(review.user)}</span>
                 {review.rating != null && (
                   <div className="flex items-center gap-0.5">
                     <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />

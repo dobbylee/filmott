@@ -61,7 +61,7 @@ export class ReviewCommentsService {
     const [comments, total] = await this.commentRepo
       .createQueryBuilder('comment')
       .leftJoin('comment.user', 'user')
-      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage'])
+      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage', 'user.status'])
       .where('comment.reviewId = :reviewId', { reviewId })
       .orderBy('comment.createdAt', 'ASC')
       .skip(skip)
