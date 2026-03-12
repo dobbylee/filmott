@@ -70,9 +70,17 @@ export class ReviewsController {
   @UseGuards(JwtAuthGuard)
   async getLikedIds(
     @CurrentUser() user: JwtPayload,
-    @Query('contentId', ParseIntPipe) contentId: number,
+    @Query('contentId') contentId?: string,
+    @Query('reviewIds') reviewIds?: string,
   ) {
-    return this.reviewsService.getLikedReviewIds(user.id, contentId);
+    if (reviewIds) {
+      const ids = reviewIds.split(',').map(Number).filter(Boolean);
+      return this.reviewsService.getLikedReviewIdsByIds(user.id, ids);
+    }
+    if (contentId) {
+      return this.reviewsService.getLikedReviewIds(user.id, parseInt(contentId, 10));
+    }
+    return [];
   }
 
   @Get()

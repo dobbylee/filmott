@@ -196,6 +196,17 @@ export class ReviewsService {
     return result.map((r) => r.reviewId);
   }
 
+  async getLikedReviewIdsByIds(userId: number, reviewIds: number[]): Promise<number[]> {
+    if (reviewIds.length === 0) return [];
+    const result = await this.reviewLikeRepo
+      .createQueryBuilder('rl')
+      .where('rl.userId = :userId', { userId })
+      .andWhere('rl.reviewId IN (:...reviewIds)', { reviewIds })
+      .select('rl.reviewId', 'reviewId')
+      .getRawMany();
+    return result.map((r) => r.reviewId);
+  }
+
   async toggleLike(
     userId: number,
     reviewId: number,

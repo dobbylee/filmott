@@ -20,6 +20,7 @@ export default function WatchlistListPage() {
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
 
   const [data, setData] = useState<WatchlistPage | null>(null);
+  const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [showDateModal, setShowDateModal] = useState(false);
   const [markWatchedId, setMarkWatchedId] = useState<number | null>(null);
@@ -39,6 +40,21 @@ export default function WatchlistListPage() {
         `/watchlist/me?status=${activeStatus}&page=${currentPage}`
       );
       setData(res.data);
+
+      // Fetch liked status for watched items with reviews
+      if (activeStatus === 'watched') {
+        const reviewIds = res.data.items
+          .filter((item) => item.review?.id)
+          .map((item) => item.review!.id);
+        if (reviewIds.length > 0) {
+          const likedRes = await api.get<number[]>(
+            `/reviews/liked-ids?reviewIds=${reviewIds.join(',')}`
+          );
+          setLikedIds(new Set(likedRes.data));
+        } else {
+          setLikedIds(new Set());
+        }
+      }
     } catch {
       // ignore
     } finally {
@@ -178,6 +194,7 @@ export default function WatchlistListPage() {
               <WatchlistCard
                 key={item.id}
                 item={item}
+                initialLiked={item.review ? likedIds.has(item.review.id) : false}
                 onMarkWatched={activeStatus === 'want_to_watch' ? handleMarkWatched : undefined}
                 onRemove={activeStatus === 'want_to_watch' ? handleRemove : undefined}
               />

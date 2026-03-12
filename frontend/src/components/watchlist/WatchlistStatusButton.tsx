@@ -80,6 +80,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
     } finally {
       setIsLoading(false);
       setShowDropdown(false);
+      setShowDateModal(false);
     }
   };
 

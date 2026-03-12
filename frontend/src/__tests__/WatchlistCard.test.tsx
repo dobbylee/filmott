@@ -8,6 +8,10 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 1, nickname: 'test' }, openAuthModal: vi.fn() }),
+}));
+
 const baseContent = {
   id: 1,
   tmdbId: 123,
@@ -65,7 +69,7 @@ describe('WatchlistCard', () => {
 
     expect(screen.getByText('인셉션')).toBeInTheDocument();
     expect(screen.getByText(/영화 · 2010/)).toBeInTheDocument();
-    expect(screen.getByText(/감상일/)).toBeInTheDocument();
+    expect(screen.getByText('내 리뷰')).toBeInTheDocument();
     expect(screen.getByText('4.5')).toBeInTheDocument();
     expect(screen.getByText('최고의 SF 영화')).toBeInTheDocument();
   });

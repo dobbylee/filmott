@@ -208,6 +208,7 @@ describe('WatchlistService', () => {
       const mockQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
@@ -224,6 +225,10 @@ describe('WatchlistService', () => {
         'Review',
         'review',
         'review.userId = w.userId AND review.contentId = w.contentId',
+      );
+      expect(mockQb.loadRelationCountAndMap).toHaveBeenCalledWith(
+        'review.commentsCount',
+        'review.comments',
       );
     });
 
@@ -249,6 +254,7 @@ describe('WatchlistService', () => {
       const mockQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),

@@ -126,13 +126,17 @@ export class WatchlistService {
       .where('w.userId = :userId', { userId })
       .andWhere('w.status = :status', { status });
 
-    // If watched, also join user's review for that content
+    // If watched, also join user's review for that content + commentsCount
     if (status === 'watched') {
       qb.leftJoinAndMapOne(
         'w.review',
         'Review',
         'review',
         'review.userId = w.userId AND review.contentId = w.contentId',
+      );
+      qb.loadRelationCountAndMap(
+        'review.commentsCount',
+        'review.comments',
       );
     }
 
