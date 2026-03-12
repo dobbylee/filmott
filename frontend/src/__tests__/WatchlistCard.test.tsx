@@ -1,15 +1,29 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WatchlistCard from '@/components/watchlist/WatchlistCard';
 import type { WatchlistItem } from '@/types/watchlist';
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 1, nickname: 'test' }, openAuthModal: vi.fn() }),
+  useAuth: () => ({
+    user: { id: 1, nickname: 'test' },
+    isLoading: false,
+    openAuthModal: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/api', () => ({
+  default: {
+    get: vi.fn().mockResolvedValue({
+      data: { data: [], total: 0, page: 1, totalPages: 1 },
+    }),
+    post: vi.fn().mockResolvedValue({ data: { liked: true, likesCount: 1 } }),
+    delete: vi.fn().mockResolvedValue({}),
+  },
 }));
 
 const baseContent = {
@@ -24,7 +38,7 @@ const baseContent = {
   updatedAt: '2026-01-01T00:00:00Z',
 };
 
-const watchedItem: WatchlistItem = {
+const watchedItemWithReview: WatchlistItem = {
   id: 1,
   userId: 1,
   contentId: 1,
@@ -42,6 +56,22 @@ const watchedItem: WatchlistItem = {
     likesCount: 0,
     createdAt: '2026-03-10T00:00:00Z',
     updatedAt: '2026-03-10T00:00:00Z',
+  },
+};
+
+const watchedItemWithoutReview: WatchlistItem = {
+  id: 3,
+  userId: 1,
+  contentId: 3,
+  status: 'watched',
+  watchedAt: '2026-03-15T00:00:00Z',
+  createdAt: '2026-03-15T00:00:00Z',
+  updatedAt: '2026-03-15T00:00:00Z',
+  content: {
+    ...baseContent,
+    id: 3,
+    tmdbId: 789,
+    title: '다크 나이트',
   },
 };
 
@@ -64,83 +94,139 @@ const wantToWatchItem: WatchlistItem = {
 };
 
 describe('WatchlistCard', () => {
-  it('should render watched item with review preview', () => {
-    render(<WatchlistCard item={watchedItem} />);
+  describe('watched item with review', () => {
+    it('renders title and poster', () => {
+      render(<WatchlistCard item={watchedItemWithReview} />);
 
-    expect(screen.getByText('인셉션')).toBeInTheDocument();
-    expect(screen.getByText(/영화 · 2010/)).toBeInTheDocument();
-    expect(screen.getByText('내 리뷰')).toBeInTheDocument();
-    expect(screen.getByText('4.5')).toBeInTheDocument();
-    expect(screen.getByText('최고의 SF 영화')).toBeInTheDocument();
+      expect(screen.getByText('인셉션')).toBeInTheDocument();
+      const img = screen.getByAltText('인셉션');
+      expect(img).toBeInTheDocument();
+    });
+
+    it('renders "내 리뷰" badge, rating, and comment', () => {
+      render(<WatchlistCard item={watchedItemWithReview} />);
+
+      expect(screen.getByText('내 리뷰')).toBeInTheDocument();
+      expect(screen.getByText('4.5')).toBeInTheDocument();
+      expect(screen.getByText('최고의 SF 영화')).toBeInTheDocument();
+    });
+
+    it('renders content type and release year', () => {
+      render(<WatchlistCard item={watchedItemWithReview} />);
+
+      // span 안에 "영화"와 "· 2010"이 별도 텍스트 노드로 렌더링됨
+      // '최고의 SF 영화' 코멘트와 구분하기 위해 exact match 사용
+      const typeYearSpans = screen.getAllByText(/영화/);
+      const typeYearSpan = typeYearSpans.find((el) =>
+        el.textContent?.includes('2010')
+      );
+      expect(typeYearSpan).toBeDefined();
+      expect(typeYearSpan?.textContent).toContain('영화');
+      expect(typeYearSpan?.textContent).toContain('2010');
+    });
+
+    it('renders watched day number from watchedAt', () => {
+      render(<WatchlistCard item={watchedItemWithReview} />);
+
+      // watchedAt: '2026-03-10' → day = 10
+      expect(screen.getByText('10')).toBeInTheDocument();
+    });
+
+    it('renders like button', () => {
+      render(<WatchlistCard item={watchedItemWithReview} />);
+
+      expect(screen.getByRole('button', { name: /좋아요/ })).toBeInTheDocument();
+    });
+
+    it('links to content detail page', () => {
+      render(<WatchlistCard item={watchedItemWithReview} />);
+
+      const links = screen.getAllByRole('link');
+      const contentLinks = links.filter(
+        (link) => link.getAttribute('href') === '/contents/movie/123'
+      );
+      expect(contentLinks.length).toBeGreaterThan(0);
+    });
+
+    it('opens comments modal when comment button is clicked', async () => {
+      const user = userEvent.setup();
+      render(<WatchlistCard item={watchedItemWithReview} />);
+
+      // 댓글 버튼 — aria-label 없고 SVG를 포함한 버튼
+      const buttons = screen.getAllByRole('button');
+      const commentButton = buttons.find(
+        (btn) =>
+          !btn.getAttribute('aria-label') &&
+          btn.querySelector('svg') !== null
+      );
+      expect(commentButton).toBeDefined();
+      await user.click(commentButton!);
+
+      await waitFor(() => {
+        expect(screen.getByText('댓글')).toBeInTheDocument();
+      });
+    });
   });
 
-  it('should render want_to_watch item with action buttons', () => {
-    const onMarkWatched = vi.fn();
-    const onRemove = vi.fn();
+  describe('watched item without review', () => {
+    it('renders "리뷰 작성" button', () => {
+      render(<WatchlistCard item={watchedItemWithoutReview} />);
 
-    render(
-      <WatchlistCard
-        item={wantToWatchItem}
-        onMarkWatched={onMarkWatched}
-        onRemove={onRemove}
-      />
-    );
+      expect(screen.getByText('리뷰 작성')).toBeInTheDocument();
+    });
 
-    expect(screen.getByText('브레이킹 배드')).toBeInTheDocument();
-    expect(screen.getByText(/시리즈/)).toBeInTheDocument();
-    expect(screen.getByText(/추가일/)).toBeInTheDocument();
-    expect(screen.getByText('감상 완료')).toBeInTheDocument();
-    expect(screen.getByText('제거')).toBeInTheDocument();
+    it('does not render "내 리뷰" badge', () => {
+      render(<WatchlistCard item={watchedItemWithoutReview} />);
+
+      expect(screen.queryByText('내 리뷰')).not.toBeInTheDocument();
+    });
+
+    it('opens review form modal when "리뷰 작성" is clicked', async () => {
+      const user = userEvent.setup();
+      render(<WatchlistCard item={watchedItemWithoutReview} />);
+
+      await user.click(screen.getByText('리뷰 작성'));
+
+      await waitFor(() => {
+        // ReviewFormModal 헤더 h2
+        expect(screen.getAllByText('리뷰 작성').length).toBeGreaterThan(0);
+        // 별점 레이블
+        expect(screen.getByText('별점')).toBeInTheDocument();
+      });
+    });
   });
 
-  it('should call onMarkWatched when "감상 완료" button clicked', async () => {
-    const user = userEvent.setup();
-    const onMarkWatched = vi.fn();
-    const onRemove = vi.fn();
+  describe('want_to_watch item', () => {
+    it('renders title', () => {
+      render(<WatchlistCard item={wantToWatchItem} />);
 
-    render(
-      <WatchlistCard
-        item={wantToWatchItem}
-        onMarkWatched={onMarkWatched}
-        onRemove={onRemove}
-      />
-    );
+      expect(screen.getByText('브레이킹 배드')).toBeInTheDocument();
+    });
 
-    await user.click(screen.getByText('감상 완료'));
-    expect(onMarkWatched).toHaveBeenCalledWith(2);
-  });
+    it('links to content detail page', () => {
+      render(<WatchlistCard item={wantToWatchItem} />);
 
-  it('should call onRemove when "제거" button clicked', async () => {
-    const user = userEvent.setup();
-    const onMarkWatched = vi.fn();
-    const onRemove = vi.fn();
+      const links = screen.getAllByRole('link');
+      const contentLinks = links.filter(
+        (link) => link.getAttribute('href') === '/contents/tv/456'
+      );
+      expect(contentLinks.length).toBeGreaterThan(0);
+    });
 
-    render(
-      <WatchlistCard
-        item={wantToWatchItem}
-        onMarkWatched={onMarkWatched}
-        onRemove={onRemove}
-      />
-    );
+    it('does not render review section', () => {
+      render(<WatchlistCard item={wantToWatchItem} />);
 
-    await user.click(screen.getByText('제거'));
-    expect(onRemove).toHaveBeenCalledWith(2);
-  });
+      expect(screen.queryByText('내 리뷰')).not.toBeInTheDocument();
+      expect(screen.queryByText('리뷰 작성')).not.toBeInTheDocument();
+    });
 
-  it('should not show action buttons for watched items', () => {
-    render(<WatchlistCard item={watchedItem} />);
+    it('does not render watched day number (watchedAt is null)', () => {
+      render(<WatchlistCard item={wantToWatchItem} />);
 
-    expect(screen.queryByText('감상 완료')).not.toBeInTheDocument();
-    expect(screen.queryByText('제거')).not.toBeInTheDocument();
-  });
-
-  it('should link to content detail page', () => {
-    render(<WatchlistCard item={watchedItem} />);
-
-    const links = screen.getAllByRole('link');
-    const contentLinks = links.filter(
-      (link) => link.getAttribute('href') === '/contents/movie/123'
-    );
-    expect(contentLinks.length).toBeGreaterThan(0);
+      // watched 전용 day 렌더링 블록은 want_to_watch에 없음
+      // 숫자만 단독으로 있는 큰 텍스트가 없어야 함
+      const dayEl = screen.queryByText(/^\d{1,2}$/);
+      expect(dayEl).not.toBeInTheDocument();
+    });
   });
 });

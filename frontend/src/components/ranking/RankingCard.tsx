@@ -14,6 +14,7 @@ export interface RankingItem {
     posterUrl?: string;
     releaseDate?: string;
     voteAverage?: number;
+    genres?: { id: number; name: string }[];
   } | null;
   title?: string;
 }
@@ -70,11 +71,17 @@ export default function RankingCard({ item }: RankingCardProps) {
           <p className="truncate text-base font-bold text-white drop-shadow-md">
             {title}
           </p>
-          {content?.releaseDate && (
-            <p className="text-xs font-medium text-white/60 mt-0.5">
-              {content.releaseDate.substring(0, 4)}
-            </p>
-          )}
+          <div className="mt-1 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-medium text-white/60">
+              {content?.releaseDate && <span>{content.releaseDate.substring(0, 4)}</span>}
+              {content && <span>{content.contentType === 'tv' ? '시리즈' : '영화'}</span>}
+            </div>
+            {content?.genres && content.genres.length > 0 && (
+              <span className="text-[10px] text-white/50 truncate max-w-[60px]">
+                {content.genres[0].name}
+              </span>
+            )}
+          </div>
         </div>
       </div>
   );

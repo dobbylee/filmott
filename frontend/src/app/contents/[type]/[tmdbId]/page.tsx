@@ -134,7 +134,7 @@ export default async function ContentDetailPage({
       <div className="relative">
         {/* 백드롭 */}
         {content.backdropUrl ? (
-          <div className="relative aspect-video w-full max-h-[50vh]">
+          <div className="relative h-[40vh] md:h-[55vh] w-full">
             <Image
               src={content.backdropUrl}
               alt={content.title}
@@ -153,7 +153,7 @@ export default async function ContentDetailPage({
         <div className="relative mx-auto max-w-7xl px-4">
           <div
             className={`flex gap-6 ${
-              content.backdropUrl ? '-mt-40 md:-mt-52' : 'mt-6'
+              content.backdropUrl ? '-mt-[22vh] md:-mt-[28vh]' : 'mt-6'
             }`}
           >
             {/* 포스터 */}
@@ -258,8 +258,8 @@ export default async function ContentDetailPage({
                 );
               })()}
 
-              {/* 워치리스트 버튼 */}
-              <div className="mt-4">
+              {/* 기록하기 버튼 */}
+              <div className="mt-6">
                 <WatchlistStatusButton
                   tmdbId={Number(tmdbId)}
                   contentType={type as 'movie' | 'tv'}
@@ -271,7 +271,7 @@ export default async function ContentDetailPage({
       </div>
 
       {/* 중단: 줄거리, 출연진, OTT */}
-      <div className="mx-auto max-w-7xl px-4 pt-20 pb-8 space-y-16">
+      <div className="mx-auto max-w-7xl px-4 pt-28 pb-8 space-y-24">
         {/* 줄거리 */}
         {content.overview && (
           <section>

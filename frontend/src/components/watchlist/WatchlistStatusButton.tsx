@@ -151,7 +151,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
       return (
         <>
           <Plus className="h-4 w-4" />
-          <span>워치리스트</span>
+          <span>기록하기</span>
           <ChevronDown className="h-3.5 w-3.5 text-white/50" />
         </>
       );
@@ -187,7 +187,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative inline-block" ref={dropdownRef}>
       <button
         onClick={handleButtonClick}
         disabled={isLoading}
@@ -197,7 +197,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
       </button>
 
       {showDropdown && (
-        <div className="absolute left-0 top-full z-10 mt-2 w-52 rounded-xl border border-white/10 bg-[#111] py-1 shadow-2xl overflow-hidden">
+        <div className="absolute left-0 top-full z-10 mt-2 min-w-full rounded-xl border border-white/10 bg-[#111] py-1 shadow-2xl overflow-hidden whitespace-nowrap">
           {!status && (
             <>
               <button
@@ -205,14 +205,14 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors"
               >
                 <Bookmark className="h-4 w-4 text-yellow-400" />
-                감상할 작품에 추가
+                감상할 작품
               </button>
               <button
                 onClick={handleWatchedClick}
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors"
               >
                 <Eye className="h-4 w-4 text-green-400" />
-                감상한 작품으로 기록
+                감상한 작품
               </button>
             </>
           )}
@@ -224,7 +224,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors"
               >
                 <Check className="h-4 w-4 text-green-400" />
-                감상 완료로 전환
+                감상한 작품
               </button>
               <button
                 onClick={removeFromWatchlist}

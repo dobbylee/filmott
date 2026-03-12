@@ -332,4 +332,209 @@ describe('WatchlistService', () => {
       expect(result).toEqual({ status: null, watchlistId: null });
     });
   });
+
+  describe('getWantToWatchAll', () => {
+    it('should return all want_to_watch items without pagination', async () => {
+      const items = [
+        { id: 1, status: 'want_to_watch', content: { id: 1, title: 'Movie A' } },
+        { id: 2, status: 'want_to_watch', content: { id: 2, title: 'Movie B' } },
+      ];
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(items),
+      };
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getWantToWatchAll(1);
+
+      expect(result.items).toHaveLength(2);
+      expect(result.total).toBe(2);
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'w.status = :status',
+        { status: 'want_to_watch' },
+      );
+    });
+
+    it('should return empty list when no want_to_watch items', async () => {
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getWantToWatchAll(1);
+
+      expect(result.items).toHaveLength(0);
+      expect(result.total).toBe(0);
+    });
+  });
+
+  describe('getWatchedYears', () => {
+    it('should return distinct years from watched items', async () => {
+      const mockQb = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { year: '2026' },
+          { year: '2025' },
+          { year: '2024' },
+        ]),
+      };
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getWatchedYears(1);
+
+      expect(result.years).toEqual([2026, 2025, 2024]);
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'w.status = :status',
+        { status: 'watched' },
+      );
+    });
+
+    it('should return empty years when no watched items', async () => {
+      const mockQb = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      };
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getWatchedYears(1);
+
+      expect(result.years).toEqual([]);
+    });
+  });
+
+  describe('getWatchedByYear', () => {
+    it('should return items grouped by month for a given year', async () => {
+      const items = [
+        {
+          id: 1,
+          status: 'watched',
+          watchedAt: new Date('2026-03-15'),
+          updatedAt: new Date('2026-03-15'),
+          content: { id: 1, title: 'Movie A' },
+        },
+        {
+          id: 2,
+          status: 'watched',
+          watchedAt: new Date('2026-03-05'),
+          updatedAt: new Date('2026-03-05'),
+          content: { id: 2, title: 'Movie B' },
+        },
+        {
+          id: 3,
+          status: 'watched',
+          watchedAt: new Date('2026-01-20'),
+          updatedAt: new Date('2026-01-20'),
+          content: { id: 3, title: 'Movie C' },
+        },
+      ];
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(items),
+      };
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getWatchedByYear(1, 2026);
+
+      expect(result.year).toBe(2026);
+      expect(result.totalCount).toBe(3);
+      expect(result.months).toHaveLength(2); // March and January
+      // months sorted newest first: March(3) > January(1)
+      expect(result.months[0].month).toBe(3);
+      expect(result.months[0].count).toBe(2);
+      expect(result.months[1].month).toBe(1);
+      expect(result.months[1].count).toBe(1);
+    });
+
+    it('should use updatedAt when watchedAt is null', async () => {
+      const items = [
+        {
+          id: 1,
+          status: 'watched',
+          watchedAt: null,
+          updatedAt: new Date('2026-02-10'),
+          content: { id: 1, title: 'Movie A' },
+        },
+      ];
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(items),
+      };
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getWatchedByYear(1, 2026);
+
+      expect(result.totalCount).toBe(1);
+      expect(result.months[0].month).toBe(2); // February
+    });
+
+    it('should return empty months when no items in that year', async () => {
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getWatchedByYear(1, 2020);
+
+      expect(result.year).toBe(2020);
+      expect(result.totalCount).toBe(0);
+      expect(result.months).toHaveLength(0);
+    });
+
+    it('should query with correct date range for the given year', async () => {
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      await service.getWatchedByYear(1, 2025);
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'COALESCE(w.watchedAt, w.updatedAt) >= :startDate',
+        { startDate: new Date(2025, 0, 1) },
+      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'COALESCE(w.watchedAt, w.updatedAt) < :endDate',
+        { endDate: new Date(2026, 0, 1) },
+      );
+    });
+  });
 });

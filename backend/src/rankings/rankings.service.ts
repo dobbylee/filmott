@@ -132,8 +132,6 @@ export class RankingsService {
   async fetchAllTrending(): Promise<void> {
     const categories: { type: 'movie' | 'tv' | 'all'; timeWindow: 'day' | 'week' }[] = [
       { type: 'all', timeWindow: 'day' },
-      { type: 'movie', timeWindow: 'day' },
-      { type: 'tv', timeWindow: 'day' },
       { type: 'all', timeWindow: 'week' },
     ];
 

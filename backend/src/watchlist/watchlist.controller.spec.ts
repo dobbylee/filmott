@@ -12,6 +12,9 @@ describe('WatchlistController', () => {
     getMyWatchlist: jest.fn(),
     getMyWatchlistCounts: jest.fn(),
     getWatchlistStatusByTmdbId: jest.fn(),
+    getWantToWatchAll: jest.fn(),
+    getWatchedYears: jest.fn(),
+    getWatchedByYear: jest.fn(),
   };
 
   const user = { id: 1, nickname: 'test', role: 'USER' };
@@ -107,6 +110,72 @@ describe('WatchlistController', () => {
 
       expect(result).toEqual(counts);
       expect(mockWatchlistService.getMyWatchlistCounts).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('GET /watchlist/me/want-to-watch', () => {
+    it('should return all want_to_watch items', async () => {
+      const items = { items: [{ id: 1 }, { id: 2 }], total: 2 };
+      mockWatchlistService.getWantToWatchAll.mockResolvedValue(items);
+
+      const result = await controller.getWantToWatchAll(user);
+
+      expect(result).toEqual(items);
+      expect(mockWatchlistService.getWantToWatchAll).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('GET /watchlist/me/watched-years', () => {
+    it('should return distinct watched years', async () => {
+      const years = { years: [2026, 2025, 2024] };
+      mockWatchlistService.getWatchedYears.mockResolvedValue(years);
+
+      const result = await controller.getWatchedYears(user);
+
+      expect(result).toEqual(years);
+      expect(mockWatchlistService.getWatchedYears).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('GET /watchlist/me/watched', () => {
+    it('should return watched items for current year by default', async () => {
+      const currentYear = new Date().getFullYear();
+      const response = { year: currentYear, totalCount: 3, months: [] };
+      mockWatchlistService.getWatchedByYear.mockResolvedValue(response);
+
+      const result = await controller.getWatchedByYear(user);
+
+      expect(result).toEqual(response);
+      expect(mockWatchlistService.getWatchedByYear).toHaveBeenCalledWith(1, currentYear);
+    });
+
+    it('should pass parsed year from query param', async () => {
+      const response = { year: 2025, totalCount: 5, months: [] };
+      mockWatchlistService.getWatchedByYear.mockResolvedValue(response);
+
+      const result = await controller.getWatchedByYear(user, '2025');
+
+      expect(result).toEqual(response);
+      expect(mockWatchlistService.getWatchedByYear).toHaveBeenCalledWith(1, 2025);
+    });
+
+    it('should fallback to current year for invalid year string', async () => {
+      const currentYear = new Date().getFullYear();
+      const response = { year: currentYear, totalCount: 0, months: [] };
+      mockWatchlistService.getWatchedByYear.mockResolvedValue(response);
+
+      await controller.getWatchedByYear(user, 'invalid');
+
+      expect(mockWatchlistService.getWatchedByYear).toHaveBeenCalledWith(1, currentYear);
+    });
+
+    it('should fallback to current year for out-of-range year', async () => {
+      const currentYear = new Date().getFullYear();
+      mockWatchlistService.getWatchedByYear.mockResolvedValue({ year: currentYear, totalCount: 0, months: [] });
+
+      await controller.getWatchedByYear(user, '1800');
+
+      expect(mockWatchlistService.getWatchedByYear).toHaveBeenCalledWith(1, currentYear);
     });
   });
 

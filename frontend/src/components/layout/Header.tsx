@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Search, Compass, Menu, X, User as UserIcon } from 'lucide-react';
+import { Search, Compass, Menu, X, User as UserIcon, Library } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Header() {
@@ -76,6 +76,9 @@ export default function Header() {
         <nav className="hidden md:flex items-center gap-6">
           <Link href="/discover?type=movie" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">영화</Link>
           <Link href="/discover?type=tv" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">시리즈</Link>
+          {user && (
+            <Link href="/profile/watchlist?status=watched" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">내 기록</Link>
+          )}
         </nav>
 
         {/* 오른쪽: 검색창 + 유저 */}
@@ -153,9 +156,14 @@ export default function Header() {
               <Compass className="h-5 w-5" /> 시리즈
             </Link>
             {user && (
-              <Link href="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-                <UserIcon className="h-5 w-5" /> 프로필
-              </Link>
+              <>
+                <Link href="/profile/watchlist?status=watched" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+                  <Library className="h-5 w-5" /> 내 기록
+                </Link>
+                <Link href="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+                  <UserIcon className="h-5 w-5" /> 프로필
+                </Link>
+              </>
             )}
 
             <form onSubmit={(e) => { handleSearch(e); setShowMobileMenu(false); }} className="mt-2 px-2">

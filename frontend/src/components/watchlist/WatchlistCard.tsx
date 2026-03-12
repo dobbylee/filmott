@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, Pencil } from 'lucide-react';
+import { Star, Plus } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from '@/components/review/LikeButton';
 import ReviewCommentsModal from '@/components/review/ReviewCommentsModal';
@@ -106,9 +106,9 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                   <div className="flex items-center h-full">
                     <button
                       onClick={() => setShowReviewForm(true)}
-                      className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/50 hover:border-primary/30 hover:bg-primary/10 hover:text-primary transition-colors"
+                      className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-card px-4 py-2 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                     >
-                      <Pencil className="h-3.5 w-3.5" />
+                      <Plus className="h-4 w-4" />
                       리뷰 작성
                     </button>
                   </div>
@@ -125,7 +125,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                     size="md"
                   />
                 )}
-                <span className="text-xs text-white/30">
+                <span className="mt-auto text-xs text-white/30">
                   {content.contentType === 'movie' ? '영화' : '시리즈'}
                   {content.releaseDate && ` · ${content.releaseDate.slice(0, 4)}`}
                 </span>

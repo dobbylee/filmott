@@ -55,7 +55,7 @@ async function TrendingSection() {
     ]);
     return (
       <RankingCarousel
-        title="TMDB 트렌드"
+        title="지금 뜨는 작품"
         tabs={[
           { label: '일간', items: day },
           { label: '주간', items: week },
@@ -63,7 +63,7 @@ async function TrendingSection() {
       />
     );
   } catch {
-    return <SectionError title="TMDB 트렌드" />;
+    return <SectionError title="지금 뜨는 작품" />;
   }
 }
 
@@ -195,7 +195,7 @@ export default function HomePage() {
         <BoxOfficeSection />
       </Suspense>
 
-      <Suspense fallback={<SectionSkeleton title="TMDB 트렌드" />}>
+      <Suspense fallback={<SectionSkeleton title="지금 뜨는 작품" />}>
         <TrendingSection />
       </Suspense>
 

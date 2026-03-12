@@ -29,6 +29,9 @@ export default function WatchlistListPage() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [watchedData, setWatchedData] = useState<WatchedByYearResponse | null>(null);
 
+  // tab counts (total)
+  const [counts, setCounts] = useState<{ watchedCount: number; wantToWatchCount: number } | null>(null);
+
   // shared state
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -115,6 +118,14 @@ export default function WatchlistListPage() {
     }
   }, [user]);
 
+  // Fetch total counts on mount
+  useEffect(() => {
+    if (!user) return;
+    api.get<{ watchedCount: number; wantToWatchCount: number }>('/watchlist/me/counts')
+      .then((res) => setCounts(res.data))
+      .catch(() => {});
+  }, [user]);
+
   // Main effect: fetch data based on active tab
   useEffect(() => {
     if (!user) return;
@@ -158,9 +169,6 @@ export default function WatchlistListPage() {
     );
   }
 
-  // Determine watched tab count
-  const watchedTabCount = watchedData?.totalCount ?? null;
-
   return (
     <div className="mx-auto max-w-2xl px-4 pb-12">
       {/* Back link */}
@@ -184,8 +192,8 @@ export default function WatchlistListPage() {
         >
           <Eye className={`h-4 w-4 ${activeStatus === 'watched' ? 'text-green-400' : ''}`} />
           감상한 작품
-          {activeStatus === 'watched' && watchedTabCount !== null && (
-            <span className="text-xs text-white/30">({watchedTabCount})</span>
+          {counts && (
+            <span className="text-xs text-white/30">({counts.watchedCount})</span>
           )}
         </button>
         <button
@@ -198,8 +206,8 @@ export default function WatchlistListPage() {
         >
           <Bookmark className={`h-4 w-4 ${activeStatus === 'want_to_watch' ? 'text-yellow-400' : ''}`} />
           감상할 작품
-          {wtwData && activeStatus === 'want_to_watch' && (
-            <span className="text-xs text-white/30">({wtwData.total})</span>
+          {counts && (
+            <span className="text-xs text-white/30">({counts.wantToWatchCount})</span>
           )}
         </button>
       </div>
@@ -209,11 +217,16 @@ export default function WatchlistListPage() {
         <>
           {/* Year filter */}
           {watchedYears.length > 0 && selectedYear !== null && (
-            <YearFilter
-              years={watchedYears}
-              selectedYear={selectedYear}
-              onYearChange={handleYearChange}
-            />
+            <div className="mb-6 flex items-center gap-3">
+              <YearFilter
+                years={watchedYears}
+                selectedYear={selectedYear}
+                onYearChange={handleYearChange}
+              />
+              {watchedData && (
+                <span className="text-sm text-white/30">{watchedData.totalCount}편</span>
+              )}
+            </div>
           )}
 
           {isLoading ? (
@@ -261,9 +274,9 @@ export default function WatchlistListPage() {
       {activeStatus === 'want_to_watch' && (
         <>
           {isLoading ? (
-            <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="aspect-[2/3] rounded-2xl bg-white/5 animate-pulse" />
+            <div className="grid grid-cols-5 gap-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+                <div key={i} className="aspect-[2/3] rounded-lg bg-white/5 animate-pulse" />
               ))}
             </div>
           ) : !wtwData || wtwData.items.length === 0 ? (
@@ -280,44 +293,34 @@ export default function WatchlistListPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
+            <div className="grid grid-cols-5 gap-2">
               {wtwData.items.map((item) => {
                 const { content } = item;
                 const href = `/contents/${content.contentType}/${content.tmdbId}`;
                 const posterSrc = content.posterUrl
-                  ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w500${content.posterUrl}`)
+                  ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w342${content.posterUrl}`)
                   : null;
 
                 return (
                   <Link
                     key={item.id}
                     href={href}
-                    className="group block relative w-full hover:-translate-y-2 transition-all duration-300"
+                    className="group block relative w-full hover:-translate-y-1 transition-transform duration-200"
                   >
-                    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-white/5 border border-white/5 shadow-lg">
+                    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-white/5 border border-white/5">
                       {posterSrc ? (
                         <Image
                           src={posterSrc}
                           alt={content.title}
                           fill
-                          sizes="(max-width: 640px) 33vw, 25vw"
-                          className="object-cover transition-transform duration-700 group-hover:scale-110"
+                          sizes="20vw"
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                       ) : (
-                        <div className="flex h-full items-center justify-center text-xs text-white/40 bg-zinc-900">
+                        <div className="flex h-full items-center justify-center text-[10px] text-white/40 bg-zinc-900">
                           포스터 없음
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300" />
-                      <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-1 opacity-90 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                        <p className="truncate text-sm font-bold text-white drop-shadow-md">
-                          {content.title}
-                        </p>
-                        <div className="mt-1 flex items-center gap-2 text-xs font-medium text-white/60">
-                          {content.releaseDate && <span>{content.releaseDate.slice(0, 4)}</span>}
-                          <span>{content.contentType === 'tv' ? '시리즈' : '영화'}</span>
-                        </div>
-                      </div>
                     </div>
                   </Link>
                 );

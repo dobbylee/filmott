@@ -12,7 +12,7 @@ export default function YearFilter({ years, selectedYear, onYearChange }: YearFi
   if (years.length === 0) return null;
 
   return (
-    <div className="relative mb-6 inline-block">
+    <div className="relative inline-block">
       <select
         value={selectedYear}
         onChange={(e) => onYearChange(parseInt(e.target.value, 10))}
