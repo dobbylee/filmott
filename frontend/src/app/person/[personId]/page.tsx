@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import { Calendar, User } from 'lucide-react';
 import { fetchApi } from '@/lib/fetcher';
-import FilmographyGrid from './FilmographyGrid';
+import FilmographyGrid from '@/components/content/FilmographyGrid';
 import {
   TMDB_IMAGE_BASE,
   type PersonDetail,

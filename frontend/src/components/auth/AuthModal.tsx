@@ -4,28 +4,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/utils/error';
+import { validateNickname } from '@/utils/nickname';
+import { validatePassword } from '@/utils/validation';
 import api from '@/lib/api';
-
-const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9_]+$/;
-const NICKNAME_MAX_BYTES = 16;
-const NICKNAME_RESERVED = ['admin', 'filmott', 'deleted'];
-
-function getNicknameByteLength(str: string): number {
-  let len = 0;
-  for (const ch of str) {
-    len += /[\u3131-\uD79D]/.test(ch) ? 2 : 1;
-  }
-  return len;
-}
-
-function validateNickname(value: string): string | null {
-  if (value.length < 2) return '닉네임은 2자 이상이어야 합니다.';
-  if (!NICKNAME_REGEX.test(value)) return '한글, 영문, 숫자, 밑줄(_)만 사용할 수 있습니다.';
-  if (getNicknameByteLength(value) > NICKNAME_MAX_BYTES) return '닉네임이 너무 깁니다. (한글 8자 / 영문 16자 이내)';
-  if (NICKNAME_RESERVED.some((w) => value.toLowerCase().startsWith(w))) return '사용할 수 없는 닉네임입니다.';
-  if (/\s/.test(value)) return '공백은 사용할 수 없습니다.';
-  return null;
-}
 
 export default function AuthModal() {
   const { login, signup, authModal, openAuthModal, closeAuthModal } = useAuth();
@@ -125,6 +106,11 @@ export default function AuthModal() {
     }
     if (nicknameStatus === 'taken') {
       setError('이미 사용 중인 닉네임입니다.');
+      return;
+    }
+    const passwordErr = validatePassword(password);
+    if (passwordErr) {
+      setError(passwordErr);
       return;
     }
     if (password !== confirmPassword) {
@@ -269,7 +255,7 @@ export default function AuthModal() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={8}
-                placeholder="8자 이상 비밀번호"
+                placeholder="영문, 숫자, 특수문자 포함 8자 이상"
                 className={inputClass}
               />
             </div>

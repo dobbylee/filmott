@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
@@ -12,6 +13,7 @@ describe('AuthController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [AuthController],
       providers: [
         { provide: AuthService, useValue: mockAuthService },
@@ -58,6 +60,24 @@ describe('AuthController', () => {
 
       expect(mockAuthService.login).toHaveBeenCalledWith(dto);
       expect(result).toEqual(response);
+    });
+  });
+
+  describe('ThrottlerGuard', () => {
+    it('should have ThrottlerGuard applied at controller level', () => {
+      const guards = Reflect.getMetadata('__guards__', AuthController);
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(ThrottlerGuard);
+    });
+
+    it('should have Throttle decorator on register method', () => {
+      const allMetadataKeys = Reflect.getMetadataKeys(AuthController.prototype.register);
+      expect(allMetadataKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
+    });
+
+    it('should have Throttle decorator on login method', () => {
+      const allMetadataKeys = Reflect.getMetadataKeys(AuthController.prototype.login);
+      expect(allMetadataKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
     });
   });
 });

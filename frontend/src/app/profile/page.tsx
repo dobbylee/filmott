@@ -7,30 +7,10 @@ import { Pencil, Check, X, AlertCircle, Eye, Bookmark, LogOut } from 'lucide-rea
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { getErrorMessage } from '@/utils/error';
+import { validateNickname } from '@/utils/nickname';
+import { validatePassword } from '@/utils/validation';
 import type { User } from '@/types/auth';
 import type { WatchlistCounts } from '@/types/watchlist';
-
-// 닉네임 바이트 길이 계산 (한글 2바이트, 영문/숫자 1바이트)
-function getNicknameByteLength(str: string): number {
-  let len = 0;
-  for (const ch of str) {
-    len += /[\u3131-\uD79D]/.test(ch) ? 2 : 1;
-  }
-  return len;
-}
-
-const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9_]+$/;
-const NICKNAME_MAX_BYTES = 16;
-const NICKNAME_RESERVED = ['admin', 'filmott', 'deleted'];
-
-function validateNickname(value: string): string | null {
-  if (value.length < 2) return '닉네임은 2자 이상이어야 합니다.';
-  if (!NICKNAME_REGEX.test(value)) return '한글, 영문, 숫자, 밑줄(_)만 사용할 수 있습니다.';
-  if (getNicknameByteLength(value) > NICKNAME_MAX_BYTES) return '닉네임이 너무 깁니다. (한글 8자 / 영문 16자 이내)';
-  if (NICKNAME_RESERVED.some((w) => value.toLowerCase().startsWith(w))) return '사용할 수 없는 닉네임입니다.';
-  if (/\s/.test(value)) return '공백은 사용할 수 없습니다.';
-  return null;
-}
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -218,8 +198,9 @@ export default function ProfilePage() {
     setPwError('');
     setPwMessage('');
 
-    if (newPassword.length < 8) {
-      setPwError('새 비밀번호는 8자 이상이어야 합니다.');
+    const passwordErr = validatePassword(newPassword);
+    if (passwordErr) {
+      setPwError(passwordErr);
       return;
     }
     if (newPassword !== confirmNewPassword) {
@@ -500,7 +481,7 @@ export default function ProfilePage() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     minLength={8}
-                    placeholder="8자 이상"
+                    placeholder="영문, 숫자, 특수문자 포함 8자 이상"
                     autoFocus
                     className={inputClass}
                   />

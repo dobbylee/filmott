@@ -3,8 +3,8 @@ import type { Metadata } from 'next';
 import { fetchApi } from '@/lib/fetcher';
 import Pagination from '@/components/content/Pagination';
 import ContentGrid from '@/components/content/ContentGrid';
-import SearchTypeFilter from './SearchTypeFilter';
-import SearchResultSections from './SearchResultSections';
+import SearchTypeFilter from '@/components/search/SearchTypeFilter';
+import SearchResultSections from '@/components/search/SearchResultSections';
 import type { TmdbSearchResult, TmdbSearchItem } from '@/types/content';
 
 interface SearchPageProps {

@@ -45,14 +45,14 @@ describe('WatchlistStatusButton', () => {
     mockUser = null;
   });
 
-  it('should show "워치리스트" when not registered', async () => {
+  it('should show "기록하기" when not registered', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
 
     render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
-      expect(screen.getByText('워치리스트')).toBeInTheDocument();
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
     });
   });
 
@@ -84,7 +84,7 @@ describe('WatchlistStatusButton', () => {
 
     render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
 
-    await user.click(screen.getByText('워치리스트'));
+    await user.click(screen.getByText('기록하기'));
     expect(mockOpenAuthModal).toHaveBeenCalledWith('login');
   });
 
@@ -96,16 +96,19 @@ describe('WatchlistStatusButton', () => {
     render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
-      expect(screen.getByText('워치리스트')).toBeInTheDocument();
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('워치리스트'));
+    await user.click(screen.getByText('기록하기'));
 
-    expect(screen.getByText('감상할 작품에 추가')).toBeInTheDocument();
-    expect(screen.getByText('감상한 작품으로 기록')).toBeInTheDocument();
+    // 드롭다운에 "감상할 작품"과 "감상한 작품" 옵션이 나타남
+    const dropdownItems = screen.getAllByText('감상할 작품');
+    expect(dropdownItems.length).toBeGreaterThan(0);
+    const watchedItems = screen.getAllByText('감상한 작품');
+    expect(watchedItems.length).toBeGreaterThan(0);
   });
 
-  it('should show dropdown with "감상 완료로 전환" and "제거" for want_to_watch', async () => {
+  it('should show dropdown with "감상한 작품" and "제거" for want_to_watch', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: 'want_to_watch', watchlistId: 1 } });
     const user = userEvent.setup();
@@ -118,7 +121,9 @@ describe('WatchlistStatusButton', () => {
 
     await user.click(screen.getByText('감상할 작품'));
 
-    expect(screen.getByText('감상 완료로 전환')).toBeInTheDocument();
+    // 드롭다운에 "감상한 작품"(전환) 버튼과 "제거" 버튼이 나타남
+    const watchedItems = screen.getAllByText('감상한 작품');
+    expect(watchedItems.length).toBeGreaterThan(0);
     expect(screen.getByText('제거')).toBeInTheDocument();
   });
 

@@ -4,6 +4,7 @@ import {
   IsString,
   Min,
   Max,
+  MaxLength,
 } from 'class-validator';
 
 export class UpdateReviewDto {
@@ -15,5 +16,6 @@ export class UpdateReviewDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   comment?: string;
 }

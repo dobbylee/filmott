@@ -18,6 +18,6 @@ export class CreateReviewDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @MaxLength(500)
   comment?: string;
 }

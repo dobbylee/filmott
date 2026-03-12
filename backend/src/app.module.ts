@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -8,14 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { ContentsModule } from './contents/contents.module';
 import { RankingsModule } from './rankings/rankings.module';
 import { ReviewsModule } from './reviews/reviews.module';
-import { User } from './users/user.entity';
-import { Content } from './contents/content.entity';
-import { Ranking } from './rankings/ranking.entity';
-import { Review } from './reviews/review.entity';
-import { ReviewLike } from './reviews/review-like.entity';
-import { ReviewComment } from './reviews/review-comment.entity';
 import { WatchlistModule } from './watchlist/watchlist.module';
-import { Watchlist } from './watchlist/watchlist.entity';
 
 @Module({
   imports: [
@@ -33,7 +27,7 @@ import { Watchlist } from './watchlist/watchlist.entity';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
-        entities: [User, Content, Ranking, Review, ReviewLike, ReviewComment, Watchlist],
+        autoLoadEntities: true,
         synchronize: false,
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         extra: {
@@ -41,6 +35,8 @@ import { Watchlist } from './watchlist/watchlist.entity';
         },
       }),
     }),
+
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
 
     UsersModule,
     AuthModule,

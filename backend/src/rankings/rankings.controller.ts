@@ -1,6 +1,9 @@
 import { Controller, Get, Post, Param, Query, UseGuards, BadRequestException } from '@nestjs/common';
 import { RankingsService } from './rankings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../users/enums/user-role.enum';
 import { GetRankingsDto } from './dto/get-rankings.dto';
 
 @Controller('rankings')
@@ -12,8 +15,6 @@ export class RankingsController {
     'daily-box-office',
     'weekly-box-office',
     'trending-all-day',
-    'trending-movie-day',
-    'trending-tv-day',
     'trending-all-week',
   ];
 
@@ -43,7 +44,8 @@ export class RankingsController {
    * 수동 갱신 (관리용)
    */
   @Post('refresh/:category')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   async refresh(@Param('category') category: string) {
     switch (category) {
       case 'daily-box-office':
@@ -52,10 +54,6 @@ export class RankingsController {
         return this.rankingsService.fetchWeeklyBoxOffice();
       case 'trending-all-day':
         return this.rankingsService.fetchTrending('all', 'day');
-      case 'trending-movie-day':
-        return this.rankingsService.fetchTrending('movie', 'day');
-      case 'trending-tv-day':
-        return this.rankingsService.fetchTrending('tv', 'day');
       case 'trending-all-week':
         return this.rankingsService.fetchTrending('all', 'week');
       default:

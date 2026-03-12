@@ -16,5 +16,9 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   @MinLength(8, { message: '새 비밀번호는 8자 이상이어야 합니다.' })
+  @Matches(
+    /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/,
+    { message: '비밀번호는 8자 이상, 영문/숫자/특수문자를 모두 포함해야 합니다.' },
+  )
   newPassword?: string;
 }
