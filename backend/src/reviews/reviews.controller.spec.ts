@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
 import { ReviewCommentsService } from './review-comments.service';
@@ -10,11 +11,14 @@ describe('ReviewsController', () => {
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
+    findMyReview: jest.fn(),
     findByContent: jest.fn(),
     findByUser: jest.fn(),
     getRecentReviews: jest.fn(),
     getContentStats: jest.fn(),
     toggleLike: jest.fn(),
+    getLikedReviewIds: jest.fn(),
+    getLikedReviewIdsByIds: jest.fn(),
   };
 
   const mockCommentsService = {
@@ -124,6 +128,46 @@ describe('ReviewsController', () => {
       await controller.getRecent('5');
 
       expect(mockReviewsService.getRecentReviews).toHaveBeenCalledWith(5);
+    });
+
+    it('should cap limit at 50', async () => {
+      mockReviewsService.getRecentReviews.mockResolvedValue([]);
+
+      await controller.getRecent('100');
+
+      expect(mockReviewsService.getRecentReviews).toHaveBeenCalledWith(50);
+    });
+
+    it('should enforce minimum limit of 1', async () => {
+      mockReviewsService.getRecentReviews.mockResolvedValue([]);
+
+      await controller.getRecent('0');
+
+      expect(mockReviewsService.getRecentReviews).toHaveBeenCalledWith(1);
+    });
+
+    it('should throw BadRequestException for non-numeric limit', async () => {
+      await expect(controller.getRecent('abc')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('parseInt NaN validation', () => {
+    it('should throw BadRequestException for non-numeric page in findByContent', async () => {
+      await expect(controller.findByContent(1, 'abc')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for non-numeric page in findByUser', async () => {
+      await expect(controller.findByUser(1, 'xyz')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for non-numeric page in getComments', async () => {
+      await expect(controller.getComments(1, 'notanumber')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for non-numeric contentId in getLikedIds', async () => {
+      const user = { id: 1, nickname: 'test' };
+
+      await expect(controller.getLikedIds(user, 'abc')).rejects.toThrow(BadRequestException);
     });
   });
 

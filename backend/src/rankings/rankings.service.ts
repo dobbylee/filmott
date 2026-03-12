@@ -6,6 +6,7 @@ import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
+import { TMDB_IMAGE_BASE } from '../common/constants';
 
 @Injectable()
 export class RankingsService {
@@ -171,7 +172,7 @@ export class RankingsService {
         const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
         const title = mediaType === 'movie' ? item.title : item.name;
         const posterUrl = item.poster_path
-          ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+          ? `${TMDB_IMAGE_BASE}/w500${item.poster_path}`
           : undefined;
 
         let contentId: number | undefined;

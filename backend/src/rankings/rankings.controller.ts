@@ -57,7 +57,7 @@ export class RankingsController {
       case 'trending-all-week':
         return this.rankingsService.fetchTrending('all', 'week');
       default:
-        return { message: `Unknown category: ${category}` };
+        throw new BadRequestException(`Unknown category: ${category}`);
     }
   }
 }

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
+import { BadRequestException } from '@nestjs/common';
 import { RankingsController } from './rankings.controller';
 import { RankingsService } from './rankings.service';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -89,16 +90,12 @@ describe('RankingsController', () => {
       );
     });
 
-    it('should return unknown message for removed trending-movie-day category', async () => {
-      const result = await controller.refresh('trending-movie-day');
-
-      expect(result).toEqual({ message: 'Unknown category: trending-movie-day' });
+    it('should throw BadRequestException for removed trending-movie-day category', async () => {
+      await expect(controller.refresh('trending-movie-day')).rejects.toThrow(BadRequestException);
     });
 
-    it('should return unknown message for removed trending-tv-day category', async () => {
-      const result = await controller.refresh('trending-tv-day');
-
-      expect(result).toEqual({ message: 'Unknown category: trending-tv-day' });
+    it('should throw BadRequestException for removed trending-tv-day category', async () => {
+      await expect(controller.refresh('trending-tv-day')).rejects.toThrow(BadRequestException);
     });
 
     it('should call fetchTrending with all type and week window', async () => {
@@ -112,10 +109,8 @@ describe('RankingsController', () => {
       );
     });
 
-    it('should return message for unknown category', async () => {
-      const result = await controller.refresh('unknown');
-
-      expect(result).toEqual({ message: 'Unknown category: unknown' });
+    it('should throw BadRequestException for unknown category', async () => {
+      await expect(controller.refresh('unknown')).rejects.toThrow(BadRequestException);
     });
   });
 

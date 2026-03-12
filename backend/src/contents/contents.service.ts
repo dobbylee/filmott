@@ -8,8 +8,7 @@ import {
   TmdbPersonDetail,
   TmdbPersonCredit,
 } from '../tmdb/tmdb.service';
-
-const IMAGE_BASE = 'https://image.tmdb.org/t/p';
+import { TMDB_IMAGE_BASE } from '../common/constants';
 
 const GENRE_NAME_MAP: Record<number, string> = {
   28: '액션',
@@ -238,10 +237,10 @@ export class ContentsService {
       title: title ?? '',
       originalTitle: originalTitle ?? undefined,
       posterUrl: tmdbData.poster_path
-        ? `${IMAGE_BASE}/w500${tmdbData.poster_path}`
+        ? `${TMDB_IMAGE_BASE}/w500${tmdbData.poster_path}`
         : undefined,
       backdropUrl: tmdbData.backdrop_path
-        ? `${IMAGE_BASE}/original${tmdbData.backdrop_path}`
+        ? `${TMDB_IMAGE_BASE}/original${tmdbData.backdrop_path}`
         : undefined,
       overview: tmdbData.overview ?? undefined,
       releaseDate: releaseDate ? new Date(releaseDate) : undefined,

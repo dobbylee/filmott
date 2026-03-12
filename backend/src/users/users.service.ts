@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { User, SafeUser } from './user.entity';
 import { UserStatus } from './enums/user-status.enum';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -19,12 +19,21 @@ export class UsersService {
     private readonly usersRepo: Repository<User>,
   ) {}
 
+  /**
+   * 닉네임으로 사용자 조회 (DELETED 제외)
+   * ACTIVE + SUSPENDED 모두 포함 -- 닉네임 중복 체크 시 정지된 계정도 잡아야 함
+   */
   async findOne(nickname: string): Promise<User | null> {
     return this.usersRepo.findOne({
-      where: { nickname, status: UserStatus.ACTIVE },
+      where: { nickname, status: Not(UserStatus.DELETED) },
     });
   }
 
+  /**
+   * 이메일로 사용자 조회 (status 필터 없음)
+   * TODO: 소셜 로그인 도입 시 status 필터 검토 필요
+   * - 현재는 로그인 시 auth.service에서 status 체크를 별도로 수행하므로 문제없음
+   */
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepo.findOne({ where: { email } });
   }

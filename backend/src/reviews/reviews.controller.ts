@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
 import { ReviewCommentsService } from './review-comments.service';
@@ -25,6 +26,15 @@ export class ReviewsController {
     private readonly reviewsService: ReviewsService,
     private readonly reviewCommentsService: ReviewCommentsService,
   ) {}
+
+  private parseIntOrDefault(value: string | undefined, defaultValue: number, name: string): number {
+    if (value === undefined || value === '') return defaultValue;
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed)) {
+      throw new BadRequestException(`${name} must be a valid integer`);
+    }
+    return parsed;
+  }
 
   // --- Reviews CRUD ---
 
@@ -78,7 +88,9 @@ export class ReviewsController {
       return this.reviewsService.getLikedReviewIdsByIds(user.id, ids);
     }
     if (contentId) {
-      return this.reviewsService.getLikedReviewIds(user.id, parseInt(contentId, 10));
+      const parsedContentId = this.parseIntOrDefault(contentId, 0, 'contentId');
+      if (parsedContentId === 0) return [];
+      return this.reviewsService.getLikedReviewIds(user.id, parsedContentId);
     }
     return [];
   }
@@ -89,15 +101,15 @@ export class ReviewsController {
     @Query('page') page?: string,
     @Query('sort') sort?: string,
   ) {
-    const p = page ? parseInt(page, 10) : 1;
+    const p = this.parseIntOrDefault(page, 1, 'page');
     const s = sort === 'likes' ? 'likes' : 'latest';
     return this.reviewsService.findByContent(contentId, p, s);
   }
 
   @Get('recent')
   async getRecent(@Query('limit') limit?: string) {
-    const l = limit ? parseInt(limit, 10) : 10;
-    return this.reviewsService.getRecentReviews(l);
+    const l = this.parseIntOrDefault(limit, 10, 'limit');
+    return this.reviewsService.getRecentReviews(Math.min(Math.max(l, 1), 50));
   }
 
   @Get('user/:userId')
@@ -105,7 +117,7 @@ export class ReviewsController {
     @Param('userId', ParseIntPipe) userId: number,
     @Query('page') page?: string,
   ) {
-    const p = page ? parseInt(page, 10) : 1;
+    const p = this.parseIntOrDefault(page, 1, 'page');
     return this.reviewsService.findByUser(userId, p);
   }
 
@@ -152,7 +164,7 @@ export class ReviewsController {
     @Param('id', ParseIntPipe) reviewId: number,
     @Query('page') page?: string,
   ) {
-    const p = page ? parseInt(page, 10) : 1;
+    const p = this.parseIntOrDefault(page, 1, 'page');
     return this.reviewCommentsService.findByReview(reviewId, p);
   }
 }

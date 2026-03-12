@@ -235,7 +235,7 @@ export class ReviewsService {
         const updated = await manager.findOne(Review, {
           where: { id: reviewId },
         });
-        return { liked: false, likesCount: updated!.likesCount };
+        return { liked: false, likesCount: updated?.likesCount ?? 0 };
       } else {
         const like = this.reviewLikeRepo.create({ reviewId, userId });
         await manager.save(like);
@@ -249,7 +249,7 @@ export class ReviewsService {
         const updated = await manager.findOne(Review, {
           where: { id: reviewId },
         });
-        return { liked: true, likesCount: updated!.likesCount };
+        return { liked: true, likesCount: updated?.likesCount ?? 0 };
       }
     });
   }

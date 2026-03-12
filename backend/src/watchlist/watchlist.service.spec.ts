@@ -393,6 +393,15 @@ describe('WatchlistService', () => {
       const result = await service.getWatchedYears(1);
 
       expect(result.years).toEqual([2026, 2025, 2024]);
+      // N10: TypeORM 프로퍼티명 사용 확인 (raw SQL 컬럼명 아님)
+      expect(mockQb.select).toHaveBeenCalledWith(
+        'DISTINCT EXTRACT(YEAR FROM COALESCE(w.watchedAt, w.updatedAt))',
+        'year',
+      );
+      expect(mockQb.where).toHaveBeenCalledWith(
+        'w.userId = :userId',
+        { userId: 1 },
+      );
       expect(mockQb.andWhere).toHaveBeenCalledWith(
         'w.status = :status',
         { status: 'watched' },

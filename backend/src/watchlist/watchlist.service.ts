@@ -187,8 +187,8 @@ export class WatchlistService {
   async getWatchedYears(userId: number): Promise<{ years: number[] }> {
     const result = await this.watchlistRepo
       .createQueryBuilder('w')
-      .select('DISTINCT EXTRACT(YEAR FROM COALESCE(w.watched_at, w.updated_at))', 'year')
-      .where('w.user_id = :userId', { userId })
+      .select('DISTINCT EXTRACT(YEAR FROM COALESCE(w.watchedAt, w.updatedAt))', 'year')
+      .where('w.userId = :userId', { userId })
       .andWhere('w.status = :status', { status: 'watched' })
       .orderBy('year', 'DESC')
       .getRawMany();

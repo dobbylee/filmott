@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { Not } from 'typeorm';
 import { User } from './user.entity';
 import { UserStatus } from './enums/user-status.enum';
 import { UserRole } from './enums/user-role.enum';
@@ -34,13 +35,13 @@ describe('UsersService', () => {
   });
 
   describe('findOne', () => {
-    it('should query with ACTIVE status condition', async () => {
+    it('should query with Not(DELETED) status condition to include ACTIVE and SUSPENDED', async () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
 
       await service.findOne('test');
 
       expect(mockUsersRepo.findOne).toHaveBeenCalledWith({
-        where: { nickname: 'test', status: UserStatus.ACTIVE },
+        where: { nickname: 'test', status: Not(UserStatus.DELETED) },
       });
     });
   });
