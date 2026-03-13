@@ -96,11 +96,11 @@ export class WatchlistService {
     });
 
     if (!item) {
-      throw new NotFoundException('Watchlist item not found');
+      throw new NotFoundException('워치리스트 항목을 찾을 수 없습니다.');
     }
 
     if (item.userId !== userId) {
-      throw new ForbiddenException('Not your watchlist item');
+      throw new ForbiddenException('본인의 워치리스트 항목만 수정할 수 있습니다.');
     }
 
     if (dto.status) {
@@ -126,11 +126,11 @@ export class WatchlistService {
     });
 
     if (!item) {
-      throw new NotFoundException('Watchlist item not found');
+      throw new NotFoundException('워치리스트 항목을 찾을 수 없습니다.');
     }
 
     if (item.userId !== userId) {
-      throw new ForbiddenException('Not your watchlist item');
+      throw new ForbiddenException('본인의 워치리스트 항목만 수정할 수 있습니다.');
     }
 
     await this.watchlistRepo.remove(item);
@@ -183,15 +183,17 @@ export class WatchlistService {
   }
 
   /**
-   * Get all want_to_watch items (no pagination, for poster grid)
+   * Get all want_to_watch items (for poster grid, limit 상한 200)
    */
-  async getWantToWatchAll(userId: number) {
+  async getWantToWatchAll(userId: number, limit = 100) {
+    const safeLimit = Math.min(Math.max(limit, 1), 200);
     const items = await this.watchlistRepo
       .createQueryBuilder('w')
       .leftJoinAndSelect('w.content', 'content')
       .where('w.userId = :userId', { userId })
       .andWhere('w.status = :status', { status: 'want_to_watch' })
       .orderBy('w.createdAt', 'DESC')
+      .take(safeLimit)
       .getMany();
 
     return { items, total: items.length };

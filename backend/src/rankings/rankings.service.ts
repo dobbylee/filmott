@@ -8,6 +8,9 @@ import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
 import { TMDB_IMAGE_BASE } from '../common/constants';
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const TMDB_CALL_DELAY_MS = 250;
+
 @Injectable()
 export class RankingsService {
   private readonly logger = new Logger(RankingsService.name);
@@ -34,10 +37,17 @@ export class RankingsService {
       const boxOfficeItems = await this.kobisService.getDailyBoxOffice(yesterday);
       const fetchedAt = new Date();
 
-      // TMDB 매칭을 병렬로 처리
-      const matchResults = await Promise.allSettled(
-        boxOfficeItems.map((item) => this.matchKobisToTmdb(item.movieNm, item.openDt)),
-      );
+      // TMDB 매칭을 순차 처리 (rate limit 방어: 250ms 간격)
+      const matchResults: PromiseSettledResult<{ id: number; posterUrl?: string } | null>[] = [];
+      for (const item of boxOfficeItems) {
+        try {
+          const value = await this.matchKobisToTmdb(item.movieNm, item.openDt);
+          matchResults.push({ status: 'fulfilled', value });
+        } catch (reason) {
+          matchResults.push({ status: 'rejected', reason });
+        }
+        await sleep(TMDB_CALL_DELAY_MS);
+      }
 
       const rankingsToUpsert: Ranking[] = boxOfficeItems.map((item, idx) => {
         const ranking = this.rankingRepo.create({
@@ -87,9 +97,17 @@ export class RankingsService {
       const boxOfficeItems = await this.kobisService.getWeeklyBoxOffice(lastWeek);
       const fetchedAt = new Date();
 
-      const matchResults = await Promise.allSettled(
-        boxOfficeItems.map((item) => this.matchKobisToTmdb(item.movieNm, item.openDt)),
-      );
+      // TMDB 매칭을 순차 처리 (rate limit 방어: 250ms 간격)
+      const matchResults: PromiseSettledResult<{ id: number; posterUrl?: string } | null>[] = [];
+      for (const item of boxOfficeItems) {
+        try {
+          const value = await this.matchKobisToTmdb(item.movieNm, item.openDt);
+          matchResults.push({ status: 'fulfilled', value });
+        } catch (reason) {
+          matchResults.push({ status: 'rejected', reason });
+        }
+        await sleep(TMDB_CALL_DELAY_MS);
+      }
 
       const rankingsToUpsert: Ranking[] = boxOfficeItems.map((item, idx) => {
         const ranking = this.rankingRepo.create({
@@ -157,16 +175,21 @@ export class RankingsService {
       const trendingData = await this.tmdbService.getTrending(type, timeWindow);
       const fetchedAt = new Date();
 
-      // contents 테이블 캐싱을 병렬 처리
-      const cacheResults = await Promise.allSettled(
-        trendingData.results.map((item) => {
-          const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
-          return this.contentsService.findOrFetchByTmdbId(
+      // contents 테이블 캐싱을 순차 처리 (rate limit 방어: 250ms 간격)
+      const cacheResults: PromiseSettledResult<any>[] = [];
+      for (const item of trendingData.results) {
+        const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
+        try {
+          const value = await this.contentsService.findOrFetchByTmdbId(
             item.id,
             mediaType as 'movie' | 'tv',
           );
-        }),
-      );
+          cacheResults.push({ status: 'fulfilled', value });
+        } catch (reason) {
+          cacheResults.push({ status: 'rejected', reason });
+        }
+        await sleep(TMDB_CALL_DELAY_MS);
+      }
 
       const rankingsToUpsert: Ranking[] = trendingData.results.map((item, i) => {
         const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';

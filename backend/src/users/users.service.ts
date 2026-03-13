@@ -30,12 +30,13 @@ export class UsersService {
   }
 
   /**
-   * 이메일로 사용자 조회 (status 필터 없음)
-   * TODO: 소셜 로그인 도입 시 status 필터 검토 필요
-   * - 현재는 로그인 시 auth.service에서 status 체크를 별도로 수행하므로 문제없음
+   * 이메일로 사용자 조회 (DELETED 제외)
+   * ACTIVE + SUSPENDED 모두 포함 -- 탈퇴 유저의 이메일 재사용 허용
    */
   async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepo.findOne({ where: { email } });
+    return this.usersRepo.findOne({
+      where: { email, status: Not(UserStatus.DELETED) },
+    });
   }
 
   async isNicknameAvailable(nickname: string): Promise<boolean> {
@@ -52,8 +53,22 @@ export class UsersService {
   async findById(id: number): Promise<SafeUser | null> {
     const user = await this.usersRepo.findOne({ where: { id } });
     if (!user) return null;
-    const { password, ...result } = user;
+    const { password: _, ...result } = user;
     return result;
+  }
+
+  /**
+   * JWT validate용: status/role 확인을 위해 id, nickname, status, role 반환
+   * password는 제외, status는 포함 (findById와 다른 점)
+   */
+  async findByIdWithStatus(
+    id: number,
+  ): Promise<Pick<User, 'id' | 'nickname' | 'status' | 'role'> | null> {
+    const user = await this.usersRepo.findOne({
+      where: { id },
+      select: ['id', 'nickname', 'status', 'role'],
+    });
+    return user ?? null;
   }
 
   private isReservedNickname(nickname: string): boolean {
@@ -92,8 +107,7 @@ export class UsersService {
     const savedUser = await this.usersRepo.save(newUser);
 
     // Return user without password
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _pw, ...result } = savedUser;
+    const { password: _, ...result } = savedUser;
     return result;
   }
 

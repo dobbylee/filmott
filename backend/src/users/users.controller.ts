@@ -12,6 +12,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,8 +23,10 @@ import type { JwtPayload } from '../auth/decorators/current-user.decorator';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // 닉네임 중복 체크
+  // 닉네임 중복 체크 (인증 없이 접근 가능 -> rate limit 강화)
   @Get('check-nickname/:nickname')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   async checkNickname(@Param('nickname') nickname: string) {
     const available = await this.usersService.isNicknameAvailable(nickname);
     return { available };

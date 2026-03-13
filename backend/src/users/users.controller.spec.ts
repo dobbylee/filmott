@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 
@@ -16,6 +17,7 @@ describe('UsersController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [UsersController],
       providers: [
         { provide: UsersService, useValue: mockUsersService },
@@ -45,6 +47,15 @@ describe('UsersController', () => {
       const result = await controller.checkNickname('takenuser');
 
       expect(result).toEqual({ available: false });
+    });
+
+    it('checkNickname에 ThrottlerGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        UsersController.prototype.checkNickname,
+      );
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(ThrottlerGuard);
     });
   });
 

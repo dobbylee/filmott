@@ -60,8 +60,12 @@ export class WatchlistController {
   }
 
   @Get('me/want-to-watch')
-  async getWantToWatchAll(@CurrentUser() user: JwtPayload) {
-    return this.watchlistService.getWantToWatchAll(user.id);
+  async getWantToWatchAll(
+    @CurrentUser() user: JwtPayload,
+    @Query('limit') limitStr?: string,
+  ) {
+    const limit = limitStr ? parseInt(limitStr, 10) : 100;
+    return this.watchlistService.getWantToWatchAll(user.id, isNaN(limit) ? 100 : limit);
   }
 
   @Get('me/watched-years')

@@ -259,6 +259,60 @@ describe('RankingsService', () => {
     });
   });
 
+  describe('fetchDailyBoxOffice - 순차 TMDB 호출', () => {
+    it('여러 항목을 순차적으로 TMDB 매칭해야 한다 (rate limit 방어)', async () => {
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: 'Movie A',
+          movieCd: '111',
+          openDt: '2026-03-01',
+          audiCnt: '100000',
+          audiAcc: '500000',
+          salesAmt: '1000000',
+          salesAcc: '5000000',
+        },
+        {
+          rank: '2',
+          movieNm: 'Movie B',
+          movieCd: '222',
+          openDt: '2026-03-02',
+          audiCnt: '80000',
+          audiAcc: '400000',
+          salesAmt: '800000',
+          salesAcc: '4000000',
+        },
+      ];
+
+      mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
+
+      const callOrder: string[] = [];
+      mockTmdbService.searchByType.mockImplementation(async (name: string) => {
+        callOrder.push(`search:${name}`);
+        return {
+          results: [
+            { id: 100, title: name, release_date: '2026-03-01' },
+          ],
+        };
+      });
+      mockContentsService.findOrFetchByTmdbId.mockImplementation(async () => {
+        callOrder.push('cache');
+        return { id: 1, posterUrl: '/poster.jpg' };
+      });
+
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchDailyBoxOffice();
+
+      // 순차 호출 확인: Movie A 검색+캐시 -> Movie B 검색+캐시
+      expect(callOrder[0]).toBe('search:Movie A');
+      expect(callOrder[1]).toBe('cache');
+      expect(callOrder[2]).toBe('search:Movie B');
+      expect(callOrder[3]).toBe('cache');
+    });
+  });
+
   describe('fetchDailyBoxOffice - 에러 처리', () => {
     it('KOBIS 서비스 실패 시 에러를 던져야 한다', async () => {
       const error = new Error('KOBIS API error');
