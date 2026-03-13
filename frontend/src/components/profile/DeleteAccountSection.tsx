@@ -24,9 +24,9 @@ export default function DeleteAccountSection() {
 
   return (
     <div className="rounded-xl border border-red-500/20 bg-white/[0.02] p-5">
-      <h2 className="mb-2 text-sm font-semibold text-red-400">계정 삭제</h2>
+      <h2 className="mb-2 text-sm font-semibold text-red-400">회원 탈퇴</h2>
       <p className="mb-4 text-xs text-white/40">
-        계정을 삭제하면 복구할 수 없습니다. 모든 데이터가 영구적으로 삭제됩니다.
+        탈퇴하면 복구할 수 없습니다. 작성한 리뷰는 익명으로 유지됩니다.
       </p>
 
       {error && (
@@ -39,7 +39,7 @@ export default function DeleteAccountSection() {
             onClick={handleDelete}
             className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
           >
-            정말 삭제합니다
+            정말 탈퇴합니다
           </button>
           <button
             onClick={() => setShowConfirm(false)}
@@ -53,7 +53,7 @@ export default function DeleteAccountSection() {
           onClick={() => setShowConfirm(true)}
           className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
         >
-          계정 삭제
+          회원 탈퇴
         </button>
       )}
     </div>

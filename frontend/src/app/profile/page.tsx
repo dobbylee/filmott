@@ -54,7 +54,7 @@ export default function ProfilePage() {
       <WatchlistStats userId={user.id} />
 
       {/* 로그아웃 */}
-      <div className="mb-4">
+      <div className="mt-8 mb-8">
         <button
           onClick={handleLogout}
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white transition-all"

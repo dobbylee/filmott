@@ -103,10 +103,9 @@ describe('WatchlistCard', () => {
       expect(img).toBeInTheDocument();
     });
 
-    it('"내 리뷰" 뱃지, 평점, 코멘트를 렌더링한다', () => {
+    it('평점과 코멘트를 렌더링한다', () => {
       render(<WatchlistCard item={watchedItemWithReview} />);
 
-      expect(screen.getByText('내 리뷰')).toBeInTheDocument();
       expect(screen.getByText('4.5')).toBeInTheDocument();
       expect(screen.getByText('최고의 SF 영화')).toBeInTheDocument();
     });
@@ -152,18 +151,19 @@ describe('WatchlistCard', () => {
       const user = userEvent.setup();
       render(<WatchlistCard item={watchedItemWithReview} />);
 
-      // 댓글 버튼 — aria-label 없고 SVG를 포함한 버튼
+      // 댓글 버튼 — title 속성이 없고(날짜 수정 버튼 제외) SVG를 포함한 버튼
       const buttons = screen.getAllByRole('button');
       const commentButton = buttons.find(
         (btn) =>
           !btn.getAttribute('aria-label') &&
+          !btn.getAttribute('title') &&
           btn.querySelector('svg') !== null
       );
       expect(commentButton).toBeDefined();
       await user.click(commentButton!);
 
       await waitFor(() => {
-        expect(screen.getByText('댓글')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: '댓글' })).toBeInTheDocument();
       });
     });
   });
@@ -175,10 +175,11 @@ describe('WatchlistCard', () => {
       expect(screen.getByText('리뷰 작성')).toBeInTheDocument();
     });
 
-    it('"내 리뷰" 뱃지를 렌더링하지 않는다', () => {
+    it('평점과 코멘트를 렌더링하지 않는다', () => {
       render(<WatchlistCard item={watchedItemWithoutReview} />);
 
-      expect(screen.queryByText('내 리뷰')).not.toBeInTheDocument();
+      // 리뷰가 없으므로 평점 수치가 없어야 함
+      expect(screen.queryByText('4.5')).not.toBeInTheDocument();
     });
 
     it('"리뷰 작성" 클릭 시 리뷰 폼 모달을 열어야 한다', async () => {
@@ -216,7 +217,7 @@ describe('WatchlistCard', () => {
     it('리뷰 섹션을 렌더링하지 않는다', () => {
       render(<WatchlistCard item={wantToWatchItem} />);
 
-      expect(screen.queryByText('내 리뷰')).not.toBeInTheDocument();
+      // want_to_watch 상태는 평점, 리뷰 작성 버튼 모두 렌더링하지 않음
       expect(screen.queryByText('리뷰 작성')).not.toBeInTheDocument();
     });
 
