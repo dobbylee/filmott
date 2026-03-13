@@ -1,27 +1,27 @@
 import { validatePassword } from '@/utils/validation';
 
 describe('validatePassword', () => {
-  it('should return error for passwords shorter than 8 characters', () => {
+  it('8자 미만 비밀번호에 대해 에러를 반환해야 한다', () => {
     expect(validatePassword('Ab1!xyz')).toBe('비밀번호는 8자 이상이어야 합니다.');
   });
 
-  it('should return error when missing letters', () => {
+  it('영문이 없을 때 에러를 반환해야 한다', () => {
     expect(validatePassword('12345678!')).toBe('영문을 포함해야 합니다.');
   });
 
-  it('should return error when missing digits', () => {
+  it('숫자가 없을 때 에러를 반환해야 한다', () => {
     expect(validatePassword('abcdefgh!')).toBe('숫자를 포함해야 합니다.');
   });
 
-  it('should return error when missing special characters', () => {
+  it('특수문자가 없을 때 에러를 반환해야 한다', () => {
     expect(validatePassword('abcdefg1')).toBe('특수문자를 포함해야 합니다.');
   });
 
-  it('should return null for valid password', () => {
+  it('유효한 비밀번호에 대해 null을 반환해야 한다', () => {
     expect(validatePassword('Password1!')).toBeNull();
   });
 
-  it('should accept various special characters', () => {
+  it('다양한 특수문자를 허용해야 한다', () => {
     expect(validatePassword('Abcdefg1@')).toBeNull();
     expect(validatePassword('Abcdefg1#')).toBeNull();
     expect(validatePassword('Abcdefg1$')).toBeNull();
@@ -30,7 +30,7 @@ describe('validatePassword', () => {
     expect(validatePassword('Abcdefg1&')).toBeNull();
   });
 
-  it('should return null for empty string (length check catches it)', () => {
+  it('빈 문자열에 대해 길이 검사 에러를 반환해야 한다', () => {
     expect(validatePassword('')).toBe('비밀번호는 8자 이상이어야 합니다.');
   });
 });

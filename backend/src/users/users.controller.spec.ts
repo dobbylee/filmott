@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 
@@ -10,6 +10,8 @@ describe('UsersController', () => {
     findById: jest.fn(),
     update: jest.fn(),
     deactivate: jest.fn(),
+    isNicknameAvailable: jest.fn(),
+    verifyPassword: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -27,8 +29,59 @@ describe('UsersController', () => {
     jest.clearAllMocks();
   });
 
+  describe('GET /users/check-nickname/:nickname (checkNickname)', () => {
+    it('닉네임이 사용 가능하면 available: true를 반환해야 한다', async () => {
+      mockUsersService.isNicknameAvailable.mockResolvedValue(true);
+
+      const result = await controller.checkNickname('newuser');
+
+      expect(mockUsersService.isNicknameAvailable).toHaveBeenCalledWith('newuser');
+      expect(result).toEqual({ available: true });
+    });
+
+    it('닉네임이 이미 사용 중이면 available: false를 반환해야 한다', async () => {
+      mockUsersService.isNicknameAvailable.mockResolvedValue(false);
+
+      const result = await controller.checkNickname('takenuser');
+
+      expect(result).toEqual({ available: false });
+    });
+  });
+
+  describe('POST /users/me/verify-password (verifyPassword)', () => {
+    it('비밀번호가 올바르면 verified: true를 반환해야 한다', async () => {
+      const mockUser = { id: 1, nickname: 'test' };
+      mockUsersService.verifyPassword.mockResolvedValue(true);
+
+      const result = await controller.verifyPassword(mockUser, 'correct!Password1');
+
+      expect(mockUsersService.verifyPassword).toHaveBeenCalledWith(1, 'correct!Password1');
+      expect(result).toEqual({ verified: true });
+    });
+
+    it('비밀번호가 비어있으면 BadRequestException을 던져야 한다', async () => {
+      const mockUser = { id: 1, nickname: 'test' };
+
+      await expect(controller.verifyPassword(mockUser, '')).rejects.toThrow(BadRequestException);
+      expect(mockUsersService.verifyPassword).not.toHaveBeenCalled();
+    });
+
+    it('비밀번호가 undefined이면 BadRequestException을 던져야 한다', async () => {
+      const mockUser = { id: 1, nickname: 'test' };
+
+      await expect(controller.verifyPassword(mockUser, undefined as any)).rejects.toThrow(BadRequestException);
+    });
+
+    it('비밀번호가 틀리면 BadRequestException을 던져야 한다', async () => {
+      const mockUser = { id: 1, nickname: 'test' };
+      mockUsersService.verifyPassword.mockResolvedValue(false);
+
+      await expect(controller.verifyPassword(mockUser, 'wrong!Pass1')).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('GET /users/me (getProfile)', () => {
-    it('should return the current user profile', async () => {
+    it('현재 사용자 프로필을 반환해야 한다', async () => {
       const mockUser = { id: 1, nickname: 'test' };
       const profile = { id: 1, nickname: 'test', email: 'test@test.com' };
       mockUsersService.findById.mockResolvedValue(profile);
@@ -39,7 +92,7 @@ describe('UsersController', () => {
       expect(result).toEqual(profile);
     });
 
-    it('should throw NotFoundException when user is not found', async () => {
+    it('사용자를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       const mockUser = { id: 999, nickname: 'ghost' };
       mockUsersService.findById.mockResolvedValue(null);
 
@@ -48,7 +101,7 @@ describe('UsersController', () => {
   });
 
   describe('PATCH /users/me (update)', () => {
-    it('should update and return the updated user', async () => {
+    it('업데이트하고 수정된 사용자를 반환해야 한다', async () => {
       const mockUser = { id: 1, nickname: 'test' };
       const dto = { nickname: 'newname' };
       const updated = { id: 1, nickname: 'newname', email: 'test@test.com' };
@@ -62,7 +115,7 @@ describe('UsersController', () => {
   });
 
   describe('DELETE /users/me (deactivate)', () => {
-    it('should call deactivate with the current user id', async () => {
+    it('현재 사용자 ID로 deactivate를 호출해야 한다', async () => {
       const mockUser = { id: 1, nickname: 'test' };
       mockUsersService.deactivate.mockResolvedValue(undefined);
 

@@ -79,7 +79,7 @@ describe('AuthContext', () => {
   });
 
   describe('useAuth', () => {
-    it('should throw error when used outside AuthProvider', () => {
+    it('AuthProvider 외부에서 사용 시 에러를 던져야 한다', () => {
       // Suppress React error boundary console.error
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -96,8 +96,8 @@ describe('AuthContext', () => {
     });
   });
 
-  describe('AuthProvider initial state', () => {
-    it('should have user null and isLoading false after mount', async () => {
+  describe('AuthProvider 초기 상태', () => {
+    it('마운트 후 user가 null이고 isLoading이 false여야 한다', async () => {
       render(
         <AuthProvider>
           <AuthConsumer />
@@ -111,7 +111,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('token')).toHaveTextContent('null');
     });
 
-    it('should restore user and token from localStorage', async () => {
+    it('localStorage에서 user와 token을 복원해야 한다', async () => {
       localStorageMock.setItem('access_token', 'stored-token');
       localStorageMock.setItem('user', JSON.stringify(mockUser));
 
@@ -128,7 +128,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('token')).toHaveTextContent('stored-token');
     });
 
-    it('should handle corrupted user JSON in localStorage', async () => {
+    it('localStorage의 손상된 user JSON을 처리해야 한다', async () => {
       localStorageMock.setItem('access_token', 'stored-token');
       localStorageMock.setItem('user', 'invalid-json');
 
@@ -147,7 +147,7 @@ describe('AuthContext', () => {
   });
 
   describe('login', () => {
-    it('should call API, set user/token, and save to localStorage', async () => {
+    it('API를 호출하고, user/token을 설정하고, localStorage에 저장해야 한다', async () => {
       mockPost.mockResolvedValue(mockAuthResponse);
       const user = userEvent.setup();
 
@@ -178,7 +178,7 @@ describe('AuthContext', () => {
   });
 
   describe('signup', () => {
-    it('should call API, set user/token, and save to localStorage', async () => {
+    it('API를 호출하고, user/token을 설정하고, localStorage에 저장해야 한다', async () => {
       mockPost.mockResolvedValue(mockAuthResponse);
       const user = userEvent.setup();
 
@@ -210,7 +210,7 @@ describe('AuthContext', () => {
   });
 
   describe('logout', () => {
-    it('should clear user/token and remove from localStorage', async () => {
+    it('user/token을 초기화하고 localStorage에서 제거해야 한다', async () => {
       mockPost.mockResolvedValue(mockAuthResponse);
       const user = userEvent.setup();
 
@@ -243,7 +243,7 @@ describe('AuthContext', () => {
   });
 
   describe('authModal', () => {
-    it('should open modal with login mode by default', async () => {
+    it('기본적으로 login 모드로 모달을 열어야 한다', async () => {
       const user = userEvent.setup();
 
       render(
@@ -260,7 +260,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('modalMode')).toHaveTextContent('login');
     });
 
-    it('should open modal with signup mode', async () => {
+    it('signup 모드로 모달을 열어야 한다', async () => {
       const user = userEvent.setup();
 
       render(
@@ -275,7 +275,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('modalMode')).toHaveTextContent('signup');
     });
 
-    it('should close modal and preserve mode', async () => {
+    it('모달을 닫고 모드를 유지해야 한다', async () => {
       const user = userEvent.setup();
 
       render(
@@ -295,8 +295,8 @@ describe('AuthContext', () => {
     });
   });
 
-  describe('auth:required event', () => {
-    it('should open login modal and clear user on auth:required event', async () => {
+  describe('auth:required 이벤트', () => {
+    it('auth:required 이벤트 발생 시 로그인 모달을 열고 사용자를 초기화해야 한다', async () => {
       // Start with a logged in user
       localStorageMock.setItem('access_token', 'stored-token');
       localStorageMock.setItem('user', JSON.stringify(mockUser));

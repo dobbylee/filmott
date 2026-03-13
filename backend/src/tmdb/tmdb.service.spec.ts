@@ -37,7 +37,7 @@ describe('TmdbService', () => {
   });
 
   describe('searchMulti', () => {
-    it('should filter results to movie, tv, and person', async () => {
+    it('결과를 movie, tv, person으로 필터링해야 한다', async () => {
       const mockData = {
         page: 1,
         total_pages: 1,
@@ -67,7 +67,7 @@ describe('TmdbService', () => {
   });
 
   describe('searchByType', () => {
-    it('should inject media_type into results', async () => {
+    it('결과에 media_type을 주입해야 한다', async () => {
       const mockData = {
         page: 1,
         total_pages: 1,
@@ -86,7 +86,7 @@ describe('TmdbService', () => {
   });
 
   describe('getDetails', () => {
-    it('should fetch movie details with credits and watch providers', async () => {
+    it('크레딧과 시청 제공자를 포함한 영화 상세 정보를 가져와야 한다', async () => {
       const mockData = {
         id: 123,
         title: 'Test Movie',
@@ -108,7 +108,7 @@ describe('TmdbService', () => {
   });
 
   describe('getPopular', () => {
-    it('should fetch popular content', async () => {
+    it('인기 콘텐츠를 가져와야 한다', async () => {
       const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
@@ -121,7 +121,7 @@ describe('TmdbService', () => {
   });
 
   describe('getNowPlaying', () => {
-    it('should fetch now playing movies', async () => {
+    it('현재 상영 중인 영화를 가져와야 한다', async () => {
       const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
@@ -134,7 +134,7 @@ describe('TmdbService', () => {
   });
 
   describe('getTrending', () => {
-    it('should fetch trending content with time window', async () => {
+    it('시간 범위와 함께 트렌딩 콘텐츠를 가져와야 한다', async () => {
       const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
@@ -147,7 +147,7 @@ describe('TmdbService', () => {
   });
 
   describe('getWatchProviders', () => {
-    it('should return KR providers when available', async () => {
+    it('KR 제공자가 있을 때 반환해야 한다', async () => {
       const krProviders = {
         flatrate: [{ provider_id: 8, provider_name: 'Netflix', logo_path: '/logo.jpg' }],
       };
@@ -159,7 +159,7 @@ describe('TmdbService', () => {
       expect(result).toEqual(krProviders);
     });
 
-    it('should return null when KR providers not available', async () => {
+    it('KR 제공자가 없을 때 null을 반환해야 한다', async () => {
       const mockData = { results: {} };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
@@ -170,7 +170,7 @@ describe('TmdbService', () => {
   });
 
   describe('getPersonDetail', () => {
-    it('should fetch person detail with ko-KR language', async () => {
+    it('ko-KR 언어로 인물 상세 정보를 가져와야 한다', async () => {
       const mockData = {
         id: 17419,
         name: 'Bryan Cranston',
@@ -192,7 +192,7 @@ describe('TmdbService', () => {
   });
 
   describe('getPersonCredits', () => {
-    it('should fetch person combined credits with ko-KR language', async () => {
+    it('ko-KR 언어로 인물 통합 출연작을 가져와야 한다', async () => {
       const mockData = {
         cast: [
           { id: 1396, media_type: 'tv', name: 'Breaking Bad', character: 'Walter White' },
@@ -214,7 +214,7 @@ describe('TmdbService', () => {
   });
 
   describe('discoverByFilters', () => {
-    it('should pass filter parameters correctly for movies', async () => {
+    it('영화에 대해 필터 파라미터를 올바르게 전달해야 한다', async () => {
       const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
@@ -239,7 +239,7 @@ describe('TmdbService', () => {
       });
     });
 
-    it('should use first_air_date_year for TV type', async () => {
+    it('TV 타입에 대해 first_air_date_year를 사용해야 한다', async () => {
       const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 

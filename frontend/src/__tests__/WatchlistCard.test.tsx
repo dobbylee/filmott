@@ -94,8 +94,8 @@ const wantToWatchItem: WatchlistItem = {
 };
 
 describe('WatchlistCard', () => {
-  describe('watched item with review', () => {
-    it('renders title and poster', () => {
+  describe('리뷰가 있는 감상한 작품', () => {
+    it('제목과 포스터를 렌더링한다', () => {
       render(<WatchlistCard item={watchedItemWithReview} />);
 
       expect(screen.getByText('인셉션')).toBeInTheDocument();
@@ -103,7 +103,7 @@ describe('WatchlistCard', () => {
       expect(img).toBeInTheDocument();
     });
 
-    it('renders "내 리뷰" badge, rating, and comment', () => {
+    it('"내 리뷰" 뱃지, 평점, 코멘트를 렌더링한다', () => {
       render(<WatchlistCard item={watchedItemWithReview} />);
 
       expect(screen.getByText('내 리뷰')).toBeInTheDocument();
@@ -111,7 +111,7 @@ describe('WatchlistCard', () => {
       expect(screen.getByText('최고의 SF 영화')).toBeInTheDocument();
     });
 
-    it('renders content type and release year', () => {
+    it('작품 유형과 개봉 연도를 렌더링한다', () => {
       render(<WatchlistCard item={watchedItemWithReview} />);
 
       // span 안에 "영화"와 "· 2010"이 별도 텍스트 노드로 렌더링됨
@@ -125,20 +125,20 @@ describe('WatchlistCard', () => {
       expect(typeYearSpan?.textContent).toContain('2010');
     });
 
-    it('renders watched day number from watchedAt', () => {
+    it('watchedAt에서 감상일 숫자를 렌더링한다', () => {
       render(<WatchlistCard item={watchedItemWithReview} />);
 
       // watchedAt: '2026-03-10' → day = 10
       expect(screen.getByText('10')).toBeInTheDocument();
     });
 
-    it('renders like button', () => {
+    it('좋아요 버튼을 렌더링한다', () => {
       render(<WatchlistCard item={watchedItemWithReview} />);
 
       expect(screen.getByRole('button', { name: /좋아요/ })).toBeInTheDocument();
     });
 
-    it('links to content detail page', () => {
+    it('작품 상세 페이지로 링크한다', () => {
       render(<WatchlistCard item={watchedItemWithReview} />);
 
       const links = screen.getAllByRole('link');
@@ -148,7 +148,7 @@ describe('WatchlistCard', () => {
       expect(contentLinks.length).toBeGreaterThan(0);
     });
 
-    it('opens comments modal when comment button is clicked', async () => {
+    it('댓글 버튼 클릭 시 댓글 모달을 열어야 한다', async () => {
       const user = userEvent.setup();
       render(<WatchlistCard item={watchedItemWithReview} />);
 
@@ -168,20 +168,20 @@ describe('WatchlistCard', () => {
     });
   });
 
-  describe('watched item without review', () => {
-    it('renders "리뷰 작성" button', () => {
+  describe('리뷰가 없는 감상한 작품', () => {
+    it('"리뷰 작성" 버튼을 렌더링한다', () => {
       render(<WatchlistCard item={watchedItemWithoutReview} />);
 
       expect(screen.getByText('리뷰 작성')).toBeInTheDocument();
     });
 
-    it('does not render "내 리뷰" badge', () => {
+    it('"내 리뷰" 뱃지를 렌더링하지 않는다', () => {
       render(<WatchlistCard item={watchedItemWithoutReview} />);
 
       expect(screen.queryByText('내 리뷰')).not.toBeInTheDocument();
     });
 
-    it('opens review form modal when "리뷰 작성" is clicked', async () => {
+    it('"리뷰 작성" 클릭 시 리뷰 폼 모달을 열어야 한다', async () => {
       const user = userEvent.setup();
       render(<WatchlistCard item={watchedItemWithoutReview} />);
 
@@ -196,14 +196,14 @@ describe('WatchlistCard', () => {
     });
   });
 
-  describe('want_to_watch item', () => {
-    it('renders title', () => {
+  describe('감상할 작품', () => {
+    it('제목을 렌더링한다', () => {
       render(<WatchlistCard item={wantToWatchItem} />);
 
       expect(screen.getByText('브레이킹 배드')).toBeInTheDocument();
     });
 
-    it('links to content detail page', () => {
+    it('작품 상세 페이지로 링크한다', () => {
       render(<WatchlistCard item={wantToWatchItem} />);
 
       const links = screen.getAllByRole('link');
@@ -213,14 +213,14 @@ describe('WatchlistCard', () => {
       expect(contentLinks.length).toBeGreaterThan(0);
     });
 
-    it('does not render review section', () => {
+    it('리뷰 섹션을 렌더링하지 않는다', () => {
       render(<WatchlistCard item={wantToWatchItem} />);
 
       expect(screen.queryByText('내 리뷰')).not.toBeInTheDocument();
       expect(screen.queryByText('리뷰 작성')).not.toBeInTheDocument();
     });
 
-    it('does not render watched day number (watchedAt is null)', () => {
+    it('감상일 숫자를 렌더링하지 않는다 (watchedAt이 null)', () => {
       render(<WatchlistCard item={wantToWatchItem} />);
 
       // watched 전용 day 렌더링 블록은 want_to_watch에 없음

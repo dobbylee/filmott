@@ -27,12 +27,12 @@ describe('AuthController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => {
+  it('정의되어 있어야 한다', () => {
     expect(controller).toBeDefined();
   });
 
   describe('POST /auth/signup (register)', () => {
-    it('should call authService.register and return token and user', async () => {
+    it('authService.register를 호출하고 토큰과 사용자를 반환해야 한다', async () => {
       const dto = { nickname: 'test', email: 'test@test.com', password: 'password1' };
       const response = {
         access_token: 'token',
@@ -48,7 +48,7 @@ describe('AuthController', () => {
   });
 
   describe('POST /auth/login (login)', () => {
-    it('should call authService.login and return token and user', async () => {
+    it('authService.login을 호출하고 토큰과 사용자를 반환해야 한다', async () => {
       const dto = { email: 'test@test.com', password: 'password1' };
       const response = {
         access_token: 'token',
@@ -64,18 +64,18 @@ describe('AuthController', () => {
   });
 
   describe('ThrottlerGuard', () => {
-    it('should have ThrottlerGuard applied at controller level', () => {
+    it('컨트롤러 레벨에 ThrottlerGuard가 적용되어 있어야 한다', () => {
       const guards = Reflect.getMetadata('__guards__', AuthController);
       expect(guards).toBeDefined();
       expect(guards).toContainEqual(ThrottlerGuard);
     });
 
-    it('should have Throttle decorator on register method', () => {
+    it('register 메서드에 Throttle 데코레이터가 있어야 한다', () => {
       const allMetadataKeys = Reflect.getMetadataKeys(AuthController.prototype.register);
       expect(allMetadataKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
     });
 
-    it('should have Throttle decorator on login method', () => {
+    it('login 메서드에 Throttle 데코레이터가 있어야 한다', () => {
       const allMetadataKeys = Reflect.getMetadataKeys(AuthController.prototype.login);
       expect(allMetadataKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
     });

@@ -42,7 +42,7 @@ describe('AuthService', () => {
   });
 
   describe('validateUser', () => {
-    it('should return user info without password if valid credentials are provided', async () => {
+    it('유효한 자격 증명이 제공되면 비밀번호 없는 사용자 정보를 반환해야 한다', async () => {
       const mockUser = {
         id: 1, nickname: 'testuser', email: 'test@example.com',
         password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.USER,
@@ -59,7 +59,7 @@ describe('AuthService', () => {
       expect(bcrypt.compare).toHaveBeenCalledWith('password123', 'hashedpassword');
     });
 
-    it('should throw UnauthorizedException if password does not match', async () => {
+    it('비밀번호가 일치하지 않으면 UnauthorizedException을 던져야 한다', async () => {
       const mockUser = {
         id: 1, nickname: 'testuser', email: 'test@example.com',
         password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.USER,
@@ -70,13 +70,13 @@ describe('AuthService', () => {
       await expect(service.validateUser('test@example.com', 'wrongpass')).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw UnauthorizedException if user is not found', async () => {
+    it('사용자를 찾을 수 없으면 UnauthorizedException을 던져야 한다', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
 
       await expect(service.validateUser('notfound@example.com', 'password123')).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw UnauthorizedException with message for DELETED user', async () => {
+    it('DELETED 사용자에 대해 메시지와 함께 UnauthorizedException을 던져야 한다', async () => {
       const mockUser = {
         id: 1, nickname: 'deleted_1_123', email: 'deleted_1_123@deleted.local',
         password: 'hashedpassword', status: UserStatus.DELETED, role: UserRole.USER,
@@ -87,7 +87,7 @@ describe('AuthService', () => {
         .rejects.toThrow(new UnauthorizedException('탈퇴한 계정입니다.'));
     });
 
-    it('should throw UnauthorizedException with message for SUSPENDED user', async () => {
+    it('SUSPENDED 사용자에 대해 메시지와 함께 UnauthorizedException을 던져야 한다', async () => {
       const mockUser = {
         id: 1, nickname: 'testuser', email: 'test@example.com',
         password: 'hashedpassword', status: UserStatus.SUSPENDED, role: UserRole.USER,
@@ -100,7 +100,7 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('should correctly return an access token and user info with role', async () => {
+    it('역할이 포함된 액세스 토큰과 사용자 정보를 올바르게 반환해야 한다', async () => {
       const mockUser = {
         id: 1, nickname: 'testuser', email: 'test@example.com',
         password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.USER,
@@ -125,7 +125,7 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('should create user and return access token and user info with role', async () => {
+    it('사용자를 생성하고 역할이 포함된 액세스 토큰과 사용자 정보를 반환해야 한다', async () => {
       const createUserDto = { nickname: 'newuser', email: 'new@example.com', password: 'password123' };
       const createdUser = {
         id: 2, nickname: 'newuser', email: 'new@example.com',

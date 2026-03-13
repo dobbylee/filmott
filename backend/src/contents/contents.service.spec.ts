@@ -42,7 +42,7 @@ describe('ContentsService', () => {
   });
 
   describe('findOrFetchByTmdbId', () => {
-    it('should return cached content if exists in DB', async () => {
+    it('DB에 캐시된 콘텐츠가 있으면 반환해야 한다', async () => {
       const cachedContent = {
         id: 1,
         tmdbId: 123,
@@ -57,7 +57,7 @@ describe('ContentsService', () => {
       expect(mockTmdbService.getDetails).not.toHaveBeenCalled();
     });
 
-    it('should fetch from TMDB and save when not in DB', async () => {
+    it('DB에 없으면 TMDB에서 가져와 저장해야 한다', async () => {
       mockContentRepo.findOne.mockResolvedValue(null);
 
       const tmdbData = {
@@ -95,7 +95,7 @@ describe('ContentsService', () => {
   });
 
   describe('searchContents', () => {
-    it('should call searchByType for person, movie, tv when no type specified', async () => {
+    it('type이 지정되지 않으면 person, movie, tv에 대해 searchByType을 호출해야 한다', async () => {
       const personResult = { page: 1, total_pages: 1, total_results: 2, results: [{ id: 1, media_type: 'person' }] };
       const movieResult = { page: 1, total_pages: 2, total_results: 5, results: [{ id: 2, media_type: 'movie' }] };
       const tvResult = { page: 1, total_pages: 1, total_results: 3, results: [{ id: 3, media_type: 'tv' }] };
@@ -119,7 +119,7 @@ describe('ContentsService', () => {
       expect(result.results).toHaveLength(3);
     });
 
-    it('should call searchByType when type is specified', async () => {
+    it('type이 지정되면 searchByType을 호출해야 한다', async () => {
       const searchResult = { page: 1, total_pages: 1, total_results: 1, results: [] };
       mockTmdbService.searchByType.mockResolvedValue(searchResult);
 
@@ -131,7 +131,7 @@ describe('ContentsService', () => {
   });
 
   describe('getContentDetail', () => {
-    it('should fetch from TMDB, upsert to DB, and include extra info', async () => {
+    it('TMDB에서 가져와 DB에 upsert하고 추가 정보를 포함해야 한다', async () => {
       const tmdbData = {
         id: 456,
         title: 'Detail Movie',
@@ -178,7 +178,7 @@ describe('ContentsService', () => {
       expect(result.tmdbId).toBe(456);
     });
 
-    it('should throw NotFoundException when TMDB returns no data', async () => {
+    it('TMDB가 데이터를 반환하지 않으면 NotFoundException을 던져야 한다', async () => {
       mockTmdbService.getDetails.mockResolvedValue({});
 
       await expect(
@@ -186,7 +186,7 @@ describe('ContentsService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should update existing content in DB on detail fetch', async () => {
+    it('상세 조회 시 DB의 기존 콘텐츠를 업데이트해야 한다', async () => {
       const tmdbData = {
         id: 789,
         title: 'Updated Movie',
@@ -222,8 +222,8 @@ describe('ContentsService', () => {
     });
   });
 
-  describe('findOrFetchByTmdbId - TV content', () => {
-    it('should map tv content using name and first_air_date', async () => {
+  describe('findOrFetchByTmdbId - TV 콘텐츠', () => {
+    it('name과 first_air_date를 사용하여 TV 콘텐츠를 매핑해야 한다', async () => {
       mockContentRepo.findOne.mockResolvedValue(null);
 
       const tvData = {
@@ -258,7 +258,7 @@ describe('ContentsService', () => {
       expect(result).toEqual(savedContent);
     });
 
-    it('should use episode_run_time when tv has no direct runtime', async () => {
+    it('TV에 직접 runtime이 없으면 episode_run_time을 사용해야 한다', async () => {
       mockContentRepo.findOne.mockResolvedValue(null);
 
       const tvData = {
@@ -291,7 +291,7 @@ describe('ContentsService', () => {
   });
 
   describe('getPersonDetail', () => {
-    it('should delegate to tmdbService.getPersonDetail', async () => {
+    it('tmdbService.getPersonDetail에 위임해야 한다', async () => {
       const personData = {
         id: 17419,
         name: 'Bryan Cranston',
@@ -311,7 +311,7 @@ describe('ContentsService', () => {
   });
 
   describe('getPersonCredits', () => {
-    it('should filter to movie/tv and sort by date descending', async () => {
+    it('movie/tv로 필터링하고 날짜 내림차순으로 정렬해야 한다', async () => {
       const creditsData = {
         cast: [
           { id: 1, media_type: 'movie', title: 'Old Movie', release_date: '2010-05-01', vote_average: 7.0 },
@@ -337,7 +337,7 @@ describe('ContentsService', () => {
       expect(result.crew[0].id).toBe(4);
     });
 
-    it('should exclude non-movie/tv media types from credits', async () => {
+    it('크레딧에서 movie/tv가 아닌 미디어 타입을 제외해야 한다', async () => {
       const creditsData = {
         cast: [
           { id: 1, media_type: 'movie', title: 'A Movie', release_date: '2020-01-01', vote_average: 7.0 },
@@ -355,7 +355,7 @@ describe('ContentsService', () => {
   });
 
   describe('discoverContents', () => {
-    it('should call discoverByFilters with correct parameters', async () => {
+    it('올바른 파라미터로 discoverByFilters를 호출해야 한다', async () => {
       const discoverResult = { page: 1, total_pages: 5, total_results: 100, results: [] };
       mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
 

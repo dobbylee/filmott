@@ -47,7 +47,7 @@ describe('WatchlistService', () => {
       status: 'want_to_watch' as const,
     };
 
-    it('should create a new watchlist entry', async () => {
+    it('새 워치리스트 항목을 생성해야 한다', async () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
       mockWatchlistRepo.findOne.mockResolvedValue(null);
@@ -67,7 +67,7 @@ describe('WatchlistService', () => {
       expect(result).toEqual(created);
     });
 
-    it('should set watchedAt when status is watched', async () => {
+    it('status가 watched이면 watchedAt을 설정해야 한다', async () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
       mockWatchlistRepo.findOne.mockResolvedValue(null);
@@ -88,7 +88,7 @@ describe('WatchlistService', () => {
       expect(result.status).toBe('watched');
     });
 
-    it('should update existing watchlist entry (upsert)', async () => {
+    it('기존 워치리스트 항목을 업데이트해야 한다 (upsert)', async () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
 
@@ -106,7 +106,7 @@ describe('WatchlistService', () => {
   });
 
   describe('updateStatus', () => {
-    it('should update status from want_to_watch to watched', async () => {
+    it('want_to_watch에서 watched로 상태를 업데이트해야 한다', async () => {
       const item = { id: 1, userId: 1, status: 'want_to_watch', watchedAt: null };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
@@ -117,7 +117,7 @@ describe('WatchlistService', () => {
       expect(result.watchedAt).toBeInstanceOf(Date);
     });
 
-    it('should set watchedAt to null when changing to want_to_watch', async () => {
+    it('want_to_watch로 변경 시 watchedAt을 null로 설정해야 한다', async () => {
       const item = { id: 1, userId: 1, status: 'watched', watchedAt: new Date() };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
@@ -128,7 +128,7 @@ describe('WatchlistService', () => {
       expect(result.watchedAt).toBeNull();
     });
 
-    it('should update watchedAt when only watchedAt is provided for watched item', async () => {
+    it('watched 항목에 watchedAt만 제공되면 watchedAt을 업데이트해야 한다', async () => {
       const item = { id: 1, userId: 1, status: 'watched', watchedAt: new Date('2026-01-01') };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
@@ -138,7 +138,7 @@ describe('WatchlistService', () => {
       expect(result.watchedAt).toEqual(new Date('2026-03-10T00:00:00Z'));
     });
 
-    it('should throw NotFoundException when item not found', async () => {
+    it('항목을 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue(null);
 
       await expect(service.updateStatus(1, 999, { status: 'watched' })).rejects.toThrow(
@@ -146,7 +146,7 @@ describe('WatchlistService', () => {
       );
     });
 
-    it('should throw ForbiddenException when not the owner', async () => {
+    it('소유자가 아니면 ForbiddenException을 던져야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
       await expect(service.updateStatus(1, 1, { status: 'watched' })).rejects.toThrow(
@@ -156,7 +156,7 @@ describe('WatchlistService', () => {
   });
 
   describe('removeFromWatchlist', () => {
-    it('should remove the watchlist item', async () => {
+    it('워치리스트 항목을 제거해야 한다', async () => {
       const item = { id: 1, userId: 1 };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.remove.mockResolvedValue(item);
@@ -166,13 +166,13 @@ describe('WatchlistService', () => {
       expect(mockWatchlistRepo.remove).toHaveBeenCalledWith(item);
     });
 
-    it('should throw NotFoundException when item not found', async () => {
+    it('항목을 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue(null);
 
       await expect(service.removeFromWatchlist(1, 999)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException when not the owner', async () => {
+    it('소유자가 아니면 ForbiddenException을 던져야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
       await expect(service.removeFromWatchlist(1, 1)).rejects.toThrow(ForbiddenException);
@@ -180,7 +180,7 @@ describe('WatchlistService', () => {
   });
 
   describe('getMyWatchlist', () => {
-    it('should return paginated watchlist with content', async () => {
+    it('콘텐츠가 포함된 페이지네이션된 워치리스트를 반환해야 한다', async () => {
       const mockQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
@@ -204,7 +204,7 @@ describe('WatchlistService', () => {
       expect(result.totalPages).toBe(1);
     });
 
-    it('should LEFT JOIN review when status is watched', async () => {
+    it('status가 watched일 때 review를 LEFT JOIN해야 한다', async () => {
       const mockQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
@@ -232,7 +232,7 @@ describe('WatchlistService', () => {
       );
     });
 
-    it('should NOT JOIN review when status is want_to_watch', async () => {
+    it('status가 want_to_watch일 때 review를 JOIN하지 않아야 한다', async () => {
       const mockQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
@@ -250,7 +250,7 @@ describe('WatchlistService', () => {
       expect(mockQb.leftJoinAndMapOne).not.toHaveBeenCalled();
     });
 
-    it('should handle pagination correctly', async () => {
+    it('페이지네이션을 올바르게 처리해야 한다', async () => {
       const mockQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
@@ -273,7 +273,7 @@ describe('WatchlistService', () => {
   });
 
   describe('getMyWatchlistCounts', () => {
-    it('should return correct counts', async () => {
+    it('올바른 카운트를 반환해야 한다', async () => {
       mockWatchlistRepo.count
         .mockResolvedValueOnce(5)  // watched
         .mockResolvedValueOnce(3); // want_to_watch
@@ -286,7 +286,7 @@ describe('WatchlistService', () => {
   });
 
   describe('getWatchlistStatus', () => {
-    it('should return status when item exists', async () => {
+    it('항목이 존재하면 상태를 반환해야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue({ id: 1, status: 'watched' });
 
       const result = await service.getWatchlistStatus(1, 1);
@@ -294,7 +294,7 @@ describe('WatchlistService', () => {
       expect(result).toEqual({ status: 'watched', watchlistId: 1 });
     });
 
-    it('should return null when item does not exist', async () => {
+    it('항목이 존재하지 않으면 null을 반환해야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue(null);
 
       const result = await service.getWatchlistStatus(1, 999);
@@ -304,7 +304,7 @@ describe('WatchlistService', () => {
   });
 
   describe('getWatchlistStatusByTmdbId', () => {
-    it('should return status when found via tmdbId', async () => {
+    it('tmdbId로 찾은 경우 상태를 반환해야 한다', async () => {
       const mockQb = {
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -318,7 +318,7 @@ describe('WatchlistService', () => {
       expect(result).toEqual({ status: 'want_to_watch', watchlistId: 1 });
     });
 
-    it('should return null when content not in watchlist', async () => {
+    it('워치리스트에 콘텐츠가 없으면 null을 반환해야 한다', async () => {
       const mockQb = {
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -334,7 +334,7 @@ describe('WatchlistService', () => {
   });
 
   describe('getWantToWatchAll', () => {
-    it('should return all want_to_watch items without pagination', async () => {
+    it('페이지네이션 없이 모든 want_to_watch 항목을 반환해야 한다', async () => {
       const items = [
         { id: 1, status: 'want_to_watch', content: { id: 1, title: 'Movie A' } },
         { id: 2, status: 'want_to_watch', content: { id: 2, title: 'Movie B' } },
@@ -358,7 +358,7 @@ describe('WatchlistService', () => {
       );
     });
 
-    it('should return empty list when no want_to_watch items', async () => {
+    it('want_to_watch 항목이 없으면 빈 목록을 반환해야 한다', async () => {
       const mockQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -376,7 +376,7 @@ describe('WatchlistService', () => {
   });
 
   describe('getWatchedYears', () => {
-    it('should return distinct years from watched items', async () => {
+    it('감상 항목에서 중복 없는 연도를 반환해야 한다', async () => {
       const mockQb = {
         select: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -408,7 +408,7 @@ describe('WatchlistService', () => {
       );
     });
 
-    it('should return empty years when no watched items', async () => {
+    it('감상 항목이 없으면 빈 연도를 반환해야 한다', async () => {
       const mockQb = {
         select: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -425,7 +425,7 @@ describe('WatchlistService', () => {
   });
 
   describe('getWatchedByYear', () => {
-    it('should return items grouped by month for a given year', async () => {
+    it('주어진 연도에 대해 월별로 그룹화된 항목을 반환해야 한다', async () => {
       const items = [
         {
           id: 1,
@@ -473,7 +473,7 @@ describe('WatchlistService', () => {
       expect(result.months[1].count).toBe(1);
     });
 
-    it('should use updatedAt when watchedAt is null', async () => {
+    it('watchedAt이 null이면 updatedAt을 사용해야 한다', async () => {
       const items = [
         {
           id: 1,
@@ -501,7 +501,7 @@ describe('WatchlistService', () => {
       expect(result.months[0].month).toBe(2); // February
     });
 
-    it('should return empty months when no items in that year', async () => {
+    it('해당 연도에 항목이 없으면 빈 months를 반환해야 한다', async () => {
       const mockQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
@@ -521,7 +521,7 @@ describe('WatchlistService', () => {
       expect(result.months).toHaveLength(0);
     });
 
-    it('should query with correct date range for the given year', async () => {
+    it('주어진 연도에 대해 올바른 날짜 범위로 조회해야 한다', async () => {
       const mockQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
@@ -544,6 +544,68 @@ describe('WatchlistService', () => {
         'COALESCE(w.watchedAt, w.updatedAt) < :endDate',
         { endDate: new Date(2026, 0, 1) },
       );
+    });
+  });
+
+  describe('addToWatchlistByContentId', () => {
+    it('존재하지 않으면 새 워치리스트 항목을 생성해야 한다', async () => {
+      mockWatchlistRepo.findOne.mockResolvedValue(null);
+      const created = { id: 10, userId: 1, contentId: 5, status: 'watched', watchedAt: expect.any(Date) };
+      mockWatchlistRepo.create.mockReturnValue(created);
+      mockWatchlistRepo.save.mockResolvedValue(created);
+
+      const result = await service.addToWatchlistByContentId(1, 5, 'watched');
+
+      expect(mockWatchlistRepo.findOne).toHaveBeenCalledWith({
+        where: { userId: 1, contentId: 5 },
+      });
+      expect(mockWatchlistRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 1,
+          contentId: 5,
+          status: 'watched',
+        }),
+      );
+      expect(result).toEqual(created);
+    });
+
+    it('새 항목에서 status가 want_to_watch이면 watchedAt을 null로 설정해야 한다', async () => {
+      mockWatchlistRepo.findOne.mockResolvedValue(null);
+      const created = { id: 11, userId: 1, contentId: 5, status: 'want_to_watch', watchedAt: null };
+      mockWatchlistRepo.create.mockReturnValue(created);
+      mockWatchlistRepo.save.mockResolvedValue(created);
+
+      await service.addToWatchlistByContentId(1, 5, 'want_to_watch');
+
+      expect(mockWatchlistRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'want_to_watch',
+          watchedAt: null,
+        }),
+      );
+    });
+
+    it('기존 워치리스트 항목을 업데이트해야 한다', async () => {
+      const existing = { id: 5, userId: 1, contentId: 5, status: 'want_to_watch', watchedAt: null };
+      mockWatchlistRepo.findOne.mockResolvedValue(existing);
+      mockWatchlistRepo.save.mockImplementation((item: any) => Promise.resolve(item));
+
+      const result = await service.addToWatchlistByContentId(1, 5, 'watched');
+
+      expect(result.status).toBe('watched');
+      expect(result.watchedAt).toBeInstanceOf(Date);
+      expect(mockWatchlistRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('기존 항목을 want_to_watch로 업데이트 시 watchedAt을 null로 설정해야 한다', async () => {
+      const existing = { id: 5, userId: 1, contentId: 5, status: 'watched', watchedAt: new Date() };
+      mockWatchlistRepo.findOne.mockResolvedValue(existing);
+      mockWatchlistRepo.save.mockImplementation((item: any) => Promise.resolve(item));
+
+      const result = await service.addToWatchlistByContentId(1, 5, 'want_to_watch');
+
+      expect(result.status).toBe('want_to_watch');
+      expect(result.watchedAt).toBeNull();
     });
   });
 });

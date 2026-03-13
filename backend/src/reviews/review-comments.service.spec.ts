@@ -49,7 +49,7 @@ describe('ReviewCommentsService', () => {
   });
 
   describe('create', () => {
-    it('should create a comment on existing review', async () => {
+    it('존재하는 리뷰에 댓글을 생성해야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue({ id: 1 });
       const created = { id: 1, userId: 1, reviewId: 1, content: 'Nice review!' };
       mockCommentRepo.create.mockReturnValue(created);
@@ -65,7 +65,7 @@ describe('ReviewCommentsService', () => {
       });
     });
 
-    it('should throw NotFoundException when review not found', async () => {
+    it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue(null);
 
       await expect(
@@ -75,7 +75,7 @@ describe('ReviewCommentsService', () => {
   });
 
   describe('delete', () => {
-    it('should delete comment when owned by user', async () => {
+    it('소유자가 댓글을 삭제할 수 있어야 한다', async () => {
       const comment = { id: 1, userId: 1 };
       mockCommentRepo.findOne.mockResolvedValue(comment);
       mockCommentRepo.remove.mockResolvedValue(comment);
@@ -85,19 +85,19 @@ describe('ReviewCommentsService', () => {
       expect(mockCommentRepo.remove).toHaveBeenCalledWith(comment);
     });
 
-    it('should throw NotFoundException when comment not found', async () => {
+    it('댓글을 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockCommentRepo.findOne.mockResolvedValue(null);
 
       await expect(service.delete(1, 999)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException when not the owner', async () => {
+    it('소유자가 아니면 ForbiddenException을 던져야 한다', async () => {
       mockCommentRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
       await expect(service.delete(1, 1)).rejects.toThrow(ForbiddenException);
     });
 
-    it('should allow ADMIN to delete any comment', async () => {
+    it('ADMIN은 모든 댓글을 삭제할 수 있어야 한다', async () => {
       const comment = { id: 1, userId: 2 };
       mockCommentRepo.findOne.mockResolvedValue(comment);
       mockCommentRepo.remove.mockResolvedValue(comment);
@@ -107,7 +107,7 @@ describe('ReviewCommentsService', () => {
       expect(mockCommentRepo.remove).toHaveBeenCalledWith(comment);
     });
 
-    it('should throw ForbiddenException for non-owner with USER role', async () => {
+    it('USER 역할의 비소유자에게 ForbiddenException을 던져야 한다', async () => {
       mockCommentRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
       await expect(service.delete(1, 1, UserRole.USER)).rejects.toThrow(
@@ -128,7 +128,7 @@ describe('ReviewCommentsService', () => {
       mockCommentRepo.createQueryBuilder.mockReturnValue(mockQb);
     });
 
-    it('should return paginated comments', async () => {
+    it('페이지네이션된 댓글을 반환해야 한다', async () => {
       const comments = [
         { id: 1, reviewId: 1, userId: 1, content: 'Comment 1', user: { id: 1, nickname: 'user1' } },
       ];
@@ -142,7 +142,7 @@ describe('ReviewCommentsService', () => {
       expect(result.totalPages).toBe(1);
     });
 
-    it('should sanitize user and remove password field', async () => {
+    it('사용자 정보를 정제하고 password 필드를 제거해야 한다', async () => {
       const comments = [
         {
           id: 1,
@@ -162,7 +162,7 @@ describe('ReviewCommentsService', () => {
       expect(result.data[0].user.nickname).toBe('user1');
     });
 
-    it('should handle comments without user relation', async () => {
+    it('user 관계가 없는 댓글을 처리해야 한다', async () => {
       const comments = [
         { id: 1, reviewId: 1, userId: 1, content: 'No user loaded', user: null },
       ];
@@ -173,7 +173,7 @@ describe('ReviewCommentsService', () => {
       expect(result.data).toHaveLength(1);
     });
 
-    it('should calculate totalPages correctly', async () => {
+    it('totalPages를 올바르게 계산해야 한다', async () => {
       mockQb.getManyAndCount.mockResolvedValue([[], 25]);
 
       const result = await service.findByReview(1, 1);

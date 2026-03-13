@@ -38,7 +38,7 @@ describe('RankingsController', () => {
   });
 
   describe('GET /api/rankings', () => {
-    it('should return rankings with default limit', async () => {
+    it('기본 limit으로 랭킹을 반환해야 한다', async () => {
       const mockRankings = [
         { id: 1, source: 'kobis', category: 'daily-box-office', rank: 1 },
       ];
@@ -57,7 +57,7 @@ describe('RankingsController', () => {
       );
     });
 
-    it('should pass custom limit', async () => {
+    it('사용자 지정 limit을 전달해야 한다', async () => {
       mockRankingsService.getRankings.mockResolvedValue([]);
 
       await controller.getRankings({ source: 'tmdb', category: 'trending-all-day', limit: '5' });
@@ -71,7 +71,7 @@ describe('RankingsController', () => {
   });
 
   describe('POST /api/rankings/refresh/:category', () => {
-    it('should call fetchDailyBoxOffice for daily-box-office', async () => {
+    it('daily-box-office에 대해 fetchDailyBoxOffice를 호출해야 한다', async () => {
       mockRankingsService.fetchDailyBoxOffice.mockResolvedValue([]);
 
       await controller.refresh('daily-box-office');
@@ -79,7 +79,7 @@ describe('RankingsController', () => {
       expect(mockRankingsService.fetchDailyBoxOffice).toHaveBeenCalled();
     });
 
-    it('should call fetchTrending for trending categories', async () => {
+    it('트렌딩 카테고리에 대해 fetchTrending을 호출해야 한다', async () => {
       mockRankingsService.fetchTrending.mockResolvedValue([]);
 
       await controller.refresh('trending-all-day');
@@ -90,15 +90,15 @@ describe('RankingsController', () => {
       );
     });
 
-    it('should throw BadRequestException for removed trending-movie-day category', async () => {
+    it('제거된 trending-movie-day 카테고리에 대해 BadRequestException을 던져야 한다', async () => {
       await expect(controller.refresh('trending-movie-day')).rejects.toThrow(BadRequestException);
     });
 
-    it('should throw BadRequestException for removed trending-tv-day category', async () => {
+    it('제거된 trending-tv-day 카테고리에 대해 BadRequestException을 던져야 한다', async () => {
       await expect(controller.refresh('trending-tv-day')).rejects.toThrow(BadRequestException);
     });
 
-    it('should call fetchTrending with all type and week window', async () => {
+    it('all 타입과 week 윈도우로 fetchTrending을 호출해야 한다', async () => {
       mockRankingsService.fetchTrending.mockResolvedValue([]);
 
       await controller.refresh('trending-all-week');
@@ -109,13 +109,13 @@ describe('RankingsController', () => {
       );
     });
 
-    it('should throw BadRequestException for unknown category', async () => {
+    it('알 수 없는 카테고리에 대해 BadRequestException을 던져야 한다', async () => {
       await expect(controller.refresh('unknown')).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('refresh endpoint guards', () => {
-    it('should have JwtAuthGuard and RolesGuard applied to refresh method', () => {
+  describe('refresh 엔드포인트 가드', () => {
+    it('refresh 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
       const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.refresh);
       expect(guards).toBeDefined();
       expect(guards).toHaveLength(2);
@@ -123,13 +123,13 @@ describe('RankingsController', () => {
       expect(guards[1]).toBe(RolesGuard);
     });
 
-    it('should have ADMIN role required for refresh method', () => {
+    it('refresh 메서드에 ADMIN 역할이 필요해야 한다', () => {
       const roles = reflector.get<UserRole[]>(ROLES_KEY, RankingsController.prototype.refresh);
       expect(roles).toBeDefined();
       expect(roles).toContain(UserRole.ADMIN);
     });
 
-    it('should NOT have guards on getRankings method', () => {
+    it('getRankings 메서드에는 가드가 없어야 한다', () => {
       const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.getRankings);
       expect(guards).toBeUndefined();
     });

@@ -31,7 +31,7 @@ describe('ContentsController', () => {
   });
 
   describe('search', () => {
-    it('should call searchContents with correct params', async () => {
+    it('올바른 파라미터로 searchContents를 호출해야 한다', async () => {
       const searchResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
       mockContentsService.searchContents.mockResolvedValue(searchResult);
 
@@ -41,7 +41,7 @@ describe('ContentsController', () => {
       expect(result).toEqual(searchResult);
     });
 
-    it('should default page to 1 when not provided', async () => {
+    it('page가 제공되지 않으면 기본값 1을 사용해야 한다', async () => {
       const searchResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
       mockContentsService.searchContents.mockResolvedValue(searchResult);
 
@@ -52,7 +52,7 @@ describe('ContentsController', () => {
   });
 
   describe('discover', () => {
-    it('should call discoverContents with correct params', async () => {
+    it('올바른 파라미터로 discoverContents를 호출해야 한다', async () => {
       const discoverResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
       mockContentsService.discoverContents.mockResolvedValue(discoverResult);
 
@@ -73,7 +73,7 @@ describe('ContentsController', () => {
       expect(result).toEqual(discoverResult);
     });
 
-    it('should default type to movie', async () => {
+    it('type 기본값을 movie로 사용해야 한다', async () => {
       const discoverResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
       mockContentsService.discoverContents.mockResolvedValue(discoverResult);
 
@@ -89,7 +89,7 @@ describe('ContentsController', () => {
   });
 
   describe('getPersonDetail', () => {
-    it('should call getPersonDetail with personId', async () => {
+    it('personId로 getPersonDetail을 호출해야 한다', async () => {
       const personData = {
         id: 17419,
         name: 'Bryan Cranston',
@@ -109,7 +109,7 @@ describe('ContentsController', () => {
   });
 
   describe('getPersonCredits', () => {
-    it('should call getPersonCredits with personId', async () => {
+    it('personId로 getPersonCredits를 호출해야 한다', async () => {
       const creditsData = {
         cast: [{ id: 1, media_type: 'movie', title: 'Movie 1' }],
         crew: [],
@@ -124,7 +124,7 @@ describe('ContentsController', () => {
   });
 
   describe('getDetail', () => {
-    it('should call getContentDetail with parsed tmdbId', async () => {
+    it('파싱된 tmdbId로 getContentDetail을 호출해야 한다', async () => {
       const detailResult = { id: 1, tmdbId: 123, title: 'Test' };
       mockContentsService.getContentDetail.mockResolvedValue(detailResult);
 

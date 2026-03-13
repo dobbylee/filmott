@@ -50,7 +50,7 @@ describe('RankingsService', () => {
   });
 
   describe('fetchDailyBoxOffice', () => {
-    it('should fetch KOBIS data, match with TMDB, and upsert rankings with targetDate', async () => {
+    it('KOBIS 데이터를 가져오고 TMDB와 매칭하여 targetDate와 함께 랭킹을 upsert해야 한다', async () => {
       const kobisItems = [
         {
           rank: '1',
@@ -106,7 +106,7 @@ describe('RankingsService', () => {
       );
     });
 
-    it('should save ranking even when TMDB matching fails', async () => {
+    it('TMDB 매칭 실패 시에도 랭킹을 저장해야 한다', async () => {
       const kobisItems = [
         {
           rank: '1',
@@ -133,7 +133,7 @@ describe('RankingsService', () => {
       expect(result[0].targetDate).toBeDefined();
     });
 
-    it('should set targetDate to yesterday in YYYY-MM-DD format', async () => {
+    it('targetDate를 YYYY-MM-DD 형식의 어제 날짜로 설정해야 한다', async () => {
       const kobisItems = [
         {
           rank: '1',
@@ -160,7 +160,7 @@ describe('RankingsService', () => {
   });
 
   describe('fetchTrending', () => {
-    it('should fetch TMDB trending data and upsert rankings with targetDate', async () => {
+    it('TMDB 트렌딩 데이터를 가져오고 targetDate와 함께 랭킹을 upsert해야 한다', async () => {
       const trendingData = {
         results: [
           {
@@ -202,7 +202,7 @@ describe('RankingsService', () => {
       );
     });
 
-    it('should set targetDate to today in YYYY-MM-DD format', async () => {
+    it('targetDate를 YYYY-MM-DD 형식의 오늘 날짜로 설정해야 한다', async () => {
       const trendingData = {
         results: [
           {
@@ -226,7 +226,7 @@ describe('RankingsService', () => {
       expect(result[0].targetDate).toBe(expectedDate);
     });
 
-    it('should save ranking even when content caching fails', async () => {
+    it('콘텐츠 캐싱 실패 시에도 랭킹을 저장해야 한다', async () => {
       const trendingData = {
         results: [
           {
@@ -259,8 +259,8 @@ describe('RankingsService', () => {
     });
   });
 
-  describe('fetchDailyBoxOffice - error handling', () => {
-    it('should throw error when KOBIS service fails', async () => {
+  describe('fetchDailyBoxOffice - 에러 처리', () => {
+    it('KOBIS 서비스 실패 시 에러를 던져야 한다', async () => {
       const error = new Error('KOBIS API error');
       mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
 
@@ -268,8 +268,8 @@ describe('RankingsService', () => {
     });
   });
 
-  describe('fetchTrending - error handling', () => {
-    it('should throw error when TMDB getTrending fails', async () => {
+  describe('fetchTrending - 에러 처리', () => {
+    it('TMDB getTrending 실패 시 에러를 던져야 한다', async () => {
       const error = new Error('TMDB API error');
       mockTmdbService.getTrending.mockRejectedValue(error);
 
@@ -278,7 +278,7 @@ describe('RankingsService', () => {
   });
 
   describe('getRankings', () => {
-    it('should return latest rankings with content joined', async () => {
+    it('content가 조인된 최신 랭킹을 반환해야 한다', async () => {
       const fetchedAt = new Date('2026-03-09T10:00:00Z');
       mockRankingRepo.findOne.mockResolvedValue({ fetchedAt });
 
@@ -330,7 +330,7 @@ describe('RankingsService', () => {
       });
     });
 
-    it('should return empty array when no rankings exist', async () => {
+    it('랭킹이 없을 때 빈 배열을 반환해야 한다', async () => {
       mockRankingRepo.findOne.mockResolvedValue(null);
 
       const result = await service.getRankings('kobis', 'daily-box-office');

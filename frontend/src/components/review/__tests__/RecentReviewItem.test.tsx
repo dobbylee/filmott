@@ -41,7 +41,7 @@ const baseReview: Review = {
 };
 
 describe('RecentReviewItem', () => {
-  it('renders review with user nickname and rating', () => {
+  it('사용자 닉네임과 평점이 포함된 리뷰를 렌더링한다', () => {
     render(<RecentReviewItem review={baseReview} />);
 
     expect(screen.getByText('Alice')).toBeInTheDocument();
@@ -49,14 +49,14 @@ describe('RecentReviewItem', () => {
     expect(screen.getByText('Great movie!')).toBeInTheDocument();
   });
 
-  it('renders content title and poster', () => {
+  it('작품 제목과 포스터를 렌더링한다', () => {
     render(<RecentReviewItem review={baseReview} />);
 
     expect(screen.getByText('Test Movie')).toBeInTheDocument();
     expect(screen.getByAltText('Test Movie')).toBeInTheDocument();
   });
 
-  it('renders deleted user fallback', () => {
+  it('탈퇴한 사용자 대체 텍스트를 렌더링한다', () => {
     const deletedReview: Review = {
       ...baseReview,
       user: { id: 99, nickname: 'deleted', email: '', status: 'DELETED' },
@@ -66,7 +66,7 @@ describe('RecentReviewItem', () => {
     expect(screen.getByText('탈퇴한 사용자')).toBeInTheDocument();
   });
 
-  it('renders without comment when comment is absent', () => {
+  it('코멘트가 없을 때 코멘트 없이 렌더링한다', () => {
     const noCommentReview: Review = { ...baseReview, comment: undefined };
     render(<RecentReviewItem review={noCommentReview} />);
 
@@ -74,7 +74,7 @@ describe('RecentReviewItem', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument();
   });
 
-  it('renders correct link href for content', () => {
+  it('작품에 대한 올바른 링크 href를 렌더링한다', () => {
     render(<RecentReviewItem review={baseReview} />);
 
     const links = screen.getAllByRole('link');

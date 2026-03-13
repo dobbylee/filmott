@@ -38,7 +38,7 @@ describe('Header', () => {
     mockUser = null;
   });
 
-  it('should render logo and login button when not authenticated', () => {
+  it('비인증 상태에서 로고와 로그인 버튼을 렌더링해야 한다', () => {
     render(<Header />);
 
     const logoLinks = screen.getAllByText((_, el) => el?.textContent === 'filmott');
@@ -46,7 +46,7 @@ describe('Header', () => {
     expect(screen.getByText('로그인')).toBeInTheDocument();
   });
 
-  it('should show user nickname as a link to /profile when authenticated', () => {
+  it('인증 상태에서 닉네임을 /profile 링크로 표시해야 한다', () => {
     mockUser = { nickname: 'testuser' };
 
     render(<Header />);
@@ -59,7 +59,7 @@ describe('Header', () => {
     expect(profileLink).toHaveAttribute('href', '/profile');
   });
 
-  it('should not show dropdown menu when user area clicked (link instead)', () => {
+  it('사용자 영역 클릭 시 드롭다운 메뉴를 표시하지 않아야 한다 (링크 방식)', () => {
     mockUser = { nickname: 'testuser' };
 
     render(<Header />);
@@ -69,7 +69,7 @@ describe('Header', () => {
     expect(screen.queryByText('로그아웃')).not.toBeInTheDocument();
   });
 
-  it('should handle search form submission', async () => {
+  it('검색 폼 제출을 처리해야 한다', async () => {
     const user = userEvent.setup();
 
     render(<Header />);

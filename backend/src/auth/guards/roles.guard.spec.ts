@@ -22,42 +22,42 @@ describe('RolesGuard', () => {
     } as unknown as ExecutionContext;
   };
 
-  it('should allow access when no @Roles decorator is set', () => {
+  it('@Roles 데코레이터가 설정되지 않으면 접근을 허용해야 한다', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
     const context = createMockContext(UserRole.USER);
 
     expect(guard.canActivate(context)).toBe(true);
   });
 
-  it('should allow access when @Roles is empty array', () => {
+  it('@Roles가 빈 배열이면 접근을 허용해야 한다', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([]);
     const context = createMockContext(UserRole.USER);
 
     expect(guard.canActivate(context)).toBe(true);
   });
 
-  it('should allow access when user has required role', () => {
+  it('사용자가 필요한 역할을 가지고 있으면 접근을 허용해야 한다', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMIN]);
     const context = createMockContext(UserRole.ADMIN);
 
     expect(guard.canActivate(context)).toBe(true);
   });
 
-  it('should deny access when user does not have required role', () => {
+  it('사용자가 필요한 역할을 가지고 있지 않으면 접근을 거부해야 한다', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMIN]);
     const context = createMockContext(UserRole.USER);
 
     expect(guard.canActivate(context)).toBe(false);
   });
 
-  it('should allow access when user has one of multiple required roles', () => {
+  it('사용자가 여러 필수 역할 중 하나를 가지고 있으면 접근을 허용해야 한다', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.USER, UserRole.ADMIN]);
     const context = createMockContext(UserRole.USER);
 
     expect(guard.canActivate(context)).toBe(true);
   });
 
-  it('should deny access when user has no role', () => {
+  it('사용자에게 역할이 없으면 접근을 거부해야 한다', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMIN]);
     const context = createMockContext(undefined);
 

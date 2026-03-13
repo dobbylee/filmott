@@ -19,12 +19,12 @@ function wrapper({ children }: { children: ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>;
 }
 
-describe('AuthContext - handleAuthRequired', () => {
+describe('AuthContext - handleAuthRequired 처리', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it('should clear localStorage when auth:required event fires', async () => {
+  it('auth:required 이벤트 발생 시 localStorage를 초기화해야 한다', async () => {
     localStorage.setItem('access_token', 'test-token');
     localStorage.setItem('user', JSON.stringify({ id: 1, nickname: 'test' }));
 
@@ -48,7 +48,7 @@ describe('AuthContext - handleAuthRequired', () => {
     expect(result.current.authModal.mode).toBe('login');
   });
 
-  it('should use AUTH_REQUIRED_EVENT constant for event listening', () => {
+  it('이벤트 리스닝에 AUTH_REQUIRED_EVENT 상수를 사용해야 한다', () => {
     // Verify the constant is used, not a hardcoded string
     expect(AUTH_REQUIRED_EVENT).toBe('auth:required');
 

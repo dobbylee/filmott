@@ -45,7 +45,7 @@ describe('WatchlistStatusButton', () => {
     mockUser = null;
   });
 
-  it('should show "기록하기" when not registered', async () => {
+  it('미등록 상태에서 "기록하기"를 표시해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
 
@@ -56,7 +56,7 @@ describe('WatchlistStatusButton', () => {
     });
   });
 
-  it('should show "감상할 작품" when status is want_to_watch', async () => {
+  it('상태가 want_to_watch일 때 "감상할 작품"을 표시해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: 'want_to_watch', watchlistId: 1 } });
 
@@ -67,7 +67,7 @@ describe('WatchlistStatusButton', () => {
     });
   });
 
-  it('should show "감상한 작품" when status is watched', async () => {
+  it('상태가 watched일 때 "감상한 작품"을 표시해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: 'watched', watchlistId: 1 } });
 
@@ -78,7 +78,7 @@ describe('WatchlistStatusButton', () => {
     });
   });
 
-  it('should open auth modal when clicking without login', async () => {
+  it('비로그인 상태에서 클릭 시 인증 모달을 열어야 한다', async () => {
     mockUser = null;
     const user = userEvent.setup();
 
@@ -88,7 +88,7 @@ describe('WatchlistStatusButton', () => {
     expect(mockOpenAuthModal).toHaveBeenCalledWith('login');
   });
 
-  it('should show dropdown options when not registered and clicked', async () => {
+  it('미등록 상태에서 클릭 시 드롭다운 옵션을 표시해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
     const user = userEvent.setup();
@@ -108,7 +108,7 @@ describe('WatchlistStatusButton', () => {
     expect(watchedItems.length).toBeGreaterThan(0);
   });
 
-  it('should show dropdown with "감상한 작품" and "제거" for want_to_watch', async () => {
+  it('want_to_watch 상태에서 "감상한 작품"과 "제거" 드롭다운을 표시해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: 'want_to_watch', watchlistId: 1 } });
     const user = userEvent.setup();
@@ -127,7 +127,7 @@ describe('WatchlistStatusButton', () => {
     expect(screen.getByText('제거')).toBeInTheDocument();
   });
 
-  it('should show dropdown with "제거" for watched', async () => {
+  it('watched 상태에서 "제거" 드롭다운을 표시해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: 'watched', watchlistId: 1 } });
     const user = userEvent.setup();

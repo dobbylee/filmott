@@ -29,7 +29,7 @@ describe('KobisService', () => {
   });
 
   describe('getDailyBoxOffice', () => {
-    it('should return daily box office list', async () => {
+    it('일일 박스오피스 목록을 반환해야 한다', async () => {
       const mockItems = [
         {
           rank: '1',
@@ -68,7 +68,7 @@ describe('KobisService', () => {
       );
     });
 
-    it('should return empty array when no data', async () => {
+    it('데이터가 없을 때 빈 배열을 반환해야 한다', async () => {
       const response: AxiosResponse = {
         data: {
           boxOfficeResult: {
@@ -89,7 +89,7 @@ describe('KobisService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should throw error on API failure', async () => {
+    it('API 실패 시 에러를 던져야 한다', async () => {
       mockHttpService.get.mockReturnValue(
         throwError(() => new Error('API Error')),
       );
@@ -101,7 +101,7 @@ describe('KobisService', () => {
   });
 
   describe('getWeeklyBoxOffice', () => {
-    it('should return weekly box office list', async () => {
+    it('주간 박스오피스 목록을 반환해야 한다', async () => {
       const mockItems = [
         {
           rank: '1',

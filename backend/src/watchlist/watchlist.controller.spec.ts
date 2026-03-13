@@ -35,7 +35,7 @@ describe('WatchlistController', () => {
   });
 
   describe('POST /watchlist', () => {
-    it('should add to watchlist', async () => {
+    it('워치리스트에 추가해야 한다', async () => {
       const dto = { tmdbId: 550, contentType: 'movie' as const, status: 'want_to_watch' as const };
       const created = { id: 1, userId: 1, contentId: 1, status: 'want_to_watch' };
       mockWatchlistService.addToWatchlist.mockResolvedValue(created);
@@ -48,7 +48,7 @@ describe('WatchlistController', () => {
   });
 
   describe('PATCH /watchlist/:id', () => {
-    it('should update watchlist status', async () => {
+    it('워치리스트 상태를 업데이트해야 한다', async () => {
       const dto = { status: 'watched' as const };
       const updated = { id: 1, userId: 1, status: 'watched' };
       mockWatchlistService.updateStatus.mockResolvedValue(updated);
@@ -61,7 +61,7 @@ describe('WatchlistController', () => {
   });
 
   describe('DELETE /watchlist/:id', () => {
-    it('should remove from watchlist', async () => {
+    it('워치리스트에서 제거해야 한다', async () => {
       mockWatchlistService.removeFromWatchlist.mockResolvedValue(undefined);
 
       const result = await controller.remove(user, 1);
@@ -72,7 +72,7 @@ describe('WatchlistController', () => {
   });
 
   describe('GET /watchlist/me', () => {
-    it('should return watchlist with default params', async () => {
+    it('기본 파라미터로 워치리스트를 반환해야 한다', async () => {
       const paginated = { items: [], total: 0, page: 1, totalPages: 0 };
       mockWatchlistService.getMyWatchlist.mockResolvedValue(paginated);
 
@@ -82,7 +82,7 @@ describe('WatchlistController', () => {
       expect(result).toEqual(paginated);
     });
 
-    it('should pass status and page params', async () => {
+    it('status와 page 파라미터를 전달해야 한다', async () => {
       const paginated = { items: [], total: 0, page: 2, totalPages: 1 };
       mockWatchlistService.getMyWatchlist.mockResolvedValue(paginated);
 
@@ -92,7 +92,7 @@ describe('WatchlistController', () => {
       expect(result).toEqual(paginated);
     });
 
-    it('should default to want_to_watch for invalid status', async () => {
+    it('유효하지 않은 status에 대해 want_to_watch를 기본값으로 사용해야 한다', async () => {
       mockWatchlistService.getMyWatchlist.mockResolvedValue({ items: [], total: 0, page: 1, totalPages: 0 });
 
       await controller.getMyWatchlist(user, 'invalid');
@@ -102,7 +102,7 @@ describe('WatchlistController', () => {
   });
 
   describe('GET /watchlist/me/counts', () => {
-    it('should return watchlist counts', async () => {
+    it('워치리스트 카운트를 반환해야 한다', async () => {
       const counts = { watchedCount: 5, wantToWatchCount: 3 };
       mockWatchlistService.getMyWatchlistCounts.mockResolvedValue(counts);
 
@@ -114,7 +114,7 @@ describe('WatchlistController', () => {
   });
 
   describe('GET /watchlist/me/want-to-watch', () => {
-    it('should return all want_to_watch items', async () => {
+    it('모든 want_to_watch 항목을 반환해야 한다', async () => {
       const items = { items: [{ id: 1 }, { id: 2 }], total: 2 };
       mockWatchlistService.getWantToWatchAll.mockResolvedValue(items);
 
@@ -126,7 +126,7 @@ describe('WatchlistController', () => {
   });
 
   describe('GET /watchlist/me/watched-years', () => {
-    it('should return distinct watched years', async () => {
+    it('중복 없는 감상 연도를 반환해야 한다', async () => {
       const years = { years: [2026, 2025, 2024] };
       mockWatchlistService.getWatchedYears.mockResolvedValue(years);
 
@@ -138,7 +138,7 @@ describe('WatchlistController', () => {
   });
 
   describe('GET /watchlist/me/watched', () => {
-    it('should return watched items for current year by default', async () => {
+    it('기본적으로 현재 연도의 감상 항목을 반환해야 한다', async () => {
       const currentYear = new Date().getFullYear();
       const response = { year: currentYear, totalCount: 3, months: [] };
       mockWatchlistService.getWatchedByYear.mockResolvedValue(response);
@@ -149,7 +149,7 @@ describe('WatchlistController', () => {
       expect(mockWatchlistService.getWatchedByYear).toHaveBeenCalledWith(1, currentYear);
     });
 
-    it('should pass parsed year from query param', async () => {
+    it('쿼리 파라미터에서 파싱된 연도를 전달해야 한다', async () => {
       const response = { year: 2025, totalCount: 5, months: [] };
       mockWatchlistService.getWatchedByYear.mockResolvedValue(response);
 
@@ -159,7 +159,7 @@ describe('WatchlistController', () => {
       expect(mockWatchlistService.getWatchedByYear).toHaveBeenCalledWith(1, 2025);
     });
 
-    it('should fallback to current year for invalid year string', async () => {
+    it('유효하지 않은 연도 문자열에 대해 현재 연도로 폴백해야 한다', async () => {
       const currentYear = new Date().getFullYear();
       const response = { year: currentYear, totalCount: 0, months: [] };
       mockWatchlistService.getWatchedByYear.mockResolvedValue(response);
@@ -169,7 +169,7 @@ describe('WatchlistController', () => {
       expect(mockWatchlistService.getWatchedByYear).toHaveBeenCalledWith(1, currentYear);
     });
 
-    it('should fallback to current year for out-of-range year', async () => {
+    it('범위를 벗어난 연도에 대해 현재 연도로 폴백해야 한다', async () => {
       const currentYear = new Date().getFullYear();
       mockWatchlistService.getWatchedByYear.mockResolvedValue({ year: currentYear, totalCount: 0, months: [] });
 
@@ -180,7 +180,7 @@ describe('WatchlistController', () => {
   });
 
   describe('GET /watchlist/me/status', () => {
-    it('should return watchlist status by tmdbId', async () => {
+    it('tmdbId로 워치리스트 상태를 반환해야 한다', async () => {
       const status = { status: 'watched', watchlistId: 1 };
       mockWatchlistService.getWatchlistStatusByTmdbId.mockResolvedValue(status);
 
@@ -190,7 +190,7 @@ describe('WatchlistController', () => {
       expect(mockWatchlistService.getWatchlistStatusByTmdbId).toHaveBeenCalledWith(1, 550, 'movie');
     });
 
-    it('should default contentType to movie for invalid values', async () => {
+    it('유효하지 않은 값에 대해 contentType 기본값을 movie로 사용해야 한다', async () => {
       mockWatchlistService.getWatchlistStatusByTmdbId.mockResolvedValue({ status: null, watchlistId: null });
 
       await controller.getWatchlistStatusByTmdbId(user, 550, 'invalid');
@@ -198,7 +198,7 @@ describe('WatchlistController', () => {
       expect(mockWatchlistService.getWatchlistStatusByTmdbId).toHaveBeenCalledWith(1, 550, 'movie');
     });
 
-    it('should use tv when contentType is tv', async () => {
+    it('contentType이 tv이면 tv를 사용해야 한다', async () => {
       mockWatchlistService.getWatchlistStatusByTmdbId.mockResolvedValue({ status: null, watchlistId: null });
 
       await controller.getWatchlistStatusByTmdbId(user, 100, 'tv');

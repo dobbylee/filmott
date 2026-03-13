@@ -30,6 +30,7 @@ describe('ReviewsService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     delete: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
 
   const mockDataSource = {
@@ -60,7 +61,7 @@ describe('ReviewsService', () => {
   });
 
   describe('create', () => {
-    it('should create a review with rating and comment', async () => {
+    it('별점과 코멘트로 리뷰를 생성해야 한다', async () => {
       const dto = { contentId: 1, rating: 8, comment: 'Great movie!' };
       mockReviewRepo.findOne.mockResolvedValue(null);
       const created = { id: 1, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
@@ -82,7 +83,7 @@ describe('ReviewsService', () => {
       expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched');
     });
 
-    it('should create a review with rating only', async () => {
+    it('별점만으로 리뷰를 생성해야 한다', async () => {
       const dto = { contentId: 1, rating: 7 };
       mockReviewRepo.findOne.mockResolvedValue(null);
       const created = { id: 2, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
@@ -95,7 +96,7 @@ describe('ReviewsService', () => {
       expect(result.id).toBe(2);
     });
 
-    it('should create a review with comment only (no rating) via DTO - rating validated at pipe level', async () => {
+    it('DTO를 통해 코멘트만으로 리뷰를 생성해야 한다 - rating은 파이프 레벨에서 검증', async () => {
       // rating은 DTO ValidationPipe에서 필수 검증됨. 서비스는 rating이 있다고 가정
       const dto = { contentId: 1, rating: 5, comment: '좋아요' };
       mockReviewRepo.findOne.mockResolvedValue(null);
@@ -109,7 +110,7 @@ describe('ReviewsService', () => {
       expect(result.rating).toBe(5);
     });
 
-    it('should not add to watchlist if already watched', async () => {
+    it('이미 감상한 경우 워치리스트에 추가하지 않아야 한다', async () => {
       const dto = { contentId: 1, rating: 8 };
       mockReviewRepo.findOne.mockResolvedValue(null);
       const created = { id: 4, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
@@ -121,7 +122,7 @@ describe('ReviewsService', () => {
       expect(mockWatchlistService.addToWatchlistByContentId).not.toHaveBeenCalled();
     });
 
-    it('should convert want_to_watch to watched on review creation', async () => {
+    it('리뷰 생성 시 want_to_watch를 watched로 전환해야 한다', async () => {
       const dto = { contentId: 1, rating: 9 };
       mockReviewRepo.findOne.mockResolvedValue(null);
       const created = { id: 5, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
@@ -134,7 +135,7 @@ describe('ReviewsService', () => {
       expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched');
     });
 
-    it('should throw ConflictException when review already exists', async () => {
+    it('리뷰가 이미 존재하면 ConflictException을 던져야 한다', async () => {
       const dto = { contentId: 1, rating: 8 };
       mockReviewRepo.findOne.mockResolvedValue({ id: 1, userId: 1, contentId: 1 });
 
@@ -143,7 +144,7 @@ describe('ReviewsService', () => {
   });
 
   describe('update', () => {
-    it('should update review and reset likes_count', async () => {
+    it('리뷰를 수정하고 likes_count를 초기화해야 한다', async () => {
       const review = {
         id: 1,
         userId: 1,
@@ -168,7 +169,7 @@ describe('ReviewsService', () => {
       expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
     });
 
-    it('should throw NotFoundException when review not found', async () => {
+    it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue(null);
 
       await expect(service.update(1, 999, { rating: 5 })).rejects.toThrow(
@@ -176,7 +177,7 @@ describe('ReviewsService', () => {
       );
     });
 
-    it('should throw ForbiddenException when not the owner', async () => {
+    it('소유자가 아니면 ForbiddenException을 던져야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue({
         id: 1,
         userId: 2,
@@ -189,7 +190,7 @@ describe('ReviewsService', () => {
       );
     });
 
-    it('should throw BadRequestException when update tries to clear rating', async () => {
+    it('수정 시 rating을 제거하려 하면 BadRequestException을 던져야 한다', async () => {
       const review = {
         id: 1,
         userId: 1,
@@ -207,7 +208,7 @@ describe('ReviewsService', () => {
   });
 
   describe('delete', () => {
-    it('should delete review when owned by user', async () => {
+    it('소유자가 리뷰를 삭제할 수 있어야 한다', async () => {
       const review = { id: 1, userId: 1 };
       mockReviewRepo.findOne.mockResolvedValue(review);
       mockReviewRepo.remove.mockResolvedValue(review);
@@ -217,19 +218,19 @@ describe('ReviewsService', () => {
       expect(mockReviewRepo.remove).toHaveBeenCalledWith(review);
     });
 
-    it('should throw NotFoundException when review not found', async () => {
+    it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue(null);
 
       await expect(service.delete(1, 999)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException when not the owner', async () => {
+    it('소유자가 아니면 ForbiddenException을 던져야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
       await expect(service.delete(1, 1)).rejects.toThrow(ForbiddenException);
     });
 
-    it('should allow ADMIN to delete any review', async () => {
+    it('ADMIN은 모든 리뷰를 삭제할 수 있어야 한다', async () => {
       const review = { id: 1, userId: 2 };
       mockReviewRepo.findOne.mockResolvedValue(review);
       mockReviewRepo.remove.mockResolvedValue(review);
@@ -239,7 +240,7 @@ describe('ReviewsService', () => {
       expect(mockReviewRepo.remove).toHaveBeenCalledWith(review);
     });
 
-    it('should throw ForbiddenException for non-owner with USER role', async () => {
+    it('USER 역할의 비소유자에게 ForbiddenException을 던져야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
       await expect(service.delete(1, 1, UserRole.USER)).rejects.toThrow(
@@ -248,8 +249,103 @@ describe('ReviewsService', () => {
     });
   });
 
+  describe('findMyReview', () => {
+    it('commentsCount가 포함된 내 리뷰를 반환해야 한다', async () => {
+      const review = { id: 1, userId: 1, contentId: 5, rating: 8, commentsCount: 3 };
+      const mockQb = {
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(review),
+      };
+      mockReviewRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.findMyReview(1, 5);
+
+      expect(result).toEqual(review);
+      expect(mockQb.where).toHaveBeenCalledWith('review.userId = :userId', { userId: 1 });
+      expect(mockQb.andWhere).toHaveBeenCalledWith('review.contentId = :contentId', { contentId: 5 });
+    });
+
+    it('내 리뷰가 존재하지 않으면 null을 반환해야 한다', async () => {
+      const mockQb = {
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+      mockReviewRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.findMyReview(1, 999);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getLikedReviewIds', () => {
+    it('콘텐츠에 대한 좋아요한 리뷰 ID를 반환해야 한다', async () => {
+      const mockQb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([{ reviewId: 1 }, { reviewId: 3 }]),
+      };
+      mockReviewLikeRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getLikedReviewIds(1, 5);
+
+      expect(result).toEqual([1, 3]);
+      expect(mockQb.where).toHaveBeenCalledWith('rl.userId = :userId', { userId: 1 });
+    });
+
+    it('좋아요가 없으면 빈 배열을 반환해야 한다', async () => {
+      const mockQb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      };
+      mockReviewLikeRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getLikedReviewIds(1, 99);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getLikedReviewIdsByIds', () => {
+    it('reviewIds가 비어있으면 빈 배열을 반환해야 한다', async () => {
+      const result = await service.getLikedReviewIdsByIds(1, []);
+
+      expect(result).toEqual([]);
+      expect(mockReviewLikeRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('주어진 ID로 필터링된 좋아요한 리뷰 ID를 반환해야 한다', async () => {
+      const mockQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([{ reviewId: 2 }, { reviewId: 4 }]),
+      };
+      mockReviewLikeRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getLikedReviewIdsByIds(1, [2, 4, 6]);
+
+      expect(result).toEqual([2, 4]);
+      expect(mockQb.where).toHaveBeenCalledWith('rl.userId = :userId', { userId: 1 });
+      expect(mockQb.andWhere).toHaveBeenCalledWith('rl.reviewId IN (:...reviewIds)', { reviewIds: [2, 4, 6] });
+    });
+  });
+
   describe('findByContent', () => {
-    it('should return paginated reviews sorted by latest', async () => {
+    it('최신순으로 정렬된 페이지네이션된 리뷰를 반환해야 한다', async () => {
       const mockQb = {
         leftJoin: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
@@ -274,7 +370,7 @@ describe('ReviewsService', () => {
       expect(mockQb.orderBy).toHaveBeenCalledWith('review.createdAt', 'DESC');
     });
 
-    it('should sort by likes when specified', async () => {
+    it('지정 시 좋아요순으로 정렬해야 한다', async () => {
       const mockQb = {
         leftJoin: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
@@ -295,7 +391,7 @@ describe('ReviewsService', () => {
   });
 
   describe('findByUser', () => {
-    it('should return paginated reviews for a user', async () => {
+    it('사용자에 대한 페이지네이션된 리뷰를 반환해야 한다', async () => {
       mockReviewRepo.findAndCount.mockResolvedValue([
         [{ id: 1, userId: 1, contentId: 1 }],
         1,
@@ -309,7 +405,7 @@ describe('ReviewsService', () => {
   });
 
   describe('getRecentReviews', () => {
-    it('should return recent reviews with user and content', async () => {
+    it('사용자와 콘텐츠가 포함된 최근 리뷰를 반환해야 한다', async () => {
       const mockReviews = [
         { id: 1, userId: 1, user: { id: 1, nickname: 'test' }, content: { id: 1 } },
       ];
@@ -332,7 +428,7 @@ describe('ReviewsService', () => {
   });
 
   describe('getContentStats', () => {
-    it('should return average rating and review count', async () => {
+    it('평균 별점과 리뷰 수를 반환해야 한다', async () => {
       const mockQb = {
         select: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
@@ -351,7 +447,7 @@ describe('ReviewsService', () => {
       expect(result.reviewCount).toBe(10);
     });
 
-    it('should return null average when no reviews', async () => {
+    it('리뷰가 없으면 null 평균을 반환해야 한다', async () => {
       const mockQb = {
         select: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
@@ -372,7 +468,7 @@ describe('ReviewsService', () => {
   });
 
   describe('toggleLike', () => {
-    it('should add like when not liked', async () => {
+    it('좋아요하지 않은 상태에서 좋아요를 추가해야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 0 });
       mockReviewLikeRepo.findOne.mockResolvedValue(null);
 
@@ -398,7 +494,7 @@ describe('ReviewsService', () => {
       expect(result.likesCount).toBe(1);
     });
 
-    it('should remove like when already liked', async () => {
+    it('이미 좋아요한 상태에서 좋아요를 제거해야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 1 });
       mockReviewLikeRepo.findOne.mockResolvedValue({ id: 1, reviewId: 1, userId: 1 });
 
@@ -423,7 +519,58 @@ describe('ReviewsService', () => {
       expect(result.likesCount).toBe(0);
     });
 
-    it('should throw NotFoundException when review not found', async () => {
+    it('좋아요 추가 후 수정된 리뷰가 null이면 likesCount 0을 반환해야 한다', async () => {
+      mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 0 });
+      mockReviewLikeRepo.findOne.mockResolvedValue(null);
+
+      const mockManager = {
+        save: jest.fn(),
+        remove: jest.fn(),
+        findOne: jest.fn().mockResolvedValue(null),
+        createQueryBuilder: jest.fn().mockReturnValue({
+          update: jest.fn().mockReturnThis(),
+          set: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({}),
+        }),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: any) => cb(mockManager),
+      );
+      mockReviewLikeRepo.create.mockReturnValue({ reviewId: 1, userId: 1 });
+
+      const result = await service.toggleLike(1, 1);
+
+      expect(result.liked).toBe(true);
+      expect(result.likesCount).toBe(0);
+    });
+
+    it('좋아요 제거 후 수정된 리뷰가 null이면 likesCount 0을 반환해야 한다', async () => {
+      mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 1 });
+      mockReviewLikeRepo.findOne.mockResolvedValue({ id: 1, reviewId: 1, userId: 1 });
+
+      const mockManager = {
+        save: jest.fn(),
+        remove: jest.fn(),
+        findOne: jest.fn().mockResolvedValue(null),
+        createQueryBuilder: jest.fn().mockReturnValue({
+          update: jest.fn().mockReturnThis(),
+          set: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({}),
+        }),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: any) => cb(mockManager),
+      );
+
+      const result = await service.toggleLike(1, 1);
+
+      expect(result.liked).toBe(false);
+      expect(result.likesCount).toBe(0);
+    });
+
+    it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue(null);
 
       await expect(service.toggleLike(1, 999)).rejects.toThrow(
