@@ -296,7 +296,7 @@ export default function WatchlistListPage() {
       {activeStatus === 'want_to_watch' && (
         <>
           {isLoading ? (
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
                 <div key={i} className="aspect-[2/3] rounded-lg bg-white/5 animate-pulse" />
               ))}
@@ -316,7 +316,7 @@ export default function WatchlistListPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                 {wtwItems.map((item) => {
                   const { content } = item;
                   const href = `/contents/${content.contentType}/${content.tmdbId}`;

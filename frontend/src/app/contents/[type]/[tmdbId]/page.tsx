@@ -153,7 +153,7 @@ export default async function ContentDetailPage({
         <div className="relative mx-auto max-w-7xl px-4">
           <div
             className={`flex gap-6 ${
-              content.backdropUrl ? '-mt-[22vh] md:-mt-[28vh]' : 'mt-6'
+              content.backdropUrl ? '-mt-32 md:-mt-48' : 'mt-6'
             }`}
           >
             {/* 포스터 */}
