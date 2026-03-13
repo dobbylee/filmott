@@ -183,20 +183,23 @@ export class WatchlistService {
   }
 
   /**
-   * Get all want_to_watch items (for poster grid, limit 상한 200)
+   * Get want_to_watch items with cursor-based pagination
    */
-  async getWantToWatchAll(userId: number, limit = 100) {
-    const safeLimit = Math.min(Math.max(limit, 1), 200);
-    const items = await this.watchlistRepo
+  async getWantToWatchAll(userId: number, limit = 30, offset = 0) {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safeOffset = Math.max(offset, 0);
+
+    const [items, total] = await this.watchlistRepo
       .createQueryBuilder('w')
       .leftJoinAndSelect('w.content', 'content')
       .where('w.userId = :userId', { userId })
       .andWhere('w.status = :status', { status: 'want_to_watch' })
       .orderBy('w.createdAt', 'DESC')
+      .skip(safeOffset)
       .take(safeLimit)
-      .getMany();
+      .getManyAndCount();
 
-    return { items, total: items.length };
+    return { items, total, hasMore: safeOffset + items.length < total };
   }
 
   /**

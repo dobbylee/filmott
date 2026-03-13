@@ -35,6 +35,7 @@ export interface WatchlistPage {
 export interface WantToWatchResponse {
   items: WatchlistItem[];
   total: number;
+  hasMore: boolean;
 }
 
 export interface WatchedMonthGroup {

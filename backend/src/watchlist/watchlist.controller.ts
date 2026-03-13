@@ -63,9 +63,15 @@ export class WatchlistController {
   async getWantToWatchAll(
     @CurrentUser() user: JwtPayload,
     @Query('limit') limitStr?: string,
+    @Query('offset') offsetStr?: string,
   ) {
-    const limit = limitStr ? parseInt(limitStr, 10) : 100;
-    return this.watchlistService.getWantToWatchAll(user.id, isNaN(limit) ? 100 : limit);
+    const limit = limitStr ? parseInt(limitStr, 10) : 30;
+    const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
+    return this.watchlistService.getWantToWatchAll(
+      user.id,
+      isNaN(limit) ? 30 : limit,
+      isNaN(offset) ? 0 : offset,
+    );
   }
 
   @Get('me/watched-years')

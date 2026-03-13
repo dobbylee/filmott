@@ -22,7 +22,10 @@ export default function WatchlistListPage() {
   const yearParam = searchParams.get('year');
 
   // want_to_watch state
-  const [wtwData, setWtwData] = useState<WantToWatchResponse | null>(null);
+  const [wtwItems, setWtwItems] = useState<WantToWatchResponse['items']>([]);
+  const [wtwTotal, setWtwTotal] = useState(0);
+  const [wtwHasMore, setWtwHasMore] = useState(false);
+  const [wtwLoadingMore, setWtwLoadingMore] = useState(false);
 
   // watched state
   const [watchedYears, setWatchedYears] = useState<number[]>([]);
@@ -104,19 +107,38 @@ export default function WatchlistListPage() {
     }
   }, [user, selectedYear, fetchLikedIds]);
 
-  // Fetch want_to_watch list (all items, no pagination)
+  // Fetch want_to_watch list (first page)
   const fetchWantToWatch = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const res = await api.get<WantToWatchResponse>('/watchlist/me/want-to-watch');
-      setWtwData(res.data);
+      const res = await api.get<WantToWatchResponse>('/watchlist/me/want-to-watch?limit=30&offset=0');
+      setWtwItems(res.data.items);
+      setWtwTotal(res.data.total);
+      setWtwHasMore(res.data.hasMore);
     } catch {
       // ignore
     } finally {
       setIsLoading(false);
     }
   }, [user]);
+
+  // Load more want_to_watch items
+  const loadMoreWtw = useCallback(async () => {
+    if (!user || wtwLoadingMore) return;
+    setWtwLoadingMore(true);
+    try {
+      const res = await api.get<WantToWatchResponse>(
+        `/watchlist/me/want-to-watch?limit=30&offset=${wtwItems.length}`
+      );
+      setWtwItems((prev) => [...prev, ...res.data.items]);
+      setWtwHasMore(res.data.hasMore);
+    } catch {
+      // ignore
+    } finally {
+      setWtwLoadingMore(false);
+    }
+  }, [user, wtwItems.length, wtwLoadingMore]);
 
   // Fetch total counts on mount
   useEffect(() => {
@@ -279,7 +301,7 @@ export default function WatchlistListPage() {
                 <div key={i} className="aspect-[2/3] rounded-lg bg-white/5 animate-pulse" />
               ))}
             </div>
-          ) : !wtwData || wtwData.items.length === 0 ? (
+          ) : wtwItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Bookmark className="mb-3 h-10 w-10 text-white/10" />
               <p className="text-sm text-white/40">
@@ -293,39 +315,52 @@ export default function WatchlistListPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-5 gap-2">
-              {wtwData.items.map((item) => {
-                const { content } = item;
-                const href = `/contents/${content.contentType}/${content.tmdbId}`;
-                const posterSrc = content.posterUrl
-                  ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w342${content.posterUrl}`)
-                  : null;
+            <>
+              <div className="grid grid-cols-5 gap-2">
+                {wtwItems.map((item) => {
+                  const { content } = item;
+                  const href = `/contents/${content.contentType}/${content.tmdbId}`;
+                  const posterSrc = content.posterUrl
+                    ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w342${content.posterUrl}`)
+                    : null;
 
-                return (
-                  <Link
-                    key={item.id}
-                    href={href}
-                    className="group block relative w-full hover:-translate-y-1 transition-transform duration-200"
+                  return (
+                    <Link
+                      key={item.id}
+                      href={href}
+                      className="group block relative w-full hover:-translate-y-1 transition-transform duration-200"
+                    >
+                      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-white/5 border border-white/5">
+                        {posterSrc ? (
+                          <Image
+                            src={posterSrc}
+                            alt={content.title}
+                            fill
+                            sizes="20vw"
+                            className="object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-[10px] text-white/40 bg-zinc-900">
+                            포스터 없음
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+              {wtwHasMore && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={loadMoreWtw}
+                    disabled={wtwLoadingMore}
+                    className="rounded-lg border border-white/10 bg-white/[0.03] px-6 py-2.5 text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors disabled:opacity-40"
                   >
-                    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-white/5 border border-white/5">
-                      {posterSrc ? (
-                        <Image
-                          src={posterSrc}
-                          alt={content.title}
-                          fill
-                          sizes="20vw"
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-[10px] text-white/40 bg-zinc-900">
-                          포스터 없음
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+                    {wtwLoadingMore ? '불러오는 중...' : `더보기 (${wtwItems.length}/${wtwTotal})`}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

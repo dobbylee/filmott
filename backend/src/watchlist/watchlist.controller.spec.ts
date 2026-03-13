@@ -114,14 +114,24 @@ describe('WatchlistController', () => {
   });
 
   describe('GET /watchlist/me/want-to-watch', () => {
-    it('모든 want_to_watch 항목을 반환해야 한다', async () => {
-      const items = { items: [{ id: 1 }, { id: 2 }], total: 2 };
-      mockWatchlistService.getWantToWatchAll.mockResolvedValue(items);
+    it('기본 limit 30, offset 0으로 want_to_watch 항목을 반환해야 한다', async () => {
+      const data = { items: [{ id: 1 }, { id: 2 }], total: 2, hasMore: false };
+      mockWatchlistService.getWantToWatchAll.mockResolvedValue(data);
 
       const result = await controller.getWantToWatchAll(user);
 
-      expect(result).toEqual(items);
-      expect(mockWatchlistService.getWantToWatchAll).toHaveBeenCalledWith(1, 100);
+      expect(result).toEqual(data);
+      expect(mockWatchlistService.getWantToWatchAll).toHaveBeenCalledWith(1, 30, 0);
+    });
+
+    it('limit과 offset을 전달해야 한다', async () => {
+      const data = { items: [], total: 50, hasMore: true };
+      mockWatchlistService.getWantToWatchAll.mockResolvedValue(data);
+
+      const result = await controller.getWantToWatchAll(user, '30', '30');
+
+      expect(result).toEqual(data);
+      expect(mockWatchlistService.getWantToWatchAll).toHaveBeenCalledWith(1, 30, 30);
     });
   });
 
