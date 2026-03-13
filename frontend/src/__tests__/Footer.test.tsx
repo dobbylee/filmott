@@ -7,7 +7,7 @@ describe('Footer', () => {
     render(<Footer />);
     expect(screen.getByText((_, el) => el?.textContent === 'filmott')).toBeInTheDocument();
     expect(
-      screen.getByText('영화, 드라마 리뷰과 별점을 남기고 공유하세요.'),
+      screen.getByText('영화, 드라마 리뷰와 별점을 남기고 공유하세요.'),
     ).toBeInTheDocument();
   });
 

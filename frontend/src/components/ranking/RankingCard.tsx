@@ -79,7 +79,9 @@ export default function RankingCard({ item }: RankingCardProps) {
             </div>
             {item.audienceCount ? (
               <span className="text-sm font-semibold text-white/80">
-                {Math.floor(item.audienceCount / 10000)}만
+                {item.audienceCount >= 10000
+                  ? `${Math.floor(item.audienceCount / 10000)}만`
+                  : item.audienceCount.toLocaleString()}
               </span>
             ) : content?.genres && content.genres.length > 0 ? (
               <span className="text-[10px] text-white/50 truncate max-w-[60px]">
