@@ -6,6 +6,7 @@ import { X, AlertTriangle } from 'lucide-react';
 import api from '@/lib/api';
 import StarRating from './StarRating';
 import type { Review } from '@/types/review';
+import { useFocusTrap } from '@/utils/useFocusTrap';
 
 interface ReviewFormModalProps {
   contentId: number;
@@ -21,6 +22,7 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
   const [comment, setComment] = useState(existingReview?.comment ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const modalRef = useFocusTrap<HTMLDivElement>();
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -72,7 +74,7 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
+      <div ref={modalRef} className="relative w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"

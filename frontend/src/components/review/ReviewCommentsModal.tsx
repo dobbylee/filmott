@@ -9,6 +9,7 @@ import { formatCommentDate } from '@/utils/date';
 import { useComments } from './useComments';
 import CommentList from './CommentList';
 import UserAvatar from '@/components/common/UserAvatar';
+import { useFocusTrap } from '@/utils/useFocusTrap';
 
 interface ReviewCommentsModalProps {
   review: Review;
@@ -19,6 +20,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
   const { user, isLoading: authLoading, openAuthModal } = useAuth();
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const modalRef = useFocusTrap<HTMLDivElement>();
 
   const {
     comments,
@@ -80,7 +82,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl border border-border bg-card shadow-2xl">
+      <div ref={modalRef} className="relative flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl border border-border bg-card shadow-2xl">
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-base font-bold">댓글</h2>
