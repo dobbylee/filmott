@@ -89,7 +89,7 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">별점</label>
-            <StarRating value={rating} onChange={setRating} />
+            <StarRating value={rating} onChange={(v) => { setRating(v); if (error) setError(''); }} />
             {error && rating === 0 && (
               <p className="mt-1.5 text-xs text-destructive">{error}</p>
             )}
@@ -122,8 +122,8 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
           <div className="flex justify-end gap-2">
             <button
               type="submit"
-              disabled={isSubmitting || rating === 0}
-              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              disabled={isSubmitting}
+              className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-colors"
             >
               {isSubmitting ? '저장 중...' : isEditing ? '수정' : '작성'}
             </button>

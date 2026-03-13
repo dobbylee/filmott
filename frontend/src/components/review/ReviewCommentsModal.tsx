@@ -155,7 +155,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
             <button
               type="submit"
               disabled={authLoading || !user || !newComment.trim() || isSubmitting}
-              className="rounded-lg bg-primary px-4 py-3 sm:px-3 sm:py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-3 sm:px-3 sm:py-2 text-white hover:opacity-90 disabled:opacity-50 transition-colors"
               aria-label="댓글 등록"
             >
               <Send className="h-4 w-4" />

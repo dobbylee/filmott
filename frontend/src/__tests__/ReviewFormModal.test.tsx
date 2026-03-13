@@ -59,21 +59,23 @@ describe('ReviewFormModal', () => {
     expect(screen.getByText('리뷰 수정')).toBeInTheDocument();
   });
 
-  it('별점 선택 전에는 등록 버튼이 비활성화되어야 한다', () => {
-    render(<ReviewFormModal {...defaultProps} />);
-
-    const submitBtn = screen.getByText('등록');
-    expect(submitBtn).toBeDisabled();
-  });
-
-  it('별점을 선택하면 등록 버튼이 활성화되어야 한다', async () => {
+  it('별점 미선택 상태에서 작성 클릭 시 에러를 표시해야 한다', async () => {
     const user = userEvent.setup();
     render(<ReviewFormModal {...defaultProps} />);
 
-    await user.click(screen.getByLabelText('5점'));
+    await user.click(screen.getByText('작성'));
+    expect(screen.getByText('별점을 선택해주세요.')).toBeInTheDocument();
+  });
 
-    const submitBtn = screen.getByText('등록');
-    expect(submitBtn).not.toBeDisabled();
+  it('별점 선택 시 에러가 사라져야 한다', async () => {
+    const user = userEvent.setup();
+    render(<ReviewFormModal {...defaultProps} />);
+
+    await user.click(screen.getByText('작성'));
+    expect(screen.getByText('별점을 선택해주세요.')).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('5점'));
+    expect(screen.queryByText('별점을 선택해주세요.')).not.toBeInTheDocument();
   });
 
   it('신규 작성 시 POST API를 호출해야 한다', async () => {
@@ -87,7 +89,7 @@ describe('ReviewFormModal', () => {
       screen.getByPlaceholderText('작품에 대한 한마디를 남겨보세요.'),
       '멋진 영화!',
     );
-    await user.click(screen.getByText('등록'));
+    await user.click(screen.getByText('작성'));
 
     expect(mockPost).toHaveBeenCalledWith('/reviews', {
       contentId: 1,
@@ -132,7 +134,7 @@ describe('ReviewFormModal', () => {
     render(<ReviewFormModal {...defaultProps} />);
 
     await user.click(screen.getByLabelText('6점'));
-    await user.click(screen.getByText('등록'));
+    await user.click(screen.getByText('작성'));
 
     expect(defaultProps.onMutate).toHaveBeenCalled();
     expect(defaultProps.onClose).toHaveBeenCalled();
@@ -247,10 +249,8 @@ describe('ReviewFormModal', () => {
 
     render(<ReviewFormModal {...defaultProps} />);
 
-    // 등록 버튼이 disabled이므로 직접 form submit은 불가하지만,
-    // 별점 0인 상태에서 submit을 시뮬레이션 확인
-    const submitBtn = screen.getByText('등록');
-    expect(submitBtn).toBeDisabled();
+    await user.click(screen.getByText('작성'));
+    expect(screen.getByText('별점을 선택해주세요.')).toBeInTheDocument();
   });
 
   it('코멘트가 비어있으면 undefined로 전달해야 한다', async () => {
@@ -260,7 +260,7 @@ describe('ReviewFormModal', () => {
     render(<ReviewFormModal {...defaultProps} />);
 
     await user.click(screen.getByLabelText('7점'));
-    await user.click(screen.getByText('등록'));
+    await user.click(screen.getByText('작성'));
 
     expect(mockPost).toHaveBeenCalledWith('/reviews', {
       contentId: 1,

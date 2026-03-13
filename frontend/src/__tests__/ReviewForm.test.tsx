@@ -57,7 +57,7 @@ describe('ReviewForm', () => {
     await user.click(screen.getByText('리뷰 작성'));
     expect(screen.getByText('별점')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('작품에 대한 한마디를 남겨보세요.')).toBeInTheDocument();
-    expect(screen.getByText('등록')).toBeDisabled();
+    expect(screen.getByText('작성')).toBeInTheDocument();
   });
 
   it('기존 리뷰가 있으면 내 리뷰 모드로 표시한다', () => {

@@ -105,7 +105,7 @@ export default function ReviewComments({
             <button
               type="submit"
               disabled={authLoading || !user || !newComment.trim() || isSubmitting}
-              className="rounded-md bg-primary p-1.5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="rounded-md bg-gradient-to-r from-fuchsia-700 to-indigo-600 p-1.5 text-white hover:opacity-90 disabled:opacity-50 transition-colors"
               aria-label="댓글 등록"
             >
               <Send className="h-3.5 w-3.5" />
