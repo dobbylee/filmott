@@ -101,7 +101,7 @@ export class ContentsService {
     // DB에 저장/업데이트 (watchProviders, credits 포함)
     const content = await this.upsertFromTmdb(tmdbData, type);
     content.watchProviders = watchProviders;
-    content.credits = credits as Record<string, unknown>[];
+    content.credits = credits;
     await this.contentRepo.save(content);
 
     return {

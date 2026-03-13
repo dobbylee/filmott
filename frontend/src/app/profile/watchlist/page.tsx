@@ -354,9 +354,9 @@ export default function WatchlistListPage() {
                   <button
                     onClick={loadMoreWtw}
                     disabled={wtwLoadingMore}
-                    className="rounded-lg border border-white/10 bg-white/[0.03] px-6 py-2.5 text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors disabled:opacity-40"
+                    className="rounded-full border border-white/10 bg-white/5 px-8 py-2.5 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
                   >
-                    {wtwLoadingMore ? '불러오는 중...' : `더보기 (${wtwItems.length}/${wtwTotal})`}
+                    {wtwLoadingMore ? '불러오는 중...' : `더보기 (${wtwTotal - wtwItems.length}개 남음)`}
                   </button>
                 </div>
               )}

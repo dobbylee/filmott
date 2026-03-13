@@ -7,6 +7,27 @@ import {
   Unique,
 } from 'typeorm';
 
+export interface ContentProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+}
+
+export interface ContentWatchProviders {
+  link?: string;
+  flatrate?: ContentProvider[];
+  rent?: ContentProvider[];
+  buy?: ContentProvider[];
+}
+
+export interface ContentCredit {
+  id: number;
+  name: string;
+  character: string;
+  profile_path?: string;
+  order: number;
+}
+
 @Entity('contents')
 @Unique(['tmdbId', 'contentType'])
 export class Content {
@@ -47,10 +68,10 @@ export class Content {
   runtime?: number;
 
   @Column({ name: 'watch_providers', type: 'jsonb', nullable: true })
-  watchProviders?: Record<string, unknown> | null;
+  watchProviders?: ContentWatchProviders | null;
 
   @Column({ type: 'jsonb', nullable: true })
-  credits?: Record<string, unknown>[] | null;
+  credits?: ContentCredit[] | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
