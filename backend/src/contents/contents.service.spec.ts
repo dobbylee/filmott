@@ -131,7 +131,7 @@ describe('ContentsService', () => {
   });
 
   describe('getContentDetail', () => {
-    it('TMDB에서 가져와 DB에 upsert하고 추가 정보를 포함해야 한다', async () => {
+    it('캐시 미스 시 TMDB에서 가져와 DB에 저장하고 추가 정보를 포함해야 한다', async () => {
       const tmdbData = {
         id: 456,
         title: 'Detail Movie',
@@ -158,8 +158,11 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
-      // upsert: no existing record
-      mockContentRepo.findOne.mockResolvedValue(null);
+      // 첫번째 findOne: TTL 캐시 확인 (미스)
+      // 두번째 findOne: upsertFromTmdb 내부
+      mockContentRepo.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
       const savedContent = {
         id: 2,
         tmdbId: 456,
@@ -171,6 +174,7 @@ describe('ContentsService', () => {
 
       const result = await service.getContentDetail(456, 'movie');
 
+      expect(mockTmdbService.getDetails).toHaveBeenCalledWith(456, 'movie');
       expect(result.watchProviders).toEqual(
         tmdbData['watch/providers'].results.KR,
       );
@@ -178,15 +182,42 @@ describe('ContentsService', () => {
       expect(result.tmdbId).toBe(456);
     });
 
-    it('TMDB가 데이터를 반환하지 않으면 NotFoundException을 던져야 한다', async () => {
-      mockTmdbService.getDetails.mockResolvedValue({});
+    it('TTL 이내 캐시가 있으면 TMDB 호출 없이 DB 캐시를 반환해야 한다', async () => {
+      const cachedContent = {
+        id: 2,
+        tmdbId: 456,
+        contentType: 'movie',
+        title: 'Cached Movie',
+        updatedAt: new Date(), // 방금 업데이트됨 (TTL 이내)
+        watchProviders: { flatrate: [{ provider_id: 8 }] },
+        credits: [{ id: 1, name: 'Actor 1' }],
+      };
+      mockContentRepo.findOne.mockResolvedValue(cachedContent);
 
-      await expect(
-        service.getContentDetail(999, 'movie'),
-      ).rejects.toThrow(NotFoundException);
+      const result = await service.getContentDetail(456, 'movie');
+
+      expect(mockTmdbService.getDetails).not.toHaveBeenCalled();
+      expect(result.tmdbId).toBe(456);
+      expect(result.watchProviders).toEqual(cachedContent.watchProviders);
+      expect(result.credits).toEqual(cachedContent.credits);
     });
 
-    it('상세 조회 시 DB의 기존 콘텐츠를 업데이트해야 한다', async () => {
+    it('TTL 초과 시 TMDB에서 재호출하고 DB를 업데이트해야 한다', async () => {
+      const expiredContent = {
+        id: 3,
+        tmdbId: 789,
+        contentType: 'movie',
+        title: 'Old Title',
+        updatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000), // 25시간 전
+        watchProviders: { flatrate: [] },
+        credits: [],
+      };
+      // 첫번째 findOne: TTL 캐시 확인 (초과)
+      // 두번째 findOne: upsertFromTmdb 내부
+      mockContentRepo.findOne
+        .mockResolvedValueOnce(expiredContent)
+        .mockResolvedValueOnce(expiredContent);
+
       const tmdbData = {
         id: 789,
         title: 'Updated Movie',
@@ -198,27 +229,66 @@ describe('ContentsService', () => {
         vote_average: 8.0,
         genres: [],
         runtime: 100,
+        credits: { cast: [{ id: 10, name: 'New Actor' }] },
+        'watch/providers': {
+          results: {
+            KR: { flatrate: [{ provider_id: 337, provider_name: 'Disney+' }] },
+          },
+        },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+      mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
+
+      const result = await service.getContentDetail(789, 'movie');
+
+      expect(mockTmdbService.getDetails).toHaveBeenCalledWith(789, 'movie');
+      expect(mockContentRepo.save).toHaveBeenCalled();
+      expect(result.credits).toHaveLength(1);
+    });
+
+    it('캐시에 watchProviders가 null이면 TMDB를 재호출해야 한다', async () => {
+      const partialCache = {
+        id: 4,
+        tmdbId: 100,
+        contentType: 'movie',
+        title: 'Partial Cache',
+        updatedAt: new Date(),
+        watchProviders: null,
+        credits: null,
+      };
+      mockContentRepo.findOne
+        .mockResolvedValueOnce(partialCache)
+        .mockResolvedValueOnce(partialCache);
+
+      const tmdbData = {
+        id: 100,
+        title: 'Partial Cache',
+        original_title: 'Partial Cache',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        genres: [],
+        runtime: null,
         credits: { cast: [] },
         'watch/providers': { results: {} },
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+      mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
 
-      const existingContent = {
-        id: 3,
-        tmdbId: 789,
-        contentType: 'movie',
-        title: 'Old Title',
-      };
-      mockContentRepo.findOne.mockResolvedValue(existingContent);
-      mockContentRepo.save.mockResolvedValue({
-        ...existingContent,
-        title: 'Updated Movie',
-      });
+      await service.getContentDetail(100, 'movie');
 
-      const result = await service.getContentDetail(789, 'movie');
+      expect(mockTmdbService.getDetails).toHaveBeenCalledWith(100, 'movie');
+    });
 
-      expect(mockContentRepo.save).toHaveBeenCalled();
-      expect(result.title).toBe('Updated Movie');
+    it('TMDB가 데이터를 반환하지 않으면 NotFoundException을 던져야 한다', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+      mockTmdbService.getDetails.mockResolvedValue({});
+
+      await expect(
+        service.getContentDetail(999, 'movie'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

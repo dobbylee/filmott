@@ -144,7 +144,7 @@ describe('ReviewsService', () => {
   });
 
   describe('update', () => {
-    it('리뷰를 수정하고 likes_count를 초기화해야 한다', async () => {
+    it('rating 변경 시 likes_count를 초기화하고 좋아요를 삭제해야 한다', async () => {
       const review = {
         id: 1,
         userId: 1,
@@ -167,6 +167,74 @@ describe('ReviewsService', () => {
       expect(result.rating).toBe(9);
       expect(result.likesCount).toBe(0);
       expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
+    });
+
+    it('코멘트만 변경 시 좋아요를 유지해야 한다', async () => {
+      const review = {
+        id: 1,
+        userId: 1,
+        contentId: 1,
+        rating: 7,
+        comment: 'Good',
+        hasSpoiler: false,
+        likesCount: 5,
+      };
+      mockReviewRepo.findOne.mockResolvedValue({ ...review });
+      mockReviewRepo.save.mockImplementation((r: any) => Promise.resolve(r));
+
+      const result = await service.update(1, 1, { comment: 'Updated comment' });
+
+      expect(result.comment).toBe('Updated comment');
+      expect(result.rating).toBe(7);
+      expect(result.likesCount).toBe(5);
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      expect(mockReviewRepo.save).toHaveBeenCalled();
+    });
+
+    it('rating과 코멘트 동시 변경 시 좋아요를 초기화해야 한다', async () => {
+      const review = {
+        id: 1,
+        userId: 1,
+        contentId: 1,
+        rating: 7,
+        comment: 'Good',
+        hasSpoiler: false,
+        likesCount: 3,
+      };
+      mockReviewRepo.findOne.mockResolvedValue({ ...review });
+
+      const mockManager = {
+        delete: jest.fn().mockResolvedValue({ affected: 3 }),
+        save: jest.fn().mockImplementation((r: any) => Promise.resolve(r)),
+      };
+      mockDataSource.transaction.mockImplementation((cb: any) => cb(mockManager));
+
+      const result = await service.update(1, 1, { rating: 9, comment: 'New comment' });
+
+      expect(result.rating).toBe(9);
+      expect(result.comment).toBe('New comment');
+      expect(result.likesCount).toBe(0);
+      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
+    });
+
+    it('동일한 rating으로 수정 시 좋아요를 유지해야 한다', async () => {
+      const review = {
+        id: 1,
+        userId: 1,
+        contentId: 1,
+        rating: 7,
+        comment: 'Good',
+        hasSpoiler: false,
+        likesCount: 10,
+      };
+      mockReviewRepo.findOne.mockResolvedValue({ ...review });
+      mockReviewRepo.save.mockImplementation((r: any) => Promise.resolve(r));
+
+      const result = await service.update(1, 1, { rating: 7, comment: 'Same rating' });
+
+      expect(result.rating).toBe(7);
+      expect(result.likesCount).toBe(10);
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
     });
 
     it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
@@ -424,6 +492,38 @@ describe('ReviewsService', () => {
       expect(result).toHaveLength(1);
       expect(mockQb.take).toHaveBeenCalledWith(5);
       expect(mockQb.orderBy).toHaveBeenCalledWith('review.createdAt', 'DESC');
+    });
+
+    it('limit이 50을 초과하면 50으로 제한해야 한다', async () => {
+      const mockQb = {
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockReviewRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      await service.getRecentReviews(100);
+
+      expect(mockQb.take).toHaveBeenCalledWith(50);
+    });
+
+    it('limit이 0 이하이면 1로 제한해야 한다', async () => {
+      const mockQb = {
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockReviewRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      await service.getRecentReviews(0);
+
+      expect(mockQb.take).toHaveBeenCalledWith(1);
     });
   });
 

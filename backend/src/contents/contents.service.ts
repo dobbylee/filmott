@@ -8,37 +8,7 @@ import {
   TmdbPersonDetail,
   TmdbPersonCredit,
 } from '../tmdb/tmdb.service';
-import { TMDB_IMAGE_BASE } from '../common/constants';
-
-const GENRE_NAME_MAP: Record<number, string> = {
-  28: '액션',
-  12: '모험',
-  16: '애니메이션',
-  35: '코미디',
-  80: '범죄',
-  99: '다큐멘터리',
-  18: '드라마',
-  10751: '가족',
-  14: '판타지',
-  36: '역사',
-  27: '공포',
-  10402: '음악',
-  9648: '미스터리',
-  10749: '로맨스',
-  878: 'SF',
-  10770: 'TV 영화',
-  53: '스릴러',
-  10752: '전쟁',
-  37: '서부',
-  10759: '액션 & 어드벤처',
-  10762: '키즈',
-  10763: '뉴스',
-  10764: '리얼리티',
-  10765: 'SF & 판타지',
-  10766: '소프 오페라',
-  10767: '토크',
-  10768: '전쟁 & 정치',
-};
+import { TMDB_IMAGE_BASE, GENRE_NAME_MAP, CONTENT_DETAIL_TTL_MS } from '../common/constants';
 
 @Injectable()
 export class ContentsService {
@@ -94,24 +64,45 @@ export class ContentsService {
   }
 
   /**
-   * 상세: TMDB에서 최신 데이터 fetch + DB 업데이트, OTT 정보 포함
+   * 상세: TTL 이내면 DB 캐시 반환, 초과 시 TMDB 재호출 후 업데이트
    */
   async getContentDetail(tmdbId: number, type: 'movie' | 'tv') {
+    // DB에서 기존 캐시 확인
+    const cached = await this.contentRepo.findOne({
+      where: { tmdbId, contentType: type },
+    });
+
+    // TTL 이내이고 watchProviders/credits가 캐시되어 있으면 DB 캐시 반환
+    if (cached && cached.watchProviders !== null && cached.credits !== null) {
+      const age = Date.now() - new Date(cached.updatedAt).getTime();
+      if (age < CONTENT_DETAIL_TTL_MS) {
+        return {
+          ...cached,
+          watchProviders: cached.watchProviders,
+          credits: cached.credits,
+        };
+      }
+    }
+
+    // TTL 초과 또는 캐시 미스: TMDB에서 fetch
     const tmdbData = await this.tmdbService.getDetails(tmdbId, type);
 
     if (!tmdbData || !tmdbData.id) {
       throw new NotFoundException(
-        `Content not found: ${type}/${tmdbId}`,
+        `콘텐츠를 찾을 수 없습니다: ${type}/${tmdbId}`,
       );
     }
 
-    // DB에 저장/업데이트
-    const content = await this.upsertFromTmdb(tmdbData, type);
-
-    // OTT 정보, 출연진 등 추가 정보 포함하여 반환
+    // OTT 정보, 출연진 추출
     const watchProviders =
       tmdbData['watch/providers']?.results?.KR ?? null;
     const credits = tmdbData.credits?.cast?.slice(0, 20) ?? [];
+
+    // DB에 저장/업데이트 (watchProviders, credits 포함)
+    const content = await this.upsertFromTmdb(tmdbData, type);
+    content.watchProviders = watchProviders;
+    content.credits = credits as Record<string, unknown>[];
+    await this.contentRepo.save(content);
 
     return {
       ...content,

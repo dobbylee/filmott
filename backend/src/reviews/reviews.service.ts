@@ -74,14 +74,21 @@ export class ReviewsService {
       throw new BadRequestException('rating은 필수입니다.');
     }
 
+    const ratingChanged = dto.rating !== undefined && dto.rating !== review.rating;
+
     if (dto.rating !== undefined) review.rating = dto.rating;
     if (dto.comment !== undefined) review.comment = dto.comment;
-    // 수정 시 likes_count 리셋 + 좋아요 데이터 삭제를 트랜잭션으로 처리
-    return this.dataSource.transaction(async (manager) => {
-      review.likesCount = 0;
-      await manager.delete(ReviewLike, { reviewId: review.id });
-      return manager.save(review);
-    });
+
+    // rating이 변경된 경우에만 likes_count 리셋 + 좋아요 데이터 삭제 (트랜잭션)
+    if (ratingChanged) {
+      return this.dataSource.transaction(async (manager) => {
+        review.likesCount = 0;
+        await manager.delete(ReviewLike, { reviewId: review.id });
+        return manager.save(review);
+      });
+    }
+
+    return this.reviewRepo.save(review);
   }
 
   async delete(userId: number, reviewId: number, userRole?: string): Promise<void> {
@@ -168,13 +175,14 @@ export class ReviewsService {
   }
 
   async getRecentReviews(limit = 10) {
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
     return this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
       .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage', 'user.status'])
       .leftJoinAndSelect('review.content', 'content')
       .orderBy('review.createdAt', 'DESC')
-      .take(limit)
+      .take(safeLimit)
       .getMany();
   }
 

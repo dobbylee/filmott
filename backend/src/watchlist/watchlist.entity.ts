@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
+import { Review } from '../reviews/review.entity';
 
 @Entity('watchlist')
 @Unique(['userId', 'contentId'])
@@ -42,4 +43,7 @@ export class Watchlist {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
+
+  /** leftJoinAndMapOne으로 매핑되는 리뷰 (데코레이터 없음, 비영속 프로퍼티) */
+  review?: Review;
 }

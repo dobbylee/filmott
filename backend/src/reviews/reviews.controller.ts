@@ -36,7 +36,7 @@ export class ReviewsController {
     return parsed;
   }
 
-  // --- Reviews CRUD ---
+  // --- CRUD (POST, PATCH, DELETE) ---
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -67,6 +67,9 @@ export class ReviewsController {
     return { message: '삭제되었습니다.' };
   }
 
+  // --- 고정 경로 GET (my, liked-ids, recent, query 기반) ---
+  // NestJS는 위에서 아래로 매칭하므로, 고정 경로를 파라미터 경로(:id) 위에 배치
+
   @Get('my')
   @UseGuards(JwtAuthGuard)
   async findMyReview(
@@ -95,6 +98,12 @@ export class ReviewsController {
     return [];
   }
 
+  @Get('recent')
+  async getRecent(@Query('limit') limit?: string) {
+    const l = this.parseIntOrDefault(limit, 10, 'limit');
+    return this.reviewsService.getRecentReviews(Math.min(Math.max(l, 1), 50));
+  }
+
   @Get()
   async findByContent(
     @Query('contentId', ParseIntPipe) contentId: number,
@@ -106,11 +115,7 @@ export class ReviewsController {
     return this.reviewsService.findByContent(contentId, p, s);
   }
 
-  @Get('recent')
-  async getRecent(@Query('limit') limit?: string) {
-    const l = this.parseIntOrDefault(limit, 10, 'limit');
-    return this.reviewsService.getRecentReviews(Math.min(Math.max(l, 1), 50));
-  }
+  // --- 파라미터 경로 GET (user/:userId, :id/stats) ---
 
   @Get('user/:userId')
   async findByUser(

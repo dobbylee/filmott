@@ -147,7 +147,7 @@ export class UsersService {
     }
 
     const savedUser = await this.usersRepo.save(user);
-    const { password, ...result } = savedUser;
+    const { password: _, ...result } = savedUser;
     return result;
   }
 

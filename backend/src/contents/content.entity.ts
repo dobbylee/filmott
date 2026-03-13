@@ -46,6 +46,12 @@ export class Content {
   @Column({ type: 'integer', nullable: true })
   runtime?: number;
 
+  @Column({ name: 'watch_providers', type: 'jsonb', nullable: true })
+  watchProviders?: Record<string, unknown> | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  credits?: Record<string, unknown>[] | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

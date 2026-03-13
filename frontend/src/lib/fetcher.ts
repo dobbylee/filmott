@@ -17,7 +17,14 @@ export async function fetchApi<T>(
   });
 
   if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText}`);
+    let message = `API error: ${res.status} ${res.statusText}`;
+    try {
+      const body = await res.json();
+      if (body.message) message = body.message;
+    } catch {
+      // JSON 파싱 실패 시 기본 메시지 사용
+    }
+    throw new Error(message);
   }
 
   return res.json();

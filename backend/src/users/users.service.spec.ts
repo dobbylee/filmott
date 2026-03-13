@@ -46,6 +46,18 @@ describe('UsersService', () => {
     });
   });
 
+  describe('findByEmail', () => {
+    it('DELETED 유저를 제외하고 Not(DELETED) 조건으로 조회해야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      await service.findByEmail('test@test.com');
+
+      expect(mockUsersRepo.findOne).toHaveBeenCalledWith({
+        where: { email: 'test@test.com', status: Not(UserStatus.DELETED) },
+      });
+    });
+  });
+
   describe('findById', () => {
     it('사용자가 존재하면 비밀번호 없는 SafeUser를 반환해야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValue({

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
+import type { ReactNode } from 'react';
 import type { User } from '@/types/auth';
 
 const mockPost = vi.fn();
@@ -322,6 +325,24 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('token')).toHaveTextContent('null');
       expect(screen.getByTestId('modalOpen')).toHaveTextContent('true');
       expect(screen.getByTestId('modalMode')).toHaveTextContent('login');
+    });
+
+    it('이벤트 리스닝에 AUTH_REQUIRED_EVENT 상수를 사용해야 한다', () => {
+      expect(AUTH_REQUIRED_EVENT).toBe('auth:required');
+
+      const addSpy = vi.spyOn(window, 'addEventListener');
+
+      function hookWrapper({ children }: { children: ReactNode }) {
+        return <AuthProvider>{children}</AuthProvider>;
+      }
+      renderHook(() => useAuth(), { wrapper: hookWrapper });
+
+      const authRequiredCalls = addSpy.mock.calls.filter(
+        ([event]) => event === AUTH_REQUIRED_EVENT,
+      );
+      expect(authRequiredCalls.length).toBeGreaterThan(0);
+
+      addSpy.mockRestore();
     });
   });
 });

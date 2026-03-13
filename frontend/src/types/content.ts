@@ -115,8 +115,10 @@ export interface ContentDetail extends ContentItem {
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
 /**
- * TMDB 장르 ID → 한글명 매핑.
- * 백엔드 contents.service.ts의 GENRE_NAME_MAP과 동기화 필요.
+ * TMDB 장르 ID -> 한글명 매핑.
+ *
+ * [동기화 주의]
+ * 백엔드 backend/src/common/constants.ts의 GENRE_NAME_MAP과 동일한 데이터.
  * 한쪽을 수정하면 반드시 다른 쪽도 함께 업데이트할 것.
  */
 export const GENRE_MAP: Record<number, string> = {
@@ -185,12 +187,17 @@ export const TV_GENRES = [
   { id: 10768, name: '전쟁 & 정치' },
 ];
 
+/**
+ * OTT 제공사 목록.
+ * logo는 TMDB logo_path 원본 형식 (예: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg').
+ * 이미지 렌더링 시: `${TMDB_IMAGE_BASE}/original${provider.logo}` 형식으로 조합.
+ */
 export const OTT_PROVIDERS = [
-  { id: 8, name: '넷플릭스', logo: '/t/p/original/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' },
-  { id: 337, name: '디즈니+', logo: '/t/p/original/97yvRBw1GzX7fXprcF80er19ot.jpg' },
-  { id: 356, name: '웨이브', logo: '/t/p/original/2ioan5BX5L9tz4fIGU93blTeFhv.jpg' },
-  { id: 97, name: '왓챠', logo: '/t/p/original/681L3YVSY7FVjAufGKoagM17VEh.jpg' },
-  { id: 350, name: '애플 TV+', logo: '/t/p/original/6uhKBfmtzFqOcLousHwZuzcrScK.jpg' },
-  { id: 119, name: '아마존 프라임', logo: '/t/p/original/emthp39XA2YScoYL1p0sdbAH2WA.jpg' },
-  { id: 1883, name: '티빙', logo: '/t/p/original/cNi4Nv5EPsnvf5WmgkyT1DDho3u.jpg' },
+  { id: 8, name: '넷플릭스', logo: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' },
+  { id: 337, name: '디즈니+', logo: '/97yvRBw1GzX7fXprcF80er19ot.jpg' },
+  { id: 356, name: '웨이브', logo: '/2ioan5BX5L9tz4fIGU93blTeFhv.jpg' },
+  { id: 97, name: '왓챠', logo: '/681L3YVSY7FVjAufGKoagM17VEh.jpg' },
+  { id: 350, name: '애플 TV+', logo: '/6uhKBfmtzFqOcLousHwZuzcrScK.jpg' },
+  { id: 119, name: '아마존 프라임', logo: '/emthp39XA2YScoYL1p0sdbAH2WA.jpg' },
+  { id: 1883, name: '티빙', logo: '/cNi4Nv5EPsnvf5WmgkyT1DDho3u.jpg' },
 ];

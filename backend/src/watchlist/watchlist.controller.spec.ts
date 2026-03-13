@@ -121,7 +121,7 @@ describe('WatchlistController', () => {
       const result = await controller.getWantToWatchAll(user);
 
       expect(result).toEqual(items);
-      expect(mockWatchlistService.getWantToWatchAll).toHaveBeenCalledWith(1);
+      expect(mockWatchlistService.getWantToWatchAll).toHaveBeenCalledWith(1, 100);
     });
   });
 
