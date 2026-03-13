@@ -88,8 +88,8 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
               <div className="flex-1 min-w-0 flex flex-col">
                 {review ? (
                   <>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="rounded bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-1.5 py-0.5 text-[10px] font-medium text-white whitespace-nowrap">
                         내 리뷰
                       </span>
                       {review.rating != null && (
@@ -98,6 +98,8 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                           <span className="text-xs font-semibold">{review.rating}</span>
                         </div>
                       )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1.5">
                       <button
                         onClick={() => setShowComments(true)}
                         className="flex items-center gap-0.5 hover:text-white transition-colors"
@@ -107,7 +109,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                       </button>
                     </div>
                     {review.comment && (
-                      <p className="mt-3 px-3 text-sm leading-relaxed text-white/70 line-clamp-2">
+                      <p className="mt-2 text-sm leading-relaxed text-white/70 line-clamp-2">
                         {review.comment}
                       </p>
                     )}
@@ -117,9 +119,9 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                     <div className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 p-[1px] hover:opacity-80 transition-opacity">
                       <button
                         onClick={() => setShowReviewForm(true)}
-                        className="flex items-center gap-2 rounded-[7px] bg-card px-4 py-2 text-sm font-medium text-white/70 hover:text-white transition-colors"
+                        className="flex items-center gap-1.5 whitespace-nowrap rounded-[7px] bg-card px-3 py-1.5 text-xs font-medium text-white/70 hover:text-white transition-colors"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-3.5 w-3.5" />
                         리뷰 작성
                       </button>
                     </div>
