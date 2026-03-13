@@ -43,6 +43,19 @@ describe('api 인스턴스', () => {
   });
 });
 
+describe('refreshApi 인스턴스', () => {
+  it('올바른 baseURL을 가져야 한다', async () => {
+    const { refreshApi } = await import('@/lib/api');
+    expect(refreshApi.defaults.baseURL).toBe('http://localhost:3001/api');
+  });
+
+  it('인터셉터가 등록되어 있지 않아야 한다', async () => {
+    const { refreshApi } = await import('@/lib/api');
+    expect(refreshApi.interceptors.request.handlers).toHaveLength(0);
+    expect(refreshApi.interceptors.response.handlers).toHaveLength(0);
+  });
+});
+
 describe('api response 인터셉터 - refresh token', () => {
   let dispatchEventSpy: ReturnType<typeof vi.spyOn>;
 
@@ -73,13 +86,13 @@ describe('api response 인터셉터 - refresh token', () => {
     message: 'Request failed',
   });
 
-  it('401 응답 시 refresh token으로 토큰 갱신을 시도해야 한다', async () => {
-    const { default: api } = await import('@/lib/api');
+  it('401 응답 시 refreshApi를 통해 토큰 갱신을 시도해야 한다', async () => {
+    const { default: api, refreshApi } = await import('@/lib/api');
 
     localStorage.setItem('refresh_token', 'old-refresh-token');
 
-    // mock api.post for refresh
-    const postSpy = vi.spyOn(api, 'post').mockResolvedValueOnce({
+    // refreshApi.post를 mock
+    const refreshPostSpy = vi.spyOn(refreshApi, 'post').mockResolvedValueOnce({
       data: {
         access_token: 'new-access-token',
         refresh_token: 'new-refresh-token',
@@ -87,12 +100,8 @@ describe('api response 인터셉터 - refresh token', () => {
       },
     });
 
-    // mock the retry request
-    const requestSpy = vi.fn().mockResolvedValueOnce({ data: 'success' });
-    vi.spyOn(api, 'request').mockImplementationOnce(requestSpy);
-
-    // api 함수 자체를 mock하여 재시도 요청 처리
-    const originalApi = api as unknown as { (config: AxiosRequestConfig): Promise<unknown> };
+    // api.post가 호출되지 않았는지 확인 (refreshApi만 사용되어야 함)
+    const apiPostSpy = vi.spyOn(api, 'post');
 
     const mockError = createMockError(401, '/some-endpoint');
     const handler = api.interceptors.response.handlers[0];
@@ -103,20 +112,22 @@ describe('api response 인터셉터 - refresh token', () => {
       // refresh 후 api(originalRequest)가 호출됨 - mock이 없으면 에러 발생 가능
     }
 
-    expect(postSpy).toHaveBeenCalledWith('/auth/refresh', { refresh_token: 'old-refresh-token' });
+    expect(refreshPostSpy).toHaveBeenCalledWith('/auth/refresh', { refresh_token: 'old-refresh-token' });
+    expect(apiPostSpy).not.toHaveBeenCalled();
     expect(localStorage.getItem('access_token')).toBe('new-access-token');
     expect(localStorage.getItem('refresh_token')).toBe('new-refresh-token');
 
-    postSpy.mockRestore();
+    refreshPostSpy.mockRestore();
+    apiPostSpy.mockRestore();
   });
 
   it('refresh 성공 시 localStorage에 새 토큰을 저장해야 한다', async () => {
-    const { default: api } = await import('@/lib/api');
+    const { default: api, refreshApi } = await import('@/lib/api');
 
     localStorage.setItem('refresh_token', 'old-refresh-token');
 
     const mockUser = { id: 1, nickname: 'test', email: 'test@test.com' };
-    const postSpy = vi.spyOn(api, 'post').mockResolvedValueOnce({
+    const refreshPostSpy = vi.spyOn(refreshApi, 'post').mockResolvedValueOnce({
       data: {
         access_token: 'refreshed-access-token',
         refresh_token: 'refreshed-refresh-token',
@@ -137,17 +148,17 @@ describe('api response 인터셉터 - refresh token', () => {
     expect(localStorage.getItem('refresh_token')).toBe('refreshed-refresh-token');
     expect(localStorage.getItem('user')).toBe(JSON.stringify(mockUser));
 
-    postSpy.mockRestore();
+    refreshPostSpy.mockRestore();
   });
 
   it('refresh 실패 시 AUTH_REQUIRED_EVENT를 dispatch해야 한다', async () => {
-    const { default: api } = await import('@/lib/api');
+    const { default: api, refreshApi } = await import('@/lib/api');
 
     localStorage.setItem('access_token', 'old-token');
     localStorage.setItem('refresh_token', 'expired-refresh-token');
     localStorage.setItem('user', '{"id":1}');
 
-    const postSpy = vi.spyOn(api, 'post').mockRejectedValueOnce(new Error('Refresh failed'));
+    const refreshPostSpy = vi.spyOn(refreshApi, 'post').mockRejectedValueOnce(new Error('Refresh failed'));
 
     const mockError = createMockError(401, '/protected-endpoint');
     const handler = api.interceptors.response.handlers[0];
@@ -163,7 +174,7 @@ describe('api response 인터셉터 - refresh token', () => {
     );
     expect(authEvent).toBeDefined();
 
-    postSpy.mockRestore();
+    refreshPostSpy.mockRestore();
   });
 
   it('refresh_token이 없을 때 AUTH_REQUIRED_EVENT를 dispatch해야 한다', async () => {
@@ -184,20 +195,20 @@ describe('api response 인터셉터 - refresh token', () => {
   });
 
   it('/auth/refresh 요청 자체가 401이면 무한 루프 없이 바로 로그아웃해야 한다', async () => {
-    const { default: api } = await import('@/lib/api');
+    const { default: api, refreshApi } = await import('@/lib/api');
 
     localStorage.setItem('access_token', 'old-token');
     localStorage.setItem('refresh_token', 'bad-refresh-token');
 
-    const postSpy = vi.spyOn(api, 'post');
+    const refreshPostSpy = vi.spyOn(refreshApi, 'post');
 
     const mockError = createMockError(401, '/auth/refresh');
     const handler = api.interceptors.response.handlers[0];
 
     await expect(handler.rejected!(mockError)).rejects.toBeDefined();
 
-    // refresh 재시도를 하지 않아야 함 (post가 호출되지 않아야 함)
-    expect(postSpy).not.toHaveBeenCalled();
+    // refresh 재시도를 하지 않아야 함 (refreshApi.post가 호출되지 않아야 함)
+    expect(refreshPostSpy).not.toHaveBeenCalled();
 
     expect(localStorage.getItem('access_token')).toBeNull();
     expect(localStorage.getItem('refresh_token')).toBeNull();
@@ -208,14 +219,14 @@ describe('api response 인터셉터 - refresh token', () => {
     );
     expect(authEvent).toBeDefined();
 
-    postSpy.mockRestore();
+    refreshPostSpy.mockRestore();
   });
 
   it('이미 재시도한 요청(_retry)은 다시 재시도하지 않아야 한다', async () => {
-    const { default: api } = await import('@/lib/api');
+    const { default: api, refreshApi } = await import('@/lib/api');
 
     localStorage.setItem('refresh_token', 'some-token');
-    const postSpy = vi.spyOn(api, 'post');
+    const refreshPostSpy = vi.spyOn(refreshApi, 'post');
 
     const mockError = createMockError(401, '/some-endpoint', true);
     const handler = api.interceptors.response.handlers[0];
@@ -223,9 +234,9 @@ describe('api response 인터셉터 - refresh token', () => {
     await expect(handler.rejected!(mockError)).rejects.toBeDefined();
 
     // refresh 요청을 시도하지 않아야 함
-    expect(postSpy).not.toHaveBeenCalled();
+    expect(refreshPostSpy).not.toHaveBeenCalled();
 
-    postSpy.mockRestore();
+    refreshPostSpy.mockRestore();
   });
 
   it('401이 아닌 에러는 그대로 reject해야 한다', async () => {

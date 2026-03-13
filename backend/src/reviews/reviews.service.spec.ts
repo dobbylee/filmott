@@ -6,7 +6,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ReviewsService } from './reviews.service';
 import { Review } from './review.entity';
 import { ReviewLike } from './review-like.entity';
@@ -158,9 +158,9 @@ describe('ReviewsService', () => {
 
       const mockManager = {
         delete: jest.fn().mockResolvedValue({ affected: 5 }),
-        save: jest.fn().mockImplementation((r: any) => Promise.resolve(r)),
+        save: jest.fn().mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
       };
-      mockDataSource.transaction.mockImplementation((cb: any) => cb(mockManager));
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager));
 
       const result = await service.update(1, 1, { rating: 9 });
 
@@ -183,9 +183,9 @@ describe('ReviewsService', () => {
 
       const mockManager = {
         delete: jest.fn().mockResolvedValue({ affected: 5 }),
-        save: jest.fn().mockImplementation((r: any) => Promise.resolve(r)),
+        save: jest.fn().mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
       };
-      mockDataSource.transaction.mockImplementation((cb: any) => cb(mockManager));
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager));
 
       const result = await service.update(1, 1, { comment: 'Updated comment' });
 
@@ -209,9 +209,9 @@ describe('ReviewsService', () => {
 
       const mockManager = {
         delete: jest.fn().mockResolvedValue({ affected: 3 }),
-        save: jest.fn().mockImplementation((r: any) => Promise.resolve(r)),
+        save: jest.fn().mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
       };
-      mockDataSource.transaction.mockImplementation((cb: any) => cb(mockManager));
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager));
 
       const result = await service.update(1, 1, { rating: 9, comment: 'New comment' });
 
@@ -232,7 +232,7 @@ describe('ReviewsService', () => {
         likesCount: 10,
       };
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
-      mockReviewRepo.save.mockImplementation((r: any) => Promise.resolve(r));
+      mockReviewRepo.save.mockImplementation((r: Partial<Review>) => Promise.resolve(r));
 
       const result = await service.update(1, 1, { rating: 7, comment: 'Good' });
 
@@ -274,7 +274,7 @@ describe('ReviewsService', () => {
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
 
       await expect(
-        service.update(1, 1, { rating: null as any }),
+        service.update(1, 1, { rating: null as unknown as number }),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -588,7 +588,7 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: any) => cb(mockManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager),
       );
       mockReviewLikeRepo.create.mockReturnValue({ reviewId: 1, userId: 1 });
 
@@ -614,7 +614,7 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: any) => cb(mockManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager),
       );
 
       const result = await service.toggleLike(1, 1);
@@ -639,7 +639,7 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: any) => cb(mockManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager),
       );
       mockReviewLikeRepo.create.mockReturnValue({ reviewId: 1, userId: 1 });
 
@@ -665,7 +665,7 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: any) => cb(mockManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager),
       );
 
       const result = await service.toggleLike(1, 1);

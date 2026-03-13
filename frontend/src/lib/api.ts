@@ -8,6 +8,11 @@ const api = axios.create({
   },
 });
 
+// refresh 요청 전용 인스턴스 — 인터셉터를 우회하여 무한 루프 방지
+const refreshApi = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+});
+
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token');
@@ -76,7 +81,7 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) throw new Error('No refresh token');
 
-      const { data } = await api.post('/auth/refresh', { refresh_token: refreshToken });
+      const { data } = await refreshApi.post('/auth/refresh', { refresh_token: refreshToken });
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
       localStorage.setItem('user', JSON.stringify(data.user));
@@ -97,4 +102,5 @@ api.interceptors.response.use(
   },
 );
 
+export { refreshApi };
 export default api;

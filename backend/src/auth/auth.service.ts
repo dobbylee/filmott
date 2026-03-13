@@ -1,12 +1,13 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { SafeUser } from '../users/user.entity';
 import { UserStatus } from '../users/enums/user-status.enum';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import * as crypto from 'crypto';
+import { createHash, randomBytes } from 'crypto';
+import { Cron } from '@nestjs/schedule';
 import { LoginDto } from './dto/login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -20,6 +21,7 @@ export class AuthService {
     private jwtService: JwtService,
     @InjectRepository(RefreshToken)
     private refreshTokenRepo: Repository<RefreshToken>,
+    private dataSource: DataSource,
   ) {}
 
   async validateUser(email: string, pass: string): Promise<SafeUser> {
@@ -49,12 +51,13 @@ export class AuthService {
     const payload = { nickname: user.nickname, sub: user.id, role: user.role };
     const accessToken = this.jwtService.sign(payload);
 
-    const refreshTokenValue = crypto.randomBytes(32).toString('hex');
+    const rawToken = randomBytes(32).toString('hex');
+    const hashedToken = createHash('sha256').update(rawToken).digest('hex');
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS);
 
     const refreshToken = this.refreshTokenRepo.create({
-      token: refreshTokenValue,
+      token: hashedToken,
       userId: user.id,
       expiresAt,
     });
@@ -62,61 +65,87 @@ export class AuthService {
 
     return {
       access_token: accessToken,
-      refresh_token: refreshTokenValue,
+      refresh_token: rawToken,
     };
   }
 
   async refreshTokens(refreshToken: string) {
-    const tokenEntity = await this.refreshTokenRepo.findOne({
-      where: { token: refreshToken },
+    const hashedInput = createHash('sha256').update(refreshToken).digest('hex');
+
+    return this.dataSource.transaction(async (manager) => {
+      const tokenEntity = await manager.findOne(RefreshToken, {
+        where: { token: hashedInput },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!tokenEntity) {
+        throw new UnauthorizedException('유효하지 않은 리프레시 토큰입니다.');
+      }
+
+      if (tokenEntity.expiresAt < new Date()) {
+        await manager.remove(tokenEntity);
+        throw new UnauthorizedException('만료된 리프레시 토큰입니다.');
+      }
+
+      const user = await this.usersService.findByIdWithStatus(tokenEntity.userId);
+      if (!user) {
+        await manager.remove(tokenEntity);
+        throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+      }
+
+      if (user.status === UserStatus.DELETED) {
+        await manager.remove(tokenEntity);
+        throw new UnauthorizedException('탈퇴한 계정입니다.');
+      }
+
+      if (user.status === UserStatus.SUSPENDED) {
+        await manager.remove(tokenEntity);
+        throw new UnauthorizedException('정지된 계정입니다.');
+      }
+
+      // Rotation: 기존 토큰 삭제 후 새 토큰 쌍 발급
+      await manager.remove(tokenEntity);
+
+      const payload = { nickname: user.nickname, sub: user.id, role: user.role };
+      const accessToken = this.jwtService.sign(payload);
+      const rawToken = randomBytes(32).toString('hex');
+      const hashedNewToken = createHash('sha256').update(rawToken).digest('hex');
+
+      const newRefreshToken = manager.create(RefreshToken, {
+        token: hashedNewToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+      });
+      await manager.save(newRefreshToken);
+
+      return {
+        access_token: accessToken,
+        refresh_token: rawToken,
+        user: {
+          id: user.id,
+          nickname: user.nickname,
+          role: user.role,
+        },
+      };
     });
-
-    if (!tokenEntity) {
-      throw new UnauthorizedException('유효하지 않은 리프레시 토큰입니다.');
-    }
-
-    if (tokenEntity.expiresAt < new Date()) {
-      await this.refreshTokenRepo.remove(tokenEntity);
-      throw new UnauthorizedException('만료된 리프레시 토큰입니다.');
-    }
-
-    const user = await this.usersService.findByIdWithStatus(tokenEntity.userId);
-    if (!user) {
-      await this.refreshTokenRepo.remove(tokenEntity);
-      throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
-    }
-
-    if (user.status === UserStatus.DELETED) {
-      await this.refreshTokenRepo.remove(tokenEntity);
-      throw new UnauthorizedException('탈퇴한 계정입니다.');
-    }
-
-    if (user.status === UserStatus.SUSPENDED) {
-      await this.refreshTokenRepo.remove(tokenEntity);
-      throw new UnauthorizedException('정지된 계정입니다.');
-    }
-
-    // Rotation: 기존 토큰 삭제 후 새 토큰 쌍 발급
-    await this.refreshTokenRepo.remove(tokenEntity);
-
-    const tokens = await this.generateTokens(user);
-
-    return {
-      ...tokens,
-      user: {
-        id: user.id,
-        nickname: user.nickname,
-        role: user.role,
-      },
-    };
   }
 
   async revokeRefreshToken(refreshToken: string): Promise<void> {
-    await this.refreshTokenRepo.delete({ token: refreshToken });
+    const hashedToken = createHash('sha256').update(refreshToken).digest('hex');
+    await this.refreshTokenRepo.delete({ token: hashedToken });
   }
 
   async revokeAllUserTokens(userId: number): Promise<void> {
     await this.refreshTokenRepo.delete({ userId });
+  }
+
+  @Cron('0 3 * * *') // 매일 새벽 3시
+  async cleanExpiredTokens(): Promise<void> {
+    await this.refreshTokenRepo
+      .createQueryBuilder('rt')
+      .delete()
+      .where('expires_at < :now', { now: new Date() })
+      .execute();
   }
 
   async login(loginDto: LoginDto) {

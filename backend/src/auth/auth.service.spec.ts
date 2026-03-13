@@ -7,6 +7,8 @@ import { UnauthorizedException } from '@nestjs/common';
 import { UserStatus } from '../users/enums/user-status.enum';
 import { UserRole } from '../users/enums/user-role.enum';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { DataSource, EntityManager } from 'typeorm';
+import { createHash } from 'crypto';
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt');
@@ -31,6 +33,11 @@ describe('AuthService', () => {
     findOne: jest.fn(),
     remove: jest.fn(),
     delete: jest.fn(),
+    createQueryBuilder: jest.fn(),
+  };
+
+  const mockDataSource = {
+    transaction: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -40,6 +47,7 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: getRepositoryToken(RefreshToken), useValue: mockRefreshTokenRepo },
+        { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 
@@ -127,13 +135,13 @@ describe('AuthService', () => {
       });
     });
 
-    it('refresh token을 DB에 저장해야 한다', async () => {
+    it('refresh token의 SHA-256 해시를 DB에 저장해야 한다', async () => {
       const user = { id: 1, nickname: 'testuser', role: UserRole.USER };
       mockJwtService.sign.mockReturnValue('mocked.jwt.token');
       mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
       mockRefreshTokenRepo.save.mockResolvedValue({});
 
-      await service.generateTokens(user);
+      const result = await service.generateTokens(user);
 
       expect(mockRefreshTokenRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -144,7 +152,12 @@ describe('AuthService', () => {
       );
       expect(mockRefreshTokenRepo.save).toHaveBeenCalled();
 
-      const createArg = mockRefreshTokenRepo.create.mock.calls[0][0] as { expiresAt: Date };
+      // DB에 저장된 토큰은 반환된 rawToken의 SHA-256 해시여야 한다
+      const createArg = mockRefreshTokenRepo.create.mock.calls[0][0] as { token: string; expiresAt: Date };
+      const expectedHash = createHash('sha256').update(result.refresh_token).digest('hex');
+      expect(createArg.token).toBe(expectedHash);
+      expect(createArg.token).not.toBe(result.refresh_token);
+
       const now = new Date();
       const daysDiff = (createArg.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
       expect(daysDiff).toBeGreaterThan(6.9);
@@ -153,84 +166,153 @@ describe('AuthService', () => {
   });
 
   describe('refreshTokens', () => {
-    const mockTokenEntity = {
-      id: 1,
-      token: 'valid-refresh-token',
-      userId: 1,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      createdAt: new Date(),
-    };
+    it('정상적으로 트랜잭션 내에서 토큰을 rotation하고 새 토큰 쌍을 반환해야 한다', async () => {
+      const rawToken = 'valid-refresh-token';
+      const hashedToken = createHash('sha256').update(rawToken).digest('hex');
+      const mockTokenEntity = {
+        id: 1,
+        token: hashedToken,
+        userId: 1,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      };
 
-    it('정상적으로 토큰을 rotation하고 새 토큰 쌍을 반환해야 한다', async () => {
-      mockRefreshTokenRepo.findOne.mockResolvedValue(mockTokenEntity);
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(mockTokenEntity),
+        remove: jest.fn().mockResolvedValue(mockTokenEntity),
+        create: jest.fn().mockImplementation((_entity: unknown, data: Partial<RefreshToken>) => data),
+        save: jest.fn().mockResolvedValue({}),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+      );
       mockUsersService.findByIdWithStatus.mockResolvedValue({
         id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER,
       });
-      mockRefreshTokenRepo.remove.mockResolvedValue(mockTokenEntity);
       mockJwtService.sign.mockReturnValue('new.jwt.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
-      mockRefreshTokenRepo.save.mockResolvedValue({});
 
-      const result = await service.refreshTokens('valid-refresh-token');
+      const result = await service.refreshTokens(rawToken);
 
       expect(result.access_token).toBe('new.jwt.token');
       expect(result.refresh_token).toBeDefined();
+      expect(result.refresh_token.length).toBe(64);
       expect(result.user).toEqual({
         id: 1, nickname: 'testuser', role: UserRole.USER,
       });
-      expect(mockRefreshTokenRepo.remove).toHaveBeenCalledWith(mockTokenEntity);
+      // 트랜잭션이 사용되었는지 확인
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      // 해시된 토큰으로 조회했는지 확인
+      expect(mockManager.findOne).toHaveBeenCalledWith(
+        RefreshToken,
+        expect.objectContaining({
+          where: { token: hashedToken },
+          lock: { mode: 'pessimistic_write' },
+        }),
+      );
+      // 기존 토큰 삭제 확인
+      expect(mockManager.remove).toHaveBeenCalledWith(mockTokenEntity);
+      // 새 토큰이 manager를 통해 저장되었는지 확인
+      expect(mockManager.save).toHaveBeenCalled();
     });
 
     it('존재하지 않는 토큰이면 UnauthorizedException을 던져야 한다', async () => {
-      mockRefreshTokenRepo.findOne.mockResolvedValue(null);
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(null),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+      );
 
       await expect(service.refreshTokens('nonexistent-token'))
         .rejects.toThrow(new UnauthorizedException('유효하지 않은 리프레시 토큰입니다.'));
     });
 
     it('만료된 토큰이면 삭제 후 UnauthorizedException을 던져야 한다', async () => {
-      const expiredToken = {
-        ...mockTokenEntity,
+      const rawToken = 'expired-token';
+      const hashedToken = createHash('sha256').update(rawToken).digest('hex');
+      const expiredTokenEntity = {
+        id: 1,
+        token: hashedToken,
+        userId: 1,
         expiresAt: new Date(Date.now() - 1000),
+        createdAt: new Date(),
       };
-      mockRefreshTokenRepo.findOne.mockResolvedValue(expiredToken);
-      mockRefreshTokenRepo.remove.mockResolvedValue(expiredToken);
 
-      await expect(service.refreshTokens('valid-refresh-token'))
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(expiredTokenEntity),
+        remove: jest.fn().mockResolvedValue(expiredTokenEntity),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+      );
+
+      await expect(service.refreshTokens(rawToken))
         .rejects.toThrow(new UnauthorizedException('만료된 리프레시 토큰입니다.'));
-      expect(mockRefreshTokenRepo.remove).toHaveBeenCalledWith(expiredToken);
+      expect(mockManager.remove).toHaveBeenCalledWith(expiredTokenEntity);
     });
 
     it('SUSPENDED 사용자의 토큰이면 삭제 후 UnauthorizedException을 던져야 한다', async () => {
-      mockRefreshTokenRepo.findOne.mockResolvedValue(mockTokenEntity);
+      const rawToken = 'suspended-user-token';
+      const hashedToken = createHash('sha256').update(rawToken).digest('hex');
+      const mockTokenEntity = {
+        id: 1,
+        token: hashedToken,
+        userId: 1,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      };
+
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(mockTokenEntity),
+        remove: jest.fn().mockResolvedValue(mockTokenEntity),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+      );
       mockUsersService.findByIdWithStatus.mockResolvedValue({
         id: 1, nickname: 'testuser', status: UserStatus.SUSPENDED, role: UserRole.USER,
       });
-      mockRefreshTokenRepo.remove.mockResolvedValue(mockTokenEntity);
 
-      await expect(service.refreshTokens('valid-refresh-token'))
+      await expect(service.refreshTokens(rawToken))
         .rejects.toThrow(new UnauthorizedException('정지된 계정입니다.'));
     });
 
     it('DELETED 사용자의 토큰이면 삭제 후 UnauthorizedException을 던져야 한다', async () => {
-      mockRefreshTokenRepo.findOne.mockResolvedValue(mockTokenEntity);
+      const rawToken = 'deleted-user-token';
+      const hashedToken = createHash('sha256').update(rawToken).digest('hex');
+      const mockTokenEntity = {
+        id: 1,
+        token: hashedToken,
+        userId: 1,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      };
+
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValue(mockTokenEntity),
+        remove: jest.fn().mockResolvedValue(mockTokenEntity),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+      );
       mockUsersService.findByIdWithStatus.mockResolvedValue({
         id: 1, nickname: 'testuser', status: UserStatus.DELETED, role: UserRole.USER,
       });
-      mockRefreshTokenRepo.remove.mockResolvedValue(mockTokenEntity);
 
-      await expect(service.refreshTokens('valid-refresh-token'))
+      await expect(service.refreshTokens(rawToken))
         .rejects.toThrow(new UnauthorizedException('탈퇴한 계정입니다.'));
     });
   });
 
   describe('revokeRefreshToken', () => {
-    it('해당 토큰을 삭제해야 한다', async () => {
+    it('해시된 토큰으로 삭제해야 한다', async () => {
       mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 1 });
+      const rawToken = 'some-token';
+      const expectedHash = createHash('sha256').update(rawToken).digest('hex');
 
-      await service.revokeRefreshToken('some-token');
+      await service.revokeRefreshToken(rawToken);
 
-      expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({ token: 'some-token' });
+      expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({ token: expectedHash });
     });
   });
 
@@ -241,6 +323,24 @@ describe('AuthService', () => {
       await service.revokeAllUserTokens(1);
 
       expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({ userId: 1 });
+    });
+  });
+
+  describe('cleanExpiredTokens', () => {
+    it('만료된 토큰을 삭제해야 한다', async () => {
+      const mockQb = {
+        delete: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 5 }),
+      };
+      mockRefreshTokenRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      await service.cleanExpiredTokens();
+
+      expect(mockRefreshTokenRepo.createQueryBuilder).toHaveBeenCalledWith('rt');
+      expect(mockQb.delete).toHaveBeenCalled();
+      expect(mockQb.where).toHaveBeenCalledWith('expires_at < :now', { now: expect.any(Date) });
+      expect(mockQb.execute).toHaveBeenCalled();
     });
   });
 
