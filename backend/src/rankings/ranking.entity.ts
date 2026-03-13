@@ -46,6 +46,9 @@ export class Ranking {
   @JoinColumn({ name: 'content_id' })
   content?: Content;
 
+  @Column({ name: 'audience_count', type: 'bigint', nullable: true })
+  audienceCount?: number;
+
   @Column({ name: 'fetched_at', type: 'timestamptz', default: () => 'now()' })
   fetchedAt!: Date;
 }

@@ -55,6 +55,7 @@ export class RankingsService {
           category: 'daily-box-office',
           rank: parseInt(item.rank, 10),
           title: item.movieNm,
+          audienceCount: parseInt(item.audiAcc, 10) || undefined,
           targetDate,
           fetchedAt,
         });
@@ -115,6 +116,7 @@ export class RankingsService {
           category: 'weekly-box-office',
           rank: parseInt(item.rank, 10),
           title: item.movieNm,
+          audienceCount: parseInt(item.audiAcc, 10) || undefined,
           targetDate,
           fetchedAt,
         });

@@ -136,7 +136,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
           {/* 리뷰 원문 */}
           <div className="mb-4 rounded-lg bg-white/5 p-4">
             <div className="flex items-center gap-2">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-white'}`}>
                 {isDeletedUser(review.user) ? '?' : (review.user?.nickname?.charAt(0) ?? '?')}
               </div>
               <span className={`text-sm font-medium ${isDeletedUser(review.user) ? 'text-muted-foreground' : ''}`}>{getDisplayNickname(review.user)}</span>
@@ -162,31 +162,31 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
 
           {/* 댓글 목록 */}
           {isLoading && comments.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-4 text-center">불러오는 중...</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">불러오는 중...</p>
           ) : comments.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-4 text-center">아직 댓글이 없습니다.</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">아직 댓글이 없습니다.</p>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-white/[0.06]">
               {comments.map((c) => (
-                <div key={c.id} className="flex items-start gap-2">
-                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium flex-shrink-0 mt-0.5 ${isDeletedUser(c.user) ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
+                <div key={c.id} className="flex items-start gap-3 px-2 py-3 hover:bg-white/[0.03] transition-colors">
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium flex-shrink-0 ${isDeletedUser(c.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-white'}`}>
                     {isDeletedUser(c.user) ? '?' : (c.user?.nickname?.charAt(0) ?? '?')}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium ${isDeletedUser(c.user) ? 'text-muted-foreground' : ''}`}>{getDisplayNickname(c.user)}</span>
-                      <span className="text-[10px] text-muted-foreground">{formatDate(c.createdAt)}</span>
+                      <span className={`text-sm font-medium ${isDeletedUser(c.user) ? 'text-muted-foreground' : ''}`}>{getDisplayNickname(c.user)}</span>
+                      <span className="text-[11px] text-muted-foreground">{formatDate(c.createdAt)}</span>
                       {user && user.id === c.userId && (
                         <button
                           onClick={() => handleDelete(c.id)}
                           className="ml-auto p-1.5 sm:p-0 text-muted-foreground hover:text-destructive transition-colors"
                           aria-label="댓글 삭제"
                         >
-                          <Trash2 className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-card-foreground mt-0.5">{c.content}</p>
+                    <p className="text-sm text-white/70 mt-1 leading-relaxed">{c.content}</p>
                   </div>
                 </div>
               ))}
@@ -225,7 +225,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
             <button
               type="submit"
               disabled={authLoading || !user || !newComment.trim() || isSubmitting}
-              className="rounded-lg bg-primary px-4 py-3 sm:px-3 sm:py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="rounded-lg bg-gradient-to-r from-fuchsia-600 to-blue-500 px-4 py-3 sm:px-3 sm:py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50 transition-all"
               aria-label="댓글 등록"
             >
               <Send className="h-4 w-4" />

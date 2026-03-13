@@ -9,6 +9,7 @@ import LikeButton from '@/components/review/LikeButton';
 import ReviewCommentsModal from '@/components/review/ReviewCommentsModal';
 import ReviewFormModal from '@/components/review/ReviewFormModal';
 import WatchedDateModal from '@/components/watchlist/WatchedDateModal';
+import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { WatchlistItem } from '@/types/watchlist';
@@ -25,7 +26,9 @@ function getDay(dateStr: string | null): string {
 }
 
 export default function WatchlistCard({ item, initialLiked = false, onMutate }: WatchlistCardProps) {
+  const { user } = useAuth();
   const { content, status, watchedAt, review } = item;
+  const reviewWithUser = review && user ? { ...review, user: review.user ?? { id: user.id, nickname: user.nickname } } : review;
   const href = `/contents/${content.contentType}/${content.tmdbId}`;
   const posterSrc = content.posterUrl
     ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`)
@@ -86,7 +89,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                 {review ? (
                   <>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                      <span className="rounded bg-gradient-to-r from-fuchsia-600 to-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
                         내 리뷰
                       </span>
                       {review.rating != null && (
@@ -111,13 +114,15 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                   </>
                 ) : (
                   <div className="flex items-center h-full">
-                    <button
-                      onClick={() => setShowReviewForm(true)}
-                      className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-card px-4 py-2 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-                    >
-                      <Plus className="h-4 w-4" />
-                      리뷰 작성
-                    </button>
+                    <div className="rounded-lg bg-gradient-to-r from-fuchsia-600 to-blue-500 p-[1px] hover:opacity-80 transition-opacity">
+                      <button
+                        onClick={() => setShowReviewForm(true)}
+                        className="flex items-center gap-2 rounded-[7px] bg-card px-4 py-2 text-sm font-medium text-white/70 hover:text-white transition-colors"
+                      >
+                        <Plus className="h-4 w-4" />
+                        리뷰 작성
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -142,9 +147,9 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
         </div>
       </div>
 
-      {showComments && review && (
+      {showComments && reviewWithUser && (
         <ReviewCommentsModal
-          review={review}
+          review={reviewWithUser}
           onClose={() => setShowComments(false)}
         />
       )}

@@ -6,6 +6,7 @@ import { Star } from 'lucide-react';
 export interface RankingItem {
   id: number;
   rank: number;
+  audienceCount?: number;
   content: {
     id: number;
     tmdbId: number;
@@ -76,11 +77,15 @@ export default function RankingCard({ item }: RankingCardProps) {
               {content?.releaseDate && <span>{content.releaseDate.substring(0, 4)}</span>}
               {content && <span>{content.contentType === 'tv' ? '시리즈' : '영화'}</span>}
             </div>
-            {content?.genres && content.genres.length > 0 && (
+            {item.audienceCount ? (
+              <span className="text-sm font-semibold text-white/80">
+                {Math.floor(item.audienceCount / 10000)}만
+              </span>
+            ) : content?.genres && content.genres.length > 0 ? (
               <span className="text-[10px] text-white/50 truncate max-w-[60px]">
                 {content.genres[0].name}
               </span>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

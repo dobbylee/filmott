@@ -1,19 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import NicknameEditor from '@/components/profile/NicknameEditor';
-import PasswordChangeModal from '@/components/profile/PasswordChangeModal';
 import WatchlistStats from '@/components/profile/WatchlistStats';
 import DeleteAccountSection from '@/components/profile/DeleteAccountSection';
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user, isLoading, updateUser, logout, openAuthModal } = useAuth();
-  const [showPwModal, setShowPwModal] = useState(false);
-
   useEffect(() => {
     if (!isLoading && !user) {
       openAuthModal('login');
@@ -53,16 +50,6 @@ export default function ProfilePage() {
         <p className="mt-1 text-sm text-white/40">{user.email}</p>
       </div>
 
-      {/* 비밀번호 변경 */}
-      <div className="mb-4">
-        <button
-          onClick={() => setShowPwModal(true)}
-          className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white transition-all text-left"
-        >
-          비밀번호 변경
-        </button>
-      </div>
-
       {/* 워치리스트 통계 */}
       <WatchlistStats userId={user.id} />
 
@@ -80,11 +67,6 @@ export default function ProfilePage() {
       {/* 회원 탈퇴 */}
       <DeleteAccountSection />
 
-      {/* 비밀번호 변경 모달 */}
-      <PasswordChangeModal
-        isOpen={showPwModal}
-        onClose={() => setShowPwModal(false)}
-      />
     </div>
   );
 }

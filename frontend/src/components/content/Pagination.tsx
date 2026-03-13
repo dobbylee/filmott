@@ -60,7 +60,7 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
           onClick={() => goToPage(page)}
           className={`flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-md border text-sm ${
             page === currentPage
-              ? 'border-primary bg-primary text-primary-foreground'
+              ? 'border-transparent bg-gradient-to-br from-fuchsia-600 to-blue-500 text-white'
               : 'border-border hover:bg-secondary'
           }`}
         >

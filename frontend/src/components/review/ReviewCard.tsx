@@ -32,7 +32,7 @@ export default function ReviewCard({ review, showInteractions = true, initialLik
         {/* 상단: 아바타 + 닉네임 + 별점 + 댓글 (왼쪽) / 좋아요 (오른쪽) */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-white'}`}>
               {isDeletedUser(review.user) ? '?' : (review.user?.nickname?.charAt(0) ?? '?')}
             </div>
             <div>
