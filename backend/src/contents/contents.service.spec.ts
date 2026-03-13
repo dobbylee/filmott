@@ -444,5 +444,207 @@ describe('ContentsService', () => {
       });
       expect(result).toEqual(discoverResult);
     });
+
+    it('기본 파라미터 없이 호출해도 정상 동작해야 한다', async () => {
+      const discoverResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
+
+      const result = await service.discoverContents('movie', {});
+
+      expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith('movie', {
+        genres: undefined,
+        watchProviders: undefined,
+        year: undefined,
+        sort: undefined,
+        page: undefined,
+      });
+      expect(result).toEqual(discoverResult);
+    });
+  });
+
+  describe('findOrFetchByTmdbId - GENRE_NAME_MAP 적용', () => {
+    it('TMDB 장르 id에 대해 한글명으로 매핑해야 한다', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const tmdbData = {
+        id: 999,
+        title: 'Genre Test Movie',
+        original_title: 'Genre Test Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: 'Test',
+        release_date: '2024-01-01',
+        vote_average: 7.0,
+        genres: [
+          { id: 28, name: 'Action' },
+          { id: 18, name: 'Drama' },
+          { id: 9999, name: 'Unknown Genre' },
+        ],
+        runtime: 120,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      const savedContent = { id: 10, tmdbId: 999, title: 'Genre Test Movie' };
+      mockContentRepo.create.mockReturnValue(savedContent);
+      mockContentRepo.save.mockResolvedValue(savedContent);
+
+      await service.findOrFetchByTmdbId(999, 'movie');
+
+      expect(mockContentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          genres: [
+            { id: 28, name: '액션' },
+            { id: 18, name: '드라마' },
+            { id: 9999, name: 'Unknown Genre' },
+          ],
+        }),
+      );
+    });
+
+    it('GENRE_NAME_MAP에 없는 장르는 TMDB 원본 이름을 사용해야 한다', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const tmdbData = {
+        id: 888,
+        title: 'Unknown Genre Movie',
+        original_title: 'Unknown Genre Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        genres: [{ id: 99999, name: 'Exotic Genre' }],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      mockContentRepo.create.mockImplementation((data: any) => data);
+      mockContentRepo.save.mockImplementation((data: any) => Promise.resolve(data));
+
+      await service.findOrFetchByTmdbId(888, 'movie');
+
+      expect(mockContentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          genres: [{ id: 99999, name: 'Exotic Genre' }],
+        }),
+      );
+    });
+  });
+
+  describe('searchContents - 추가 케이스', () => {
+    it('person 타입으로 검색하면 searchByType에 person을 전달해야 한다', async () => {
+      const searchResult = { page: 1, total_pages: 1, total_results: 2, results: [{ id: 1 }] };
+      mockTmdbService.searchByType.mockResolvedValue(searchResult);
+
+      const result = await service.searchContents('배우', 'person', 1);
+
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('배우', 'person', 1);
+      expect(result).toEqual(searchResult);
+    });
+
+    it('tv 타입으로 검색하면 searchByType에 tv를 전달해야 한다', async () => {
+      const searchResult = { page: 2, total_pages: 5, total_results: 50, results: [] };
+      mockTmdbService.searchByType.mockResolvedValue(searchResult);
+
+      const result = await service.searchContents('드라마', 'tv', 2);
+
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('드라마', 'tv', 2);
+      expect(result.page).toBe(2);
+    });
+
+    it('전체 검색 시 person은 항상 page 1로 호출해야 한다', async () => {
+      const personResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const movieResult = { page: 3, total_pages: 3, total_results: 10, results: [] };
+      const tvResult = { page: 3, total_pages: 2, total_results: 5, results: [] };
+
+      mockTmdbService.searchByType
+        .mockResolvedValueOnce(personResult)
+        .mockResolvedValueOnce(movieResult)
+        .mockResolvedValueOnce(tvResult);
+
+      await service.searchContents('test', undefined, 3);
+
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'person', 1);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'movie', 3);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'tv', 3);
+    });
+  });
+
+  describe('getContentDetail - 추가 케이스', () => {
+    it('TMDB에서 KR 이외의 지역 결과만 있으면 watchProviders가 null이어야 한다', async () => {
+      mockContentRepo.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      const tmdbData = {
+        id: 700,
+        title: 'Non-KR Movie',
+        original_title: 'Non-KR Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        genres: [],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': {
+          results: {
+            US: { flatrate: [{ provider_id: 8, provider_name: 'Netflix' }] },
+          },
+        },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      const savedContent = { id: 20, tmdbId: 700, contentType: 'movie', title: 'Non-KR Movie' };
+      mockContentRepo.create.mockReturnValue(savedContent);
+      mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
+
+      const result = await service.getContentDetail(700, 'movie');
+
+      expect(result.watchProviders).toBeNull();
+    });
+
+    it('credits.cast가 20개 초과이면 20개로 잘라야 한다', async () => {
+      mockContentRepo.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      const cast = Array.from({ length: 30 }, (_, i) => ({
+        id: i + 1,
+        name: `Actor ${i + 1}`,
+        character: `Role ${i + 1}`,
+        profile_path: null,
+        order: i,
+      }));
+
+      const tmdbData = {
+        id: 800,
+        title: 'Big Cast Movie',
+        original_title: 'Big Cast Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        genres: [],
+        runtime: null,
+        credits: { cast },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      const savedContent = { id: 21, tmdbId: 800, contentType: 'movie', title: 'Big Cast Movie' };
+      mockContentRepo.create.mockReturnValue(savedContent);
+      mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
+
+      const result = await service.getContentDetail(800, 'movie');
+
+      expect(result.credits).toHaveLength(20);
+    });
   });
 });

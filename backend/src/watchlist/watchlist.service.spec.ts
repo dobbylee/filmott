@@ -103,6 +103,36 @@ describe('WatchlistService', () => {
       expect(result.watchedAt).toBeInstanceOf(Date);
       expect(mockWatchlistRepo.create).not.toHaveBeenCalled();
     });
+
+    it('기존 watched 항목에서 watchedAt이 주어지면 해당 날짜로 업데이트해야 한다', async () => {
+      const content = { id: 1, tmdbId: 550, contentType: 'movie' };
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+
+      const existing = { id: 5, userId: 1, contentId: 1, status: 'want_to_watch', watchedAt: null };
+      mockWatchlistRepo.findOne.mockResolvedValue(existing);
+      mockWatchlistRepo.save.mockImplementation((item: any) => Promise.resolve(item));
+
+      const watchedDto = { ...dto, status: 'watched' as const, watchedAt: '2026-01-15T00:00:00Z' };
+      const result = await service.addToWatchlist(1, watchedDto);
+
+      expect(result.status).toBe('watched');
+      expect(result.watchedAt).toEqual(new Date('2026-01-15T00:00:00Z'));
+    });
+
+    it('기존 항목을 want_to_watch로 업데이트하면 watchedAt이 null이어야 한다', async () => {
+      const content = { id: 1, tmdbId: 550, contentType: 'movie' };
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+
+      const existing = { id: 5, userId: 1, contentId: 1, status: 'watched', watchedAt: new Date() };
+      mockWatchlistRepo.findOne.mockResolvedValue(existing);
+      mockWatchlistRepo.save.mockImplementation((item: any) => Promise.resolve(item));
+
+      const wantDto = { ...dto, status: 'want_to_watch' as const };
+      const result = await service.addToWatchlist(1, wantDto);
+
+      expect(result.status).toBe('want_to_watch');
+      expect(result.watchedAt).toBeNull();
+    });
   });
 
   describe('updateStatus', () => {
@@ -152,6 +182,28 @@ describe('WatchlistService', () => {
       await expect(service.updateStatus(1, 1, { status: 'watched' })).rejects.toThrow(
         ForbiddenException,
       );
+    });
+
+    it('watched 상태에서 watchedAt을 지정하면 해당 날짜로 설정해야 한다', async () => {
+      const item = { id: 1, userId: 1, status: 'want_to_watch', watchedAt: null };
+      mockWatchlistRepo.findOne.mockResolvedValue(item);
+      mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
+
+      const result = await service.updateStatus(1, 1, { status: 'watched', watchedAt: '2026-06-15T00:00:00Z' });
+
+      expect(result.status).toBe('watched');
+      expect(result.watchedAt).toEqual(new Date('2026-06-15T00:00:00Z'));
+    });
+
+    it('status 없이 watchedAt만 주어지고 want_to_watch 상태이면 변경하지 않아야 한다', async () => {
+      const item = { id: 1, userId: 1, status: 'want_to_watch', watchedAt: null };
+      mockWatchlistRepo.findOne.mockResolvedValue(item);
+      mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
+
+      const result = await service.updateStatus(1, 1, { watchedAt: '2026-06-15T00:00:00Z' });
+
+      expect(result.status).toBe('want_to_watch');
+      expect(result.watchedAt).toBeNull();
     });
   });
 
@@ -334,74 +386,59 @@ describe('WatchlistService', () => {
   });
 
   describe('getWantToWatchAll', () => {
-    it('limit 상한 내에서 want_to_watch 항목을 반환해야 한다', async () => {
+    const createWantToWatchQb = (items: any[] = [], total = 0) => ({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([items, total]),
+    });
+
+    it('want_to_watch 항목을 반환해야 한다', async () => {
       const items = [
         { id: 1, status: 'want_to_watch', content: { id: 1, title: 'Movie A' } },
         { id: 2, status: 'want_to_watch', content: { id: 2, title: 'Movie B' } },
       ];
-      const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(items),
-      };
+      const mockQb = createWantToWatchQb(items, 2);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       const result = await service.getWantToWatchAll(1);
 
       expect(result.items).toHaveLength(2);
       expect(result.total).toBe(2);
+      expect(result.hasMore).toBe(false);
       expect(mockQb.andWhere).toHaveBeenCalledWith(
         'w.status = :status',
         { status: 'want_to_watch' },
       );
-      expect(mockQb.take).toHaveBeenCalledWith(100);
+      expect(mockQb.take).toHaveBeenCalledWith(30);
     });
 
     it('want_to_watch 항목이 없으면 빈 목록을 반환해야 한다', async () => {
-      const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
+      const mockQb = createWantToWatchQb([], 0);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       const result = await service.getWantToWatchAll(1);
 
       expect(result.items).toHaveLength(0);
       expect(result.total).toBe(0);
+      expect(result.hasMore).toBe(false);
     });
 
-    it('기본 limit 100으로 조회해야 한다', async () => {
-      const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
+    it('기본 limit 30, offset 0으로 조회해야 한다', async () => {
+      const mockQb = createWantToWatchQb([], 0);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       await service.getWantToWatchAll(1);
 
-      expect(mockQb.take).toHaveBeenCalledWith(100);
+      expect(mockQb.take).toHaveBeenCalledWith(30);
+      expect(mockQb.skip).toHaveBeenCalledWith(0);
     });
 
     it('limit을 지정하면 해당 값으로 조회해야 한다', async () => {
-      const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
+      const mockQb = createWantToWatchQb([], 0);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       await service.getWantToWatchAll(1, 50);
@@ -409,36 +446,78 @@ describe('WatchlistService', () => {
       expect(mockQb.take).toHaveBeenCalledWith(50);
     });
 
-    it('limit이 200을 초과하면 200으로 제한해야 한다', async () => {
-      const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
+    it('limit이 100을 초과하면 100으로 제한해야 한다', async () => {
+      const mockQb = createWantToWatchQb([], 0);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       await service.getWantToWatchAll(1, 500);
 
-      expect(mockQb.take).toHaveBeenCalledWith(200);
+      expect(mockQb.take).toHaveBeenCalledWith(100);
     });
 
     it('limit이 0 이하이면 1로 보정해야 한다', async () => {
-      const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
+      const mockQb = createWantToWatchQb([], 0);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       await service.getWantToWatchAll(1, 0);
 
       expect(mockQb.take).toHaveBeenCalledWith(1);
+    });
+
+    it('음수 limit이면 1로 보정해야 한다', async () => {
+      const mockQb = createWantToWatchQb([], 0);
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      await service.getWantToWatchAll(1, -10);
+
+      expect(mockQb.take).toHaveBeenCalledWith(1);
+    });
+
+    it('limit이 경계값 100일 때 정확히 100으로 조회해야 한다', async () => {
+      const mockQb = createWantToWatchQb([], 0);
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      await service.getWantToWatchAll(1, 100);
+
+      expect(mockQb.take).toHaveBeenCalledWith(100);
+    });
+
+    it('offset을 지정하면 해당 값으로 skip해야 한다', async () => {
+      const mockQb = createWantToWatchQb([], 0);
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      await service.getWantToWatchAll(1, 30, 60);
+
+      expect(mockQb.skip).toHaveBeenCalledWith(60);
+    });
+
+    it('음수 offset이면 0으로 보정해야 한다', async () => {
+      const mockQb = createWantToWatchQb([], 0);
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      await service.getWantToWatchAll(1, 30, -5);
+
+      expect(mockQb.skip).toHaveBeenCalledWith(0);
+    });
+
+    it('더 많은 항목이 있으면 hasMore가 true여야 한다', async () => {
+      const items = [{ id: 1, status: 'want_to_watch' }];
+      const mockQb = createWantToWatchQb(items, 50);
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getWantToWatchAll(1, 30, 0);
+
+      expect(result.hasMore).toBe(true);
+    });
+
+    it('모든 항목을 불러왔으면 hasMore가 false여야 한다', async () => {
+      const items = Array.from({ length: 10 }, (_, i) => ({ id: i + 1 }));
+      const mockQb = createWantToWatchQb(items, 10);
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const result = await service.getWantToWatchAll(1, 30, 0);
+
+      expect(result.hasMore).toBe(false);
     });
   });
 

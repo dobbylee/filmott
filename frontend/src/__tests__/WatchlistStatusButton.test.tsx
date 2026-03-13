@@ -142,4 +142,109 @@ describe('WatchlistStatusButton', () => {
 
     expect(screen.getByText('제거')).toBeInTheDocument();
   });
+
+  it('미등록 상태에서 "감상할 작품" 클릭 시 POST API를 호출해야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
+    mockPost.mockResolvedValue({ data: { id: 10 } });
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('기록하기'));
+    // 드롭다운에서 "감상할 작품" 클릭
+    const options = screen.getAllByText('감상할 작품');
+    await user.click(options[options.length - 1]);
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('/watchlist', expect.objectContaining({
+        tmdbId: 123,
+        contentType: 'movie',
+        status: 'want_to_watch',
+      }));
+    });
+  });
+
+  it('watched 상태에서 "제거" 클릭 시 DELETE API를 호출해야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockResolvedValue({ data: { status: 'watched', watchlistId: 5 } });
+    mockDelete.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('감상한 작품')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('감상한 작품'));
+    await user.click(screen.getByText('제거'));
+
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalledWith('/watchlist/5');
+    });
+  });
+
+  it('want_to_watch 상태에서 "제거" 클릭 시 DELETE API를 호출해야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockResolvedValue({ data: { status: 'want_to_watch', watchlistId: 3 } });
+    mockDelete.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton tmdbId={456} contentType="tv" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('감상할 작품')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('감상할 작품'));
+    await user.click(screen.getByText('제거'));
+
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalledWith('/watchlist/3');
+    });
+  });
+
+  it('제거 후 상태가 미등록("기록하기")으로 변경되어야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockResolvedValue({ data: { status: 'watched', watchlistId: 5 } });
+    mockDelete.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('감상한 작품')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('감상한 작품'));
+    await user.click(screen.getByText('제거'));
+
+    await waitFor(() => {
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
+    });
+  });
+
+  it('로그인 상태에서 상태 조회 API를 호출해야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
+
+    render(<WatchlistStatusButton tmdbId={999} contentType="tv" />);
+
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalledWith('/watchlist/me/status?tmdbId=999&contentType=tv');
+    });
+  });
+
+  it('비로그인 상태에서는 상태 조회 API를 호출하지 않아야 한다', () => {
+    mockUser = null;
+
+    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+
+    expect(mockGet).not.toHaveBeenCalled();
+  });
 });
