@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 interface WatchedDateModalProps {
@@ -11,6 +11,14 @@ interface WatchedDateModalProps {
 export default function WatchedDateModal({ onConfirm, onCancel }: WatchedDateModalProps) {
   const today = new Date().toISOString().split('T')[0];
   const [date, setDate] = useState(today);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">

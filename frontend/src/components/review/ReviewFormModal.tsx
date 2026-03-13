@@ -24,8 +24,15 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,6 +88,9 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
           <div className="mb-4">
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">별점</label>
             <StarRating value={rating} onChange={setRating} />
+            {error && rating === 0 && (
+              <p className="mt-1.5 text-xs text-destructive">{error}</p>
+            )}
           </div>
 
           <div className="mb-4">
@@ -97,7 +107,7 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
             />
           </div>
 
-          {error && (
+          {error && rating > 0 && (
             <p className="mb-3 text-sm text-destructive">{error}</p>
           )}
 
