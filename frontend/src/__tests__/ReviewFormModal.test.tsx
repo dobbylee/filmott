@@ -199,7 +199,34 @@ describe('ReviewFormModal', () => {
     expect(screen.getByText(/3개/)).toBeInTheDocument();
   });
 
-  it('rating 변경 없이 좋아요가 있어도 경고를 표시하지 않아야 한다', () => {
+  it('코멘트만 변경 시에도 좋아요가 있으면 경고를 표시해야 한다', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ReviewFormModal
+        {...defaultProps}
+        existingReview={{
+          id: 10,
+          userId: 1,
+          contentId: 1,
+          rating: 5,
+          comment: '기존 리뷰',
+          likesCount: 3,
+          createdAt: '2024-12-25T12:00:00Z',
+          updatedAt: '2024-12-25T12:00:00Z',
+        }}
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText('작품에 대한 한마디를 남겨보세요.');
+    await user.clear(textarea);
+    await user.type(textarea, '수정된 리뷰');
+
+    expect(screen.getByText(/초기화/)).toBeInTheDocument();
+    expect(screen.getByText(/3개/)).toBeInTheDocument();
+  });
+
+  it('rating과 코멘트 모두 변경 없으면 좋아요가 있어도 경고를 표시하지 않아야 한다', () => {
     render(
       <ReviewFormModal
         {...defaultProps}

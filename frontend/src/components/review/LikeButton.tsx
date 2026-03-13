@@ -10,6 +10,7 @@ interface LikeButtonProps {
   initialCount: number;
   initialLiked?: boolean;
   size?: 'sm' | 'md';
+  onChange?: (liked: boolean, count: number) => void;
 }
 
 export default function LikeButton({
@@ -17,6 +18,7 @@ export default function LikeButton({
   initialCount,
   initialLiked = false,
   size = 'sm',
+  onChange,
 }: LikeButtonProps) {
   const { user, openAuthModal } = useAuth();
   const [liked, setLiked] = useState(initialLiked);
@@ -50,6 +52,7 @@ export default function LikeButton({
       );
       setLiked(res.data.liked);
       setCount(res.data.likesCount);
+      onChange?.(res.data.liked, res.data.likesCount);
     } catch {
       setLiked(prevLiked);
       setCount(prevCount);

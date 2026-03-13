@@ -169,7 +169,7 @@ describe('ReviewsService', () => {
       expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
     });
 
-    it('코멘트만 변경 시 좋아요를 유지해야 한다', async () => {
+    it('코멘트만 변경 시에도 좋아요를 초기화해야 한다', async () => {
       const review = {
         id: 1,
         userId: 1,
@@ -180,15 +180,19 @@ describe('ReviewsService', () => {
         likesCount: 5,
       };
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
-      mockReviewRepo.save.mockImplementation((r: any) => Promise.resolve(r));
+
+      const mockManager = {
+        delete: jest.fn().mockResolvedValue({ affected: 5 }),
+        save: jest.fn().mockImplementation((r: any) => Promise.resolve(r)),
+      };
+      mockDataSource.transaction.mockImplementation((cb: any) => cb(mockManager));
 
       const result = await service.update(1, 1, { comment: 'Updated comment' });
 
       expect(result.comment).toBe('Updated comment');
       expect(result.rating).toBe(7);
-      expect(result.likesCount).toBe(5);
-      expect(mockDataSource.transaction).not.toHaveBeenCalled();
-      expect(mockReviewRepo.save).toHaveBeenCalled();
+      expect(result.likesCount).toBe(0);
+      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
     });
 
     it('rating과 코멘트 동시 변경 시 좋아요를 초기화해야 한다', async () => {
@@ -217,7 +221,7 @@ describe('ReviewsService', () => {
       expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
     });
 
-    it('동일한 rating으로 수정 시 좋아요를 유지해야 한다', async () => {
+    it('rating과 코멘트 모두 동일하면 좋아요를 유지해야 한다', async () => {
       const review = {
         id: 1,
         userId: 1,
@@ -230,7 +234,7 @@ describe('ReviewsService', () => {
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
       mockReviewRepo.save.mockImplementation((r: any) => Promise.resolve(r));
 
-      const result = await service.update(1, 1, { rating: 7, comment: 'Same rating' });
+      const result = await service.update(1, 1, { rating: 7, comment: 'Good' });
 
       expect(result.rating).toBe(7);
       expect(result.likesCount).toBe(10);

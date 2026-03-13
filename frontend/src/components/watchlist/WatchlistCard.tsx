@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, Plus } from 'lucide-react';
+import { Star, Plus, Pencil } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from '@/components/review/LikeButton';
 import ReviewCommentsModal from '@/components/review/ReviewCommentsModal';
@@ -45,12 +45,13 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
           <>
             <button
               onClick={() => setShowDateEdit(true)}
-              className="flex-shrink-0 flex items-center justify-center w-[50px] rounded-lg hover:bg-white/5 transition-colors"
+              className="flex-shrink-0 flex flex-col items-center justify-center w-[50px] gap-1 rounded-lg hover:bg-white/5 active:bg-white/10 transition-colors"
               title="감상 날짜 수정"
             >
               <span className="text-3xl font-bold text-white/80 hover:text-fuchsia-400 transition-colors">
                 {getDay(watchedAt)}
               </span>
+              <Pencil className="h-3 w-3 text-white/30" />
             </button>
             <div className="flex-shrink-0 w-px bg-white/10" />
           </>
@@ -88,18 +89,13 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
               <div className="flex-1 min-w-0 flex flex-col">
                 {review ? (
                   <>
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-1.5 py-0.5 text-[10px] font-medium text-white whitespace-nowrap">
-                        내 리뷰
-                      </span>
+                    <div className="flex items-center gap-3">
                       {review.rating != null && (
                         <div className="flex items-center gap-0.5">
                           <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
                           <span className="text-xs font-semibold">{review.rating}</span>
                         </div>
                       )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1.5">
                       <button
                         onClick={() => setShowComments(true)}
                         className="flex items-center gap-0.5 hover:text-white transition-colors"

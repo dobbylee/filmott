@@ -16,9 +16,10 @@ interface ReviewFormProps {
   existingReview?: Review | null;
   initialLiked?: boolean;
   onMutate?: () => void;
+  refreshKey?: number;
 }
 
-export default function ReviewForm({ contentId, existingReview, initialLiked = false, onMutate }: ReviewFormProps) {
+export default function ReviewForm({ contentId, existingReview, initialLiked = false, onMutate, refreshKey = 0 }: ReviewFormProps) {
   const { user, isLoading: authLoading, openAuthModal } = useAuth();
   const router = useRouter();
   const [showFormModal, setShowFormModal] = useState(false);
@@ -26,6 +27,11 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
   const [showComments, setShowComments] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [currentLikesCount, setCurrentLikesCount] = useState(existingReview?.likesCount ?? 0);
+
+  useEffect(() => {
+    setCurrentLikesCount(existingReview?.likesCount ?? 0);
+  }, [existingReview?.likesCount, refreshKey]);
 
   const hasExisting = existingReview != null;
 
@@ -112,10 +118,12 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
             </div>
 
             <LikeButton
+              key={refreshKey}
               reviewId={existingReview.id}
               initialCount={existingReview.likesCount}
               initialLiked={initialLiked}
               size="md"
+              onChange={(_liked, count) => setCurrentLikesCount(count)}
             />
           </div>
 
@@ -170,7 +178,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
         {showFormModal && (
           <ReviewFormModal
             contentId={contentId}
-            existingReview={existingReview}
+            existingReview={{ ...existingReview, likesCount: currentLikesCount }}
             onClose={() => setShowFormModal(false)}
             onMutate={onMutate}
           />

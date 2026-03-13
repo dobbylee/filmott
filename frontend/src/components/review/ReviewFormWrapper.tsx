@@ -57,6 +57,7 @@ export default function ReviewFormWrapper({ contentId }: ReviewFormWrapperProps)
       existingReview={existingReview}
       initialLiked={myLiked}
       onMutate={handleMutate}
+      refreshKey={refreshKey}
     />
   );
 }

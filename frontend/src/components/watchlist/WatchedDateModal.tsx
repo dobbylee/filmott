@@ -23,8 +23,8 @@ export default function WatchedDateModal({ onConfirm, onCancel }: WatchedDateMod
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div ref={modalRef} className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-[#111] p-6 shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onCancel}>
+      <div ref={modalRef} onClick={(e) => e.stopPropagation()} className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-[#111] p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold text-white">감상 날짜</h3>
           <button

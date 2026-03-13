@@ -141,24 +141,24 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
             <p className="mb-3 text-sm text-destructive">{error}</p>
           )}
 
-          {isEditing && existingReview.likesCount > 0 && rating !== existingReview.rating && (
-            <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-xs text-red-400">
-              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              수정 시 좋아요({existingReview.likesCount}개) 초기화
-            </div>
-          )}
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
+            {isEditing && existingReview.likesCount > 0 && (rating !== existingReview.rating || comment !== (existingReview.comment ?? '')) && (
+              <div className="mr-auto flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-xs text-red-400">
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                수정 시 좋아요({existingReview.likesCount}개) 초기화
+              </div>
+            )}
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-colors"
+              className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-colors"
             >
               {isSubmitting ? '저장 중...' : isEditing ? '수정' : '작성'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
             >
               취소
             </button>

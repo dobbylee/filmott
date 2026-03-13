@@ -75,12 +75,13 @@ export class ReviewsService {
     }
 
     const ratingChanged = dto.rating !== undefined && dto.rating !== review.rating;
+    const commentChanged = dto.comment !== undefined && dto.comment !== review.comment;
 
     if (dto.rating !== undefined) review.rating = dto.rating;
     if (dto.comment !== undefined) review.comment = dto.comment;
 
-    // rating이 변경된 경우에만 likes_count 리셋 + 좋아요 데이터 삭제 (트랜잭션)
-    if (ratingChanged) {
+    // rating 또는 comment가 변경된 경우 likes_count 리셋 + 좋아요 데이터 삭제 (트랜잭션)
+    if (ratingChanged || commentChanged) {
       return this.dataSource.transaction(async (manager) => {
         review.likesCount = 0;
         await manager.delete(ReviewLike, { reviewId: review.id });
