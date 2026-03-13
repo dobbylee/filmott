@@ -1,57 +1,39 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { X, Star, Trash2, Send } from 'lucide-react';
-import api from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { X, Star, Send } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Review } from '@/types/review';
-import { getDisplayNickname, isDeletedUser } from '@/utils/user';
-
-interface Comment {
-  id: number;
-  userId: number;
-  content: string;
-  createdAt: string;
-  user?: {
-    id: number;
-    nickname: string;
-    status?: string;
-  };
-}
-
-interface CommentsResponse {
-  data: Comment[];
-  total: number;
-  page: number;
-  totalPages: number;
-}
+import { getDisplayNickname } from '@/utils/user';
+import { formatCommentDate } from '@/utils/date';
+import { useComments } from './useComments';
+import CommentList from './CommentList';
+import UserAvatar from '@/components/common/UserAvatar';
 
 interface ReviewCommentsModalProps {
   review: Review;
   onClose: () => void;
 }
 
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsModalProps) {
   const { user, isLoading: authLoading, openAuthModal } = useAuth();
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
+  const {
+    comments,
+    total,
+    page,
+    totalPages,
+    isLoading,
+    errorMessage,
+    setErrorMessage,
+    loadComments,
+    submitComment,
+    deleteComment,
+  } = useComments(review.id);
+
+  // ESC 키 + body overflow 제어
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -63,28 +45,6 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [onClose]);
-
-  const loadComments = useCallback(async (p: number) => {
-    setIsLoading(true);
-    setErrorMessage('');
-    try {
-      const res = await api.get<CommentsResponse>(
-        `/reviews/${review.id}/comments?page=${p}`,
-      );
-      if (p === 1) {
-        setComments(res.data.data);
-      } else {
-        setComments((prev) => [...prev, ...res.data.data]);
-      }
-      setTotal(res.data.total);
-      setPage(res.data.page);
-      setTotalPages(res.data.totalPages);
-    } catch {
-      setErrorMessage('댓글을 불러오는 데 실패했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [review.id]);
 
   useEffect(() => {
     loadComments(1);
@@ -100,12 +60,8 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
 
     setIsSubmitting(true);
     try {
-      await api.post(`/reviews/${review.id}/comments`, {
-        content: newComment.trim(),
-      });
+      await submitComment(newComment.trim());
       setNewComment('');
-      setTotal((prev) => prev + 1);
-      await loadComments(1);
     } catch {
       setErrorMessage('댓글 등록에 실패했습니다.');
     } finally {
@@ -115,9 +71,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
 
   const handleDelete = async (commentId: number) => {
     try {
-      await api.delete(`/reviews/comments/${commentId}`);
-      setComments((prev) => prev.filter((c) => c.id !== commentId));
-      setTotal((prev) => Math.max(0, prev - 1));
+      await deleteComment(commentId);
     } catch {
       setErrorMessage('댓글 삭제에 실패했습니다.');
     }
@@ -143,10 +97,8 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
           {/* 리뷰 원문 */}
           <div className="mb-4 rounded-lg bg-white/5 p-4">
             <div className="flex items-center gap-2">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
-                {isDeletedUser(review.user) ? '?' : (review.user?.nickname?.charAt(0) ?? '?')}
-              </div>
-              <span className={`text-sm font-medium ${isDeletedUser(review.user) ? 'text-muted-foreground' : ''}`}>{getDisplayNickname(review.user)}</span>
+              <UserAvatar user={review.user} size="lg" />
+              <span className={`text-sm font-medium ${review.user?.status === 'DELETED' ? 'text-muted-foreground' : ''}`}>{getDisplayNickname(review.user)}</span>
               {review.rating != null && (
                 <div className="flex items-center gap-0.5 ml-1">
                   <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
@@ -159,7 +111,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
                 {review.comment}
               </p>
             )}
-            <span className="text-[10px] text-muted-foreground mt-2 block">{formatDate(review.createdAt)}</span>
+            <span className="text-[10px] text-muted-foreground mt-2 block">{formatCommentDate(review.createdAt)}</span>
           </div>
 
           {/* 댓글 수 */}
@@ -168,46 +120,15 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
           </p>
 
           {/* 댓글 목록 */}
-          {isLoading && comments.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-4 text-center">불러오는 중...</p>
-          ) : comments.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-4 text-center">아직 댓글이 없습니다.</p>
-          ) : (
-            <div className="space-y-3">
-              {comments.map((c) => (
-                <div key={c.id} className="flex items-start gap-2">
-                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium flex-shrink-0 mt-0.5 ${isDeletedUser(c.user) ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
-                    {isDeletedUser(c.user) ? '?' : (c.user?.nickname?.charAt(0) ?? '?')}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium ${isDeletedUser(c.user) ? 'text-muted-foreground' : ''}`}>{getDisplayNickname(c.user)}</span>
-                      <span className="text-[10px] text-muted-foreground">{formatDate(c.createdAt)}</span>
-                      {user && user.id === c.userId && (
-                        <button
-                          onClick={() => handleDelete(c.id)}
-                          className="ml-auto p-1.5 sm:p-0 text-muted-foreground hover:text-destructive transition-colors"
-                          aria-label="댓글 삭제"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-card-foreground mt-0.5">{c.content}</p>
-                  </div>
-                </div>
-              ))}
-              {page < totalPages && (
-                <button
-                  onClick={() => loadComments(page + 1)}
-                  disabled={isLoading}
-                  className="w-full py-2 text-xs text-primary hover:underline disabled:opacity-50"
-                >
-                  {isLoading ? '불러오는 중...' : '더보기'}
-                </button>
-              )}
-            </div>
-          )}
+          <CommentList
+            comments={comments}
+            currentUserId={user?.id}
+            isLoading={isLoading}
+            page={page}
+            totalPages={totalPages}
+            onLoadMore={loadComments}
+            onDelete={handleDelete}
+          />
         </div>
 
         {/* 에러 메시지 */}

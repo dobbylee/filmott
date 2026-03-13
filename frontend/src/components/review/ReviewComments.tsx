@@ -1,43 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Trash2, Send } from 'lucide-react';
-import api from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getDisplayNickname, isDeletedUser } from '@/utils/user';
-
-interface Comment {
-  id: number;
-  userId: number;
-  content: string;
-  createdAt: string;
-  user?: {
-    id: number;
-    nickname: string;
-    status?: string;
-  };
-}
-
-interface CommentsResponse {
-  data: Comment[];
-  total: number;
-  page: number;
-  totalPages: number;
-}
+import { useComments } from './useComments';
+import CommentList from './CommentList';
 
 interface ReviewCommentsProps {
   reviewId: number;
   commentCount?: number;
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 export default function ReviewComments({
@@ -46,37 +17,30 @@ export default function ReviewComments({
 }: ReviewCommentsProps) {
   const { user, isLoading: authLoading, openAuthModal } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [total, setTotal] = useState(commentCount);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
-  const loadComments = useCallback(async (p: number) => {
-    setIsLoading(true);
-    setErrorMessage('');
-    try {
-      const res = await api.get<CommentsResponse>(
-        `/reviews/${reviewId}/comments?page=${p}`,
-      );
-      if (p === 1) {
-        setComments(res.data.data);
-      } else {
-        setComments((prev) => [...prev, ...res.data.data]);
-      }
-      setTotal(res.data.total);
-      setPage(res.data.page);
-      setTotalPages(res.data.totalPages);
-    } catch (err) {
-      console.error('Failed to load comments:', err);
-      setErrorMessage('댓글을 불러오는 데 실패했습니다.');
-    } finally {
-      setIsLoading(false);
+  const {
+    comments,
+    total,
+    page,
+    totalPages,
+    isLoading,
+    errorMessage,
+    setErrorMessage,
+    loadComments,
+    submitComment,
+    deleteComment,
+  } = useComments(reviewId);
+
+  // total 초기값을 commentCount로 설정하기 위한 별도 상태
+  const [displayTotal, setDisplayTotal] = useState(commentCount);
+
+  useEffect(() => {
+    if (total > 0 || comments.length > 0) {
+      setDisplayTotal(total);
     }
-  }, [reviewId]);
+  }, [total, comments.length]);
 
   useEffect(() => {
     if (isOpen && comments.length === 0) {
@@ -94,15 +58,9 @@ export default function ReviewComments({
 
     setIsSubmitting(true);
     try {
-      await api.post(`/reviews/${reviewId}/comments`, {
-        content: newComment.trim(),
-      });
+      await submitComment(newComment.trim());
       setNewComment('');
-      setTotal((prev) => prev + 1);
-      // 댓글 목록 새로고침
-      await loadComments(1);
-    } catch (err) {
-      console.error('Failed to submit comment:', err);
+    } catch {
       setErrorMessage('댓글 등록에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
@@ -111,11 +69,8 @@ export default function ReviewComments({
 
   const handleDelete = async (commentId: number) => {
     try {
-      await api.delete(`/reviews/comments/${commentId}`);
-      setComments((prev) => prev.filter((c) => c.id !== commentId));
-      setTotal((prev) => Math.max(0, prev - 1));
-    } catch (err) {
-      console.error('Failed to delete comment:', err);
+      await deleteComment(commentId);
+    } catch {
       setErrorMessage('댓글 삭제에 실패했습니다.');
     }
   };
@@ -131,7 +86,7 @@ export default function ReviewComments({
         ) : (
           <ChevronDown className="h-3.5 w-3.5" />
         )}
-        댓글 {total > 0 ? total : ''}
+        댓글 {displayTotal > 0 ? displayTotal : ''}
       </button>
 
       {isOpen && (
@@ -163,52 +118,15 @@ export default function ReviewComments({
           )}
 
           {/* 댓글 목록 */}
-          {isLoading && comments.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-2">불러오는 중...</p>
-          ) : comments.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-2">아직 댓글이 없습니다.</p>
-          ) : (
-            <>
-              {comments.map((c) => (
-                <div key={c.id} className="flex items-start gap-2 py-1.5">
-                  <div className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium flex-shrink-0 ${isDeletedUser(c.user) ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground'}`}>
-                    {isDeletedUser(c.user) ? '?' : (c.user?.nickname?.charAt(0) ?? '?')}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium ${isDeletedUser(c.user) ? 'text-muted-foreground' : ''}`}>
-                        {getDisplayNickname(c.user)}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {formatDate(c.createdAt)}
-                      </span>
-                      {user && user.id === c.userId && (
-                        <button
-                          onClick={() => handleDelete(c.id)}
-                          className="ml-auto text-muted-foreground hover:text-destructive transition-colors"
-                          aria-label="댓글 삭제"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-card-foreground mt-0.5">
-                      {c.content}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {page < totalPages && (
-                <button
-                  onClick={() => loadComments(page + 1)}
-                  disabled={isLoading}
-                  className="text-xs text-primary hover:underline disabled:opacity-50"
-                >
-                  {isLoading ? '불러오는 중...' : '더보기'}
-                </button>
-              )}
-            </>
-          )}
+          <CommentList
+            comments={comments}
+            currentUserId={user?.id}
+            isLoading={isLoading}
+            page={page}
+            totalPages={totalPages}
+            onLoadMore={loadComments}
+            onDelete={handleDelete}
+          />
         </div>
       )}
     </div>
