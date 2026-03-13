@@ -80,7 +80,7 @@ describe('ReviewsService', () => {
         hasSpoiler: false,
       });
       expect(result).toEqual(created);
-      expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched');
+      expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched', undefined);
     });
 
     it('별점만으로 리뷰를 생성해야 한다', async () => {
@@ -132,7 +132,7 @@ describe('ReviewsService', () => {
       mockWatchlistService.addToWatchlistByContentId.mockResolvedValue({});
 
       await service.create(1, dto);
-      expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched');
+      expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched', undefined);
     });
 
     it('리뷰가 이미 존재하면 ConflictException을 던져야 한다', async () => {

@@ -46,7 +46,7 @@ export class ReviewsService {
     // 리뷰 작성 시 감상한 작품에 없으면 자동 추가
     const { status } = await this.watchlistService.getWatchlistStatus(userId, dto.contentId);
     if (status !== 'watched') {
-      await this.watchlistService.addToWatchlistByContentId(userId, dto.contentId, 'watched');
+      await this.watchlistService.addToWatchlistByContentId(userId, dto.contentId, 'watched', dto.watchedAt);
     }
 
     return saved;

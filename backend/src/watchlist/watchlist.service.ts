@@ -62,14 +62,19 @@ export class WatchlistService {
     userId: number,
     contentId: number,
     status: 'watched' | 'want_to_watch',
+    watchedAt?: string,
   ): Promise<Watchlist> {
     const existing = await this.watchlistRepo.findOne({
       where: { userId, contentId },
     });
 
+    const resolvedDate = status === 'watched'
+      ? (watchedAt ? new Date(watchedAt) : new Date())
+      : null;
+
     if (existing) {
       existing.status = status;
-      existing.watchedAt = status === 'watched' ? new Date() : null;
+      existing.watchedAt = resolvedDate;
       return this.watchlistRepo.save(existing);
     }
 
@@ -77,7 +82,7 @@ export class WatchlistService {
       userId,
       contentId,
       status,
-      watchedAt: status === 'watched' ? new Date() : null,
+      watchedAt: resolvedDate,
     });
 
     return this.watchlistRepo.save(watchlist);

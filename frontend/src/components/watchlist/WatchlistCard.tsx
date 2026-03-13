@@ -8,6 +8,8 @@ import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from '@/components/review/LikeButton';
 import ReviewCommentsModal from '@/components/review/ReviewCommentsModal';
 import ReviewFormModal from '@/components/review/ReviewFormModal';
+import WatchedDateModal from '@/components/watchlist/WatchedDateModal';
+import api from '@/lib/api';
 import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { WatchlistItem } from '@/types/watchlist';
 
@@ -30,6 +32,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
     : null;
   const [showComments, setShowComments] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [showDateEdit, setShowDateEdit] = useState(false);
 
   return (
     <>
@@ -37,11 +40,15 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
         {/* 일(day) 숫자 + 구분선 */}
         {status === 'watched' && (
           <>
-            <div className="flex-shrink-0 flex items-center justify-center w-[50px]">
-              <span className="text-3xl font-bold text-white/80">
+            <button
+              onClick={() => setShowDateEdit(true)}
+              className="flex-shrink-0 flex items-center justify-center w-[50px] rounded-lg hover:bg-white/5 transition-colors"
+              title="감상 날짜 수정"
+            >
+              <span className="text-3xl font-bold text-white/80 hover:text-fuchsia-400 transition-colors">
                 {getDay(watchedAt)}
               </span>
-            </div>
+            </button>
             <div className="flex-shrink-0 w-px bg-white/10" />
           </>
         )}
@@ -147,6 +154,22 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
           contentId={item.contentId}
           onClose={() => setShowReviewForm(false)}
           onMutate={onMutate}
+        />
+      )}
+
+      {showDateEdit && (
+        <WatchedDateModal
+          onConfirm={async (date) => {
+            try {
+              await api.patch(`/watchlist/${item.id}`, { watchedAt: date });
+              onMutate?.();
+            } catch {
+              // ignore
+            } finally {
+              setShowDateEdit(false);
+            }
+          }}
+          onCancel={() => setShowDateEdit(false)}
         />
       )}
     </>

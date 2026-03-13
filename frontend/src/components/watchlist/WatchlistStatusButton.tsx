@@ -8,6 +8,8 @@ import api from '@/lib/api';
 import WatchedDateModal from './WatchedDateModal';
 import type { WatchlistStatus, WatchlistStatusResponse } from '@/types/watchlist';
 
+const WATCHLIST_UPDATED_EVENT = 'watchlist-updated';
+
 interface WatchlistStatusButtonProps {
   tmdbId: number;
   contentType: 'movie' | 'tv';
@@ -44,6 +46,21 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
     };
 
     fetchStatus();
+  }, [user, tmdbId, contentType]);
+
+  // Listen for watchlist-updated events (e.g. from ReviewFormModal)
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (!user) return;
+      api.get<WatchlistStatusResponse>(
+        `/watchlist/me/status?tmdbId=${tmdbId}&contentType=${contentType}`
+      ).then((res) => {
+        setStatus(res.data.status);
+        setWatchlistId(res.data.watchlistId);
+      }).catch(() => {});
+    };
+    window.addEventListener(WATCHLIST_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(WATCHLIST_UPDATED_EVENT, handleUpdate);
   }, [user, tmdbId, contentType]);
 
   // Close dropdown on outside click

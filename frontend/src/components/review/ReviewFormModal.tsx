@@ -6,6 +6,7 @@ import { X, AlertTriangle } from 'lucide-react';
 import api from '@/lib/api';
 import StarRating from './StarRating';
 import type { Review } from '@/types/review';
+import type { WatchlistStatusResponse } from '@/types/watchlist';
 
 interface ReviewFormModalProps {
   contentId: number;
@@ -21,6 +22,18 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
   const [comment, setComment] = useState(existingReview?.comment ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [watchedAt, setWatchedAt] = useState(new Date().toISOString().split('T')[0]);
+  const [needsDate, setNeedsDate] = useState(false);
+
+  // 감상한 작품 미등록 시 날짜 입력 표시
+  useEffect(() => {
+    if (isEditing) return;
+    api.get<WatchlistStatusResponse>(`/watchlist/me/status?contentId=${contentId}`)
+      .then((res) => {
+        setNeedsDate(res.data.status !== 'watched');
+      })
+      .catch(() => setNeedsDate(true));
+  }, [contentId, isEditing]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -47,9 +60,11 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
           contentId,
           rating,
           comment: comment || undefined,
+          ...(needsDate ? { watchedAt } : {}),
         });
       }
       onMutate?.();
+      window.dispatchEvent(new Event('watchlist-updated'));
       router.refresh();
       onClose();
     } catch (err: unknown) {
@@ -82,6 +97,19 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">별점</label>
             <StarRating value={rating} onChange={setRating} />
           </div>
+
+          {needsDate && (
+            <div className="mb-4">
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">감상 날짜</label>
+              <input
+                type="date"
+                value={watchedAt}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setWatchedAt(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary [color-scheme:dark]"
+              />
+            </div>
+          )}
 
           <div className="mb-4">
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">

@@ -101,12 +101,23 @@ export class WatchlistController {
   }
 
   @Get('me/status')
-  async getWatchlistStatusByTmdbId(
+  async getWatchlistStatus(
     @CurrentUser() user: JwtPayload,
-    @Query('tmdbId', ParseIntPipe) tmdbId: number,
-    @Query('contentType') contentType: string,
+    @Query('tmdbId') tmdbIdStr?: string,
+    @Query('contentType') contentType?: string,
+    @Query('contentId') contentIdStr?: string,
   ) {
-    const ct = contentType === 'tv' ? 'tv' : 'movie';
-    return this.watchlistService.getWatchlistStatusByTmdbId(user.id, tmdbId, ct);
+    if (contentIdStr) {
+      const contentId = parseInt(contentIdStr, 10);
+      if (isNaN(contentId)) return { status: null, watchlistId: null };
+      return this.watchlistService.getWatchlistStatus(user.id, contentId);
+    }
+    if (tmdbIdStr) {
+      const tmdbId = parseInt(tmdbIdStr, 10);
+      if (isNaN(tmdbId)) return { status: null, watchlistId: null };
+      const ct = contentType === 'tv' ? 'tv' : 'movie';
+      return this.watchlistService.getWatchlistStatusByTmdbId(user.id, tmdbId, ct);
+    }
+    return { status: null, watchlistId: null };
   }
 }

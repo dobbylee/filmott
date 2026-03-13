@@ -11,6 +11,7 @@ describe('WatchlistController', () => {
     removeFromWatchlist: jest.fn(),
     getMyWatchlist: jest.fn(),
     getMyWatchlistCounts: jest.fn(),
+    getWatchlistStatus: jest.fn(),
     getWatchlistStatusByTmdbId: jest.fn(),
     getWantToWatchAll: jest.fn(),
     getWatchedYears: jest.fn(),
@@ -191,27 +192,35 @@ describe('WatchlistController', () => {
 
   describe('GET /watchlist/me/status', () => {
     it('tmdbId로 워치리스트 상태를 반환해야 한다', async () => {
-      const status = { status: 'watched', watchlistId: 1 };
-      mockWatchlistService.getWatchlistStatusByTmdbId.mockResolvedValue(status);
+      const statusData = { status: 'watched', watchlistId: 1 };
+      mockWatchlistService.getWatchlistStatusByTmdbId.mockResolvedValue(statusData);
 
-      const result = await controller.getWatchlistStatusByTmdbId(user, 550, 'movie');
+      const result = await controller.getWatchlistStatus(user, '550', 'movie');
 
-      expect(result).toEqual(status);
+      expect(result).toEqual(statusData);
       expect(mockWatchlistService.getWatchlistStatusByTmdbId).toHaveBeenCalledWith(1, 550, 'movie');
     });
 
-    it('유효하지 않은 값에 대해 contentType 기본값을 movie로 사용해야 한다', async () => {
-      mockWatchlistService.getWatchlistStatusByTmdbId.mockResolvedValue({ status: null, watchlistId: null });
+    it('contentId로 워치리스트 상태를 반환해야 한다', async () => {
+      const statusData = { status: 'watched', watchlistId: 1 };
+      mockWatchlistService.getWatchlistStatus.mockResolvedValue(statusData);
 
-      await controller.getWatchlistStatusByTmdbId(user, 550, 'invalid');
+      const result = await controller.getWatchlistStatus(user, undefined, undefined, '10');
 
-      expect(mockWatchlistService.getWatchlistStatusByTmdbId).toHaveBeenCalledWith(1, 550, 'movie');
+      expect(result).toEqual(statusData);
+      expect(mockWatchlistService.getWatchlistStatus).toHaveBeenCalledWith(1, 10);
+    });
+
+    it('파라미터가 없으면 null을 반환해야 한다', async () => {
+      const result = await controller.getWatchlistStatus(user);
+
+      expect(result).toEqual({ status: null, watchlistId: null });
     });
 
     it('contentType이 tv이면 tv를 사용해야 한다', async () => {
       mockWatchlistService.getWatchlistStatusByTmdbId.mockResolvedValue({ status: null, watchlistId: null });
 
-      await controller.getWatchlistStatusByTmdbId(user, 100, 'tv');
+      await controller.getWatchlistStatus(user, '100', 'tv');
 
       expect(mockWatchlistService.getWatchlistStatusByTmdbId).toHaveBeenCalledWith(1, 100, 'tv');
     });

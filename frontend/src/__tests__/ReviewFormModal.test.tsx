@@ -10,9 +10,11 @@ vi.mock('next/navigation', () => ({
 
 const mockPost = vi.fn();
 const mockPatch = vi.fn();
+const mockGet = vi.fn().mockResolvedValue({ data: { status: 'watched', watchlistId: 1 } });
 
 vi.mock('@/lib/api', () => ({
   default: {
+    get: (...args: unknown[]) => mockGet(...args),
     post: (...args: unknown[]) => mockPost(...args),
     patch: (...args: unknown[]) => mockPatch(...args),
   },
