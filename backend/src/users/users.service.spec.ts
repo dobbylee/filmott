@@ -3,6 +3,7 @@ import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Not } from 'typeorm';
 import { User } from './user.entity';
+import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { UserStatus } from './enums/user-status.enum';
 import { UserRole } from './enums/user-role.enum';
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
@@ -19,11 +20,16 @@ describe('UsersService', () => {
     save: jest.fn(),
   };
 
+  const mockRefreshTokenRepo = {
+    delete: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: getRepositoryToken(User), useValue: mockUsersRepo },
+        { provide: getRepositoryToken(RefreshToken), useValue: mockRefreshTokenRepo },
       ],
     }).compile();
 
@@ -220,13 +226,14 @@ describe('UsersService', () => {
 
   describe('deactivate', () => {
     it('사용자를 익명화하고 상태를 DELETED로 설정해야 한다', async () => {
-      const mockUser: Record<string, any> = {
+      const mockUser: Record<string, unknown> = {
         id: 5,
         nickname: 'bob',
         email: 'bob@mail.com',
         status: UserStatus.ACTIVE,
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 2 });
 
       // Mock Date.now() for predictable timestamp
       const fixedTimestamp = 1740000000000;
@@ -239,6 +246,26 @@ describe('UsersService', () => {
       expect(mockUser.email).toEqual(`deleted_5_${fixedTimestamp}@deleted.local`);
       expect(mockUser.status).toEqual(UserStatus.DELETED);
       expect(mockUsersRepo.save).toHaveBeenCalledWith(mockUser);
+
+      jest.restoreAllMocks();
+    });
+
+    it('탈퇴 시 해당 유저의 모든 refresh token을 삭제해야 한다', async () => {
+      const mockUser: Record<string, unknown> = {
+        id: 7,
+        nickname: 'alice',
+        email: 'alice@mail.com',
+        status: UserStatus.ACTIVE,
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 3 });
+
+      const fixedTimestamp = 1740000000000;
+      jest.spyOn(Date, 'now').mockReturnValue(fixedTimestamp);
+
+      await service.deactivate(7);
+
+      expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({ userId: 7 });
 
       jest.restoreAllMocks();
     });

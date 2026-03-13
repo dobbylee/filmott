@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { User, SafeUser } from './user.entity';
+import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { UserStatus } from './enums/user-status.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -17,6 +18,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
   ) {}
 
   /**
@@ -156,6 +159,9 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
+
+    // 해당 유저의 모든 refresh token 삭제 (탈퇴 후 기존 토큰으로 접근 차단)
+    await this.refreshTokenRepo.delete({ userId: id });
 
     // Anonymize to release unique constraints
     const timestamp = Date.now();
