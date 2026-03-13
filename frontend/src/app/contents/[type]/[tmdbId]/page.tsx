@@ -8,8 +8,9 @@ import ReviewListClient from '@/components/review/ReviewListClient';
 import ReviewFormWrapper from '@/components/review/ReviewFormWrapper';
 import WatchlistStatusButton from '@/components/watchlist/WatchlistStatusButton';
 import type { ContentDetail, WatchProviderData } from '@/types/content';
-import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { ReviewsResponse, ContentStats } from '@/types/review';
+import ErrorWithRetry from '@/components/common/ErrorWithRetry';
+import WatchProviders from '@/components/content/WatchProviders';
 
 interface ContentDetailPageProps {
   params: Promise<{
@@ -97,14 +98,7 @@ async function ReviewsSection({ contentId }: { contentId: number }) {
       </div>
     );
   } catch {
-    return (
-      <div>
-        <h2 className="mb-4 text-lg font-bold">리뷰</h2>
-        <p className="text-sm text-muted-foreground">
-          리뷰를 불러올 수 없습니다.
-        </p>
-      </div>
-    );
+    return <ErrorWithRetry title="리뷰" message="리뷰를 불러올 수 없습니다." />;
   }
 }
 
@@ -117,11 +111,7 @@ export default async function ContentDetailPage({
   try {
     content = await fetchContentDetail(type, tmdbId);
   } catch {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">작품 정보를 불러올 수 없습니다.</p>
-      </div>
-    );
+    return <ErrorWithRetry message="작품 정보를 불러올 수 없습니다." />;
   }
 
   const genres = Array.isArray(content.genres)
@@ -247,36 +237,11 @@ export default async function ContentDetailPage({
               )}
 
               {/* OTT 플랫폼 로고 */}
-              {content.watchProviders && (() => {
-                const providers = (content.watchProviders as WatchProviderData);
-                const all = [
-                  ...(providers.flatrate ?? []),
-                  ...(providers.rent ?? []),
-                  ...(providers.buy ?? []),
-                ];
-                const unique = all
-                  .filter((p, i, arr) => arr.findIndex((x) => x.provider_id === p.provider_id) === i)
-                  .filter((p, i, arr) => !arr.slice(0, i).some((prev) => p.provider_name.startsWith(prev.provider_name)));
-                if (unique.length === 0) return null;
-                return (
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {unique.map((p) => (
-                      <div key={p.provider_id} className="group relative">
-                        <Image
-                          src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
-                          alt={p.provider_name}
-                          width={32}
-                          height={32}
-                          className="rounded-md"
-                        />
-                        <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/80 px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-                          {p.provider_name}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
+              {content.watchProviders && (
+                <div className="mt-4">
+                  <WatchProviders data={content.watchProviders as WatchProviderData} compact />
+                </div>
+              )}
 
               {/* 기록하기 버튼 */}
               <div className="mt-6">

@@ -61,8 +61,9 @@ describe('LoginPage', () => {
     expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
-  it('null을 렌더링한다 (UI 없음)', () => {
+  it('로딩 스피너를 렌더링한다', () => {
     const { container } = render(<LoginPage />);
-    expect(container.firstChild).toBeNull();
+    const spinner = container.querySelector('.animate-spin');
+    expect(spinner).toBeInTheDocument();
   });
 });

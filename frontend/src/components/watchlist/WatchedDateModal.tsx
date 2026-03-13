@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useFocusTrap } from '@/utils/useFocusTrap';
 
 interface WatchedDateModalProps {
   onConfirm: (date: string) => void;
@@ -11,10 +12,19 @@ interface WatchedDateModalProps {
 export default function WatchedDateModal({ onConfirm, onCancel }: WatchedDateModalProps) {
   const today = new Date().toISOString().split('T')[0];
   const [date, setDate] = useState(today);
+  const modalRef = useFocusTrap<HTMLDivElement>();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-[#111] p-6 shadow-2xl">
+      <div ref={modalRef} className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-[#111] p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold text-white">감상 날짜</h3>
           <button

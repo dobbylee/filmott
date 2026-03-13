@@ -68,6 +68,19 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
         </button>
       ))}
 
+      {getVisiblePages()[getVisiblePages().length - 1] < totalPages && (
+        <>
+          {getVisiblePages()[getVisiblePages().length - 1] < totalPages - 1 && (
+            <span className="px-1 text-muted-foreground">...</span>
+          )}
+          <button
+            onClick={() => goToPage(totalPages)}
+            className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-md border border-border text-sm"
+          >
+            {totalPages}
+          </button>
+        </>
+      )}
 
       <button
         onClick={() => goToPage(currentPage + 1)}

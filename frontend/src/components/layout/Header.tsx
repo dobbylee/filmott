@@ -25,6 +25,16 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // 모바일 메뉴 오픈 시 배경 스크롤 차단
+  useEffect(() => {
+    if (showMobileMenu) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [showMobileMenu]);
+
   // 검색창 외부 클릭 시 닫기
   useEffect(() => {
     if (!isSearchOpen) return;

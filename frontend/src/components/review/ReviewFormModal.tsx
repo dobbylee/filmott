@@ -6,7 +6,7 @@ import { X, AlertTriangle } from 'lucide-react';
 import api from '@/lib/api';
 import StarRating from './StarRating';
 import type { Review } from '@/types/review';
-import type { WatchlistStatusResponse } from '@/types/watchlist';
+import { useFocusTrap } from '@/utils/useFocusTrap';
 
 interface ReviewFormModalProps {
   contentId: number;
@@ -22,23 +22,19 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
   const [comment, setComment] = useState(existingReview?.comment ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [watchedAt, setWatchedAt] = useState(new Date().toISOString().split('T')[0]);
-  const [needsDate, setNeedsDate] = useState(false);
-
-  // 감상한 작품 미등록 시 날짜 입력 표시
-  useEffect(() => {
-    if (isEditing) return;
-    api.get<WatchlistStatusResponse>(`/watchlist/me/status?contentId=${contentId}`)
-      .then((res) => {
-        setNeedsDate(res.data.status !== 'watched');
-      })
-      .catch(() => setNeedsDate(true));
-  }, [contentId, isEditing]);
+  const modalRef = useFocusTrap<HTMLDivElement>();
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,11 +56,9 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
           contentId,
           rating,
           comment: comment || undefined,
-          ...(needsDate ? { watchedAt } : {}),
         });
       }
       onMutate?.();
-      window.dispatchEvent(new Event('watchlist-updated'));
       router.refresh();
       onClose();
     } catch (err: unknown) {
@@ -80,7 +74,7 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
+      <div ref={modalRef} className="relative w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
@@ -96,20 +90,10 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
           <div className="mb-4">
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">별점</label>
             <StarRating value={rating} onChange={setRating} />
+            {error && rating === 0 && (
+              <p className="mt-1.5 text-xs text-destructive">{error}</p>
+            )}
           </div>
-
-          {needsDate && (
-            <div className="mb-4">
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">감상 날짜</label>
-              <input
-                type="date"
-                value={watchedAt}
-                max={new Date().toISOString().split('T')[0]}
-                onChange={(e) => setWatchedAt(e.target.value)}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary [color-scheme:dark]"
-              />
-            </div>
-          )}
 
           <div className="mb-4">
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
@@ -125,11 +109,11 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
             />
           </div>
 
-          {error && (
+          {error && rating > 0 && (
             <p className="mb-3 text-sm text-destructive">{error}</p>
           )}
 
-          {isEditing && existingReview.likesCount > 0 && rating !== existingReview.rating && (
+          {isEditing && existingReview.likesCount > 0 && (
             <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-xs text-red-400">
               <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
               수정 시 좋아요({existingReview.likesCount}개) 초기화
@@ -139,9 +123,9 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
             <button
               type="submit"
               disabled={isSubmitting || rating === 0}
-              className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50 transition-all"
+              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
             >
-              {isSubmitting ? '저장 중...' : isEditing ? '수정' : '작성'}
+              {isSubmitting ? '저장 중...' : isEditing ? '수정' : '등록'}
             </button>
             <button
               type="button"

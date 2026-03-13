@@ -4,13 +4,46 @@ import type { WatchProviderData } from '@/types/content';
 
 interface WatchProvidersProps {
   data: WatchProviderData | null;
+  compact?: boolean;
 }
 
-export default function WatchProviders({ data }: WatchProvidersProps) {
+export default function WatchProviders({ data, compact = false }: WatchProvidersProps) {
   if (!data) return null;
 
   const hasAny = data.flatrate?.length || data.rent?.length || data.buy?.length;
   if (!hasAny) return null;
+
+  // compact 모드: 모든 provider를 합쳐 중복 제거 후 한 줄로 표시
+  if (compact) {
+    const all = [
+      ...(data.flatrate ?? []),
+      ...(data.rent ?? []),
+      ...(data.buy ?? []),
+    ];
+    const unique = all.filter(
+      (p, i, arr) => arr.findIndex((x) => x.provider_id === p.provider_id) === i
+    );
+    if (unique.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {unique.map((p) => (
+          <div key={p.provider_id} className="group relative">
+            <Image
+              src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
+              alt={p.provider_name}
+              width={32}
+              height={32}
+              className="rounded-md"
+            />
+            <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/80 px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+              {p.provider_name}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

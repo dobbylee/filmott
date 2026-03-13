@@ -5,6 +5,7 @@ import ContentGrid from '@/components/content/ContentGrid';
 import FilterBar from '@/components/content/FilterBar';
 import Pagination from '@/components/content/Pagination';
 import type { TmdbSearchResult } from '@/types/content';
+import ContentGridSkeleton from '@/components/common/ContentGridSkeleton';
 
 export const metadata: Metadata = {
   title: '탐색 - filmott',
@@ -98,13 +99,7 @@ export default async function DiscoverPage({ searchParams }: DiscoverPageProps) 
         />
       </div>
 
-      <Suspense
-        fallback={
-          <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
-            <p>불러오는 중...</p>
-          </div>
-        }
-      >
+      <Suspense fallback={<ContentGridSkeleton />}>
         <DiscoverResults
           type={type}
           genres={genres}

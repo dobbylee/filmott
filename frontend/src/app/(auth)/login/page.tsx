@@ -17,5 +17,9 @@ export default function LoginPage() {
     }
   }, [user, openAuthModal, router]);
 
-  return null;
+  return (
+    <div className="flex min-h-[400px] items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+    </div>
+  );
 }
