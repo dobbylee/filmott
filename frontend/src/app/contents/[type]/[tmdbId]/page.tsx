@@ -178,6 +178,26 @@ export default async function ContentDetailPage({
 
             {/* 텍스트 정보 */}
             <div className="relative flex-1 pt-2">
+              {/* 모바일 포스터 */}
+              <div className="mb-4 flex justify-center md:hidden">
+                <div className="relative h-[200px] w-[133px] overflow-hidden rounded-lg shadow-xl">
+                  {content.posterUrl ? (
+                    <Image
+                      src={content.posterUrl}
+                      alt={content.title}
+                      fill
+                      sizes="133px"
+                      className="object-cover"
+                      priority
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-muted text-sm text-muted-foreground">
+                      포스터 없음
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <h1 className="text-2xl font-bold md:text-3xl">{content.title}</h1>
               {content.originalTitle && content.originalTitle !== content.title && (
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -271,7 +291,7 @@ export default async function ContentDetailPage({
       </div>
 
       {/* 중단: 줄거리, 출연진, OTT */}
-      <div className="mx-auto max-w-7xl px-4 pt-28 pb-8 space-y-24">
+      <div className="mx-auto max-w-7xl px-4 pt-12 pb-8 space-y-12">
         {/* 줄거리 */}
         {content.overview && (
           <section>
