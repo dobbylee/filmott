@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleAuthRequired = () => {
       // api.ts 인터셉터에서 이미 제거하지만, 방어적으로 여기서도 클리어
       localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       setUser(null);
       setToken(null);
@@ -73,10 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const handleAuthResponse = useCallback((response: AuthResponse) => {
-    const { access_token, user: userData } = response;
+    const { access_token, refresh_token, user: userData } = response;
     setToken(access_token);
     setUser(userData);
     localStorage.setItem('access_token', access_token);
+    localStorage.setItem('refresh_token', refresh_token);
     localStorage.setItem('user', JSON.stringify(userData));
   }, []);
 
@@ -97,9 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (refreshToken) {
+      // fire-and-forget: 서버 요청 실패해도 클라이언트 로그아웃 진행
+      api.post('/auth/logout', { refresh_token: refreshToken }).catch(() => {});
+    }
     setToken(null);
     setUser(null);
     localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
   }, []);
 

@@ -24,6 +24,7 @@ const mockUser: User = {
 const mockAuthResponse = {
   data: {
     access_token: 'mock-token-abc',
+    refresh_token: 'mock-refresh-token-xyz',
     user: mockUser,
   },
 };
@@ -176,6 +177,7 @@ describe('AuthContext', () => {
       });
       expect(screen.getByTestId('token')).toHaveTextContent('mock-token-abc');
       expect(localStorageMock.setItem).toHaveBeenCalledWith('access_token', 'mock-token-abc');
+      expect(localStorageMock.setItem).toHaveBeenCalledWith('refresh_token', 'mock-refresh-token-xyz');
       expect(localStorageMock.setItem).toHaveBeenCalledWith('user', JSON.stringify(mockUser));
     });
   });
@@ -208,12 +210,13 @@ describe('AuthContext', () => {
       });
       expect(screen.getByTestId('token')).toHaveTextContent('mock-token-abc');
       expect(localStorageMock.setItem).toHaveBeenCalledWith('access_token', 'mock-token-abc');
+      expect(localStorageMock.setItem).toHaveBeenCalledWith('refresh_token', 'mock-refresh-token-xyz');
       expect(localStorageMock.setItem).toHaveBeenCalledWith('user', JSON.stringify(mockUser));
     });
   });
 
   describe('logout', () => {
-    it('user/token을 초기화하고 localStorage에서 제거해야 한다', async () => {
+    it('서버에 로그아웃 요청 후 user/token을 초기화하고 localStorage에서 제거해야 한다', async () => {
       mockPost.mockResolvedValue(mockAuthResponse);
       const user = userEvent.setup();
 
@@ -233,6 +236,44 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('user')).toHaveTextContent('testuser');
       });
 
+      mockPost.mockResolvedValue({});
+
+      // Then logout
+      await user.click(screen.getByRole('button', { name: 'logout' }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('user')).toHaveTextContent('null');
+      });
+      expect(screen.getByTestId('token')).toHaveTextContent('null');
+      expect(mockPost).toHaveBeenCalledWith('/auth/logout', { refresh_token: 'mock-refresh-token-xyz' });
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith('access_token');
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith('refresh_token');
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith('user');
+    });
+
+    it('서버 로그아웃 실패해도 클라이언트 로그아웃이 진행되어야 한다', async () => {
+      mockPost.mockResolvedValue(mockAuthResponse);
+      const user = userEvent.setup();
+
+      render(
+        <AuthProvider>
+          <AuthConsumer />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
+      });
+
+      // Login first
+      await user.click(screen.getByRole('button', { name: 'login' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('user')).toHaveTextContent('testuser');
+      });
+
+      // Make logout API call fail
+      mockPost.mockRejectedValue(new Error('Network error'));
+
       // Then logout
       await user.click(screen.getByRole('button', { name: 'logout' }));
 
@@ -241,6 +282,7 @@ describe('AuthContext', () => {
       });
       expect(screen.getByTestId('token')).toHaveTextContent('null');
       expect(localStorageMock.removeItem).toHaveBeenCalledWith('access_token');
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith('refresh_token');
       expect(localStorageMock.removeItem).toHaveBeenCalledWith('user');
     });
   });
@@ -302,6 +344,7 @@ describe('AuthContext', () => {
     it('auth:required 이벤트 발생 시 로그인 모달을 열고 사용자를 초기화해야 한다', async () => {
       // Start with a logged in user
       localStorageMock.setItem('access_token', 'stored-token');
+      localStorageMock.setItem('refresh_token', 'stored-refresh-token');
       localStorageMock.setItem('user', JSON.stringify(mockUser));
 
       render(
@@ -325,6 +368,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('token')).toHaveTextContent('null');
       expect(screen.getByTestId('modalOpen')).toHaveTextContent('true');
       expect(screen.getByTestId('modalMode')).toHaveTextContent('login');
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith('refresh_token');
     });
 
     it('이벤트 리스닝에 AUTH_REQUIRED_EVENT 상수를 사용해야 한다', () => {
