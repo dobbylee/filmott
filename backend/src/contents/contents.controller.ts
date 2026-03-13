@@ -48,7 +48,7 @@ export class ContentsController {
     @Param('tmdbId', ParseIntPipe) tmdbId: number,
   ) {
     if (type !== 'movie' && type !== 'tv') {
-      throw new BadRequestException('type must be "movie" or "tv"');
+      throw new BadRequestException('type은 "movie" 또는 "tv"만 허용됩니다.');
     }
     return this.contentsService.getContentDetail(tmdbId, type);
   }

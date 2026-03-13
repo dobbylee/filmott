@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, Eye, Bookmark, ChevronDown, Trash2, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
@@ -14,6 +15,7 @@ interface WatchlistStatusButtonProps {
 
 export default function WatchlistStatusButton({ tmdbId, contentType }: WatchlistStatusButtonProps) {
   const { user, openAuthModal } = useAuth();
+  const router = useRouter();
   const [status, setStatus] = useState<WatchlistStatus | null>(null);
   const [watchlistId, setWatchlistId] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -75,6 +77,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
       });
       setStatus(newStatus);
       setWatchlistId(res.data.id);
+      router.refresh();
     } catch {
       // ignore
     } finally {
@@ -93,6 +96,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
         watchedAt,
       });
       setStatus('watched');
+      router.refresh();
     } catch {
       // ignore
     } finally {
@@ -108,6 +112,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
       await api.delete(`/watchlist/${watchlistId}`);
       setStatus(null);
       setWatchlistId(null);
+      router.refresh();
     } catch {
       // ignore
     } finally {
