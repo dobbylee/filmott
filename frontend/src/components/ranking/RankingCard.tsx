@@ -55,7 +55,7 @@ export default function RankingCard({ item }: RankingCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300" />
 
         {/* 순위 배지 (네온 스타일) */}
-        <div className="absolute top-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 to-indigo-600 text-sm font-black text-white shadow-[0_0_15px_rgba(192,38,211,0.5)]">
+        <div className="absolute top-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-700 to-indigo-600 text-sm font-black text-white shadow-[0_0_15px_rgba(192,38,211,0.5)]">
           {item.rank}
         </div>
 

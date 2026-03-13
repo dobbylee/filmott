@@ -95,7 +95,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
           {/* 상단: 내 리뷰 뱃지 + 별점 + 댓글 (왼쪽) / 좋아요 (오른쪽) */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="rounded bg-gradient-to-r from-fuchsia-600 to-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white">내 리뷰</span>
+              <span className="rounded bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-1.5 py-0.5 text-[10px] font-medium text-white">내 리뷰</span>
               {existingReview.rating != null && (
                 <div className="flex items-center gap-0.5">
                   <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
@@ -130,7 +130,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
               onClick={handleEditClick}
-              className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-fuchsia-600 to-blue-500 px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium text-white hover:opacity-80 transition-all"
+              className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium text-white hover:opacity-80 transition-all"
             >
               수정
             </button>
@@ -189,7 +189,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
   // 작성 버튼
   return (
     <>
-      <div className="rounded-lg bg-gradient-to-r from-fuchsia-600 to-blue-500 p-[1px] hover:opacity-80 transition-opacity">
+      <div className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 p-[1px] hover:opacity-80 transition-opacity">
         <button
           onClick={() => setShowFormModal(true)}
           className="flex w-full items-center justify-center gap-2 rounded-[7px] bg-card p-3 text-sm font-medium text-white/70 hover:text-white transition-colors"

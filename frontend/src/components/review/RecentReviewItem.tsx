@@ -37,7 +37,7 @@ export default function RecentReviewItem({ review }: { review: Review }) {
         {/* 유저 + 별점 + 시간 */}
         <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shadow-sm ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-white'}`}>
+            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shadow-sm ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-700 to-indigo-600 text-white'}`}>
               {isDeletedUser(review.user) ? '?' : (review.user?.nickname?.charAt(0) ?? '?')}
             </div>
             <span className={`text-sm font-medium ${isDeletedUser(review.user) ? 'text-muted-foreground' : 'text-white/90'}`}>

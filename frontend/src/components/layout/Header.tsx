@@ -129,7 +129,7 @@ export default function Header() {
               href="/profile"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
             >
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-xs">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-700 to-indigo-600 text-xs">
                 {user.nickname.charAt(0)}
               </div>
               <span className="hidden sm:inline">{user.nickname}</span>
@@ -137,7 +137,7 @@ export default function Header() {
           ) : (
             <button
               onClick={() => openAuthModal('login')}
-              className="rounded-full bg-gradient-to-br from-fuchsia-600 to-indigo-600 px-4 py-1.5 text-sm font-bold text-white shadow-[0_0_15px_rgba(192,38,211,0.5)] hover:shadow-[0_0_25px_rgba(192,38,211,0.7)] transition-all duration-300"
+              className="rounded-full bg-gradient-to-br from-fuchsia-700 to-indigo-600 px-4 py-1.5 text-sm font-bold text-white shadow-[0_0_15px_rgba(192,38,211,0.5)] hover:shadow-[0_0_25px_rgba(192,38,211,0.7)] transition-all duration-300"
             >
               로그인
             </button>

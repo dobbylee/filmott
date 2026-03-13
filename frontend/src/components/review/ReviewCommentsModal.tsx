@@ -136,7 +136,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
           {/* 리뷰 원문 */}
           <div className="mb-4 rounded-lg bg-white/5 p-4">
             <div className="flex items-center gap-2">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-white'}`}>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${isDeletedUser(review.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-700 to-indigo-600 text-white'}`}>
                 {isDeletedUser(review.user) ? '?' : (review.user?.nickname?.charAt(0) ?? '?')}
               </div>
               <span className={`text-sm font-medium ${isDeletedUser(review.user) ? 'text-muted-foreground' : ''}`}>{getDisplayNickname(review.user)}</span>
@@ -169,7 +169,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
             <div className="divide-y divide-white/[0.06]">
               {comments.map((c) => (
                 <div key={c.id} className="flex items-start gap-3 px-2 py-3 hover:bg-white/[0.03] transition-colors">
-                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium flex-shrink-0 ${isDeletedUser(c.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-600 to-blue-500 text-white'}`}>
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium flex-shrink-0 ${isDeletedUser(c.user) ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-tr from-fuchsia-700 to-indigo-600 text-white'}`}>
                     {isDeletedUser(c.user) ? '?' : (c.user?.nickname?.charAt(0) ?? '?')}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -225,7 +225,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
             <button
               type="submit"
               disabled={authLoading || !user || !newComment.trim() || isSubmitting}
-              className="rounded-lg bg-gradient-to-r from-fuchsia-600 to-blue-500 px-4 py-3 sm:px-3 sm:py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50 transition-all"
+              className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-3 sm:px-3 sm:py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50 transition-all"
               aria-label="댓글 등록"
             >
               <Send className="h-4 w-4" />

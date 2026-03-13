@@ -139,7 +139,7 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
             <button
               type="submit"
               disabled={isSubmitting || rating === 0}
-              className="rounded-lg bg-gradient-to-r from-fuchsia-600 to-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50 transition-all"
+              className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50 transition-all"
             >
               {isSubmitting ? '저장 중...' : isEditing ? '수정' : '작성'}
             </button>

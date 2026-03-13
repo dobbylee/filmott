@@ -89,7 +89,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                 {review ? (
                   <>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="rounded bg-gradient-to-r from-fuchsia-600 to-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      <span className="rounded bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
                         내 리뷰
                       </span>
                       {review.rating != null && (
@@ -114,7 +114,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                   </>
                 ) : (
                   <div className="flex items-center h-full">
-                    <div className="rounded-lg bg-gradient-to-r from-fuchsia-600 to-blue-500 p-[1px] hover:opacity-80 transition-opacity">
+                    <div className="rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 p-[1px] hover:opacity-80 transition-opacity">
                       <button
                         onClick={() => setShowReviewForm(true)}
                         className="flex items-center gap-2 rounded-[7px] bg-card px-4 py-2 text-sm font-medium text-white/70 hover:text-white transition-colors"

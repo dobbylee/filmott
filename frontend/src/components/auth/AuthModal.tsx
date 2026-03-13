@@ -190,7 +190,7 @@ export default function AuthModal() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-lg bg-gradient-to-r from-fuchsia-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="w-full rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {isSubmitting ? '로그인 중...' : '로그인'}
             </button>
@@ -277,7 +277,7 @@ export default function AuthModal() {
             <button
               type="submit"
               disabled={isSubmitting || nicknameStatus === 'taken'}
-              className="w-full rounded-lg bg-gradient-to-r from-fuchsia-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="w-full rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {isSubmitting ? '가입 중...' : '회원가입'}
             </button>
