@@ -4,6 +4,7 @@ import RankingCarousel from '@/components/ranking/RankingCarousel';
 import RecentReviewItem from '@/components/review/RecentReviewItem';
 import type { RankingItem } from '@/components/ranking/RankingCard';
 import type { Review } from '@/types/review';
+import SectionError from '@/components/common/SectionError';
 
 /* ---- Data Fetchers ---- */
 
@@ -86,18 +87,7 @@ async function RecentReviewsSection() {
   }
 }
 
-/* ---- Error / Skeletons ---- */
-
-function SectionError({ title }: { title: string }) {
-  return (
-    <section className="py-8">
-      <h2 className="mb-4 text-2xl font-bold tracking-tight text-white/50">{title}</h2>
-      <div className="p-8 border border-red-500/20 rounded-2xl bg-red-500/5 text-red-400/80 text-center">
-        데이터를 불러올 수 없습니다.
-      </div>
-    </section>
-  );
-}
+/* ---- Skeletons ---- */
 
 function SectionSkeleton({ title }: { title: string }) {
   return (

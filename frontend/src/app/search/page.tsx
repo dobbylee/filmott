@@ -6,6 +6,7 @@ import ContentGrid from '@/components/content/ContentGrid';
 import SearchTypeFilter from '@/components/search/SearchTypeFilter';
 import SearchResultSections from '@/components/search/SearchResultSections';
 import type { TmdbSearchResult, TmdbSearchItem } from '@/types/content';
+import ContentGridSkeleton from '@/components/common/ContentGridSkeleton';
 
 interface SearchPageProps {
   searchParams: Promise<{
@@ -136,13 +137,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
       {query && <SearchTypeFilter currentType={type} />}
 
-      <Suspense
-        fallback={
-          <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
-            <p>검색 중...</p>
-          </div>
-        }
-      >
+      <Suspense fallback={<ContentGridSkeleton />}>
         <SearchResults query={query} type={type} page={page} />
       </Suspense>
     </div>
