@@ -6,6 +6,8 @@ import {
   Get,
   Body,
   Param,
+  Query,
+  ParseIntPipe,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -15,9 +17,14 @@ import {
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AdminGetUsersDto } from './dto/admin-get-users.dto';
+import { AdminUpdateStatusDto } from './dto/admin-update-status.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/decorators/current-user.decorator';
+import { UserRole } from './enums/user-role.enum';
 
 @Controller('users')
 export class UsersController {
@@ -77,5 +84,24 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deactivate(@CurrentUser() user: JwtPayload) {
     await this.usersService.deactivate(user.id);
+  }
+
+  // ADMIN 전용: 유저 목록 조회 (검색, 상태 필터, 페이지네이션)
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async getAdminUsers(@Query() dto: AdminGetUsersDto) {
+    return this.usersService.findAllForAdmin(dto);
+  }
+
+  // ADMIN 전용: 유저 상태 변경 (ACTIVE/SUSPENDED)
+  @Patch('admin/:id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async updateUserStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AdminUpdateStatusDto,
+  ) {
+    return this.usersService.updateStatusByAdmin(id, dto.status);
   }
 }

@@ -1,8 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { Reflector } from '@nestjs/core';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { ROLES_KEY } from '../auth/decorators/roles.decorator';
+import { UserRole } from './enums/user-role.enum';
+import { UserStatus } from './enums/user-status.enum';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -13,6 +19,8 @@ describe('UsersController', () => {
     deactivate: jest.fn(),
     isNicknameAvailable: jest.fn(),
     verifyPassword: jest.fn(),
+    findAllForAdmin: jest.fn(),
+    updateStatusByAdmin: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -133,6 +141,76 @@ describe('UsersController', () => {
       await controller.deactivate(mockUser);
 
       expect(mockUsersService.deactivate).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('GET /users/admin (getAdminUsers)', () => {
+    it('유저 목록을 반환해야 한다', async () => {
+      const mockResponse = {
+        users: [{ id: 1, nickname: 'user1', status: UserStatus.ACTIVE }],
+        total: 1,
+        page: 1,
+        totalPages: 1,
+      };
+      mockUsersService.findAllForAdmin.mockResolvedValue(mockResponse);
+
+      const dto = { page: '1', limit: '20' };
+      const result = await controller.getAdminUsers(dto);
+
+      expect(mockUsersService.findAllForAdmin).toHaveBeenCalledWith(dto);
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        UsersController.prototype.getAdminUsers,
+      );
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(JwtAuthGuard);
+      expect(guards).toContainEqual(RolesGuard);
+    });
+
+    it('ADMIN 역할이 필요해야 한다', () => {
+      const roles = Reflect.getMetadata(
+        ROLES_KEY,
+        UsersController.prototype.getAdminUsers,
+      );
+      expect(roles).toEqual([UserRole.ADMIN]);
+    });
+  });
+
+  describe('PATCH /users/admin/:id/status (updateUserStatus)', () => {
+    it('유저 상태를 변경하고 결과를 반환해야 한다', async () => {
+      const mockResult = {
+        id: 1,
+        nickname: 'user1',
+        status: UserStatus.SUSPENDED,
+      };
+      mockUsersService.updateStatusByAdmin.mockResolvedValue(mockResult);
+
+      const result = await controller.updateUserStatus(1, { status: UserStatus.SUSPENDED });
+
+      expect(mockUsersService.updateStatusByAdmin).toHaveBeenCalledWith(1, UserStatus.SUSPENDED);
+      expect(result).toEqual(mockResult);
+    });
+
+    it('JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        UsersController.prototype.updateUserStatus,
+      );
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(JwtAuthGuard);
+      expect(guards).toContainEqual(RolesGuard);
+    });
+
+    it('ADMIN 역할이 필요해야 한다', () => {
+      const roles = Reflect.getMetadata(
+        ROLES_KEY,
+        UsersController.prototype.updateUserStatus,
+      );
+      expect(roles).toEqual([UserRole.ADMIN]);
     });
   });
 });

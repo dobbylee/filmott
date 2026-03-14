@@ -5,14 +5,23 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { ILike, Not, Repository } from 'typeorm';
 import { User, SafeUser } from './user.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
+import { UserRole } from './enums/user-role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AdminGetUsersDto } from './dto/admin-get-users.dto';
 import * as bcrypt from 'bcrypt';
+
+interface AdminUsersResult {
+  users: SafeUser[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
 
 @Injectable()
 export class UsersService {
@@ -217,5 +226,89 @@ export class UsersService {
     user.email = `deleted_${user.id}_${timestamp}@deleted.local`;
     user.status = UserStatus.DELETED;
     await this.usersRepo.save(user);
+  }
+
+  /**
+   * 관리자용 유저 목록 조회
+   * DELETED 유저 제외, 닉네임/이메일 검색, 상태 필터, 페이지네이션
+   */
+  async findAllForAdmin(dto: AdminGetUsersDto): Promise<AdminUsersResult> {
+    const page = Math.max(1, parseInt(dto.page ?? '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(dto.limit ?? '20', 10) || 20));
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.usersRepo
+      .createQueryBuilder('user')
+      .select([
+        'user.id',
+        'user.nickname',
+        'user.email',
+        'user.provider',
+        'user.providerId',
+        'user.profileImage',
+        'user.status',
+        'user.role',
+        'user.createdAt',
+      ])
+      .where('user.status != :deleted', { deleted: UserStatus.DELETED });
+
+    if (dto.status) {
+      queryBuilder.andWhere('user.status = :status', { status: dto.status });
+    }
+
+    if (dto.search) {
+      queryBuilder.andWhere(
+        '(user.nickname ILIKE :search OR user.email ILIKE :search)',
+        { search: `%${dto.search}%` },
+      );
+    }
+
+    queryBuilder
+      .orderBy('user.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [users, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      users: users as SafeUser[],
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * 관리자용 유저 상태 변경
+   * DELETED 유저 변경 불가, ADMIN 유저 변경 불가
+   * SUSPENDED로 변경 시 해당 유저의 모든 refresh token 삭제 (즉시 세션 무효화)
+   */
+  async updateStatusByAdmin(
+    userId: number,
+    status: UserStatus.ACTIVE | UserStatus.SUSPENDED,
+  ): Promise<SafeUser> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    if (user.status === UserStatus.DELETED) {
+      throw new BadRequestException('탈퇴한 유저의 상태는 변경할 수 없습니다.');
+    }
+
+    if (user.role === UserRole.ADMIN) {
+      throw new BadRequestException('관리자 계정의 상태는 변경할 수 없습니다.');
+    }
+
+    user.status = status;
+    const savedUser = await this.usersRepo.save(user);
+
+    // SUSPENDED로 변경 시 해당 유저의 모든 refresh token 삭제 (즉시 세션 무효화)
+    if (status === UserStatus.SUSPENDED) {
+      await this.refreshTokenRepo.delete({ userId });
+    }
+
+    const { password: _, ...result } = savedUser;
+    return result;
   }
 }

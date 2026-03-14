@@ -15,10 +15,21 @@ jest.mock('bcrypt');
 describe('UsersService', () => {
   let service: UsersService;
 
+  const mockQueryBuilder = {
+    select: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    getManyAndCount: jest.fn(),
+  };
+
   const mockUsersRepo = {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
   };
 
   const mockRefreshTokenRepo = {
@@ -425,6 +436,172 @@ describe('UsersService', () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
 
       await expect(service.deactivate(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findAllForAdmin', () => {
+    const mockUsers = [
+      {
+        id: 1,
+        nickname: 'user1',
+        email: 'user1@test.com',
+        provider: AuthProvider.LOCAL,
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+        createdAt: new Date(),
+      },
+      {
+        id: 2,
+        nickname: 'user2',
+        email: 'user2@test.com',
+        provider: AuthProvider.GOOGLE,
+        status: UserStatus.SUSPENDED,
+        role: UserRole.USER,
+        createdAt: new Date(),
+      },
+    ];
+
+    it('페이지네이션이 정상 동작해야 한다', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([mockUsers, 25]);
+
+      const result = await service.findAllForAdmin({ page: '2', limit: '10' });
+
+      expect(result.page).toBe(2);
+      expect(result.totalPages).toBe(3);
+      expect(result.total).toBe(25);
+      expect(result.users).toEqual(mockUsers);
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(10);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+    });
+
+    it('기본 페이지와 limit을 사용해야 한다', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([mockUsers, 2]);
+
+      const result = await service.findAllForAdmin({});
+
+      expect(result.page).toBe(1);
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
+    });
+
+    it('검색 조건이 있으면 ILIKE 조건을 추가해야 한다', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAllForAdmin({ search: 'test' });
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(user.nickname ILIKE :search OR user.email ILIKE :search)',
+        { search: '%test%' },
+      );
+    });
+
+    it('상태 필터가 있으면 status 조건을 추가해야 한다', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAllForAdmin({ status: UserStatus.SUSPENDED });
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'user.status = :status',
+        { status: UserStatus.SUSPENDED },
+      );
+    });
+
+    it('limit이 100을 초과하면 100으로 제한해야 한다', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAllForAdmin({ limit: '200' });
+
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(100);
+    });
+  });
+
+  describe('updateStatusByAdmin', () => {
+    it('ACTIVE 유저를 SUSPENDED로 변경해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'user1',
+        email: 'user1@test.com',
+        password: 'hashed',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      };
+      mockUsersRepo.findOne.mockResolvedValue({ ...mockUser });
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 1 });
+
+      const result = await service.updateStatusByAdmin(1, UserStatus.SUSPENDED);
+
+      expect(result).not.toHaveProperty('password');
+      expect(result.status).toBe(UserStatus.SUSPENDED);
+      expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({ userId: 1 });
+    });
+
+    it('SUSPENDED 유저를 ACTIVE로 변경해야 한다', async () => {
+      const mockUser = {
+        id: 2,
+        nickname: 'user2',
+        email: 'user2@test.com',
+        password: null,
+        status: UserStatus.SUSPENDED,
+        role: UserRole.USER,
+      };
+      mockUsersRepo.findOne.mockResolvedValue({ ...mockUser });
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+
+      const result = await service.updateStatusByAdmin(2, UserStatus.ACTIVE);
+
+      expect(result.status).toBe(UserStatus.ACTIVE);
+      expect(mockRefreshTokenRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('DELETED 유저는 상태 변경이 불가능해야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue({
+        id: 3,
+        status: UserStatus.DELETED,
+        role: UserRole.USER,
+      });
+
+      await expect(
+        service.updateStatusByAdmin(3, UserStatus.ACTIVE),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('ADMIN 유저는 상태 변경이 불가능해야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue({
+        id: 4,
+        status: UserStatus.ACTIVE,
+        role: UserRole.ADMIN,
+      });
+
+      await expect(
+        service.updateStatusByAdmin(4, UserStatus.SUSPENDED),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('존재하지 않는 유저는 NotFoundException을 던져야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateStatusByAdmin(999, UserStatus.SUSPENDED),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('SUSPENDED로 변경 시 refresh token을 삭제해야 한다', async () => {
+      const mockUser = {
+        id: 5,
+        nickname: 'user5',
+        email: 'user5@test.com',
+        password: null,
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      };
+      mockUsersRepo.findOne.mockResolvedValue({ ...mockUser });
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 2 });
+
+      await service.updateStatusByAdmin(5, UserStatus.SUSPENDED);
+
+      expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({ userId: 5 });
     });
   });
 });
