@@ -2,11 +2,15 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import cookieParser from 'cookie-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Retrieve ConfigService from the application context
   const configService = app.get(ConfigService);
+
+  // Cookie parser (OAuth2 state 검증용)
+  app.use(cookieParser());
 
   // Set global prefix for API
   app.setGlobalPrefix('api');
