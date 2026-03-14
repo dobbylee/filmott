@@ -10,7 +10,6 @@ export default function AuthModal() {
   const { isOpen } = authModal;
   const backdropRef = useRef<HTMLDivElement>(null);
 
-  // ESC 닫기 + body 스크롤 잠금
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -45,19 +44,13 @@ export default function AuthModal() {
           <X className="h-5 w-5" />
         </button>
 
-        <h2 className="mb-6 text-center text-xl font-bold text-white">
-          로그인 / 회원가입
-        </h2>
+        <div className="mb-6" />
 
         <div className="space-y-3">
           <SocialLoginButton provider="google" />
           <SocialLoginButton provider="kakao" />
           <SocialLoginButton provider="naver" />
         </div>
-
-        <p className="mt-5 text-center text-sm text-white/40">
-          처음 오신 분은 자동으로 가입됩니다
-        </p>
       </div>
     </div>
   );

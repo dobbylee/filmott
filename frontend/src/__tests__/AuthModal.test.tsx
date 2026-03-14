@@ -43,8 +43,7 @@ describe('AuthModal', () => {
     mockIsOpen = true;
     render(<AuthModal />);
 
-    expect(screen.getByText('로그인 / 회원가입')).toBeInTheDocument();
-    expect(screen.getByText('처음 오신 분은 자동으로 가입됩니다')).toBeInTheDocument();
+    expect(screen.getByTestId('social-login-google')).toBeInTheDocument();
   });
 
   it('소셜 로그인 버튼 3개를 렌더링한다', () => {
@@ -107,7 +106,7 @@ describe('AuthModal', () => {
     render(<AuthModal />);
 
     // 배경 (backdrop) 클릭 - 모달 외부 영역
-    const backdrop = screen.getByText('로그인 / 회원가입').closest('.fixed');
+    const backdrop = screen.getByTestId('social-login-google').closest('.fixed');
     if (backdrop) {
       await user.click(backdrop);
       expect(mockCloseAuthModal).toHaveBeenCalled();
