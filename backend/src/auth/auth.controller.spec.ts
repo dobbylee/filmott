@@ -4,11 +4,15 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 import { GoogleService } from './social/google.service';
 import { KakaoService } from './social/kakao.service';
 import { NaverService } from './social/naver.service';
 import { AuthProvider } from '../users/enums/auth-provider.enum';
+import { UserRole } from '../users/enums/user-role.enum';
 import { SocialCallbackResult } from './auth.service';
+import { ROLES_KEY } from './decorators/roles.decorator';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -65,7 +69,7 @@ describe('AuthController', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('POST /auth/signup (register)', () => {
+  describe('POST /auth/signup (register) — ADMIN 전용', () => {
     it('authService.register를 호출하고 토큰과 사용자를 반환해야 한다', async () => {
       const dto = { nickname: 'test', email: 'test@test.com', password: 'password1' };
       const response = {
@@ -79,6 +83,19 @@ describe('AuthController', () => {
 
       expect(mockAuthService.register).toHaveBeenCalledWith(dto);
       expect(result).toEqual(response);
+    });
+
+    it('register 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata('__guards__', AuthController.prototype.register);
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(JwtAuthGuard);
+      expect(guards).toContainEqual(RolesGuard);
+    });
+
+    it('register 메서드에 ADMIN 역할만 허용되어야 한다', () => {
+      const roles = Reflect.getMetadata(ROLES_KEY, AuthController.prototype.register);
+      expect(roles).toBeDefined();
+      expect(roles).toEqual([UserRole.ADMIN]);
     });
   });
 

@@ -15,6 +15,10 @@ import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { randomBytes } from 'crypto';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from './decorators/roles.decorator';
+import { UserRole } from '../users/enums/user-role.enum';
 import { LoginDto } from './dto/login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -44,6 +48,8 @@ export class AuthController {
   // --- 기존 엔드포인트 ---
 
   @Post('signup')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   async register(@Body() createUserDto: CreateUserDto) {
     return this.authService.register(createUserDto);
