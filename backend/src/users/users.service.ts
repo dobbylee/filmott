@@ -16,7 +16,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { AdminGetUsersDto } from './dto/admin-get-users.dto';
 import * as bcrypt from 'bcrypt';
 
-interface AdminUsersResult {
+export interface AdminUsersResult {
   users: SafeUser[];
   total: number;
   page: number;
