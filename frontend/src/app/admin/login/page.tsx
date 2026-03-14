@@ -21,7 +21,7 @@ export default function AdminLoginPage() {
     try {
       const { data } = await api.post<AuthResponse>('/auth/login', { email, password });
       handleAuthSuccess(data);
-      router.replace('/');
+      router.replace('/admin');
     } catch {
       setError('로그인에 실패했습니다.');
     } finally {
