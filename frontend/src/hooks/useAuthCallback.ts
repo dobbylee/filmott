@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AuthResponse } from '@/types/auth';
 
 export type CallbackState =
@@ -39,10 +39,14 @@ export function useAuthCallback({
   onRedirect,
 }: UseAuthCallbackParams): CallbackState {
   const [state, setState] = useState<CallbackState>({ type: 'loading' });
+  const processed = useRef(false);
 
   useEffect(() => {
+    if (processed.current) return;
+
     // 에러 처리
     if (error) {
+      processed.current = true;
       setState({ type: 'error', message: getErrorText(error) });
       const timer = setTimeout(() => {
         onRedirect('/');
@@ -52,6 +56,7 @@ export function useAuthCallback({
 
     // 기존 유저: 토큰 저장 + 메인 이동
     if (token && refresh) {
+      processed.current = true;
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         onAuthSuccess({
@@ -65,11 +70,9 @@ export function useAuthCallback({
           },
         });
       } catch {
-        // JWT 파싱 실패 시에도 토큰은 저장
         localStorage.setItem('access_token', token);
         localStorage.setItem('refresh_token', refresh);
       }
-      // URL에서 토큰 제거
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, '', '/auth/callback');
       }
@@ -80,6 +83,7 @@ export function useAuthCallback({
 
     // 신규 유저: 닉네임 설정 모달 표시
     if (isNew === 'true' && tempToken) {
+      processed.current = true;
       setState({ type: 'nickname', tempToken });
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, '', '/auth/callback');
@@ -87,11 +91,14 @@ export function useAuthCallback({
       return;
     }
 
-    // 파라미터 없음: 에러
-    setState({ type: 'error', message: '잘못된 접근입니다.' });
+    // 파라미터 없음: 에러 (초기 로딩 시 searchParams가 아직 없을 수 있으므로 지연 처리)
     const timer = setTimeout(() => {
-      onRedirect('/');
-    }, 3000);
+      if (!processed.current) {
+        processed.current = true;
+        setState({ type: 'error', message: '잘못된 접근입니다.' });
+        setTimeout(() => onRedirect('/'), 3000);
+      }
+    }, 500);
     return () => clearTimeout(timer);
   }, [token, refresh, isNew, tempToken, error, onAuthSuccess, onRedirect]);
 

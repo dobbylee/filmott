@@ -186,7 +186,6 @@ describe('AuthController', () => {
         cookie: jest.fn(),
         redirect: jest.fn(),
         clearCookie: jest.fn(),
-        req: { cookies: { oauth_state: 'valid-state' } },
       };
       const existingResult: SocialCallbackResult = {
         type: 'existing',
@@ -202,7 +201,8 @@ describe('AuthController', () => {
       });
       mockAuthService.handleSocialCallback.mockResolvedValue(existingResult);
 
-      await controller.googleCallback('code123', 'valid-state', mockRes as never);
+      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      await controller.googleCallback('code123', 'valid-state', mockReq as never, mockRes as never);
 
       expect(mockRes.clearCookie).toHaveBeenCalledWith('oauth_state', { path: '/' });
       expect(mockRes.redirect).toHaveBeenCalledWith(
@@ -215,7 +215,6 @@ describe('AuthController', () => {
         cookie: jest.fn(),
         redirect: jest.fn(),
         clearCookie: jest.fn(),
-        req: { cookies: { oauth_state: 'valid-state' } },
       };
       const newResult: SocialCallbackResult = {
         type: 'new',
@@ -230,7 +229,8 @@ describe('AuthController', () => {
       });
       mockAuthService.handleSocialCallback.mockResolvedValue(newResult);
 
-      await controller.googleCallback('code456', 'valid-state', mockRes as never);
+      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      await controller.googleCallback('code456', 'valid-state', mockReq as never, mockRes as never);
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
         expect.stringContaining('new=true&tempToken=temp-jwt-token'),
@@ -242,10 +242,10 @@ describe('AuthController', () => {
         cookie: jest.fn(),
         redirect: jest.fn(),
         clearCookie: jest.fn(),
-        req: { cookies: { oauth_state: 'different-state' } },
       };
 
-      await controller.googleCallback('code123', 'wrong-state', mockRes as never);
+      const mockReq = { cookies: { oauth_state: 'different-state' } };
+      await controller.googleCallback('code123', 'wrong-state', mockReq as never, mockRes as never);
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
         expect.stringContaining('error=invalid_state'),
@@ -257,10 +257,10 @@ describe('AuthController', () => {
         cookie: jest.fn(),
         redirect: jest.fn(),
         clearCookie: jest.fn(),
-        req: { cookies: { oauth_state: 'state' } },
       };
 
-      await controller.googleCallback(undefined as unknown as string, 'state', mockRes as never);
+      const mockReq = { cookies: { oauth_state: 'state' } };
+      await controller.googleCallback(undefined as unknown as string, 'state', mockReq as never, mockRes as never);
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
         expect.stringContaining('error=missing_code'),

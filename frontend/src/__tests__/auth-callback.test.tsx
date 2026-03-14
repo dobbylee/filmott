@@ -176,6 +176,8 @@ describe('useAuthCallback', () => {
     });
 
     it('파라미터가 없으면 잘못된 접근 메시지를 반환한다', () => {
+      vi.useFakeTimers();
+
       const { result } = renderHook(() =>
         useAuthCallback({
           token: null,
@@ -188,10 +190,16 @@ describe('useAuthCallback', () => {
         })
       );
 
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
       expect(result.current.type).toBe('error');
       if (result.current.type === 'error') {
         expect(result.current.message).toBe('잘못된 접근입니다.');
       }
+
+      vi.useRealTimers();
     });
 
     it('에러 시 3초 후 리다이렉트한다', () => {

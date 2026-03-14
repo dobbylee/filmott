@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthCallback } from '@/hooks/useAuthCallback';
@@ -11,6 +11,10 @@ function AuthCallbackContent() {
   const router = useRouter();
   const { handleAuthSuccess } = useAuth();
 
+  const onRedirect = useCallback((path: string) => {
+    router.replace(path);
+  }, [router]);
+
   const state = useAuthCallback({
     token: searchParams.get('token'),
     refresh: searchParams.get('refresh'),
@@ -18,7 +22,7 @@ function AuthCallbackContent() {
     tempToken: searchParams.get('tempToken'),
     error: searchParams.get('error'),
     onAuthSuccess: handleAuthSuccess,
-    onRedirect: (path) => router.replace(path),
+    onRedirect,
   });
 
   if (state.type === 'nickname') {

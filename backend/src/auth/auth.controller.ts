@@ -4,6 +4,7 @@ import {
   Get,
   Body,
   Query,
+  Req,
   Res,
   HttpCode,
   HttpStatus,
@@ -12,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { randomBytes } from 'crypto';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -92,9 +93,10 @@ export class AuthController {
   async googleCallback(
     @Query('code') code: string,
     @Query('state') state: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.handleSocialCallback(res, 'google', code, state, async () => {
+    return this.handleSocialCallback(req, res, 'google', code, state, async () => {
       return this.googleService.getProfile(code);
     });
   }
@@ -113,9 +115,10 @@ export class AuthController {
   async kakaoCallback(
     @Query('code') code: string,
     @Query('state') state: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.handleSocialCallback(res, 'kakao', code, state, async () => {
+    return this.handleSocialCallback(req, res, 'kakao', code, state, async () => {
       return this.kakaoService.getProfile(code);
     });
   }
@@ -134,9 +137,10 @@ export class AuthController {
   async naverCallback(
     @Query('code') code: string,
     @Query('state') state: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.handleSocialCallback(res, 'naver', code, state, async () => {
+    return this.handleSocialCallback(req, res, 'naver', code, state, async () => {
       return this.naverService.getProfile(code, state);
     });
   }
@@ -160,9 +164,8 @@ export class AuthController {
     });
   }
 
-  private verifyState(res: Response, urlState: string): boolean {
-    const request = (res as { req?: { cookies?: Record<string, string> } }).req;
-    const cookieState = request?.cookies?.[OAUTH_STATE_COOKIE];
+  private verifyState(req: Request, res: Response, urlState: string): boolean {
+    const cookieState = req.cookies?.[OAUTH_STATE_COOKIE] as string | undefined;
 
     // state 쿠키 삭제
     res.clearCookie(OAUTH_STATE_COOKIE, { path: '/' });
@@ -174,6 +177,7 @@ export class AuthController {
   }
 
   private async handleSocialCallback(
+    req: Request,
     res: Response,
     provider: string,
     code: string,
@@ -188,7 +192,7 @@ export class AuthController {
         return;
       }
 
-      if (!this.verifyState(res, state)) {
+      if (!this.verifyState(req, res, state)) {
         res.redirect(`${callbackUrl}?error=invalid_state`);
         return;
       }

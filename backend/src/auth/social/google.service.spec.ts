@@ -101,13 +101,8 @@ describe('GoogleService', () => {
 
       expect(httpService.post).toHaveBeenCalledWith(
         'https://oauth2.googleapis.com/token',
-        {
-          code: 'auth-code',
-          client_id: 'test-client-id',
-          client_secret: 'test-client-secret',
-          redirect_uri: 'http://localhost:3001/auth/google/callback',
-          grant_type: 'authorization_code',
-        },
+        'code=auth-code&client_id=test-client-id&client_secret=test-client-secret&redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fauth%2Fgoogle%2Fcallback&grant_type=authorization_code',
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
       );
 
       expect(httpService.get).toHaveBeenCalledWith(

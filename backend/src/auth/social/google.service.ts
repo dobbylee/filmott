@@ -53,15 +53,19 @@ export class GoogleService {
 
   private async exchangeToken(code: string): Promise<GoogleTokenResponse> {
     try {
+      const params = new URLSearchParams({
+        code,
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        redirect_uri: this.callbackUrl,
+        grant_type: 'authorization_code',
+      });
       const { data } = await firstValueFrom(
         this.httpService.post<GoogleTokenResponse>(
           'https://oauth2.googleapis.com/token',
+          params.toString(),
           {
-            code,
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
-            redirect_uri: this.callbackUrl,
-            grant_type: 'authorization_code',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           },
         ),
       );
