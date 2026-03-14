@@ -3,10 +3,12 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
-import { UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { AuthProvider } from '../users/enums/auth-provider.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
 import { UserRole } from '../users/enums/user-role.enum';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { SocialProfile } from './interfaces/social-profile.interface';
 import { DataSource, EntityManager } from 'typeorm';
 import { createHash } from 'crypto';
 import * as bcrypt from 'bcrypt';
@@ -19,12 +21,15 @@ describe('AuthService', () => {
 
   const mockUsersService = {
     findByEmail: jest.fn(),
+    findByProvider: jest.fn(),
     create: jest.fn(),
+    createSocialUser: jest.fn(),
     findByIdWithStatus: jest.fn(),
   };
 
   const mockJwtService = {
     sign: jest.fn(),
+    verify: jest.fn(),
   };
 
   const mockRefreshTokenRepo = {
@@ -345,12 +350,12 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('access_token, refresh_token, 사용자 정보를 반환해야 한다', async () => {
+    it('ADMIN은 이메일 로그인이 가능해야 한다', async () => {
       const mockUser = {
-        id: 1, nickname: 'testuser', email: 'test@example.com',
-        password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.USER,
+        id: 1, nickname: 'adminuser', email: 'admin@example.com',
+        password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.ADMIN,
       };
-      const loginDto = { email: 'test@example.com', password: 'password123' };
+      const loginDto = { email: 'admin@example.com', password: 'password123' };
 
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
@@ -361,14 +366,176 @@ describe('AuthService', () => {
       const result = await service.login(loginDto);
 
       expect(jwtService.sign).toHaveBeenCalledWith({
-        nickname: mockUser.nickname, sub: mockUser.id, role: UserRole.USER,
+        nickname: mockUser.nickname, sub: mockUser.id, role: UserRole.ADMIN,
       });
       expect(result.access_token).toBe('mocked.jwt.token');
       expect(result.refresh_token).toBeDefined();
-      expect(typeof result.refresh_token).toBe('string');
       expect(result.user).toEqual({
-        id: 1, nickname: 'testuser', email: 'test@example.com', role: UserRole.USER,
+        id: 1, nickname: 'adminuser', email: 'admin@example.com', role: UserRole.ADMIN,
       });
+    });
+
+    it('일반 USER가 이메일 로그인 시도하면 UnauthorizedException을 던져야 한다', async () => {
+      const mockUser = {
+        id: 2, nickname: 'normaluser', email: 'user@example.com',
+        password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.USER,
+      };
+      const loginDto = { email: 'user@example.com', password: 'password123' };
+
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login(loginDto))
+        .rejects.toThrow(new UnauthorizedException('소셜 로그인을 이용해주세요.'));
+    });
+  });
+
+  describe('handleSocialCallback', () => {
+    const googleProfile: SocialProfile = {
+      provider: AuthProvider.GOOGLE,
+      providerId: 'google-123',
+      email: 'user@gmail.com',
+      nickname: 'Google User',
+      profileImage: 'http://google.com/photo.jpg',
+    };
+
+    it('기존 유저가 있으면 tokens와 user를 반환해야 한다', async () => {
+      const existingUser = {
+        id: 1,
+        nickname: 'existinguser',
+        email: 'user@gmail.com',
+        password: null,
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      };
+      mockUsersService.findByProvider.mockResolvedValue(existingUser);
+      mockJwtService.sign.mockReturnValue('mocked.jwt.token');
+      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.save.mockResolvedValue({});
+
+      const result = await service.handleSocialCallback(googleProfile);
+
+      expect(result.type).toBe('existing');
+      if (result.type === 'existing') {
+        expect(result.tokens.access_token).toBe('mocked.jwt.token');
+        expect(result.tokens.refresh_token).toBeDefined();
+        expect(result.user).toEqual({
+          id: 1,
+          nickname: 'existinguser',
+          email: 'user@gmail.com',
+          role: UserRole.USER,
+        });
+      }
+      expect(mockUsersService.findByProvider).toHaveBeenCalledWith(
+        AuthProvider.GOOGLE,
+        'google-123',
+      );
+    });
+
+    it('신규 유저면 tempToken을 반환해야 한다', async () => {
+      mockUsersService.findByProvider.mockResolvedValue(null);
+      mockJwtService.sign.mockReturnValue('temp.jwt.token');
+
+      const result = await service.handleSocialCallback(googleProfile);
+
+      expect(result.type).toBe('new');
+      if (result.type === 'new') {
+        expect(result.tempToken).toBe('temp.jwt.token');
+      }
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
+        {
+          provider: AuthProvider.GOOGLE,
+          providerId: 'google-123',
+          email: 'user@gmail.com',
+          nickname: 'Google User',
+          profileImage: 'http://google.com/photo.jpg',
+          type: 'social_signup',
+        },
+        { expiresIn: '5m' },
+      );
+    });
+
+    it('SUSPENDED 기존 유저면 UnauthorizedException을 던져야 한다', async () => {
+      const suspendedUser = {
+        id: 1,
+        nickname: 'suspended',
+        email: 'user@gmail.com',
+        password: null,
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        status: UserStatus.SUSPENDED,
+        role: UserRole.USER,
+      };
+      mockUsersService.findByProvider.mockResolvedValue(suspendedUser);
+
+      await expect(service.handleSocialCallback(googleProfile))
+        .rejects.toThrow(new UnauthorizedException('정지된 계정입니다.'));
+    });
+  });
+
+  describe('completeSocialSignup', () => {
+    it('정상적으로 유저를 생성하고 토큰을 반환해야 한다', async () => {
+      const mockPayload = {
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        email: 'user@gmail.com',
+        nickname: 'Google User',
+        profileImage: null,
+        type: 'social_signup',
+      };
+      mockJwtService.verify.mockReturnValue(mockPayload);
+
+      const createdUser = {
+        id: 1,
+        nickname: 'mynickname',
+        email: 'user@gmail.com',
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      };
+      mockUsersService.createSocialUser.mockResolvedValue(createdUser);
+      mockJwtService.sign.mockReturnValue('access.token');
+      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.save.mockResolvedValue({});
+
+      const result = await service.completeSocialSignup('valid-temp-token', 'mynickname');
+
+      expect(mockJwtService.verify).toHaveBeenCalledWith('valid-temp-token');
+      expect(mockUsersService.createSocialUser).toHaveBeenCalledWith({
+        nickname: 'mynickname',
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        email: 'user@gmail.com',
+        profileImage: null,
+      });
+      expect(result.access_token).toBe('access.token');
+      expect(result.user.nickname).toBe('mynickname');
+    });
+
+    it('만료된 tempToken이면 BadRequestException을 던져야 한다', async () => {
+      mockJwtService.verify.mockImplementation(() => {
+        throw new Error('jwt expired');
+      });
+
+      await expect(service.completeSocialSignup('expired-token', 'nickname'))
+        .rejects.toThrow(BadRequestException);
+    });
+
+    it('유효하지 않은 토큰 타입이면 BadRequestException을 던져야 한다', async () => {
+      mockJwtService.verify.mockReturnValue({
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        email: 'user@gmail.com',
+        nickname: null,
+        profileImage: null,
+        type: 'wrong_type',
+      });
+
+      await expect(service.completeSocialSignup('wrong-type-token', 'nickname'))
+        .rejects.toThrow(new BadRequestException('유효하지 않은 토큰 타입입니다.'));
     });
   });
 

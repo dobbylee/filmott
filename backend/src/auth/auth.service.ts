@@ -1,9 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { SafeUser } from '../users/user.entity';
 import { UserStatus } from '../users/enums/user-status.enum';
+import { UserRole } from '../users/enums/user-role.enum';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
@@ -11,6 +16,20 @@ import { Cron } from '@nestjs/schedule';
 import { LoginDto } from './dto/login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { SocialProfile } from './interfaces/social-profile.interface';
+
+interface SocialCallbackResultExisting {
+  type: 'existing';
+  tokens: { access_token: string; refresh_token: string };
+  user: { id: number; nickname: string; email: string | null; role: string };
+}
+
+interface SocialCallbackResultNew {
+  type: 'new';
+  tempToken: string;
+}
+
+export type SocialCallbackResult = SocialCallbackResultExisting | SocialCallbackResultNew;
 
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
 
@@ -148,8 +167,95 @@ export class AuthService {
       .execute();
   }
 
+  async handleSocialCallback(profile: SocialProfile): Promise<SocialCallbackResult> {
+    const existingUser = await this.usersService.findByProvider(
+      profile.provider,
+      profile.providerId,
+    );
+
+    if (existingUser) {
+      if (existingUser.status === UserStatus.SUSPENDED) {
+        throw new UnauthorizedException('정지된 계정입니다.');
+      }
+
+      const { password: _, ...safeUser } = existingUser;
+      const tokens = await this.generateTokens(safeUser);
+      return {
+        type: 'existing',
+        tokens,
+        user: {
+          id: safeUser.id,
+          nickname: safeUser.nickname,
+          email: safeUser.email,
+          role: safeUser.role,
+        },
+      };
+    }
+
+    // 신규 유저: tempToken 생성 (소셜 프로필 JWT, 5분 만료)
+    const tempToken = this.jwtService.sign(
+      {
+        provider: profile.provider,
+        providerId: profile.providerId,
+        email: profile.email,
+        nickname: profile.nickname,
+        profileImage: profile.profileImage,
+        type: 'social_signup',
+      },
+      { expiresIn: '5m' },
+    );
+
+    return { type: 'new', tempToken };
+  }
+
+  async completeSocialSignup(tempToken: string, nickname: string) {
+    let payload: {
+      provider: string;
+      providerId: string;
+      email: string | null;
+      nickname: string | null;
+      profileImage: string | null;
+      type: string;
+    };
+
+    try {
+      payload = this.jwtService.verify(tempToken);
+    } catch {
+      throw new BadRequestException('유효하지 않거나 만료된 임시 토큰입니다.');
+    }
+
+    if (payload.type !== 'social_signup') {
+      throw new BadRequestException('유효하지 않은 토큰 타입입니다.');
+    }
+
+    const user = await this.usersService.createSocialUser({
+      nickname,
+      provider: payload.provider as SocialProfile['provider'],
+      providerId: payload.providerId,
+      email: payload.email,
+      profileImage: payload.profileImage,
+    });
+
+    const tokens = await this.generateTokens(user);
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        nickname: user.nickname,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  }
+
   async login(loginDto: LoginDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
+
+    // USER 역할은 소셜 로그인만 허용, ADMIN만 이메일 로그인 가능
+    if (user.role === UserRole.USER) {
+      throw new UnauthorizedException('소셜 로그인을 이용해주세요.');
+    }
+
     const tokens = await this.generateTokens(user);
     return {
       ...tokens,

@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { User, SafeUser } from './user.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -39,6 +40,15 @@ export class UsersService {
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepo.findOne({
       where: { email, status: Not(UserStatus.DELETED) },
+    });
+  }
+
+  /**
+   * provider + providerId로 사용자 조회 (DELETED 제외)
+   */
+  async findByProvider(provider: AuthProvider, providerId: string): Promise<User | null> {
+    return this.usersRepo.findOne({
+      where: { provider, providerId, status: Not(UserStatus.DELETED) },
     });
   }
 
@@ -110,6 +120,39 @@ export class UsersService {
     const savedUser = await this.usersRepo.save(newUser);
 
     // Return user without password
+    const { password: _, ...result } = savedUser;
+    return result;
+  }
+
+  /**
+   * 소셜 유저 생성 (닉네임 + provider + providerId + email(nullable) + password null)
+   */
+  async createSocialUser(data: {
+    nickname: string;
+    provider: AuthProvider;
+    providerId: string;
+    email: string | null;
+    profileImage: string | null;
+  }): Promise<SafeUser> {
+    if (this.isReservedNickname(data.nickname)) {
+      throw new ConflictException('사용할 수 없는 닉네임입니다.');
+    }
+
+    const existingNickname = await this.findOne(data.nickname);
+    if (existingNickname) {
+      throw new ConflictException('이미 사용 중인 닉네임입니다.');
+    }
+
+    const newUser = this.usersRepo.create({
+      nickname: data.nickname,
+      email: data.email,
+      password: null,
+      provider: data.provider,
+      providerId: data.providerId,
+      profileImage: data.profileImage ?? undefined,
+    });
+
+    const savedUser = await this.usersRepo.save(newUser);
     const { password: _, ...result } = savedUser;
     return result;
   }

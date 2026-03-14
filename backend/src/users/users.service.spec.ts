@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Not } from 'typeorm';
 import { User } from './user.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
 import { UserRole } from './enums/user-role.enum';
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
@@ -64,6 +65,48 @@ describe('UsersService', () => {
     });
   });
 
+  describe('findByProvider', () => {
+    it('provider와 providerId로 Not(DELETED) 조건으로 조회해야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      await service.findByProvider(AuthProvider.GOOGLE, 'google-123');
+
+      expect(mockUsersRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          provider: AuthProvider.GOOGLE,
+          providerId: 'google-123',
+          status: Not(UserStatus.DELETED),
+        },
+      });
+    });
+
+    it('일치하는 사용자가 있으면 반환해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'socialuser',
+        email: 'social@test.com',
+        password: null,
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+
+      const result = await service.findByProvider(AuthProvider.GOOGLE, 'google-123');
+
+      expect(result).toEqual(mockUser);
+    });
+
+    it('일치하는 사용자가 없으면 null을 반환해야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.findByProvider(AuthProvider.KAKAO, 'kakao-999');
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('findById', () => {
     it('사용자가 존재하면 비밀번호 없는 SafeUser를 반환해야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValue({
@@ -120,6 +163,114 @@ describe('UsersService', () => {
       expect(bcrypt.hash).toHaveBeenCalledWith('password', 10);
       expect(result).not.toHaveProperty('password');
       expect(result.nickname).toEqual('test');
+    });
+  });
+
+  describe('createSocialUser', () => {
+    it('소셜 유저를 생성하고 비밀번호 없이 반환해야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null); // 닉네임 중복 없음
+      mockUsersRepo.create.mockReturnValue({
+        nickname: 'socialuser',
+        email: 'social@test.com',
+        password: null,
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+      });
+      mockUsersRepo.save.mockResolvedValue({
+        id: 1,
+        nickname: 'socialuser',
+        email: 'social@test.com',
+        password: null,
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      });
+
+      const result = await service.createSocialUser({
+        nickname: 'socialuser',
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        email: 'social@test.com',
+        profileImage: null,
+      });
+
+      expect(result).not.toHaveProperty('password');
+      expect(result.nickname).toBe('socialuser');
+      expect(result.provider).toBe(AuthProvider.GOOGLE);
+      expect(mockUsersRepo.create).toHaveBeenCalledWith({
+        nickname: 'socialuser',
+        email: 'social@test.com',
+        password: null,
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-123',
+        profileImage: undefined,
+      });
+    });
+
+    it('닉네임이 중복이면 ConflictException을 던져야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue({ id: 2, nickname: 'taken' });
+
+      await expect(
+        service.createSocialUser({
+          nickname: 'taken',
+          provider: AuthProvider.KAKAO,
+          providerId: 'kakao-456',
+          email: null,
+          profileImage: null,
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('예약어 닉네임이면 ConflictException을 던져야 한다', async () => {
+      await expect(
+        service.createSocialUser({
+          nickname: 'admin123',
+          provider: AuthProvider.NAVER,
+          providerId: 'naver-789',
+          email: 'test@naver.com',
+          profileImage: null,
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('이메일이 null인 소셜 유저(카카오)를 생성할 수 있어야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+      mockUsersRepo.create.mockReturnValue({
+        nickname: 'kakaouser',
+        email: null,
+        password: null,
+        provider: AuthProvider.KAKAO,
+        providerId: 'kakao-456',
+      });
+      mockUsersRepo.save.mockResolvedValue({
+        id: 2,
+        nickname: 'kakaouser',
+        email: null,
+        password: null,
+        provider: AuthProvider.KAKAO,
+        providerId: 'kakao-456',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      });
+
+      const result = await service.createSocialUser({
+        nickname: 'kakaouser',
+        provider: AuthProvider.KAKAO,
+        providerId: 'kakao-456',
+        email: null,
+        profileImage: 'http://profile.kakao.com/img.jpg',
+      });
+
+      expect(result.email).toBeNull();
+      expect(result.provider).toBe(AuthProvider.KAKAO);
+      expect(mockUsersRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: null,
+          password: null,
+          profileImage: 'http://profile.kakao.com/img.jpg',
+        }),
+      );
     });
   });
 
