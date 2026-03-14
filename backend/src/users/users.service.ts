@@ -49,7 +49,7 @@ export class UsersService {
 
   async verifyPassword(id: number, password: string): Promise<boolean> {
     const user = await this.usersRepo.findOne({ where: { id } });
-    if (!user || user.status !== UserStatus.ACTIVE) return false;
+    if (!user || user.status !== UserStatus.ACTIVE || !user.password) return false;
     return bcrypt.compare(password, user.password);
   }
 
@@ -132,11 +132,16 @@ export class UsersService {
       user.nickname = updateUserDto.nickname;
     }
 
-    // Handle password change
+    // Handle password change (LOCAL 유저만 비밀번호 변경 가능)
     if (updateUserDto.newPassword) {
       if (!updateUserDto.currentPassword) {
         throw new BadRequestException(
           '비밀번호 변경을 위해 현재 비밀번호를 입력해주세요.',
+        );
+      }
+      if (!user.password) {
+        throw new BadRequestException(
+          '소셜 로그인 사용자는 비밀번호를 변경할 수 없습니다.',
         );
       }
       const isMatch = await bcrypt.compare(
