@@ -15,13 +15,12 @@ vi.mock('@/contexts/AuthContext', () => ({
     user: mockUser,
     openAuthModal: mockOpenAuthModal,
     logout: vi.fn(),
-    login: vi.fn(),
-    signup: vi.fn(),
+    handleAuthSuccess: vi.fn(),
     token: null,
     isLoading: false,
     updateUser: vi.fn(),
     closeAuthModal: vi.fn(),
-    authModal: null,
+    authModal: { isOpen: false },
   }),
 }));
 
@@ -85,7 +84,7 @@ describe('WatchlistStatusButton', () => {
     render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
 
     await user.click(screen.getByText('기록하기'));
-    expect(mockOpenAuthModal).toHaveBeenCalledWith('login');
+    expect(mockOpenAuthModal).toHaveBeenCalled();
   });
 
   it('미등록 상태에서 클릭 시 드롭다운 옵션을 표시해야 한다', async () => {

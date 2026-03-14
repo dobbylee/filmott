@@ -35,7 +35,7 @@ export default function LikeButton({
 
   const handleToggle = async () => {
     if (!user) {
-      openAuthModal('login');
+      openAuthModal();
       return;
     }
     if (isLoading) return;

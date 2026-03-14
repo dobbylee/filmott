@@ -10,25 +10,17 @@ import {
 } from 'react';
 import api from '@/lib/api';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
-import type {
-  User,
-  AuthResponse,
-  LoginRequest,
-  SignupRequest,
-} from '@/types/auth';
-
-type AuthModalMode = 'login' | 'signup';
+import type { User, AuthResponse } from '@/types/auth';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (data: LoginRequest) => Promise<void>;
-  signup: (data: SignupRequest) => Promise<void>;
+  handleAuthSuccess: (data: AuthResponse) => void;
   logout: () => void;
   updateUser: (user: User) => void;
-  authModal: { isOpen: boolean; mode: AuthModalMode };
-  openAuthModal: (mode?: AuthModalMode) => void;
+  authModal: { isOpen: boolean };
+  openAuthModal: () => void;
   closeAuthModal: () => void;
 }
 
@@ -38,9 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [authModal, setAuthModal] = useState<{ isOpen: boolean; mode: AuthModalMode }>({
+  const [authModal, setAuthModal] = useState<{ isOpen: boolean }>({
     isOpen: false,
-    mode: 'login',
   });
 
   // 401 응답 시 모달 열기
@@ -52,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('user');
       setUser(null);
       setToken(null);
-      setAuthModal({ isOpen: true, mode: 'login' });
+      setAuthModal({ isOpen: true });
     };
     window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
     return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
@@ -73,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const handleAuthResponse = useCallback((response: AuthResponse) => {
+  const handleAuthSuccess = useCallback((response: AuthResponse) => {
     const { access_token, refresh_token, user: userData } = response;
     setToken(access_token);
     setUser(userData);
@@ -81,22 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('refresh_token', refresh_token);
     localStorage.setItem('user', JSON.stringify(userData));
   }, []);
-
-  const login = useCallback(
-    async (data: LoginRequest) => {
-      const response = await api.post<AuthResponse>('/auth/login', data);
-      handleAuthResponse(response.data);
-    },
-    [handleAuthResponse],
-  );
-
-  const signup = useCallback(
-    async (data: SignupRequest) => {
-      const response = await api.post<AuthResponse>('/auth/signup', data);
-      handleAuthResponse(response.data);
-    },
-    [handleAuthResponse],
-  );
 
   const logout = useCallback(() => {
     const refreshToken = localStorage.getItem('refresh_token');
@@ -116,17 +91,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(updatedUser));
   }, []);
 
-  const openAuthModal = useCallback((mode: AuthModalMode = 'login') => {
-    setAuthModal({ isOpen: true, mode });
+  const openAuthModal = useCallback(() => {
+    setAuthModal({ isOpen: true });
   }, []);
 
   const closeAuthModal = useCallback(() => {
-    setAuthModal((prev) => ({ ...prev, isOpen: false }));
+    setAuthModal({ isOpen: false });
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, token, isLoading, login, signup, logout, updateUser, authModal, openAuthModal, closeAuthModal }}
+      value={{ user, token, isLoading, handleAuthSuccess, logout, updateUser, authModal, openAuthModal, closeAuthModal }}
     >
       {children}
     </AuthContext.Provider>

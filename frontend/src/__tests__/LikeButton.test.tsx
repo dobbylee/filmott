@@ -14,14 +14,13 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     user: mockUser,
     logout: vi.fn(),
-    login: vi.fn(),
-    signup: vi.fn(),
+    handleAuthSuccess: vi.fn(),
     token: null,
     isLoading: false,
     updateUser: vi.fn(),
     openAuthModal: mockOpenAuthModal,
     closeAuthModal: vi.fn(),
-    authModal: null,
+    authModal: { isOpen: false },
   }),
 }));
 
@@ -47,7 +46,7 @@ describe('LikeButton', () => {
     render(<LikeButton reviewId={1} initialCount={5} />);
 
     await user.click(screen.getByRole('button'));
-    expect(mockOpenAuthModal).toHaveBeenCalledWith('login');
+    expect(mockOpenAuthModal).toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 

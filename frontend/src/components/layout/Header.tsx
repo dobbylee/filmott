@@ -146,7 +146,7 @@ export default function Header() {
             </Link>
           ) : (
             <button
-              onClick={() => openAuthModal('login')}
+              onClick={() => openAuthModal()}
               className="rounded-full bg-gradient-to-br from-fuchsia-700 to-indigo-600 px-4 py-1.5 text-sm font-bold text-white shadow-[0_0_15px_rgba(192,38,211,0.5)] hover:shadow-[0_0_25px_rgba(192,38,211,0.7)] transition-all duration-300"
             >
               로그인

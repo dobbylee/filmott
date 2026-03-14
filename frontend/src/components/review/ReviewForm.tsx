@@ -58,7 +58,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
         <p className="text-sm text-muted-foreground">
           리뷰를 남기려면{' '}
           <button
-            onClick={() => openAuthModal('login')}
+            onClick={() => openAuthModal()}
             className="text-primary hover:underline"
           >
             로그인

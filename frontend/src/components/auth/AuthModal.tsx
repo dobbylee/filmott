@@ -1,39 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Check, AlertCircle } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getErrorMessage } from '@/utils/error';
-import { validateNickname } from '@/utils/nickname';
-import { validatePassword } from '@/utils/validation';
-import api from '@/lib/api';
+import SocialLoginButton from '@/components/auth/SocialLoginButton';
 
 export default function AuthModal() {
-  const { login, signup, authModal, openAuthModal, closeAuthModal } = useAuth();
-  const { isOpen, mode } = authModal;
-
-  const [email, setEmail] = useState('');
-  const [nickname, setNickname] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [nicknameStatus, setNicknameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const { authModal, closeAuthModal } = useAuth();
+  const { isOpen } = authModal;
   const backdropRef = useRef<HTMLDivElement>(null);
-  const nicknameTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  // 폼 초기화
-  useEffect(() => {
-    if (isOpen) {
-      setEmail('');
-      setNickname('');
-      setPassword('');
-      setConfirmPassword('');
-      setError('');
-      setIsSubmitting(false);
-      setNicknameStatus('idle');
-    }
-  }, [isOpen, mode]);
 
   // ESC 닫기 + body 스크롤 잠금
   useEffect(() => {
@@ -49,88 +24,11 @@ export default function AuthModal() {
     };
   }, [isOpen, closeAuthModal]);
 
-  // 닉네임 중복 체크 (디바운스, 유효성 통과 시만)
-  const checkNickname = useCallback((value: string) => {
-    if (nicknameTimerRef.current) clearTimeout(nicknameTimerRef.current);
-    const validationErr = validateNickname(value);
-    if (validationErr) {
-      setNicknameStatus('idle');
-      return;
-    }
-    setNicknameStatus('checking');
-    nicknameTimerRef.current = setTimeout(async () => {
-      try {
-        const res = await api.get<{ available: boolean }>(`/users/check-nickname/${encodeURIComponent(value)}`);
-        setNicknameStatus(res.data.available ? 'available' : 'taken');
-      } catch {
-        setNicknameStatus('idle');
-      }
-    }, 400);
-  }, []);
-
-  const handleNicknameChange = (value: string) => {
-    setNickname(value);
-    checkNickname(value);
-  };
-
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === backdropRef.current) closeAuthModal();
   };
 
-  const switchMode = () => {
-    setError('');
-    openAuthModal(mode === 'login' ? 'signup' : 'login');
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-    try {
-      await login({ email, password });
-      closeAuthModal();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    const nicknameErr = validateNickname(nickname);
-    if (nicknameErr) {
-      setError(nicknameErr);
-      return;
-    }
-    if (nicknameStatus === 'taken') {
-      setError('이미 사용 중인 닉네임입니다.');
-      return;
-    }
-    const passwordErr = validatePassword(password);
-    if (passwordErr) {
-      setError(passwordErr);
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('비밀번호가 일치하지 않습니다.');
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await signup({ email, nickname, password });
-      closeAuthModal();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   if (!isOpen) return null;
-
-  const inputClass = 'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/50 placeholder-white/30';
 
   return (
     <div
@@ -148,151 +46,17 @@ export default function AuthModal() {
         </button>
 
         <h2 className="mb-6 text-center text-xl font-bold text-white">
-          {mode === 'login' ? '로그인' : '회원가입'}
+          로그인 / 회원가입
         </h2>
 
-        {error && (
-          <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
-            {error}
-          </div>
-        )}
-
-        {mode === 'login' ? (
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label htmlFor="auth-email" className="mb-1 block text-sm font-medium text-white/60">
-                이메일
-              </label>
-              <input
-                id="auth-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="example@email.com"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="auth-password" className="mb-1 block text-sm font-medium text-white/60">
-                비밀번호
-              </label>
-              <input
-                id="auth-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="비밀번호를 입력하세요"
-                className={inputClass}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {isSubmitting ? '로그인 중...' : '로그인'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleSignup} className="space-y-4">
-            <div>
-              <label htmlFor="auth-email" className="mb-1 block text-sm font-medium text-white/60">
-                이메일
-              </label>
-              <input
-                id="auth-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="example@email.com"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="auth-nickname" className="mb-1 block text-sm font-medium text-white/60">
-                닉네임
-                <span className="ml-1.5 text-xs text-white/30">한글 8자 / 영문 16자</span>
-              </label>
-              <div className="relative">
-                <input
-                  id="auth-nickname"
-                  type="text"
-                  value={nickname}
-                  onChange={(e) => handleNicknameChange(e.target.value)}
-                  required
-                  minLength={2}
-                  placeholder="2자 이상 닉네임"
-                  className={`${inputClass} pr-9`}
-                />
-                {!validateNickname(nickname) && nicknameStatus === 'available' && (
-                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-400" />
-                )}
-                {(nicknameStatus === 'taken' || (nickname.length >= 2 && validateNickname(nickname))) && (
-                  <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-400" />
-                )}
-              </div>
-              {nickname.length >= 2 && validateNickname(nickname) && (
-                <p className="mt-1 text-xs text-red-400">{validateNickname(nickname)}</p>
-              )}
-              {!validateNickname(nickname) && nicknameStatus === 'taken' && (
-                <p className="mt-1 text-xs text-red-400">이미 사용 중인 닉네임입니다.</p>
-              )}
-              {!validateNickname(nickname) && nicknameStatus === 'available' && (
-                <p className="mt-1 text-xs text-green-400">사용 가능한 닉네임입니다.</p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="auth-password" className="mb-1 block text-sm font-medium text-white/60">
-                비밀번호
-              </label>
-              <input
-                id="auth-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                placeholder="영문, 숫자, 특수문자 포함 8자 이상"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="auth-confirm" className="mb-1 block text-sm font-medium text-white/60">
-                비밀번호 확인
-              </label>
-              <input
-                id="auth-confirm"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={8}
-                placeholder="비밀번호를 다시 입력하세요"
-                className={inputClass}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitting || nicknameStatus === 'taken'}
-              className="w-full rounded-lg bg-gradient-to-r from-fuchsia-700 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {isSubmitting ? '가입 중...' : '회원가입'}
-            </button>
-          </form>
-        )}
+        <div className="space-y-3">
+          <SocialLoginButton provider="google" />
+          <SocialLoginButton provider="kakao" />
+          <SocialLoginButton provider="naver" />
+        </div>
 
         <p className="mt-5 text-center text-sm text-white/40">
-          {mode === 'login' ? '아직 계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
-          <button
-            type="button"
-            onClick={switchMode}
-            className="font-medium text-fuchsia-400 hover:text-fuchsia-300 transition-colors"
-          >
-            {mode === 'login' ? '회원가입' : '로그인'}
-          </button>
+          처음 오신 분은 자동으로 가입됩니다
         </p>
       </div>
     </div>

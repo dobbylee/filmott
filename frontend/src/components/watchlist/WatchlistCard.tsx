@@ -28,7 +28,7 @@ function getDay(dateStr: string | null): string {
 export default function WatchlistCard({ item, initialLiked = false, onMutate }: WatchlistCardProps) {
   const { user } = useAuth();
   const { content, status, watchedAt, review } = item;
-  const reviewWithUser = review && user ? { ...review, user: review.user ?? { id: user.id, nickname: user.nickname } } : review;
+  const reviewWithUser = review && user ? { ...review, user: review.user ?? user } : review;
   const href = `/contents/${content.contentType}/${content.tmdbId}`;
   const posterSrc = content.posterUrl
     ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`)

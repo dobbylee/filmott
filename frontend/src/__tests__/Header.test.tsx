@@ -21,14 +21,13 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     user: mockUser,
     logout: mockLogout,
-    login: vi.fn(),
-    signup: vi.fn(),
+    handleAuthSuccess: vi.fn(),
     token: null,
     isLoading: false,
     updateUser: vi.fn(),
     openAuthModal: mockOpenAuthModal,
     closeAuthModal: vi.fn(),
-    authModal: null,
+    authModal: { isOpen: false },
   }),
 }));
 

@@ -77,7 +77,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
 
   const handleButtonClick = () => {
     if (!user) {
-      openAuthModal('login');
+      openAuthModal();
       return;
     }
     setShowDropdown(!showDropdown);

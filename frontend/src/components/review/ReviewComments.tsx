@@ -51,7 +51,7 @@ export default function ReviewComments({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      openAuthModal('login');
+      openAuthModal();
       return;
     }
     if (!newComment.trim() || isSubmitting) return;

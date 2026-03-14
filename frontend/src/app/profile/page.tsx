@@ -13,7 +13,7 @@ export default function ProfilePage() {
   const { user, isLoading, updateUser, logout, openAuthModal } = useAuth();
   useEffect(() => {
     if (!isLoading && !user) {
-      openAuthModal('login');
+      openAuthModal();
       router.replace('/');
     }
   }, [user, isLoading, router, openAuthModal]);

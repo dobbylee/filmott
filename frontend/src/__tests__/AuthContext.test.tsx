@@ -22,11 +22,9 @@ const mockUser: User = {
 };
 
 const mockAuthResponse = {
-  data: {
-    access_token: 'mock-token-abc',
-    refresh_token: 'mock-refresh-token-xyz',
-    user: mockUser,
-  },
+  access_token: 'mock-token-abc',
+  refresh_token: 'mock-refresh-token-xyz',
+  user: mockUser,
 };
 
 // localStorage mock
@@ -53,7 +51,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 // Helper component to consume and display auth context
 function AuthConsumer() {
-  const { user, token, isLoading, authModal, login, signup, logout, openAuthModal, closeAuthModal } = useAuth();
+  const { user, token, isLoading, authModal, handleAuthSuccess, logout, openAuthModal, closeAuthModal } = useAuth();
 
   return (
     <div>
@@ -61,16 +59,11 @@ function AuthConsumer() {
       <div data-testid="token">{token ?? 'null'}</div>
       <div data-testid="isLoading">{isLoading ? 'true' : 'false'}</div>
       <div data-testid="modalOpen">{authModal.isOpen ? 'true' : 'false'}</div>
-      <div data-testid="modalMode">{authModal.mode}</div>
-      <button onClick={() => login({ email: 'test@example.com', password: 'password' })}>
-        login
-      </button>
-      <button onClick={() => signup({ email: 'test@example.com', nickname: 'testuser', password: 'password' })}>
-        signup
+      <button onClick={() => handleAuthSuccess(mockAuthResponse)}>
+        handleAuthSuccess
       </button>
       <button onClick={logout}>logout</button>
-      <button onClick={() => openAuthModal('login')}>openLoginModal</button>
-      <button onClick={() => openAuthModal('signup')}>openSignupModal</button>
+      <button onClick={() => openAuthModal()}>openModal</button>
       <button onClick={closeAuthModal}>closeModal</button>
     </div>
   );
@@ -150,9 +143,8 @@ describe('AuthContext', () => {
     });
   });
 
-  describe('login', () => {
-    it('API를 호출하고, user/token을 설정하고, localStorage에 저장해야 한다', async () => {
-      mockPost.mockResolvedValue(mockAuthResponse);
+  describe('handleAuthSuccess', () => {
+    it('user/token을 설정하고 localStorage에 저장해야 한다', async () => {
       const user = userEvent.setup();
 
       render(
@@ -165,49 +157,12 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
       });
 
-      await user.click(screen.getByRole('button', { name: 'login' }));
+      await user.click(screen.getByRole('button', { name: 'handleAuthSuccess' }));
 
       await waitFor(() => {
         expect(screen.getByTestId('user')).toHaveTextContent('testuser');
       });
 
-      expect(mockPost).toHaveBeenCalledWith('/auth/login', {
-        email: 'test@example.com',
-        password: 'password',
-      });
-      expect(screen.getByTestId('token')).toHaveTextContent('mock-token-abc');
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('access_token', 'mock-token-abc');
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('refresh_token', 'mock-refresh-token-xyz');
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('user', JSON.stringify(mockUser));
-    });
-  });
-
-  describe('signup', () => {
-    it('API를 호출하고, user/token을 설정하고, localStorage에 저장해야 한다', async () => {
-      mockPost.mockResolvedValue(mockAuthResponse);
-      const user = userEvent.setup();
-
-      render(
-        <AuthProvider>
-          <AuthConsumer />
-        </AuthProvider>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
-      });
-
-      await user.click(screen.getByRole('button', { name: 'signup' }));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('user')).toHaveTextContent('testuser');
-      });
-
-      expect(mockPost).toHaveBeenCalledWith('/auth/signup', {
-        email: 'test@example.com',
-        nickname: 'testuser',
-        password: 'password',
-      });
       expect(screen.getByTestId('token')).toHaveTextContent('mock-token-abc');
       expect(localStorageMock.setItem).toHaveBeenCalledWith('access_token', 'mock-token-abc');
       expect(localStorageMock.setItem).toHaveBeenCalledWith('refresh_token', 'mock-refresh-token-xyz');
@@ -217,7 +172,6 @@ describe('AuthContext', () => {
 
   describe('logout', () => {
     it('서버에 로그아웃 요청 후 user/token을 초기화하고 localStorage에서 제거해야 한다', async () => {
-      mockPost.mockResolvedValue(mockAuthResponse);
       const user = userEvent.setup();
 
       render(
@@ -230,8 +184,8 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
       });
 
-      // Login first
-      await user.click(screen.getByRole('button', { name: 'login' }));
+      // handleAuthSuccess로 로그인 상태 만들기
+      await user.click(screen.getByRole('button', { name: 'handleAuthSuccess' }));
       await waitFor(() => {
         expect(screen.getByTestId('user')).toHaveTextContent('testuser');
       });
@@ -252,7 +206,6 @@ describe('AuthContext', () => {
     });
 
     it('서버 로그아웃 실패해도 클라이언트 로그아웃이 진행되어야 한다', async () => {
-      mockPost.mockResolvedValue(mockAuthResponse);
       const user = userEvent.setup();
 
       render(
@@ -265,8 +218,8 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
       });
 
-      // Login first
-      await user.click(screen.getByRole('button', { name: 'login' }));
+      // handleAuthSuccess로 로그인 상태 만들기
+      await user.click(screen.getByRole('button', { name: 'handleAuthSuccess' }));
       await waitFor(() => {
         expect(screen.getByTestId('user')).toHaveTextContent('testuser');
       });
@@ -288,7 +241,7 @@ describe('AuthContext', () => {
   });
 
   describe('authModal', () => {
-    it('기본적으로 login 모드로 모달을 열어야 한다', async () => {
+    it('모달을 열고 닫아야 한다', async () => {
       const user = userEvent.setup();
 
       render(
@@ -299,44 +252,13 @@ describe('AuthContext', () => {
 
       expect(screen.getByTestId('modalOpen')).toHaveTextContent('false');
 
-      await user.click(screen.getByText('openLoginModal'));
+      await user.click(screen.getByText('openModal'));
 
-      expect(screen.getByTestId('modalOpen')).toHaveTextContent('true');
-      expect(screen.getByTestId('modalMode')).toHaveTextContent('login');
-    });
-
-    it('signup 모드로 모달을 열어야 한다', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <AuthProvider>
-          <AuthConsumer />
-        </AuthProvider>
-      );
-
-      await user.click(screen.getByText('openSignupModal'));
-
-      expect(screen.getByTestId('modalOpen')).toHaveTextContent('true');
-      expect(screen.getByTestId('modalMode')).toHaveTextContent('signup');
-    });
-
-    it('모달을 닫고 모드를 유지해야 한다', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <AuthProvider>
-          <AuthConsumer />
-        </AuthProvider>
-      );
-
-      await user.click(screen.getByText('openSignupModal'));
       expect(screen.getByTestId('modalOpen')).toHaveTextContent('true');
 
       await user.click(screen.getByText('closeModal'));
 
       expect(screen.getByTestId('modalOpen')).toHaveTextContent('false');
-      // mode is preserved after close (prev => ({ ...prev, isOpen: false }))
-      expect(screen.getByTestId('modalMode')).toHaveTextContent('signup');
     });
   });
 
@@ -367,7 +289,6 @@ describe('AuthContext', () => {
       });
       expect(screen.getByTestId('token')).toHaveTextContent('null');
       expect(screen.getByTestId('modalOpen')).toHaveTextContent('true');
-      expect(screen.getByTestId('modalMode')).toHaveTextContent('login');
       expect(localStorageMock.removeItem).toHaveBeenCalledWith('refresh_token');
     });
 

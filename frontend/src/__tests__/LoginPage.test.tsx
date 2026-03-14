@@ -12,16 +12,15 @@ vi.mock('next/navigation', () => ({
 const mockOpenAuthModal = vi.fn();
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
-    login: vi.fn(),
     user: null,
     token: null,
     isLoading: false,
-    signup: vi.fn(),
+    handleAuthSuccess: vi.fn(),
     logout: vi.fn(),
     updateUser: vi.fn(),
     openAuthModal: mockOpenAuthModal,
     closeAuthModal: vi.fn(),
-    authModal: null,
+    authModal: { isOpen: false },
   }),
 }));
 
@@ -33,7 +32,7 @@ describe('LoginPage', () => {
   it('비로그인 상태에서 로그인 모달을 열고 홈으로 리다이렉트한다', () => {
     render(<LoginPage />);
 
-    expect(mockOpenAuthModal).toHaveBeenCalledWith('login');
+    expect(mockOpenAuthModal).toHaveBeenCalled();
     expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
@@ -42,16 +41,15 @@ describe('LoginPage', () => {
     // user가 있는 경우를 위한 별도 mock
     vi.doMock('@/contexts/AuthContext', () => ({
       useAuth: () => ({
-        login: vi.fn(),
         user: { id: 1, nickname: 'testuser' },
         token: 'token',
         isLoading: false,
-        signup: vi.fn(),
+        handleAuthSuccess: vi.fn(),
         logout: vi.fn(),
         updateUser: vi.fn(),
         openAuthModal: mockOpenAuthModal,
         closeAuthModal: vi.fn(),
-        authModal: null,
+        authModal: { isOpen: false },
       }),
     }));
 

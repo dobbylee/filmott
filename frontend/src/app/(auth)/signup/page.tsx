@@ -12,7 +12,7 @@ export default function SignupPage() {
     if (user) {
       router.replace('/');
     } else {
-      openAuthModal('signup');
+      openAuthModal();
       router.replace('/');
     }
   }, [user, openAuthModal, router]);

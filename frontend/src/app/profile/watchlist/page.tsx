@@ -41,7 +41,7 @@ export default function WatchlistListPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      openAuthModal('login');
+      openAuthModal();
       router.replace('/');
     }
   }, [user, authLoading, router, openAuthModal]);

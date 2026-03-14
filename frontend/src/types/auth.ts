@@ -1,9 +1,11 @@
 export interface User {
   id: number;
   nickname: string;
-  email: string;
+  email?: string | null;
   profileImage?: string;
   status?: string;
+  role?: string;
+  provider?: string;
   createdAt?: string;
 }
 
@@ -13,19 +15,6 @@ export interface AuthResponse {
   user: User;
 }
 
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface SignupRequest {
-  email: string;
-  nickname: string;
-  password: string;
-}
-
 export interface UpdateProfileRequest {
   nickname?: string;
-  currentPassword?: string;
-  newPassword?: string;
 }

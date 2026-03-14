@@ -10,16 +10,15 @@ vi.mock('next/navigation', () => ({
 const mockOpenAuthModal = vi.fn();
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
-    signup: vi.fn(),
     user: null,
     token: null,
     isLoading: false,
-    login: vi.fn(),
+    handleAuthSuccess: vi.fn(),
     logout: vi.fn(),
     updateUser: vi.fn(),
     openAuthModal: mockOpenAuthModal,
     closeAuthModal: vi.fn(),
-    authModal: null,
+    authModal: { isOpen: false },
   }),
 }));
 
@@ -28,10 +27,10 @@ describe('SignupPage', () => {
     vi.clearAllMocks();
   });
 
-  it('비로그인 상태에서 회원가입 모달을 열고 홈으로 리다이렉트한다', () => {
+  it('비로그인 상태에서 소셜 로그인 모달을 열고 홈으로 리다이렉트한다', () => {
     render(<SignupPage />);
 
-    expect(mockOpenAuthModal).toHaveBeenCalledWith('signup');
+    expect(mockOpenAuthModal).toHaveBeenCalled();
     expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
@@ -41,10 +40,9 @@ describe('SignupPage', () => {
     expect(spinner).toBeInTheDocument();
   });
 
-  it('openAuthModal을 정확한 인자로 호출한다', () => {
+  it('openAuthModal을 호출한다', () => {
     render(<SignupPage />);
 
     expect(mockOpenAuthModal).toHaveBeenCalledTimes(1);
-    expect(mockOpenAuthModal).toHaveBeenCalledWith('signup');
   });
 });
