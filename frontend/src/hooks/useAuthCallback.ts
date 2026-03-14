@@ -58,7 +58,8 @@ export function useAuthCallback({
     if (token && refresh) {
       processed.current = true;
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const base64 = token.split('.')[1];
+        const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))));
         onAuthSuccess({
           access_token: token,
           refresh_token: refresh,

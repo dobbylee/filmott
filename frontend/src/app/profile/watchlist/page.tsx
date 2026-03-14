@@ -80,10 +80,12 @@ function WatchlistListContent() {
         setSelectedYear(res.data.years[0]);
       } else {
         setSelectedYear(null);
+        setIsLoading(false);
       }
     } catch {
       setWatchedYears([]);
       setSelectedYear(null);
+      setIsLoading(false);
     }
   }, [user, yearParam]);
 
