@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -12,7 +12,7 @@ import MonthSection from '@/components/watchlist/MonthSection';
 import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { WatchlistStatus, WantToWatchResponse, WatchedByYearResponse, WatchedYearsResponse } from '@/types/watchlist';
 
-export default function WatchlistListPage() {
+function WatchlistListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading, openAuthModal } = useAuth();
@@ -365,5 +365,24 @@ export default function WatchlistListPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function WatchlistListPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-2xl px-4">
+          <div className="h-10 w-48 rounded bg-white/5 animate-pulse mb-6" />
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-32 rounded-xl bg-white/5 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      }
+    >
+      <WatchlistListContent />
+    </Suspense>
   );
 }

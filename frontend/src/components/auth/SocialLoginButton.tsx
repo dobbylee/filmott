@@ -60,7 +60,7 @@ export default function SocialLoginButton({ provider }: SocialLoginButtonProps) 
     <button
       type="button"
       onClick={handleClick}
-      style={config.bgStyle}
+      style={'bgStyle' in config ? config.bgStyle : undefined}
       className={`flex w-full items-center justify-center gap-3 rounded-lg px-4 py-3 text-sm font-semibold transition-all ${config.bgColor} ${config.textColor}`}
       data-testid={`social-login-${provider}`}
     >

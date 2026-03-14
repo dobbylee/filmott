@@ -1,11 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthCallback } from '@/hooks/useAuthCallback';
 import NicknameSetupModal from '@/components/auth/NicknameSetupModal';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { handleAuthSuccess } = useAuth();
@@ -41,5 +42,20 @@ export default function AuthCallbackPage() {
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
       <p className="text-sm text-white/50">로그인 처리 중...</p>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+          <p className="text-sm text-white/50">로그인 처리 중...</p>
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   );
 }
