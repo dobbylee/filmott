@@ -1,8 +1,6 @@
 'use client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-// API_URL은 /api 포함이므로 auth 엔드포인트는 base URL 사용
-const BASE_URL = API_URL.replace(/\/api$/, '');
 
 interface SocialLoginButtonProps {
   provider: 'google' | 'kakao' | 'naver';
@@ -53,7 +51,7 @@ export default function SocialLoginButton({ provider }: SocialLoginButtonProps) 
   const config = providerConfig[provider];
 
   const handleClick = () => {
-    window.location.href = `${BASE_URL}/auth/${provider}`;
+    window.location.href = `${API_URL}/auth/${provider}`;
   };
 
   return (
