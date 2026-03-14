@@ -392,6 +392,7 @@ describe('UsersService', () => {
         id: 5,
         nickname: 'bob',
         email: 'bob@mail.com',
+        providerId: 'google-123',
         status: UserStatus.ACTIVE,
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
@@ -406,8 +407,32 @@ describe('UsersService', () => {
       // Should anonymize user data, set status to DELETED, and save
       expect(mockUser.nickname).toEqual(`deleted_5_${fixedTimestamp}`);
       expect(mockUser.email).toEqual(`deleted_5_${fixedTimestamp}@deleted.local`);
+      expect(mockUser.providerId).toBeNull();
       expect(mockUser.status).toEqual(UserStatus.DELETED);
       expect(mockUsersRepo.save).toHaveBeenCalledWith(mockUser);
+
+      jest.restoreAllMocks();
+    });
+
+    it('P0-2: 탈퇴 시 providerId를 null로 초기화해야 한다 (소셜 재가입 허용)', async () => {
+      const mockUser: Record<string, unknown> = {
+        id: 10,
+        nickname: 'socialuser',
+        email: 'social@mail.com',
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-abc',
+        status: UserStatus.ACTIVE,
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 0 });
+
+      const fixedTimestamp = 1740000000000;
+      jest.spyOn(Date, 'now').mockReturnValue(fixedTimestamp);
+
+      await service.deactivate(10);
+
+      expect(mockUser.providerId).toBeNull();
+      expect(mockUser.status).toEqual(UserStatus.DELETED);
 
       jest.restoreAllMocks();
     });
@@ -492,6 +517,28 @@ describe('UsersService', () => {
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         '(user.nickname ILIKE :search OR user.email ILIKE :search)',
         { search: '%test%' },
+      );
+    });
+
+    it('P1-1: 검색어의 %와 _를 이스케이프해야 한다', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAllForAdmin({ search: '100%_test' });
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(user.nickname ILIKE :search OR user.email ILIKE :search)',
+        { search: '%100\\%\\_test%' },
+      );
+    });
+
+    it('P1-1: 검색어의 백슬래시를 이스케이프해야 한다', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAllForAdmin({ search: 'a\\b' });
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(user.nickname ILIKE :search OR user.email ILIKE :search)',
+        { search: '%a\\\\b%' },
       );
     });
 

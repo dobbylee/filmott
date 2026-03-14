@@ -224,6 +224,7 @@ export class UsersService {
     const timestamp = Date.now();
     user.nickname = `deleted_${user.id}_${timestamp}`;
     user.email = `deleted_${user.id}_${timestamp}@deleted.local`;
+    user.providerId = null;
     user.status = UserStatus.DELETED;
     await this.usersRepo.save(user);
   }
@@ -257,9 +258,13 @@ export class UsersService {
     }
 
     if (dto.search) {
+      const escaped = dto.search
+        .replace(/\\/g, '\\\\')
+        .replace(/%/g, '\\%')
+        .replace(/_/g, '\\_');
       queryBuilder.andWhere(
         '(user.nickname ILIKE :search OR user.email ILIKE :search)',
-        { search: `%${dto.search}%` },
+        { search: `%${escaped}%` },
       );
     }
 

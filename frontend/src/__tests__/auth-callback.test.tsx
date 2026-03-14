@@ -9,6 +9,15 @@ Object.defineProperty(window, 'history', {
   writable: true,
 });
 
+// api mock
+const mockPost = vi.fn();
+vi.mock('@/lib/api', () => ({
+  default: {
+    post: (...args: unknown[]) => mockPost(...args),
+    get: vi.fn(),
+  },
+}));
+
 describe('useAuthCallback', () => {
   const mockOnAuthSuccess = vi.fn();
   const mockOnRedirect = vi.fn();
@@ -21,16 +30,20 @@ describe('useAuthCallback', () => {
     vi.restoreAllMocks();
   });
 
-  describe('기존 유저 토큰 처리', () => {
-    it('token과 refresh 파라미터로 onAuthSuccess를 호출한다', () => {
-      const payload = { sub: 1, nickname: 'testuser', email: 'test@example.com', provider: 'GOOGLE' };
-      const base64Payload = btoa(JSON.stringify(payload));
-      const mockToken = `header.${base64Payload}.signature`;
+  describe('기존 유저 code 교환 처리', () => {
+    it('code 파라미터로 POST /auth/social/exchange를 호출한다', async () => {
+      const mockResponse = {
+        data: {
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+          user: { id: 1, nickname: 'testuser', role: 'USER' },
+        },
+      };
+      mockPost.mockResolvedValue(mockResponse);
 
       const { result } = renderHook(() =>
         useAuthCallback({
-          token: mockToken,
-          refresh: 'mock-refresh-token',
+          code: 'one-time-code-abc',
           isNew: null,
           tempToken: null,
           error: null,
@@ -39,29 +52,25 @@ describe('useAuthCallback', () => {
         })
       );
 
-      expect(mockOnAuthSuccess).toHaveBeenCalledWith(
-        expect.objectContaining({
-          access_token: mockToken,
-          refresh_token: 'mock-refresh-token',
-          user: expect.objectContaining({
-            id: 1,
-            nickname: 'testuser',
-          }),
-        })
-      );
-      expect(mockReplaceState).toHaveBeenCalled();
-      expect(mockOnRedirect).toHaveBeenCalledWith('/');
-      expect(result.current.type).toBe('success');
+      // 비동기 처리 대기
+      await vi.waitFor(() => {
+        expect(mockPost).toHaveBeenCalledWith('/auth/social/exchange', { code: 'one-time-code-abc' });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockOnAuthSuccess).toHaveBeenCalledWith(mockResponse.data);
+        expect(mockReplaceState).toHaveBeenCalled();
+        expect(mockOnRedirect).toHaveBeenCalledWith('/');
+        expect(result.current.type).toBe('success');
+      });
     });
 
-    it('JWT 파싱 실패 시에도 토큰을 localStorage에 저장한다', () => {
-      const mockSetItem = vi.spyOn(Storage.prototype, 'setItem');
-      const invalidToken = 'not.a.valid.jwt';
+    it('code 교환 실패 시 에러 상태를 반환한다', async () => {
+      mockPost.mockRejectedValue(new Error('exchange failed'));
 
-      renderHook(() =>
+      const { result } = renderHook(() =>
         useAuthCallback({
-          token: invalidToken,
-          refresh: 'mock-refresh-token',
+          code: 'invalid-code',
           isNew: null,
           tempToken: null,
           error: null,
@@ -70,9 +79,12 @@ describe('useAuthCallback', () => {
         })
       );
 
-      expect(mockSetItem).toHaveBeenCalledWith('access_token', invalidToken);
-      expect(mockSetItem).toHaveBeenCalledWith('refresh_token', 'mock-refresh-token');
-      mockSetItem.mockRestore();
+      await vi.waitFor(() => {
+        expect(result.current.type).toBe('error');
+        if (result.current.type === 'error') {
+          expect(result.current.message).toBe('소셜 인증에 실패했습니다. 다시 시도해주세요.');
+        }
+      });
     });
   });
 
@@ -80,8 +92,7 @@ describe('useAuthCallback', () => {
     it('new=true와 tempToken 파라미터로 nickname 상태를 반환한다', () => {
       const { result } = renderHook(() =>
         useAuthCallback({
-          token: null,
-          refresh: null,
+          code: null,
           isNew: 'true',
           tempToken: 'temp-token-xyz',
           error: null,
@@ -102,8 +113,7 @@ describe('useAuthCallback', () => {
     it('social_auth_failed 에러 메시지를 반환한다', () => {
       const { result } = renderHook(() =>
         useAuthCallback({
-          token: null,
-          refresh: null,
+          code: null,
           isNew: null,
           tempToken: null,
           error: 'social_auth_failed',
@@ -121,8 +131,7 @@ describe('useAuthCallback', () => {
     it('알 수 없는 에러 코드일 때 기본 메시지를 반환한다', () => {
       const { result } = renderHook(() =>
         useAuthCallback({
-          token: null,
-          refresh: null,
+          code: null,
           isNew: null,
           tempToken: null,
           error: 'unknown_error',
@@ -140,8 +149,7 @@ describe('useAuthCallback', () => {
     it('suspended 에러 메시지를 반환한다', () => {
       const { result } = renderHook(() =>
         useAuthCallback({
-          token: null,
-          refresh: null,
+          code: null,
           isNew: null,
           tempToken: null,
           error: 'suspended',
@@ -159,8 +167,7 @@ describe('useAuthCallback', () => {
     it('deleted 에러 메시지를 반환한다', () => {
       const { result } = renderHook(() =>
         useAuthCallback({
-          token: null,
-          refresh: null,
+          code: null,
           isNew: null,
           tempToken: null,
           error: 'deleted',
@@ -175,13 +182,30 @@ describe('useAuthCallback', () => {
       }
     });
 
+    it('missing_code 에러 메시지를 반환한다', () => {
+      const { result } = renderHook(() =>
+        useAuthCallback({
+          code: null,
+          isNew: null,
+          tempToken: null,
+          error: 'missing_code',
+          onAuthSuccess: mockOnAuthSuccess,
+          onRedirect: mockOnRedirect,
+        })
+      );
+
+      expect(result.current.type).toBe('error');
+      if (result.current.type === 'error') {
+        expect(result.current.message).toBe('인증 코드가 누락되었습니다. 다시 시도해주세요.');
+      }
+    });
+
     it('파라미터가 없으면 잘못된 접근 메시지를 반환한다', () => {
       vi.useFakeTimers();
 
       const { result } = renderHook(() =>
         useAuthCallback({
-          token: null,
-          refresh: null,
+          code: null,
           isNew: null,
           tempToken: null,
           error: null,
@@ -207,8 +231,7 @@ describe('useAuthCallback', () => {
 
       renderHook(() =>
         useAuthCallback({
-          token: null,
-          refresh: null,
+          code: null,
           isNew: null,
           tempToken: null,
           error: 'social_auth_failed',

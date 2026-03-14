@@ -112,10 +112,10 @@ export default function UserManagement() {
 
   const providerLabel = (provider: string) => {
     const map: Record<string, string> = {
-      local: '이메일',
-      kakao: '카카오',
-      naver: '네이버',
-      google: '구글',
+      LOCAL: '이메일',
+      KAKAO: '카카오',
+      NAVER: '네이버',
+      GOOGLE: '구글',
     };
     return map[provider] || provider;
   };

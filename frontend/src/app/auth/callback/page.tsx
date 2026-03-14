@@ -16,8 +16,7 @@ function AuthCallbackContent() {
   }, [router]);
 
   const state = useAuthCallback({
-    token: searchParams.get('token'),
-    refresh: searchParams.get('refresh'),
+    code: searchParams.get('code'),
     isNew: searchParams.get('new'),
     tempToken: searchParams.get('tempToken'),
     error: searchParams.get('error'),

@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -20,8 +21,7 @@ import { SocialProfile } from './interfaces/social-profile.interface';
 
 interface SocialCallbackResultExisting {
   type: 'existing';
-  tokens: { access_token: string; refresh_token: string };
-  user: { id: number; nickname: string; email: string | null; role: string };
+  code: string;
 }
 
 interface SocialCallbackResultNew {
@@ -32,9 +32,17 @@ interface SocialCallbackResultNew {
 export type SocialCallbackResult = SocialCallbackResultExisting | SocialCallbackResultNew;
 
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
+const ONE_TIME_CODE_TTL = 5 * 60 * 1000; // 5분
+
+interface OneTimeCodeEntry {
+  userId: number;
+  expiresAt: number;
+}
 
 @Injectable()
 export class AuthService {
+  private oneTimeCodes = new Map<string, OneTimeCodeEntry>();
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
@@ -165,6 +173,62 @@ export class AuthService {
       .delete()
       .where('expires_at < :now', { now: new Date() })
       .execute();
+    this.cleanExpiredCodes();
+  }
+
+  generateOneTimeCode(userId: number): string {
+    const code = randomBytes(32).toString('hex');
+    this.oneTimeCodes.set(code, {
+      userId,
+      expiresAt: Date.now() + ONE_TIME_CODE_TTL,
+    });
+    return code;
+  }
+
+  async exchangeOneTimeCode(code: string) {
+    const entry = this.oneTimeCodes.get(code);
+    if (!entry) {
+      throw new UnauthorizedException('유효하지 않거나 만료된 코드입니다.');
+    }
+
+    // 일회용: 즉시 삭제
+    this.oneTimeCodes.delete(code);
+
+    if (entry.expiresAt < Date.now()) {
+      throw new UnauthorizedException('유효하지 않거나 만료된 코드입니다.');
+    }
+
+    const user = await this.usersService.findByIdWithStatus(entry.userId);
+    if (!user) {
+      throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+    }
+
+    if (user.status === UserStatus.DELETED) {
+      throw new UnauthorizedException('탈퇴한 계정입니다.');
+    }
+
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new UnauthorizedException('정지된 계정입니다.');
+    }
+
+    const tokens = await this.generateTokens(user);
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        nickname: user.nickname,
+        role: user.role,
+      },
+    };
+  }
+
+  cleanExpiredCodes(): void {
+    const now = Date.now();
+    for (const [code, entry] of this.oneTimeCodes) {
+      if (entry.expiresAt < now) {
+        this.oneTimeCodes.delete(code);
+      }
+    }
   }
 
   async handleSocialCallback(profile: SocialProfile): Promise<SocialCallbackResult> {
@@ -178,17 +242,14 @@ export class AuthService {
         throw new UnauthorizedException('정지된 계정입니다.');
       }
 
-      const { password: _, ...safeUser } = existingUser;
-      const tokens = await this.generateTokens(safeUser);
+      if (existingUser.status === UserStatus.DELETED) {
+        throw new UnauthorizedException('탈퇴한 계정입니다.');
+      }
+
+      const code = this.generateOneTimeCode(existingUser.id);
       return {
         type: 'existing',
-        tokens,
-        user: {
-          id: safeUser.id,
-          nickname: safeUser.nickname,
-          email: safeUser.email,
-          role: safeUser.role,
-        },
+        code,
       };
     }
 
@@ -226,6 +287,15 @@ export class AuthService {
 
     if (payload.type !== 'social_signup') {
       throw new BadRequestException('유효하지 않은 토큰 타입입니다.');
+    }
+
+    // 동일 provider+providerId로 이미 가입된 유저 존재 시 ConflictException
+    const existingByProvider = await this.usersService.findByProvider(
+      payload.provider as SocialProfile['provider'],
+      payload.providerId,
+    );
+    if (existingByProvider) {
+      throw new ConflictException('이미 가입된 소셜 계정입니다.');
     }
 
     const user = await this.usersService.createSocialUser({

@@ -10,6 +10,7 @@ import {
   HttpStatus,
   UseGuards,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
@@ -35,6 +36,7 @@ const STATE_COOKIE_MAX_AGE = 5 * 60 * 1000; // 5분
 @UseGuards(ThrottlerGuard)
 export class AuthController {
   private readonly frontendUrl: string;
+  private readonly isProduction: boolean;
 
   constructor(
     private readonly authService: AuthService,
@@ -44,6 +46,7 @@ export class AuthController {
     private readonly naverService: NaverService,
   ) {
     this.frontendUrl = this.configService.getOrThrow<string>('FRONTEND_URL');
+    this.isProduction = this.configService.get<string>('NODE_ENV') === 'production';
   }
 
   // --- 기존 엔드포인트 ---
@@ -146,6 +149,16 @@ export class AuthController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @Post('social/exchange')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  async exchangeCode(@Body('code') code: string) {
+    if (!code) {
+      throw new BadRequestException('코드가 필요합니다.');
+    }
+    return this.authService.exchangeOneTimeCode(code);
+  }
+
+  @HttpCode(HttpStatus.OK)
   @Post('social/complete-signup')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   async completeSocialSignup(@Body() dto: CompleteSocialSignupDto) {
@@ -158,7 +171,7 @@ export class AuthController {
     res.cookie(OAUTH_STATE_COOKIE, state, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: false, // 개발 환경에서는 false, 프로덕션에서는 true로 변경
+      secure: this.isProduction,
       maxAge: STATE_COOKIE_MAX_AGE,
       path: '/',
     });
@@ -201,10 +214,7 @@ export class AuthController {
       const result = await this.authService.handleSocialCallback(profile);
 
       if (result.type === 'existing') {
-        const params = new URLSearchParams({
-          token: result.tokens.access_token,
-          refresh: result.tokens.refresh_token,
-        });
+        const params = new URLSearchParams({ code: result.code });
         res.redirect(`${callbackUrl}?${params.toString()}`);
       } else {
         const params = new URLSearchParams({
@@ -214,8 +224,13 @@ export class AuthController {
         res.redirect(`${callbackUrl}?${params.toString()}`);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown_error';
-      res.redirect(`${callbackUrl}?error=${encodeURIComponent(message)}`);
+      let errorCode = 'social_auth_failed';
+      if (error instanceof UnauthorizedException) {
+        const message = error.message;
+        if (message.includes('정지')) errorCode = 'suspended';
+        else if (message.includes('탈퇴')) errorCode = 'deleted';
+      }
+      res.redirect(`${callbackUrl}?error=${errorCode}`);
     }
   }
 }

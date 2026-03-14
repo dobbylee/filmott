@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -24,10 +24,12 @@ describe('AuthController', () => {
     revokeRefreshToken: jest.fn(),
     handleSocialCallback: jest.fn(),
     completeSocialSignup: jest.fn(),
+    exchangeOneTimeCode: jest.fn(),
   };
 
   const mockConfigService = {
     getOrThrow: jest.fn().mockReturnValue('http://localhost:3000'),
+    get: jest.fn().mockReturnValue('development'),
   };
 
   const mockGoogleService = {
@@ -69,7 +71,7 @@ describe('AuthController', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('POST /auth/signup (register) — ADMIN 전용', () => {
+  describe('POST /auth/signup (register) -- ADMIN 전용', () => {
     it('authService.register를 호출하고 토큰과 사용자를 반환해야 한다', async () => {
       const dto = { nickname: 'test', email: 'test@test.com', password: 'password1' };
       const response = {
@@ -171,6 +173,7 @@ describe('AuthController', () => {
         expect.objectContaining({
           httpOnly: true,
           sameSite: 'lax',
+          secure: false,
           maxAge: 300000,
           path: '/',
         }),
@@ -180,8 +183,54 @@ describe('AuthController', () => {
     });
   });
 
+  describe('P0-1: state 쿠키 secure가 NODE_ENV에 따라 설정되어야 한다', () => {
+    it('development 환경에서 secure: false로 설정되어야 한다', () => {
+      const mockRes = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+      };
+
+      controller.googleRedirect(mockRes as never);
+
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'oauth_state',
+        expect.any(String),
+        expect.objectContaining({ secure: false }),
+      );
+    });
+
+    it('production 환경에서 secure: true로 설정되어야 한다', async () => {
+      const prodConfigService = {
+        getOrThrow: jest.fn().mockReturnValue('http://localhost:3000'),
+        get: jest.fn().mockReturnValue('production'),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
+        controllers: [AuthController],
+        providers: [
+          { provide: AuthService, useValue: mockAuthService },
+          { provide: ConfigService, useValue: prodConfigService },
+          { provide: GoogleService, useValue: mockGoogleService },
+          { provide: KakaoService, useValue: mockKakaoService },
+          { provide: NaverService, useValue: mockNaverService },
+        ],
+      }).compile();
+
+      const prodController = module.get<AuthController>(AuthController);
+      const mockRes = { cookie: jest.fn(), redirect: jest.fn() };
+      prodController.googleRedirect(mockRes as never);
+
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'oauth_state',
+        expect.any(String),
+        expect.objectContaining({ secure: true }),
+      );
+    });
+  });
+
   describe('GET /auth/google/callback (googleCallback)', () => {
-    it('기존 유저면 토큰과 함께 프론트엔드로 리다이렉트해야 한다', async () => {
+    it('기존 유저면 one-time code와 함께 프론트엔드로 리다이렉트해야 한다', async () => {
       const mockRes = {
         cookie: jest.fn(),
         redirect: jest.fn(),
@@ -189,8 +238,7 @@ describe('AuthController', () => {
       };
       const existingResult: SocialCallbackResult = {
         type: 'existing',
-        tokens: { access_token: 'at', refresh_token: 'rt' },
-        user: { id: 1, nickname: 'user', email: 'e@e.com', role: 'USER' },
+        code: 'one-time-code-abc',
       };
       mockGoogleService.getProfile.mockResolvedValue({
         provider: AuthProvider.GOOGLE,
@@ -206,7 +254,11 @@ describe('AuthController', () => {
 
       expect(mockRes.clearCookie).toHaveBeenCalledWith('oauth_state', { path: '/' });
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('http://localhost:3000/auth/callback?token=at&refresh=rt'),
+        expect.stringContaining('code=one-time-code-abc'),
+      );
+      // 토큰이 URL에 노출되지 않아야 한다
+      expect(mockRes.redirect).not.toHaveBeenCalledWith(
+        expect.stringContaining('token='),
       );
     });
 
@@ -266,6 +318,80 @@ describe('AuthController', () => {
         expect.stringContaining('error=missing_code'),
       );
     });
+
+    it('P1-5: SUSPENDED 에러 시 suspended 에러 코드로 리다이렉트해야 한다', async () => {
+      const mockRes = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+        clearCookie: jest.fn(),
+      };
+      mockGoogleService.getProfile.mockResolvedValue({
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-suspended',
+        email: 'sus@e.com',
+        nickname: null,
+        profileImage: null,
+      });
+      mockAuthService.handleSocialCallback.mockRejectedValue(
+        new UnauthorizedException('정지된 계정입니다.'),
+      );
+
+      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      await controller.googleCallback('code-sus', 'valid-state', mockReq as never, mockRes as never);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        expect.stringContaining('error=suspended'),
+      );
+      // error.message 원문이 노출되지 않아야 한다
+      expect(mockRes.redirect).not.toHaveBeenCalledWith(
+        expect.stringContaining('정지된'),
+      );
+    });
+
+    it('P1-5: DELETED 에러 시 deleted 에러 코드로 리다이렉트해야 한다', async () => {
+      const mockRes = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+        clearCookie: jest.fn(),
+      };
+      mockGoogleService.getProfile.mockResolvedValue({
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-deleted',
+        email: 'del@e.com',
+        nickname: null,
+        profileImage: null,
+      });
+      mockAuthService.handleSocialCallback.mockRejectedValue(
+        new UnauthorizedException('탈퇴한 계정입니다.'),
+      );
+
+      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      await controller.googleCallback('code-del', 'valid-state', mockReq as never, mockRes as never);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        expect.stringContaining('error=deleted'),
+      );
+    });
+
+    it('P1-5: 일반 에러 시 social_auth_failed 에러 코드로 리다이렉트해야 한다', async () => {
+      const mockRes = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+        clearCookie: jest.fn(),
+      };
+      mockGoogleService.getProfile.mockRejectedValue(new Error('network error'));
+
+      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      await controller.googleCallback('code-err', 'valid-state', mockReq as never, mockRes as never);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        expect.stringContaining('error=social_auth_failed'),
+      );
+      // error.message가 직접 노출되지 않아야 한다
+      expect(mockRes.redirect).not.toHaveBeenCalledWith(
+        expect.stringContaining('network'),
+      );
+    });
   });
 
   describe('GET /auth/kakao (kakaoRedirect)', () => {
@@ -295,6 +421,34 @@ describe('AuthController', () => {
 
       expect(mockNaverService.getAuthUrl).toHaveBeenCalledWith(expect.any(String));
       expect(mockRes.redirect).toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /auth/social/exchange (exchangeCode)', () => {
+    it('유효한 code로 토큰을 교환해야 한다', async () => {
+      const response = {
+        access_token: 'at',
+        refresh_token: 'rt',
+        user: { id: 1, nickname: 'user', role: 'USER' },
+      };
+      mockAuthService.exchangeOneTimeCode.mockResolvedValue(response);
+
+      const result = await controller.exchangeCode('valid-code');
+
+      expect(mockAuthService.exchangeOneTimeCode).toHaveBeenCalledWith('valid-code');
+      expect(result).toEqual(response);
+    });
+
+    it('code가 없으면 BadRequestException을 던져야 한다', async () => {
+      await expect(controller.exchangeCode('')).rejects.toThrow(BadRequestException);
+    });
+
+    it('유효하지 않은 code면 UnauthorizedException을 던져야 한다', async () => {
+      mockAuthService.exchangeOneTimeCode.mockRejectedValue(
+        new UnauthorizedException('유효하지 않거나 만료된 코드입니다.'),
+      );
+
+      await expect(controller.exchangeCode('invalid-code')).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -360,6 +514,11 @@ describe('AuthController', () => {
       expect(googleKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
       expect(kakaoKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
       expect(naverKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
+    });
+
+    it('exchangeCode 메서드에 Throttle 데코레이터가 있어야 한다', () => {
+      const keys = Reflect.getMetadataKeys(AuthController.prototype.exchangeCode);
+      expect(keys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
     });
 
     it('completeSocialSignup 메서드에 Throttle 데코레이터가 있어야 한다', () => {

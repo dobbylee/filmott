@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import api from '@/lib/api';
 import type { AuthResponse } from '@/types/auth';
 
 export type CallbackState =
@@ -10,6 +11,7 @@ export type CallbackState =
 const ERROR_MESSAGES: Record<string, string> = {
   social_auth_failed: '소셜 인증에 실패했습니다. 다시 시도해주세요.',
   invalid_state: '잘못된 요청입니다. 다시 시도해주세요.',
+  missing_code: '인증 코드가 누락되었습니다. 다시 시도해주세요.',
   provider_error: '소셜 서비스 연결에 실패했습니다.',
   suspended: '정지된 계정입니다.',
   deleted: '삭제된 계정입니다.',
@@ -20,8 +22,7 @@ function getErrorText(reason: string): string {
 }
 
 interface UseAuthCallbackParams {
-  token: string | null;
-  refresh: string | null;
+  code: string | null;
   isNew: string | null;
   tempToken: string | null;
   error: string | null;
@@ -30,8 +31,7 @@ interface UseAuthCallbackParams {
 }
 
 export function useAuthCallback({
-  token,
-  refresh,
+  code,
   isNew,
   tempToken,
   error,
@@ -54,31 +54,24 @@ export function useAuthCallback({
       return () => clearTimeout(timer);
     }
 
-    // 기존 유저: 토큰 저장 + 메인 이동
-    if (token && refresh) {
+    // 기존 유저: code로 토큰 교환
+    if (code) {
       processed.current = true;
-      try {
-        const base64 = token.split('.')[1];
-        const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))));
-        onAuthSuccess({
-          access_token: token,
-          refresh_token: refresh,
-          user: {
-            id: payload.sub,
-            nickname: payload.nickname || '',
-            email: payload.email || null,
-            provider: payload.provider || undefined,
-          },
-        });
-      } catch {
-        localStorage.setItem('access_token', token);
-        localStorage.setItem('refresh_token', refresh);
-      }
-      if (typeof window !== 'undefined') {
-        window.history.replaceState({}, '', '/auth/callback');
-      }
-      setState({ type: 'success' });
-      onRedirect('/');
+      (async () => {
+        try {
+          const { data } = await api.post<AuthResponse>('/auth/social/exchange', { code });
+          onAuthSuccess(data);
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, '', '/auth/callback');
+          }
+          setState({ type: 'success' });
+          onRedirect('/');
+        } catch {
+          setState({ type: 'error', message: getErrorText('social_auth_failed') });
+          const timer = setTimeout(() => onRedirect('/'), 3000);
+          return () => clearTimeout(timer);
+        }
+      })();
       return;
     }
 
@@ -101,7 +94,7 @@ export function useAuthCallback({
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [token, refresh, isNew, tempToken, error, onAuthSuccess, onRedirect]);
+  }, [code, isNew, tempToken, error, onAuthSuccess, onRedirect]);
 
   return state;
 }
