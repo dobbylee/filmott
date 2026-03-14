@@ -39,9 +39,6 @@ export class Review {
   @Column({ type: 'text', nullable: true })
   comment?: string;
 
-  @Column({ name: 'has_spoiler', default: false })
-  hasSpoiler!: boolean;
-
   @Column({ name: 'likes_count', default: 0 })
   likesCount!: number;
 

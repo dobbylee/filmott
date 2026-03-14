@@ -38,9 +38,14 @@ export default function ReviewListClient({ reviews: initialReviews, contentId }:
       });
   }, [user, contentId, initialReviews]);
 
+  const isAdmin = user?.role === 'ADMIN';
   const filtered = user
     ? reviews.filter((r) => r.userId !== user.id)
     : reviews;
+
+  const handleDeleteReview = (reviewId: number) => {
+    setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+  };
 
   if (filtered.length === 0) {
     return (
@@ -57,6 +62,8 @@ export default function ReviewListClient({ reviews: initialReviews, contentId }:
           key={review.id}
           review={review}
           initialLiked={likedIds.has(review.id)}
+          isAdmin={isAdmin}
+          onDelete={() => handleDeleteReview(review.id)}
         />
       ))}
     </div>

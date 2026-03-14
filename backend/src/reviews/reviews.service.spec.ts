@@ -64,7 +64,7 @@ describe('ReviewsService', () => {
     it('별점과 코멘트로 리뷰를 생성해야 한다', async () => {
       const dto = { contentId: 1, rating: 8, comment: 'Great movie!' };
       mockReviewRepo.findOne.mockResolvedValue(null);
-      const created = { id: 1, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
+      const created = { id: 1, userId: 1, ...dto, likesCount: 0 };
       mockReviewRepo.create.mockReturnValue(created);
       mockReviewRepo.save.mockResolvedValue(created);
       mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: null, watchlistId: null });
@@ -77,7 +77,7 @@ describe('ReviewsService', () => {
         contentId: 1,
         rating: 8,
         comment: 'Great movie!',
-        hasSpoiler: false,
+
       });
       expect(result).toEqual(created);
       expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched', undefined);
@@ -86,7 +86,7 @@ describe('ReviewsService', () => {
     it('별점만으로 리뷰를 생성해야 한다', async () => {
       const dto = { contentId: 1, rating: 7 };
       mockReviewRepo.findOne.mockResolvedValue(null);
-      const created = { id: 2, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
+      const created = { id: 2, userId: 1, ...dto, likesCount: 0 };
       mockReviewRepo.create.mockReturnValue(created);
       mockReviewRepo.save.mockResolvedValue(created);
       mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: null, watchlistId: null });
@@ -100,7 +100,7 @@ describe('ReviewsService', () => {
       // rating은 DTO ValidationPipe에서 필수 검증됨. 서비스는 rating이 있다고 가정
       const dto = { contentId: 1, rating: 5, comment: '좋아요' };
       mockReviewRepo.findOne.mockResolvedValue(null);
-      const created = { id: 3, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
+      const created = { id: 3, userId: 1, ...dto, likesCount: 0 };
       mockReviewRepo.create.mockReturnValue(created);
       mockReviewRepo.save.mockResolvedValue(created);
       mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: null, watchlistId: null });
@@ -113,7 +113,7 @@ describe('ReviewsService', () => {
     it('이미 감상한 경우 워치리스트에 추가하지 않아야 한다', async () => {
       const dto = { contentId: 1, rating: 8 };
       mockReviewRepo.findOne.mockResolvedValue(null);
-      const created = { id: 4, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
+      const created = { id: 4, userId: 1, ...dto, likesCount: 0 };
       mockReviewRepo.create.mockReturnValue(created);
       mockReviewRepo.save.mockResolvedValue(created);
       mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: 'watched', watchlistId: 1 });
@@ -125,7 +125,7 @@ describe('ReviewsService', () => {
     it('리뷰 생성 시 want_to_watch를 watched로 전환해야 한다', async () => {
       const dto = { contentId: 1, rating: 9 };
       mockReviewRepo.findOne.mockResolvedValue(null);
-      const created = { id: 5, userId: 1, ...dto, hasSpoiler: false, likesCount: 0 };
+      const created = { id: 5, userId: 1, ...dto, likesCount: 0 };
       mockReviewRepo.create.mockReturnValue(created);
       mockReviewRepo.save.mockResolvedValue(created);
       mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: 'want_to_watch', watchlistId: 2 });
@@ -151,7 +151,7 @@ describe('ReviewsService', () => {
         contentId: 1,
         rating: 7,
         comment: 'Good',
-        hasSpoiler: false,
+
         likesCount: 5,
       };
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
@@ -176,7 +176,7 @@ describe('ReviewsService', () => {
         contentId: 1,
         rating: 7,
         comment: 'Good',
-        hasSpoiler: false,
+
         likesCount: 5,
       };
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
@@ -202,7 +202,7 @@ describe('ReviewsService', () => {
         contentId: 1,
         rating: 7,
         comment: 'Good',
-        hasSpoiler: false,
+
         likesCount: 3,
       };
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
@@ -228,7 +228,7 @@ describe('ReviewsService', () => {
         contentId: 1,
         rating: 7,
         comment: 'Good',
-        hasSpoiler: false,
+
         likesCount: 10,
       };
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
@@ -268,7 +268,7 @@ describe('ReviewsService', () => {
         userId: 1,
         rating: 7,
         comment: null,
-        hasSpoiler: false,
+
         likesCount: 0,
       };
       mockReviewRepo.findOne.mockResolvedValue({ ...review });

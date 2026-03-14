@@ -9,6 +9,7 @@ import type { Comment } from '@/types/comment';
 interface CommentListProps {
   comments: Comment[];
   currentUserId?: number;
+  currentUserRole?: string;
   isLoading: boolean;
   page: number;
   totalPages: number;
@@ -19,6 +20,7 @@ interface CommentListProps {
 export default function CommentList({
   comments,
   currentUserId,
+  currentUserRole,
   isLoading,
   page,
   totalPages,
@@ -46,7 +48,7 @@ export default function CommentList({
               <span className="text-[11px] text-muted-foreground">
                 {formatCommentDate(c.createdAt)}
               </span>
-              {currentUserId && currentUserId === c.userId && (
+              {currentUserId && (currentUserId === c.userId || currentUserRole === 'ADMIN') && (
                 <button
                   onClick={() => onDelete(c.id)}
                   className="ml-auto p-2 -m-1 text-muted-foreground hover:text-destructive transition-colors"

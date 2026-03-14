@@ -125,6 +125,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
           <CommentList
             comments={comments}
             currentUserId={user?.id}
+            currentUserRole={user?.role}
             isLoading={isLoading}
             page={page}
             totalPages={totalPages}

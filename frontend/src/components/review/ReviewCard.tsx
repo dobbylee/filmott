@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Star } from 'lucide-react';
+import { Star, Trash2 } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from './LikeButton';
 import ReviewCommentsModal from './ReviewCommentsModal';
+import api from '@/lib/api';
 import type { Review } from '@/types/review';
 import { getDisplayNickname, isDeletedUser } from '@/utils/user';
 import UserAvatar from '@/components/common/UserAvatar';
@@ -13,6 +14,8 @@ interface ReviewCardProps {
   review: Review;
   showInteractions?: boolean;
   initialLiked?: boolean;
+  isAdmin?: boolean;
+  onDelete?: () => void;
 }
 
 function formatDate(dateStr: string): string {
@@ -24,8 +27,23 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export default function ReviewCard({ review, showInteractions = true, initialLiked = false }: ReviewCardProps) {
+export default function ReviewCard({ review, showInteractions = true, initialLiked = false, isAdmin = false, onDelete }: ReviewCardProps) {
   const [showComments, setShowComments] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleAdminDelete = async () => {
+    setDeleting(true);
+    try {
+      await api.delete(`/reviews/${review.id}`);
+      onDelete?.();
+    } catch {
+      // ignore
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   return (
     <>
@@ -76,6 +94,38 @@ export default function ReviewCard({ review, showInteractions = true, initialLik
           <p className="mt-3 text-sm leading-relaxed text-card-foreground">
             {review.comment}
           </p>
+        )}
+
+        {/* ADMIN 삭제 */}
+        {isAdmin && !showDeleteConfirm && (
+          <div className="mt-3 flex items-center justify-end">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-1 rounded-lg border border-red-500/30 px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+            >
+              삭제
+            </button>
+          </div>
+        )}
+        {isAdmin && showDeleteConfirm && (
+          <div className="mt-3 rounded-xl border border-red-500/20 bg-white/[0.02] p-4">
+            <p className="text-sm text-red-400">정말 삭제하시겠습니까?</p>
+            <div className="mt-3 flex gap-3">
+              <button
+                onClick={handleAdminDelete}
+                disabled={deleting}
+                className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              >
+                삭제
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-white/50 hover:bg-white/5 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

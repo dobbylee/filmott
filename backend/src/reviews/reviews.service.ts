@@ -38,7 +38,6 @@ export class ReviewsService {
       contentId: dto.contentId,
       rating: dto.rating,
       comment: dto.comment,
-      hasSpoiler: false,
     });
 
     const saved = await this.reviewRepo.save(review);

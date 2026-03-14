@@ -121,6 +121,7 @@ export default function ReviewComments({
           <CommentList
             comments={comments}
             currentUserId={user?.id}
+            currentUserRole={user?.role}
             isLoading={isLoading}
             page={page}
             totalPages={totalPages}
