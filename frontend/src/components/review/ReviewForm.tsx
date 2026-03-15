@@ -25,6 +25,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(existingReview?.commentsCount ?? 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [currentLikesCount, setCurrentLikesCount] = useState(existingReview?.likesCount ?? 0);
@@ -113,7 +114,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
                 className="flex items-center gap-1 hover:text-foreground transition-colors"
               >
                 <CommentIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold">{existingReview.commentsCount ?? 0}</span>
+                <span className="text-xs font-semibold">{commentsCount}</span>
               </button>
             </div>
 
@@ -187,7 +188,10 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
         {showComments && (
           <ReviewCommentsModal
             review={existingReview}
-            onClose={() => setShowComments(false)}
+            onClose={(count) => {
+              setShowComments(false);
+              if (count !== undefined) setCommentsCount(count);
+            }}
           />
         )}
       </>
