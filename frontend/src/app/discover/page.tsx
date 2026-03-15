@@ -9,7 +9,7 @@ import ContentGridSkeleton from '@/components/common/ContentGridSkeleton';
 
 export const metadata: Metadata = {
   title: '탐색',
-  description: '장르, OTT, 연도별로 영화와 드라마를 탐색하세요.',
+  description: '장르, OTT, 연도별로 영화와 시리즈를 탐색하세요.',
 };
 
 interface DiscoverPageProps {

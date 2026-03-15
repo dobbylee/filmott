@@ -15,7 +15,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold text-white mb-3">제1조 (목적)</h2>
           <p>이 약관은 filmott(이하 &quot;서비스&quot;)의 이용에 관한 기본적인 사항을 정하는 것을 목적으로 합니다.</p>
-          <p className="mt-2">서비스는 영화와 드라마에 대한 리뷰, 별점, 워치리스트를 제공하는 커뮤니티 플랫폼입니다.</p>
+          <p className="mt-2">서비스는 영화와 시리즈에 대한 리뷰, 별점, 워치리스트를 제공하는 커뮤니티 플랫폼입니다.</p>
         </section>
 
         <section>
@@ -23,7 +23,7 @@ export default function TermsPage() {
           <ul className="list-disc pl-5">
             <li><strong className="text-white/90">서비스</strong>: filmott.kr에서 제공하는 웹 서비스 일체</li>
             <li><strong className="text-white/90">회원</strong>: 서비스에 가입하여 이용하는 자</li>
-            <li><strong className="text-white/90">콘텐츠</strong>: 영화, 드라마 등 서비스에서 다루는 작품 정보</li>
+            <li><strong className="text-white/90">콘텐츠</strong>: 영화, 시리즈 등 서비스에서 다루는 작품 정보</li>
             <li><strong className="text-white/90">리뷰</strong>: 회원이 작성하는 한줄평, 별점, 댓글 등</li>
           </ul>
         </section>
@@ -56,7 +56,7 @@ export default function TermsPage() {
           <h2 className="text-lg font-semibold text-white mb-3">제5조 (서비스의 내용)</h2>
           <p className="mb-2">서비스는 다음 기능을 제공합니다.</p>
           <ul className="list-disc pl-5">
-            <li>영화/드라마 정보 탐색 (TMDB, KOBIS 데이터 기반)</li>
+            <li>영화/시리즈 정보 탐색 (TMDB, KOBIS 데이터 기반)</li>
             <li>별점 평가 및 한줄평 작성</li>
             <li>리뷰에 대한 댓글 및 좋아요</li>
             <li>워치리스트 관리 (보고 싶은 작품, 본 작품 기록)</li>
@@ -111,7 +111,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold text-white mb-3">제10조 (외부 데이터 및 면책)</h2>
           <ol className="list-decimal pl-5 space-y-1">
-            <li>서비스에서 제공하는 영화/드라마 정보는 <strong className="text-white/90">TMDB(The Movie Database)</strong>와 <strong className="text-white/90">KOBIS(영화진흥위원회)</strong>의 데이터를 기반으로 합니다.</li>
+            <li>서비스에서 제공하는 영화/시리즈 정보는 <strong className="text-white/90">TMDB(The Movie Database)</strong>와 <strong className="text-white/90">KOBIS(영화진흥위원회)</strong>의 데이터를 기반으로 합니다.</li>
             <li>외부 데이터의 <strong className="text-white/90">정확성, 완전성, 최신성을 보장하지 않습니다.</strong></li>
             <li>OTT 제공 현황, 박스오피스 순위 등은 외부 API에서 제공하는 정보이며, 실제와 차이가 있을 수 있습니다.</li>
             <li>회원 간 분쟁에 대해 서비스는 개입 의무를 지지 않으나, 원만한 해결을 위해 협조할 수 있습니다.</li>

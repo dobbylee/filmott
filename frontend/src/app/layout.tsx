@@ -32,10 +32,10 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'filmott - 영화/드라마 리뷰',
+    default: 'filmott - 영화/시리즈 리뷰',
     template: '%s | filmott',
   },
-  description: '영화와 드라마 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
+  description: '영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
   icons: {
     icon: [
       { url: '/icons/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
@@ -52,8 +52,8 @@ export const metadata: Metadata = {
     locale: 'ko_KR',
     url: SITE_URL,
     siteName: 'filmott',
-    title: 'filmott - 영화/드라마 리뷰',
-    description: '영화와 드라마 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
+    title: 'filmott - 영화/시리즈 리뷰',
+    description: '영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
     images: [
       {
         url: '/icons/og/og-image.png',
@@ -65,8 +65,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'filmott - 영화/드라마 리뷰',
-    description: '영화와 드라마 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
+    title: 'filmott - 영화/시리즈 리뷰',
+    description: '영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
     images: ['/icons/og/twitter-card.png'],
   },
   manifest: '/manifest.json',
