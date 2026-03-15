@@ -35,17 +35,28 @@ export async function generateMetadata({
   const { type, tmdbId } = await params;
   try {
     const content = await fetchContentDetail(type, tmdbId);
+    const description = content.overview?.slice(0, 160) ?? `${content.title} 상세 정보`;
     return {
-      title: `${content.title} - filmott`,
-      description: content.overview?.slice(0, 160) ?? `${content.title} 상세 정보`,
+      title: content.title,
+      description,
       openGraph: {
+        type: 'article',
         title: content.title,
-        description: content.overview ?? '',
+        description,
+        images: content.backdropUrl
+          ? [{ url: content.backdropUrl, width: 1280, height: 720, alt: content.title }]
+          : [],
+        url: `/contents/${type}/${tmdbId}`,
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: content.title,
+        description,
         images: content.backdropUrl ? [content.backdropUrl] : [],
       },
     };
   } catch {
-    return { title: '작품 상세 - filmott' };
+    return { title: '작품 상세' };
   }
 }
 

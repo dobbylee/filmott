@@ -22,7 +22,7 @@ export async function generateMetadata({
   const params = await searchParams;
   const query = params.q ?? '';
   return {
-    title: query ? `"${query}" 검색 결과 - filmott` : '검색 - filmott',
+    title: query ? `"${query}" 검색 결과` : '검색',
   };
 }
 

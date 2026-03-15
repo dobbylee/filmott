@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: '이용약관 - filmott',
+  title: '이용약관',
 };
 
 export default function TermsPage() {

@@ -91,19 +91,28 @@ export async function generateMetadata({
       `/contents/person/${personId}`,
       { next: { revalidate: 3600 } },
     );
+    const description = person.biography?.slice(0, 160) ?? `${person.name}의 출연작 목록`;
     return {
-      title: `${person.name} 필모그래피 - filmott`,
-      description: person.biography?.slice(0, 160) ?? `${person.name}의 출연작 목록`,
+      title: `${person.name} 필모그래피`,
+      description,
       openGraph: {
         title: `${person.name} 필모그래피`,
-        description: person.biography?.slice(0, 160) ?? '',
+        description,
+        images: person.profile_path
+          ? [`${TMDB_IMAGE_BASE}/w500${person.profile_path}`]
+          : [],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: `${person.name} 필모그래피`,
+        description,
         images: person.profile_path
           ? [`${TMDB_IMAGE_BASE}/w500${person.profile_path}`]
           : [],
       },
     };
   } catch {
-    return { title: '인물 정보 - filmott' };
+    return { title: '인물 정보' };
   }
 }
 
