@@ -9,13 +9,11 @@ import SectionError from '@/components/common/SectionError';
 /* ---- Data Fetchers ---- */
 
 async function fetchBoxOffice(category: 'daily-box-office' | 'weekly-box-office'): Promise<RankingItem[]> {
-  // TODO: 배포 시 cache: 'no-store' → next: { revalidate: 3600 } 으로 전환
-  return fetchApi<RankingItem[]>(`/rankings?source=kobis&category=${category}&limit=10`, { cache: 'no-store' });
+  return fetchApi<RankingItem[]>(`/rankings?source=kobis&category=${category}&limit=10`, { next: { revalidate: 21600 } });
 }
 
 async function fetchTrending(category: 'trending-all-day' | 'trending-all-week'): Promise<RankingItem[]> {
-  // TODO: 배포 시 cache: 'no-store' → next: { revalidate: 3600 } 으로 전환
-  return fetchApi<RankingItem[]>(`/rankings?source=tmdb&category=${category}&limit=20`, { cache: 'no-store' });
+  return fetchApi<RankingItem[]>(`/rankings?source=tmdb&category=${category}&limit=20`, { next: { revalidate: 21600 } });
 }
 
 async function fetchRecentReviews(): Promise<Review[]> {
