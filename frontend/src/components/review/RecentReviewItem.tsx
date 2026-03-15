@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Star } from 'lucide-react';
+import CommentIcon from '@/components/icons/CommentIcon';
 import TimeAgo from '@/components/common/TimeAgo';
 import type { Review } from '@/types/review';
 import type { ContentItem } from '@/types/content';
@@ -48,6 +49,10 @@ export default function RecentReviewItem({ review }: { review: Review }) {
                 <span className="text-xs font-semibold">{review.rating}</span>
               </div>
             )}
+            <Link href={`${href}#reviews`} className="flex items-center gap-0.5 hover:text-foreground transition-colors">
+              <CommentIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-semibold text-muted-foreground">{review.commentsCount ?? 0}</span>
+            </Link>
           </div>
           <TimeAgo date={review.createdAt} className="text-xs text-white/40 flex-shrink-0 ml-2" />
         </div>

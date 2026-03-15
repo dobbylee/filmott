@@ -27,7 +27,7 @@ export default function Footer() {
 
           {/* 오른쪽: 연락처 + 추후 링크 추가 영역 */}
           <div className="flex flex-col gap-1 text-base text-muted-foreground sm:items-end">
-            <span>Email: filmottkr@gmail.com</span>
+            <span>filmottkr@gmail.com</span>
           </div>
         </div>
 

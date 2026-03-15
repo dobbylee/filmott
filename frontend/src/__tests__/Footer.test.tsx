@@ -27,6 +27,6 @@ describe('Footer', () => {
 
   it('이메일 연락처를 표시한다', () => {
     render(<Footer />);
-    expect(screen.getByText('Email: filmottkr@gmail.com')).toBeInTheDocument();
+    expect(screen.getByText('filmottkr@gmail.com')).toBeInTheDocument();
   });
 });

@@ -181,6 +181,7 @@ export class ReviewsService {
       .leftJoin('review.user', 'user')
       .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage', 'user.status'])
       .leftJoinAndSelect('review.content', 'content')
+      .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .orderBy('review.createdAt', 'DESC')
       .take(safeLimit)
       .getMany();
