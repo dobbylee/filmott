@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Outfit, Noto_Sans_KR } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -6,6 +6,7 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import AuthModal from '@/components/auth/AuthModal';
 import GoogleAnalytics from '@/components/analytics/GoogleAnalytics';
+import ServiceWorkerRegister from '@/components/pwa/ServiceWorkerRegister';
 import './globals.css';
 
 const outfit = Outfit({
@@ -23,6 +24,10 @@ const notoSansKR = Noto_Sans_KR({
 });
 
 const SITE_URL = 'https://filmott.kr';
+
+export const viewport: Viewport = {
+  themeColor: '#000000',
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -64,7 +69,14 @@ export const metadata: Metadata = {
     description: '영화와 드라마 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
     images: ['/icons/og/twitter-card.png'],
   },
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'filmott',
+  },
   other: {
+    'mobile-web-app-capable': 'yes',
     'msapplication-TileColor': '#000000',
     'msapplication-config': '/browserconfig.xml',
   },
@@ -79,6 +91,7 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning className={`dark ${outfit.variable} ${notoSansKR.variable}`}>
       <body className="antialiased min-h-screen bg-background text-foreground selection:bg-primary/30">
         <GoogleAnalytics />
+        <ServiceWorkerRegister />
         <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark">
           <AuthProvider>
             <div className="flex min-h-screen flex-col">
