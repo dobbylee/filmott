@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Search, Compass, Menu, X, User as UserIcon, Library } from 'lucide-react';
+import { Search, Film, Tv, Menu, X, User as UserIcon, Layers } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Header() {
@@ -160,15 +160,15 @@ export default function Header() {
         <nav className="absolute top-full left-0 right-0 border-b border-white/10 bg-[#050505]/95 backdrop-blur-xl px-4 py-4 md:hidden shadow-2xl">
           <div className="flex flex-col gap-2">
             <Link href="/discover?type=movie" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-              <Compass className="h-5 w-5" /> 영화
+              <Film className="h-5 w-5" /> 영화
             </Link>
             <Link href="/discover?type=tv" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-              <Compass className="h-5 w-5" /> 시리즈
+              <Tv className="h-5 w-5" /> 시리즈
             </Link>
             {user && (
               <>
                 <Link href="/profile/watchlist?status=watched" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-                  <Library className="h-5 w-5" /> 내 기록
+                  <Layers className="h-5 w-5" /> 내 기록
                 </Link>
                 <Link href="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
                   <UserIcon className="h-5 w-5" /> 프로필
