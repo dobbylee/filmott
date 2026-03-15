@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import AuthModal from '@/components/auth/AuthModal';
+import GoogleAnalytics from '@/components/analytics/GoogleAnalytics';
 import './globals.css';
 
 const outfit = Outfit({
@@ -24,6 +25,21 @@ const notoSansKR = Noto_Sans_KR({
 export const metadata: Metadata = {
   title: 'filmott - 영화/드라마 리뷰',
   description: '최고의 프리미엄 시네마틱 경험, 영화/드라마 리뷰와 별점',
+  icons: {
+    icon: [
+      { url: '/icons/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/favicon/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icons/apple-touch-icon/apple-touch-icon.png' },
+      { url: '/icons/apple-touch-icon/apple-touch-icon-180x180.png', sizes: '180x180' },
+      { url: '/icons/apple-touch-icon/apple-touch-icon-152x152.png', sizes: '152x152' },
+    ],
+  },
+  other: {
+    'msapplication-TileColor': '#000000',
+    'msapplication-config': '/browserconfig.xml',
+  },
 };
 
 export default function RootLayout({
@@ -34,6 +50,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning className={`dark ${outfit.variable} ${notoSansKR.variable}`}>
       <body className="antialiased min-h-screen bg-background text-foreground selection:bg-primary/30">
+        <GoogleAnalytics />
         <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark">
           <AuthProvider>
             <div className="flex min-h-screen flex-col">
