@@ -172,6 +172,25 @@ export class ContentsService {
   }
 
   /**
+   * 사이트맵용: DB에 저장된 모든 콘텐츠의 tmdbId, contentType, updatedAt 반환
+   */
+  async getSitemapContents(): Promise<
+    Array<{ tmdbId: number; contentType: string; updatedAt: Date }>
+  > {
+    const rows = await this.contentRepo
+      .createQueryBuilder('c')
+      .select(['c.tmdbId', 'c.contentType', 'c.updatedAt'])
+      .orderBy('c.updatedAt', 'DESC')
+      .getMany();
+
+    return rows.map((r) => ({
+      tmdbId: r.tmdbId,
+      contentType: r.contentType,
+      updatedAt: r.updatedAt,
+    }));
+  }
+
+  /**
    * TMDB 데이터를 Content 엔티티로 변환하여 저장
    */
   private async saveFromTmdb(

@@ -42,6 +42,11 @@ export class ContentsController {
     return this.contentsService.getPersonCredits(personId);
   }
 
+  @Get('sitemap')
+  async getSitemapContents() {
+    return this.contentsService.getSitemapContents();
+  }
+
   @Get(':type/:tmdbId')
   async getDetail(
     @Param('type') type: string,

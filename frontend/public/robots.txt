@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /auth
+Disallow: /auth/*
+Disallow: /api
+Disallow: /api/*
+Disallow: /profile
+Disallow: /profile/*
+
+Sitemap: https://filmott.kr/sitemap.xml

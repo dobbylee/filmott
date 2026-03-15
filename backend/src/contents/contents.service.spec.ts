@@ -9,10 +9,17 @@ describe('ContentsService', () => {
   let service: ContentsService;
   let tmdbService: TmdbService;
 
+  const mockQueryBuilder = {
+    select: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    getMany: jest.fn(),
+  };
+
   const mockContentRepo = {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
   };
 
   const mockTmdbService = {
@@ -645,6 +652,34 @@ describe('ContentsService', () => {
       const result = await service.getContentDetail(800, 'movie');
 
       expect(result.credits).toHaveLength(20);
+    });
+  });
+
+  describe('getSitemapContents', () => {
+    it('DB에서 모든 콘텐츠의 tmdbId, contentType, updatedAt을 반환해야 한다', async () => {
+      const mockRows = [
+        { tmdbId: 123, contentType: 'movie', updatedAt: new Date('2026-03-15') },
+        { tmdbId: 456, contentType: 'tv', updatedAt: new Date('2026-03-14') },
+      ];
+      mockQueryBuilder.getMany.mockResolvedValue(mockRows);
+
+      const result = await service.getSitemapContents();
+
+      expect(mockContentRepo.createQueryBuilder).toHaveBeenCalledWith('c');
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith(['c.tmdbId', 'c.contentType', 'c.updatedAt']);
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('c.updatedAt', 'DESC');
+      expect(result).toEqual([
+        { tmdbId: 123, contentType: 'movie', updatedAt: new Date('2026-03-15') },
+        { tmdbId: 456, contentType: 'tv', updatedAt: new Date('2026-03-14') },
+      ]);
+    });
+
+    it('콘텐츠가 없으면 빈 배열을 반환해야 한다', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+
+      const result = await service.getSitemapContents();
+
+      expect(result).toEqual([]);
     });
   });
 });

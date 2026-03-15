@@ -12,6 +12,7 @@ describe('ContentsController', () => {
     discoverContents: jest.fn(),
     getPersonDetail: jest.fn(),
     getPersonCredits: jest.fn(),
+    getSitemapContents: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -120,6 +121,29 @@ describe('ContentsController', () => {
 
       expect(mockContentsService.getPersonCredits).toHaveBeenCalledWith(17419);
       expect(result).toEqual(creditsData);
+    });
+  });
+
+  describe('getSitemapContents', () => {
+    it('getSitemapContents를 호출하고 결과를 반환해야 한다', async () => {
+      const sitemapData = [
+        { tmdbId: 123, contentType: 'movie', updatedAt: new Date('2026-03-15') },
+        { tmdbId: 456, contentType: 'tv', updatedAt: new Date('2026-03-14') },
+      ];
+      mockContentsService.getSitemapContents.mockResolvedValue(sitemapData);
+
+      const result = await controller.getSitemapContents();
+
+      expect(mockContentsService.getSitemapContents).toHaveBeenCalled();
+      expect(result).toEqual(sitemapData);
+    });
+
+    it('콘텐츠가 없으면 빈 배열을 반환해야 한다', async () => {
+      mockContentsService.getSitemapContents.mockResolvedValue([]);
+
+      const result = await controller.getSitemapContents();
+
+      expect(result).toEqual([]);
     });
   });
 
