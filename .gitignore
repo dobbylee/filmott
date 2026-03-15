@@ -94,3 +94,10 @@ mcp/node_modules/
 frontend/.npm-cache/
 frontend/.next/
 frontend/node_modules/
+
+# Production env files
+backend/.env.production
+*.env.production
+
+# SSL certificates (generated on server)
+certbot/

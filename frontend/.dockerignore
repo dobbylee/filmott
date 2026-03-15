@@ -1,0 +1,7 @@
+node_modules
+.next
+.env*
+coverage/
+.git
+.gitignore
+README.md

@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.*
+*.spec.ts
+test/
+coverage/
+.git
+.gitignore
+README.md
