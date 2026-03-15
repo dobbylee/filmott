@@ -24,11 +24,11 @@ if (!ADMIN_NICKNAME || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
 async function seed() {
   const ds = new DataSource({
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT || '5432', 10),
-    username: process.env.DB_USERNAME || 'root',
-    password: process.env.DB_PASSWORD || '1q2w3e4r',
-    database: process.env.DB_DATABASE || 'filmott',
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
   });
 
   await ds.initialize();

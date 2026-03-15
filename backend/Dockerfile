@@ -15,5 +15,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev && apk del python3 make g++
 COPY --from=builder /app/dist ./dist
+RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
+USER nestjs
 EXPOSE 3001
 CMD ["node", "dist/main"]

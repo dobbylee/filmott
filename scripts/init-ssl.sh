@@ -17,7 +17,7 @@ echo "=== SSL 초기 설정 시작: $DOMAIN ==="
 
 # 1. 더미 인증서 생성 (Nginx가 기동할 수 있도록)
 echo "1. 더미 인증서 생성 중..."
-mkdir -p ./certbot/conf/live/$DOMAIN
+mkdir -p ./certbot/conf/live/$DOMAIN ./certbot/www
 openssl req -x509 -nodes -newkey rsa:2048 \
   -keyout ./certbot/conf/live/$DOMAIN/privkey.pem \
   -out ./certbot/conf/live/$DOMAIN/fullchain.pem \
