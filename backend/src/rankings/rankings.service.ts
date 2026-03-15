@@ -7,6 +7,7 @@ import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
+import { Content } from '../contents/content.entity';
 import { TMDB_IMAGE_BASE } from '../common/constants';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -189,7 +190,7 @@ export class RankingsService {
       const fetchedAt = new Date();
 
       // contents 테이블 캐싱을 순차 처리 (rate limit 방어: 250ms 간격)
-      const cacheResults: PromiseSettledResult<any>[] = [];
+      const cacheResults: PromiseSettledResult<Content>[] = [];
       for (const item of trendingData.results) {
         const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
         try {
@@ -372,8 +373,19 @@ export class RankingsService {
   private async revalidateMainPage(): Promise<void> {
     if (!this.revalidateSecret) return;
     try {
-      const url = `${this.frontendUrl}/api/revalidate?secret=${this.revalidateSecret}&path=/`;
-      await fetch(url);
+      const url = `${this.frontendUrl}/api/revalidate`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.revalidateSecret}`,
+        },
+        body: JSON.stringify({ path: '/' }),
+      });
+      if (!response.ok) {
+        this.logger.warn(`메인 페이지 캐시 갱신 실패: HTTP ${response.status}`);
+        return;
+      }
       this.logger.log('메인 페이지 캐시 갱신 완료');
     } catch {
       this.logger.warn('메인 페이지 캐시 갱신 실패 (무시)');

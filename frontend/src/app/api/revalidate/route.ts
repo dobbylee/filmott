@@ -1,12 +1,20 @@
 import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
-  const secret = request.nextUrl.searchParams.get('secret');
-  const path = request.nextUrl.searchParams.get('path') || '/';
+export async function POST(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  const secret = authHeader?.replace('Bearer ', '');
 
   if (!secret || secret !== process.env.REVALIDATE_SECRET) {
     return NextResponse.json({ message: 'Invalid secret' }, { status: 401 });
+  }
+
+  let path = '/';
+  try {
+    const body: { path?: string } = await request.json();
+    if (body.path) path = body.path;
+  } catch {
+    // body 파싱 실패 시 기본값 '/' 사용
   }
 
   revalidatePath(path);

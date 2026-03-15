@@ -46,7 +46,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
       document.body.style.overflow = '';
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, total]);
 
   useEffect(() => {
     loadComments(1);
