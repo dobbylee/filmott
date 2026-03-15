@@ -34,6 +34,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
     ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`)
     : null;
   const [showComments, setShowComments] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(review?.commentsCount ?? 0);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [showDateEdit, setShowDateEdit] = useState(false);
 
@@ -101,7 +102,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                         className="flex items-center gap-0.5 hover:text-white transition-colors"
                       >
                         <CommentIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs font-semibold text-muted-foreground">{review.commentsCount ?? 0}</span>
+                        <span className="text-xs font-semibold text-muted-foreground">{commentsCount}</span>
                       </button>
                     </div>
                     {review.comment && (
@@ -148,7 +149,10 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
       {showComments && reviewWithUser && (
         <ReviewCommentsModal
           review={reviewWithUser}
-          onClose={() => setShowComments(false)}
+          onClose={(count) => {
+            setShowComments(false);
+            if (count !== undefined) setCommentsCount(count);
+          }}
         />
       )}
 

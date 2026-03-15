@@ -29,6 +29,7 @@ function formatDate(dateStr: string): string {
 
 export default function ReviewCard({ review, showInteractions = true, initialLiked = false, isAdmin = false, onDelete }: ReviewCardProps) {
   const [showComments, setShowComments] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(review.commentsCount ?? 0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -67,7 +68,7 @@ export default function ReviewCard({ review, showInteractions = true, initialLik
                     className="flex items-center gap-1 hover:text-foreground transition-colors ml-0.5"
                   >
                     <CommentIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold">{review.commentsCount ?? 0}</span>
+                    <span className="text-xs font-semibold">{commentsCount}</span>
                   </button>
                 )}
               </div>
@@ -132,7 +133,10 @@ export default function ReviewCard({ review, showInteractions = true, initialLik
       {showComments && (
         <ReviewCommentsModal
           review={review}
-          onClose={() => setShowComments(false)}
+          onClose={(count) => {
+            setShowComments(false);
+            if (count !== undefined) setCommentsCount(count);
+          }}
         />
       )}
     </>

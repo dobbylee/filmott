@@ -13,7 +13,7 @@ import { useFocusTrap } from '@/utils/useFocusTrap';
 
 interface ReviewCommentsModalProps {
   review: Review;
-  onClose: () => void;
+  onClose: (commentsCount?: number) => void;
 }
 
 export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsModalProps) {
@@ -39,7 +39,7 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onClose(total);
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => {
@@ -81,13 +81,13 @@ export default function ReviewCommentsModal({ review, onClose }: ReviewCommentsM
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/60" onClick={() => onClose(total)} />
       <div ref={modalRef} className="relative flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl border border-border bg-card shadow-2xl">
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-base font-bold">댓글</h2>
           <button
-            onClick={onClose}
+            onClick={() => onClose(total)}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="h-5 w-5" />
