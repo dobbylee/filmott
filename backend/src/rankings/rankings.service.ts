@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
@@ -15,13 +16,20 @@ const TMDB_CALL_DELAY_MS = 250;
 export class RankingsService {
   private readonly logger = new Logger(RankingsService.name);
 
+  private readonly frontendUrl: string;
+  private readonly revalidateSecret: string;
+
   constructor(
     @InjectRepository(Ranking)
     private readonly rankingRepo: Repository<Ranking>,
     private readonly kobisService: KobisService,
     private readonly tmdbService: TmdbService,
     private readonly contentsService: ContentsService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
+    this.revalidateSecret = this.configService.get<string>('REVALIDATE_SECRET', '');
+  }
 
   /**
    * KOBIS 일별 박스오피스를 가져와 rankings에 저장
@@ -78,6 +86,7 @@ export class RankingsService {
       ]);
 
       this.logger.log(`Saved ${rankingsToUpsert.length} daily box office rankings`);
+      await this.revalidateMainPage();
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error('Failed to fetch daily box office', error);
@@ -139,6 +148,7 @@ export class RankingsService {
       ]);
 
       this.logger.log(`Saved ${rankingsToUpsert.length} weekly box office rankings`);
+      await this.revalidateMainPage();
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error('Failed to fetch weekly box office', error);
@@ -231,6 +241,7 @@ export class RankingsService {
       ]);
 
       this.logger.log(`Saved ${rankingsToUpsert.length} trending rankings for ${category}`);
+      await this.revalidateMainPage();
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error(`Failed to fetch trending: ${category}`, error);
@@ -356,5 +367,16 @@ export class RankingsService {
    */
   private formatDateWithDashes(dateStr: string): string {
     return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+  }
+
+  private async revalidateMainPage(): Promise<void> {
+    if (!this.revalidateSecret) return;
+    try {
+      const url = `${this.frontendUrl}/api/revalidate?secret=${this.revalidateSecret}&path=/`;
+      await fetch(url);
+      this.logger.log('메인 페이지 캐시 갱신 완료');
+    } catch {
+      this.logger.warn('메인 페이지 캐시 갱신 실패 (무시)');
+    }
   }
 }

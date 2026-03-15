@@ -28,6 +28,7 @@ services:
         NEXT_PUBLIC_GA_ID: ${NEXT_PUBLIC_GA_ID}
     environment:
       - NODE_ENV=production
+      - REVALIDATE_SECRET=${REVALIDATE_SECRET}
     restart: always
 
   backend:
