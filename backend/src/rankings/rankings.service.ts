@@ -34,9 +34,9 @@ export class RankingsService {
 
   /**
    * KOBIS 일별 박스오피스를 가져와 rankings에 저장
-   * 매일 00:05 + 12:00 실행 (전일자 데이터, KOBIS 보정 반영)
+   * 매일 00:10 + 12:00 실행 (전일자 데이터, KOBIS 보정 반영)
    */
-  @Cron('5 0 * * *', { name: 'daily-box-office-midnight', timeZone: 'Asia/Seoul' })
+  @Cron('10 0 * * *', { name: 'daily-box-office-midnight', timeZone: 'Asia/Seoul' })
   @Cron('0 12 * * *', { name: 'daily-box-office-noon', timeZone: 'Asia/Seoul' })
   async fetchDailyBoxOffice(): Promise<Ranking[]> {
     const yesterday = this.getYesterdayDate();
