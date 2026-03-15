@@ -2,7 +2,7 @@ const CACHE_VERSION = 'v1';
 const CACHE_NAME = `filmott-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
-  '/offline',
+  '/offline.html',
   '/icons/pwa/icon-192x192.png',
   '/icons/pwa/icon-512x512.png',
 ];
@@ -30,7 +30,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/offline'))
+      fetch(event.request).catch(() => caches.match('/offline.html'))
     );
     return;
   }
