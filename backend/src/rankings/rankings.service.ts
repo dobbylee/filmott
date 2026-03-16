@@ -17,7 +17,6 @@ const TMDB_CALL_DELAY_MS = 250;
 export class RankingsService {
   private readonly logger = new Logger(RankingsService.name);
 
-  private readonly frontendUrl: string;
   private readonly revalidateSecret: string;
 
   constructor(
@@ -28,7 +27,6 @@ export class RankingsService {
     private readonly contentsService: ContentsService,
     private readonly configService: ConfigService,
   ) {
-    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
     this.revalidateSecret = this.configService.get<string>('REVALIDATE_SECRET', '');
   }
 
