@@ -34,7 +34,7 @@ export default function RankingCard({ item }: RankingCardProps) {
   const hasPoster = !!posterUrl;
 
   const className = `group block relative flex-shrink-0 w-[160px] sm:w-[220px] transition-all duration-300 ${
-    content || hasPoster ? 'hover:-translate-y-2 cursor-pointer' : 'opacity-60'
+    content ? 'hover:-translate-y-2 cursor-pointer' : hasPoster ? 'cursor-default' : 'opacity-60'
   }`;
 
   const inner = (
@@ -76,6 +76,7 @@ export default function RankingCard({ item }: RankingCardProps) {
           </p>
           <div className="mt-1 flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-medium text-white/60">
+              {!content && hasPoster && <span className="text-white/70">상세정보 준비 중</span>}
               {content?.releaseDate && <span>{content.releaseDate.substring(0, 4)}</span>}
               {content && <span>{content.contentType === 'tv' ? '시리즈' : '영화'}</span>}
             </div>
