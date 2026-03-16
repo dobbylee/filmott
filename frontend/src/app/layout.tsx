@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     default: 'filmott - 영화/시리즈 리뷰',
     template: '%s | filmott',
   },
-  description: '영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
+  description: '영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 경험을 기록하세요.',
   icons: {
     icon: [
       { url: '/icons/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: 'filmott',
     title: 'filmott - 영화/시리즈 리뷰',
-    description: '영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
+    description: '영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 경험을 기록하세요.',
     images: [
       {
         url: '/icons/og/og-image.png',
@@ -66,8 +66,12 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'filmott - 영화/시리즈 리뷰',
-    description: '영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.',
+    description: '영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 경험을 기록하세요.',
     images: ['/icons/og/twitter-card.png'],
+  },
+  verification: {
+    google: 'WuGIDIhovyzkZISq5W4Vqj4vB8DNl1-uJLbxud_Arf8',
+    other: { 'naver-site-verification': '5b129903bdb4858e122e23dde0ffdf216e4debd5' },
   },
   manifest: '/manifest.json',
   appleWebApp: {

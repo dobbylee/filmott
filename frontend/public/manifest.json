@@ -1,7 +1,7 @@
 {
   "name": "filmott",
   "short_name": "filmott",
-  "description": "영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 시네마틱 경험을 기록하세요.",
+  "description": "영화와 시리즈 리뷰, 별점, 워치리스트. 나만의 경험을 기록하세요.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
