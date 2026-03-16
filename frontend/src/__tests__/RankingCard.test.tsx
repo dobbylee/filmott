@@ -49,4 +49,49 @@ describe('RankingCard', () => {
     const link = screen.getByRole('link');
     expect(link).toHaveAttribute('href', '/contents/movie/12345');
   });
+
+  it('content가 없지만 ranking posterUrl이 있으면 포스터를 표시한다', () => {
+    const withPoster: RankingItem = {
+      id: 3,
+      rank: 5,
+      content: null,
+      title: '수동 포스터 영화',
+      posterUrl: 'https://example.com/manual-poster.jpg',
+    };
+    render(<RankingCard item={withPoster} />);
+    const img = screen.getByAltText('수동 포스터 영화');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('src', expect.stringContaining('manual-poster.jpg'));
+  });
+
+  it('content가 없고 posterUrl도 있으면 opacity-60이 적용되지 않는다', () => {
+    const withPoster: RankingItem = {
+      id: 4,
+      rank: 7,
+      content: null,
+      title: '포스터 있는 영화',
+      posterUrl: 'https://example.com/poster.jpg',
+    };
+    const { container } = render(<RankingCard item={withPoster} />);
+    const outerDiv = container.firstChild as HTMLElement;
+    expect(outerDiv.className).not.toContain('opacity-60');
+  });
+
+  it('content.posterUrl이 ranking posterUrl보다 우선한다', () => {
+    const withBothPosters: RankingItem = {
+      id: 5,
+      rank: 2,
+      posterUrl: 'https://example.com/ranking-poster.jpg',
+      content: {
+        id: 200,
+        tmdbId: 99999,
+        contentType: 'movie',
+        title: '양쪽 포스터',
+        posterUrl: 'https://example.com/content-poster.jpg',
+      },
+    };
+    render(<RankingCard item={withBothPosters} />);
+    const img = screen.getByAltText('양쪽 포스터');
+    expect(img).toHaveAttribute('src', expect.stringContaining('content-poster.jpg'));
+  });
 });

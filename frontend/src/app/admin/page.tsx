@@ -3,6 +3,7 @@
 import AdminGuard from '@/components/admin/AdminGuard';
 import UserManagement from '@/components/admin/UserManagement';
 import RankingRefresh from '@/components/admin/RankingRefresh';
+import UnmatchedPosters from '@/components/admin/UnmatchedPosters';
 
 export default function AdminPage() {
   return (
@@ -13,6 +14,7 @@ export default function AdminPage() {
         <div className="space-y-8">
           <UserManagement />
           <RankingRefresh />
+          <UnmatchedPosters />
         </div>
       </div>
     </AdminGuard>

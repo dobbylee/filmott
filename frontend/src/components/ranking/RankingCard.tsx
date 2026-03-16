@@ -7,6 +7,7 @@ export interface RankingItem {
   id: number;
   rank: number;
   audienceCount?: number;
+  posterUrl?: string;
   content: {
     id: number;
     tmdbId: number;
@@ -28,11 +29,12 @@ export default function RankingCard({ item }: RankingCardProps) {
   const content = item.content;
   const title = content?.title ?? item.title ?? '제목 없음';
   const href = content ? `/contents/${content.contentType}/${content.tmdbId}` : '#';
-  const posterUrl = content?.posterUrl;
+  const posterUrl = content?.posterUrl ?? item.posterUrl;
   const rating = content?.voteAverage != null ? Number(content.voteAverage).toFixed(1) : null;
+  const hasPoster = !!posterUrl;
 
   const className = `group block relative flex-shrink-0 w-[160px] sm:w-[220px] transition-all duration-300 ${
-    content ? 'hover:-translate-y-2 cursor-pointer' : 'opacity-60'
+    content || hasPoster ? 'hover:-translate-y-2 cursor-pointer' : 'opacity-60'
   }`;
 
   const inner = (
