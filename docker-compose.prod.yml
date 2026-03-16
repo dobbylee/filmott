@@ -41,6 +41,7 @@ services:
     environment:
       - NODE_ENV=production
       - DB_HOST=postgres
+      - TZ=Asia/Seoul
     depends_on:
       postgres:
         condition: service_healthy

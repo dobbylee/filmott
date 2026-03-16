@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAuthCallback } from '@/hooks/useAuthCallback';
 
 // window.history.replaceState mock
@@ -52,12 +52,12 @@ describe('useAuthCallback', () => {
         })
       );
 
-      // 비동기 처리 대기
-      await vi.waitFor(() => {
+      // 비동기 처리 대기 (Testing Library waitFor는 자동으로 act로 감쌈)
+      await waitFor(() => {
         expect(mockPost).toHaveBeenCalledWith('/auth/social/exchange', { code: 'one-time-code-abc' });
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockOnAuthSuccess).toHaveBeenCalledWith(mockResponse.data);
         expect(mockReplaceState).toHaveBeenCalled();
         expect(mockOnRedirect).toHaveBeenCalledWith('/');
@@ -79,7 +79,7 @@ describe('useAuthCallback', () => {
         })
       );
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.type).toBe('error');
         if (result.current.type === 'error') {
           expect(result.current.message).toBe('소셜 인증에 실패했습니다. 다시 시도해주세요.');

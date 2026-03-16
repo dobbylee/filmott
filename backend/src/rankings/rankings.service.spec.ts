@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { RankingsService } from './rankings.service';
 import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
@@ -31,6 +32,10 @@ describe('RankingsService', () => {
     findOrFetchByTmdbId: jest.fn(),
   };
 
+  const mockConfigService = {
+    get: jest.fn().mockImplementation((key: string, defaultVal?: string) => defaultVal ?? ''),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +44,7 @@ describe('RankingsService', () => {
         { provide: KobisService, useValue: mockKobisService },
         { provide: TmdbService, useValue: mockTmdbService },
         { provide: ContentsService, useValue: mockContentsService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 

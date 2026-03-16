@@ -12,7 +12,7 @@ vi.mock('@/components/common/TimeAgo', () => ({
 
 // next/image stub
 vi.mock('next/image', () => ({
-  default: (props: Record<string, unknown>) => (
+  default: ({ fill: _fill, sizes: _sizes, ...props }: Record<string, unknown>) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img {...props} alt={props.alt as string} />
   ),

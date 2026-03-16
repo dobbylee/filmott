@@ -100,17 +100,16 @@ describe('api response 인터셉터 - refresh token', () => {
       },
     });
 
+    // api(originalRequest) 호출 시 실제 HTTP 요청이 발생하지 않도록 adapter를 mock
+    api.defaults.adapter = () => Promise.resolve({ data: {}, status: 200, statusText: 'OK', headers: {}, config: {} as never });
+
     // api.post가 호출되지 않았는지 확인 (refreshApi만 사용되어야 함)
     const apiPostSpy = vi.spyOn(api, 'post');
 
     const mockError = createMockError(401, '/some-endpoint');
     const handler = api.interceptors.response.handlers[0];
 
-    try {
-      await handler.rejected!(mockError);
-    } catch {
-      // refresh 후 api(originalRequest)가 호출됨 - mock이 없으면 에러 발생 가능
-    }
+    await handler.rejected!(mockError);
 
     expect(refreshPostSpy).toHaveBeenCalledWith('/auth/refresh', { refresh_token: 'old-refresh-token' });
     expect(apiPostSpy).not.toHaveBeenCalled();
@@ -134,15 +133,13 @@ describe('api response 인터셉터 - refresh token', () => {
         user: mockUser,
       },
     });
+    // api(originalRequest) 호출 시 실제 HTTP 요청이 발생하지 않도록 adapter를 mock
+    api.defaults.adapter = () => Promise.resolve({ data: {}, status: 200, statusText: 'OK', headers: {}, config: {} as never });
 
     const mockError = createMockError(401, '/protected-endpoint');
     const handler = api.interceptors.response.handlers[0];
 
-    try {
-      await handler.rejected!(mockError);
-    } catch {
-      // api(originalRequest) 호출 시 실패 가능
-    }
+    await handler.rejected!(mockError);
 
     expect(localStorage.getItem('access_token')).toBe('refreshed-access-token');
     expect(localStorage.getItem('refresh_token')).toBe('refreshed-refresh-token');
