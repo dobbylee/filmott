@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import { NotFoundException } from '@nestjs/common';
 import { RankingsService } from './rankings.service';
 import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
@@ -16,6 +17,7 @@ describe('RankingsService', () => {
     upsert: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    findOneBy: jest.fn(),
   };
 
   const mockKobisService = {
@@ -394,6 +396,57 @@ describe('RankingsService', () => {
       mockRankingRepo.findOne.mockResolvedValue(null);
 
       const result = await service.getRankings('kobis', 'daily-box-office');
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('updatePosterUrl', () => {
+    it('존재하는 랭킹의 posterUrl을 업데이트해야 한다', async () => {
+      const ranking = { id: 1, title: 'Test Movie', posterUrl: undefined };
+      mockRankingRepo.findOneBy.mockResolvedValue(ranking);
+      mockRankingRepo.save.mockResolvedValue({ ...ranking, posterUrl: 'https://example.com/poster.jpg' });
+
+      const result = await service.updatePosterUrl(1, 'https://example.com/poster.jpg');
+
+      expect(mockRankingRepo.findOneBy).toHaveBeenCalledWith({ id: 1 });
+      expect(mockRankingRepo.save).toHaveBeenCalledWith({
+        ...ranking,
+        posterUrl: 'https://example.com/poster.jpg',
+      });
+      expect(result.posterUrl).toBe('https://example.com/poster.jpg');
+    });
+
+    it('존재하지 않는 랭킹에 대해 NotFoundException을 던져야 한다', async () => {
+      mockRankingRepo.findOneBy.mockResolvedValue(null);
+
+      await expect(service.updatePosterUrl(999, 'https://example.com/poster.jpg'))
+        .rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getUnmatchedRankings', () => {
+    it('contentId가 NULL인 최신 targetDate의 랭킹을 반환해야 한다', async () => {
+      const latestRecord = { targetDate: '2026-03-16' };
+      mockRankingRepo.findOne.mockResolvedValue(latestRecord);
+
+      const unmatchedRankings = [
+        { id: 1, rank: 3, title: 'Unmatched Movie', targetDate: '2026-03-16', contentId: null },
+      ];
+      mockRankingRepo.find.mockResolvedValue(unmatchedRankings);
+
+      const result = await service.getUnmatchedRankings();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('Unmatched Movie');
+      expect(mockRankingRepo.findOne).toHaveBeenCalled();
+      expect(mockRankingRepo.find).toHaveBeenCalled();
+    });
+
+    it('매칭 실패 항목이 없을 때 빈 배열을 반환해야 한다', async () => {
+      mockRankingRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.getUnmatchedRankings();
 
       expect(result).toEqual([]);
     });

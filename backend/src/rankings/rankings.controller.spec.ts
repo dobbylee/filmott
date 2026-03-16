@@ -16,7 +16,10 @@ describe('RankingsController', () => {
   const mockRankingsService = {
     getRankings: jest.fn(),
     fetchDailyBoxOffice: jest.fn(),
+    fetchWeeklyBoxOffice: jest.fn(),
     fetchTrending: jest.fn(),
+    updatePosterUrl: jest.fn(),
+    getUnmatchedRankings: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -114,6 +117,32 @@ describe('RankingsController', () => {
     });
   });
 
+  describe('GET /api/rankings/unmatched', () => {
+    it('매칭 실패 항목 목록을 반환해야 한다', async () => {
+      const unmatchedRankings = [
+        { id: 1, rank: 3, title: 'Unmatched Movie', contentId: null },
+      ];
+      mockRankingsService.getUnmatchedRankings.mockResolvedValue(unmatchedRankings);
+
+      const result = await controller.getUnmatched();
+
+      expect(result).toEqual(unmatchedRankings);
+      expect(mockRankingsService.getUnmatchedRankings).toHaveBeenCalled();
+    });
+  });
+
+  describe('PATCH /api/rankings/:id/poster', () => {
+    it('posterUrl을 업데이트하고 결과를 반환해야 한다', async () => {
+      const updatedRanking = { id: 1, posterUrl: 'https://example.com/poster.jpg' };
+      mockRankingsService.updatePosterUrl.mockResolvedValue(updatedRanking);
+
+      const result = await controller.updatePosterUrl(1, { posterUrl: 'https://example.com/poster.jpg' });
+
+      expect(result).toEqual(updatedRanking);
+      expect(mockRankingsService.updatePosterUrl).toHaveBeenCalledWith(1, 'https://example.com/poster.jpg');
+    });
+  });
+
   describe('refresh 엔드포인트 가드', () => {
     it('refresh 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
       const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.refresh);
@@ -132,6 +161,34 @@ describe('RankingsController', () => {
     it('getRankings 메서드에는 가드가 없어야 한다', () => {
       const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.getRankings);
       expect(guards).toBeUndefined();
+    });
+
+    it('getUnmatched 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.getUnmatched);
+      expect(guards).toBeDefined();
+      expect(guards).toHaveLength(2);
+      expect(guards[0]).toBe(JwtAuthGuard);
+      expect(guards[1]).toBe(RolesGuard);
+    });
+
+    it('getUnmatched 메서드에 ADMIN 역할이 필요해야 한다', () => {
+      const roles = reflector.get<UserRole[]>(ROLES_KEY, RankingsController.prototype.getUnmatched);
+      expect(roles).toBeDefined();
+      expect(roles).toContain(UserRole.ADMIN);
+    });
+
+    it('updatePosterUrl 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.updatePosterUrl);
+      expect(guards).toBeDefined();
+      expect(guards).toHaveLength(2);
+      expect(guards[0]).toBe(JwtAuthGuard);
+      expect(guards[1]).toBe(RolesGuard);
+    });
+
+    it('updatePosterUrl 메서드에 ADMIN 역할이 필요해야 한다', () => {
+      const roles = reflector.get<UserRole[]>(ROLES_KEY, RankingsController.prototype.updatePosterUrl);
+      expect(roles).toBeDefined();
+      expect(roles).toContain(UserRole.ADMIN);
     });
   });
 });

@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { Ranking } from './ranking.entity';
@@ -32,9 +32,9 @@ export class RankingsService {
 
   /**
    * KOBIS 일별 박스오피스를 가져와 rankings에 저장
-   * 매일 00:10 + 12:00 실행 (전일자 데이터, KOBIS 보정 반영)
+   * 매일 00:05 + 12:00 실행 (전일자 데이터, KOBIS 보정 반영)
    */
-  @Cron('10 0 * * *', { name: 'daily-box-office-midnight', timeZone: 'Asia/Seoul' })
+  @Cron('5 0 * * *', { name: 'daily-box-office-midnight', timeZone: 'Asia/Seoul' })
   @Cron('0 12 * * *', { name: 'daily-box-office-noon', timeZone: 'Asia/Seoul' })
   async fetchDailyBoxOffice(): Promise<Ranking[]> {
     const yesterday = this.getYesterdayDate();
@@ -276,6 +276,43 @@ export class RankingsService {
       relations: ['content'],
       order: { rank: 'ASC' },
       take: limit,
+    });
+  }
+
+  /**
+   * 포스터 URL 수동 업데이트 (TMDB 매칭 실패 항목용)
+   */
+  async updatePosterUrl(id: number, posterUrl: string): Promise<Ranking> {
+    const ranking = await this.rankingRepo.findOneBy({ id });
+    if (!ranking) {
+      throw new NotFoundException(`Ranking #${id}을(를) 찾을 수 없습니다.`);
+    }
+    ranking.posterUrl = posterUrl;
+    const saved = await this.rankingRepo.save(ranking);
+    await this.revalidateMainPage();
+    return saved;
+  }
+
+  /**
+   * TMDB 매칭 실패 항목 조회 (contentId IS NULL, 최신 targetDate 기준)
+   */
+  async getUnmatchedRankings(): Promise<Ranking[]> {
+    const latestRecord = await this.rankingRepo.findOne({
+      where: { contentId: IsNull() as unknown as undefined },
+      order: { targetDate: 'DESC' },
+      select: ['targetDate'],
+    });
+
+    if (!latestRecord) {
+      return [];
+    }
+
+    return this.rankingRepo.find({
+      where: {
+        contentId: IsNull() as unknown as undefined,
+        targetDate: latestRecord.targetDate,
+      },
+      order: { rank: 'ASC' },
     });
   }
 

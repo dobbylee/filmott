@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Param, Query, UseGuards, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, BadRequestException, ParseIntPipe } from '@nestjs/common';
 import { RankingsService } from './rankings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/enums/user-role.enum';
 import { GetRankingsDto } from './dto/get-rankings.dto';
+import { UpdatePosterUrlDto } from './dto/update-poster-url.dto';
 
 @Controller('rankings')
 export class RankingsController {
@@ -37,6 +38,31 @@ export class RankingsController {
     const parsedLimit = dto.limit ? parseInt(dto.limit, 10) : 10;
     const limit = Math.min(Math.max(parsedLimit, 1), 100);
     return this.rankingsService.getRankings(dto.source, dto.category, limit);
+  }
+
+  /**
+   * GET /api/rankings/unmatched
+   * TMDB 매칭 실패 항목 목록 (ADMIN 전용)
+   */
+  @Get('unmatched')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async getUnmatched() {
+    return this.rankingsService.getUnmatchedRankings();
+  }
+
+  /**
+   * PATCH /api/rankings/:id/poster
+   * 포스터 URL 수동 설정 (ADMIN 전용)
+   */
+  @Patch(':id/poster')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async updatePosterUrl(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdatePosterUrlDto,
+  ) {
+    return this.rankingsService.updatePosterUrl(id, dto.posterUrl);
   }
 
   /**
