@@ -373,7 +373,7 @@ export class RankingsService {
   private async revalidateMainPage(): Promise<void> {
     if (!this.revalidateSecret) return;
     try {
-      const url = `${this.frontendUrl}/api/revalidate`;
+      const url = 'http://frontend:3000/internal/revalidate';
       const response = await fetch(url, {
         method: 'POST',
         headers: {
