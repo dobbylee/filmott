@@ -37,6 +37,12 @@ export default function RankingRefresh() {
 
     try {
       await api.post(`/rankings/refresh/${category}`);
+      // 메인 페이지 캐시 즉시 갱신
+      try {
+        await fetch('/api/revalidate', { method: 'POST' });
+      } catch {
+        // revalidation 실패해도 갱신 자체는 성공
+      }
       setStates((prev) => ({
         ...prev,
         [category]: { status: 'success', message: '갱신 완료' },
