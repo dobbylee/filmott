@@ -6,7 +6,7 @@ import TimeAgo from '@/components/common/TimeAgo';
 import type { Review } from '@/types/review';
 import type { ContentItem } from '@/types/content';
 import { TMDB_IMAGE_BASE } from '@/types/content';
-import { getDisplayNickname, isDeletedUser } from '@/utils/user';
+import { getDisplayNickname, isDeletedUser, isInactiveUser } from '@/utils/user';
 import UserAvatar from '@/components/common/UserAvatar';
 
 export default function RecentReviewItem({ review }: { review: Review }) {
@@ -39,10 +39,16 @@ export default function RecentReviewItem({ review }: { review: Review }) {
         {/* 유저 + 별점 + 시간 */}
         <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <UserAvatar user={review.user} size="sm" />
-            <span className={`text-sm font-medium ${isDeletedUser(review.user) ? 'text-muted-foreground' : 'text-white/90'}`}>
-              {getDisplayNickname(review.user)}
-            </span>
+            <UserAvatar user={review.user} size="sm" linkToProfile={!isInactiveUser(review.user)} userId={review.userId} />
+            {isInactiveUser(review.user) ? (
+              <span className="text-sm font-medium text-muted-foreground">
+                {getDisplayNickname(review.user)}
+              </span>
+            ) : (
+              <Link href={`/profile/${review.userId}`} className="text-sm font-medium text-white/90 hover:text-fuchsia-400 transition-colors">
+                {getDisplayNickname(review.user)}
+              </Link>
+            )}
             {review.rating != null && (
               <div className="flex items-center gap-0.5">
                 <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />

@@ -128,4 +128,11 @@ export class UsersController {
   ) {
     return this.usersService.updateStatusByAdmin(id, dto.status);
   }
+
+  // 공개 프로필 조회 (인증 불필요)
+  // 주의: :id 와일드카드이므로 고정 경로(me, admin, check-nickname) 아래에 배치
+  @Get(':id/profile')
+  async getPublicProfile(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.getPublicProfile(id);
+  }
 }

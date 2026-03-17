@@ -9,6 +9,8 @@ import { Not, Repository } from 'typeorm';
 import sharp from 'sharp';
 import { User, SafeUser } from './user.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { Review } from '../reviews/review.entity';
+import { Watchlist } from '../watchlist/watchlist.entity';
 import { R2StorageService } from '../common/r2-storage.service';
 import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
@@ -25,6 +27,16 @@ export interface AdminUsersResult {
   totalPages: number;
 }
 
+export interface PublicProfile {
+  id: number;
+  nickname: string;
+  profileImage: string | null;
+  createdAt: Date;
+  reviewCount: number;
+  watchedCount: number;
+  wantToWatchCount: number;
+}
+
 /** 프로필 이미지 업로드 허용 MIME 타입 */
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 /** 프로필 이미지 업로드 최대 크기 (5MB) */
@@ -37,6 +49,10 @@ export class UsersService {
     private readonly usersRepo: Repository<User>,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepo: Repository<RefreshToken>,
+    @InjectRepository(Review)
+    private readonly reviewRepo: Repository<Review>,
+    @InjectRepository(Watchlist)
+    private readonly watchlistRepo: Repository<Watchlist>,
     private readonly r2Storage: R2StorageService,
   ) {}
 
@@ -85,6 +101,46 @@ export class UsersService {
     if (!user) return null;
     const { password: _, ...result } = user;
     return result;
+  }
+
+  /**
+   * 공개 프로필 조회
+   * DELETED 유저: NotFoundException
+   * SUSPENDED 유저: 닉네임 마스킹, 통계 0
+   */
+  async getPublicProfile(userId: number): Promise<PublicProfile> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user || user.status === UserStatus.DELETED) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    if (user.status === UserStatus.SUSPENDED) {
+      return {
+        id: user.id,
+        nickname: '정지된 사용자',
+        profileImage: null,
+        createdAt: user.createdAt,
+        reviewCount: 0,
+        watchedCount: 0,
+        wantToWatchCount: 0,
+      };
+    }
+
+    const [reviewCount, watchedCount, wantToWatchCount] = await Promise.all([
+      this.reviewRepo.count({ where: { userId } }),
+      this.watchlistRepo.count({ where: { userId, status: 'watched' } }),
+      this.watchlistRepo.count({ where: { userId, status: 'want_to_watch' } }),
+    ]);
+
+    return {
+      id: user.id,
+      nickname: user.nickname,
+      profileImage: user.profileImage ?? null,
+      createdAt: user.createdAt,
+      reviewCount,
+      watchedCount,
+      wantToWatchCount,
+    };
   }
 
   /**

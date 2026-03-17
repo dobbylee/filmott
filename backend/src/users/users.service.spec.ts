@@ -4,6 +4,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Not } from 'typeorm';
 import { User } from './user.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { Review } from '../reviews/review.entity';
+import { Watchlist } from '../watchlist/watchlist.entity';
 import { R2StorageService } from '../common/r2-storage.service';
 import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
@@ -45,6 +47,14 @@ describe('UsersService', () => {
     delete: jest.fn(),
   };
 
+  const mockReviewRepo = {
+    count: jest.fn(),
+  };
+
+  const mockWatchlistRepo = {
+    count: jest.fn(),
+  };
+
   const mockR2Storage = {
     upload: jest.fn(),
     delete: jest.fn(),
@@ -57,6 +67,8 @@ describe('UsersService', () => {
         UsersService,
         { provide: getRepositoryToken(User), useValue: mockUsersRepo },
         { provide: getRepositoryToken(RefreshToken), useValue: mockRefreshTokenRepo },
+        { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
+        { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
         { provide: R2StorageService, useValue: mockR2Storage },
       ],
     }).compile();
@@ -814,6 +826,97 @@ describe('UsersService', () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
 
       await expect(service.removeProfileImage(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getPublicProfile', () => {
+    it('ACTIVE 유저의 공개 프로필을 반환해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'testuser',
+        profileImage: 'https://test.r2.dev/profiles/test.webp',
+        status: UserStatus.ACTIVE,
+        createdAt: new Date('2025-01-01'),
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockReviewRepo.count.mockResolvedValue(5);
+      mockWatchlistRepo.count
+        .mockResolvedValueOnce(10) // watched
+        .mockResolvedValueOnce(3); // want_to_watch
+
+      const result = await service.getPublicProfile(1);
+
+      expect(result).toEqual({
+        id: 1,
+        nickname: 'testuser',
+        profileImage: 'https://test.r2.dev/profiles/test.webp',
+        createdAt: new Date('2025-01-01'),
+        reviewCount: 5,
+        watchedCount: 10,
+        wantToWatchCount: 3,
+      });
+      expect(mockReviewRepo.count).toHaveBeenCalledWith({ where: { userId: 1 } });
+      expect(mockWatchlistRepo.count).toHaveBeenCalledWith({ where: { userId: 1, status: 'watched' } });
+      expect(mockWatchlistRepo.count).toHaveBeenCalledWith({ where: { userId: 1, status: 'want_to_watch' } });
+    });
+
+    it('DELETED 유저는 NotFoundException을 던져야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue({
+        id: 2,
+        nickname: 'deleted_2_123',
+        status: UserStatus.DELETED,
+      });
+
+      await expect(service.getPublicProfile(2)).rejects.toThrow(NotFoundException);
+    });
+
+    it('존재하지 않는 유저는 NotFoundException을 던져야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.getPublicProfile(999)).rejects.toThrow(NotFoundException);
+    });
+
+    it('SUSPENDED 유저는 닉네임을 마스킹하고 통계를 0으로 반환해야 한다', async () => {
+      const mockUser = {
+        id: 3,
+        nickname: 'suspendeduser',
+        profileImage: 'https://test.r2.dev/profiles/test.webp',
+        status: UserStatus.SUSPENDED,
+        createdAt: new Date('2025-06-01'),
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+
+      const result = await service.getPublicProfile(3);
+
+      expect(result).toEqual({
+        id: 3,
+        nickname: '정지된 사용자',
+        profileImage: null,
+        createdAt: new Date('2025-06-01'),
+        reviewCount: 0,
+        watchedCount: 0,
+        wantToWatchCount: 0,
+      });
+      // SUSPENDED 유저는 DB 조회하지 않음
+      expect(mockReviewRepo.count).not.toHaveBeenCalled();
+      expect(mockWatchlistRepo.count).not.toHaveBeenCalled();
+    });
+
+    it('profileImage가 없는 유저는 null로 반환해야 한다', async () => {
+      const mockUser = {
+        id: 4,
+        nickname: 'noimage',
+        profileImage: undefined,
+        status: UserStatus.ACTIVE,
+        createdAt: new Date('2025-01-01'),
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockReviewRepo.count.mockResolvedValue(0);
+      mockWatchlistRepo.count.mockResolvedValue(0);
+
+      const result = await service.getPublicProfile(4);
+
+      expect(result.profileImage).toBeNull();
     });
   });
 });

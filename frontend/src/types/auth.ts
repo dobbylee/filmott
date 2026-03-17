@@ -18,3 +18,13 @@ export interface AuthResponse {
 export interface UpdateProfileRequest {
   nickname?: string;
 }
+
+export interface PublicProfile {
+  id: number;
+  nickname: string;
+  profileImage: string | null;
+  createdAt: string;
+  reviewCount: number;
+  watchedCount: number;
+  wantToWatchCount: number;
+}

@@ -23,6 +23,7 @@ describe('UsersController', () => {
     updateStatusByAdmin: jest.fn(),
     updateProfileImage: jest.fn(),
     removeProfileImage: jest.fn(),
+    getPublicProfile: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -270,6 +271,43 @@ describe('UsersController', () => {
         UsersController.prototype.updateUserStatus,
       );
       expect(roles).toEqual([UserRole.ADMIN]);
+    });
+  });
+
+  describe('GET /users/:id/profile (getPublicProfile)', () => {
+    it('공개 프로필을 반환해야 한다', async () => {
+      const mockProfile = {
+        id: 1,
+        nickname: 'testuser',
+        profileImage: null,
+        createdAt: new Date('2025-01-01'),
+        reviewCount: 5,
+        watchedCount: 10,
+        wantToWatchCount: 3,
+      };
+      mockUsersService.getPublicProfile.mockResolvedValue(mockProfile);
+
+      const result = await controller.getPublicProfile(1);
+
+      expect(mockUsersService.getPublicProfile).toHaveBeenCalledWith(1);
+      expect(result).toEqual(mockProfile);
+    });
+
+    it('존재하지 않는 유저이면 서비스에서 NotFoundException을 던져야 한다', async () => {
+      mockUsersService.getPublicProfile.mockRejectedValue(
+        new NotFoundException('사용자를 찾을 수 없습니다.'),
+      );
+
+      await expect(controller.getPublicProfile(999)).rejects.toThrow(NotFoundException);
+    });
+
+    it('인증 가드가 적용되지 않아야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        UsersController.prototype.getPublicProfile,
+      );
+      // 가드가 없거나 JwtAuthGuard가 포함되지 않아야 함
+      expect(!guards || !guards.includes(JwtAuthGuard)).toBeTruthy();
     });
   });
 });

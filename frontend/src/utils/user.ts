@@ -8,3 +8,8 @@ export function getDisplayNickname(user: { nickname?: string; status?: string } 
 export function isDeletedUser(user: { status?: string } | null | undefined): boolean {
   return user?.status === 'DELETED';
 }
+
+/** 탈퇴 또는 정지된 유저 — 프로필 링크 비활성용 */
+export function isInactiveUser(user: { status?: string } | null | undefined): boolean {
+  return user?.status === 'DELETED' || user?.status === 'SUSPENDED';
+}

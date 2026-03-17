@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Star, Trash2 } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from './LikeButton';
 import ReviewCommentsModal from './ReviewCommentsModal';
 import api from '@/lib/api';
 import type { Review } from '@/types/review';
-import { getDisplayNickname, isDeletedUser } from '@/utils/user';
+import { getDisplayNickname, isDeletedUser, isInactiveUser } from '@/utils/user';
 import UserAvatar from '@/components/common/UserAvatar';
 
 interface ReviewCardProps {
@@ -52,10 +53,16 @@ export default function ReviewCard({ review, showInteractions = true, initialLik
         {/* 상단: 아바타 + 닉네임 + 별점 + 댓글 (왼쪽) / 좋아요 (오른쪽) */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <UserAvatar user={review.user} size="lg" />
+            <UserAvatar user={review.user} size="lg" linkToProfile={!isInactiveUser(review.user)} userId={review.userId} />
             <div>
               <div className="flex items-center gap-1.5">
-                <span className={`text-sm font-medium ${isDeletedUser(review.user) ? 'text-muted-foreground' : ''}`}>{getDisplayNickname(review.user)}</span>
+                {isInactiveUser(review.user) ? (
+                  <span className="text-sm font-medium text-muted-foreground">{getDisplayNickname(review.user)}</span>
+                ) : (
+                  <Link href={`/profile/${review.userId}`} className="text-sm font-medium hover:text-fuchsia-400 transition-colors">
+                    {getDisplayNickname(review.user)}
+                  </Link>
+                )}
                 {review.rating != null && (
                   <div className="flex items-center gap-0.5">
                     <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
