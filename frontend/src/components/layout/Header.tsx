@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { Search, Film, Tv, Menu, X, User as UserIcon, Layers } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import UserAvatar from '@/components/common/UserAvatar';
 
 export default function Header() {
   const { user, isLoading, openAuthModal } = useAuth();
@@ -139,9 +140,7 @@ export default function Header() {
               href="/profile"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
             >
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-700 to-indigo-600 text-xs">
-                {user.nickname.charAt(0)}
-              </div>
+              <UserAvatar user={user} size="sm" />
               <span className="hidden sm:inline">{user.nickname}</span>
             </Link>
           ) : (

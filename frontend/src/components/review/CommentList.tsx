@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { Trash2 } from 'lucide-react';
 import UserAvatar from '@/components/common/UserAvatar';
-import { getDisplayNickname, isDeletedUser } from '@/utils/user';
+import { getDisplayNickname, isDeletedUser, isInactiveUser } from '@/utils/user';
 import { formatCommentDate } from '@/utils/date';
 import type { Comment } from '@/types/comment';
 
@@ -39,12 +40,18 @@ export default function CommentList({
     <div className="divide-y divide-white/[0.06]">
       {comments.map((c) => (
         <div key={c.id} className="flex items-start gap-3 px-2 py-3 hover:bg-white/[0.03] transition-colors">
-          <UserAvatar user={c.user} size="md" />
+          <UserAvatar user={c.user} size="md" linkToProfile={!isInactiveUser(c.user)} userId={c.userId} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className={`text-sm font-medium ${isDeletedUser(c.user) ? 'text-muted-foreground' : ''}`}>
-                {getDisplayNickname(c.user)}
-              </span>
+              {isInactiveUser(c.user) ? (
+                <span className="text-sm font-medium text-muted-foreground">
+                  {getDisplayNickname(c.user)}
+                </span>
+              ) : (
+                <Link href={`/profile/${c.userId}`} className="text-sm font-medium hover:text-fuchsia-400 transition-colors">
+                  {getDisplayNickname(c.user)}
+                </Link>
+              )}
               <span className="text-[11px] text-muted-foreground">
                 {formatCommentDate(c.createdAt)}
               </span>

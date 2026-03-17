@@ -16,8 +16,8 @@ describe('ReviewSortSelector', () => {
     const latestBtn = screen.getByText('최신순');
     const likesBtn = screen.getByText('인기순');
 
-    expect(latestBtn.className).toContain('bg-white/10');
-    expect(likesBtn.className).not.toContain('bg-white/10');
+    expect(latestBtn.className).toContain('bg-white/15');
+    expect(likesBtn.className).not.toContain('bg-white/15');
   });
 
   it('인기순 선택 시 활성 스타일이 변경된다', () => {
@@ -26,8 +26,8 @@ describe('ReviewSortSelector', () => {
     const latestBtn = screen.getByText('최신순');
     const likesBtn = screen.getByText('인기순');
 
-    expect(latestBtn.className).not.toContain('bg-white/10');
-    expect(likesBtn.className).toContain('bg-white/10');
+    expect(latestBtn.className).not.toContain('bg-white/15');
+    expect(likesBtn.className).toContain('bg-white/15');
   });
 
   it('탭 클릭 시 onSortChange가 올바른 값으로 호출된다', () => {

@@ -160,7 +160,7 @@ export class ReviewsService {
 
     const [reviews, total] = await this.reviewRepo.findAndCount({
       where: { userId },
-      relations: ['content'],
+      relations: ['content', 'user'],
       order: { createdAt: 'DESC' },
       skip,
       take,
