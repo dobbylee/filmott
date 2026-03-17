@@ -74,7 +74,7 @@ export default function ReviewListClient({ reviews: initialReviews, contentId }:
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex justify-start">
         <ReviewSortSelector sort={sort} onSortChange={handleSortChange} />
       </div>
       {filtered.map((review) => (
