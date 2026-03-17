@@ -152,6 +152,7 @@ export class AuthService {
           id: user.id,
           nickname: user.nickname,
           role: user.role,
+          profileImage: user.profileImage ?? null,
         },
       };
     });
@@ -218,6 +219,7 @@ export class AuthService {
         id: user.id,
         nickname: user.nickname,
         role: user.role,
+        profileImage: user.profileImage ?? null,
       },
     };
   }
@@ -314,6 +316,7 @@ export class AuthService {
         nickname: user.nickname,
         email: user.email,
         role: user.role,
+        profileImage: user.profileImage ?? null,
       },
     };
   }
@@ -334,6 +337,7 @@ export class AuthService {
         nickname: user.nickname,
         email: user.email,
         role: user.role,
+        profileImage: user.profileImage ?? null,
       },
     };
   }

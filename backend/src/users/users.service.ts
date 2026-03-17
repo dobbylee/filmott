@@ -149,10 +149,10 @@ export class UsersService {
    */
   async findByIdWithStatus(
     id: number,
-  ): Promise<Pick<User, 'id' | 'nickname' | 'status' | 'role'> | null> {
+  ): Promise<Pick<User, 'id' | 'nickname' | 'status' | 'role' | 'profileImage'> | null> {
     const user = await this.usersRepo.findOne({
       where: { id },
-      select: ['id', 'nickname', 'status', 'role'],
+      select: ['id', 'nickname', 'status', 'role', 'profileImage'],
     });
     return user ?? null;
   }

@@ -192,7 +192,7 @@ describe('AuthService', () => {
         (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
       );
       mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER,
+        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER, profileImage: null,
       });
       mockJwtService.sign.mockReturnValue('new.jwt.token');
 
@@ -202,7 +202,7 @@ describe('AuthService', () => {
       expect(result.refresh_token).toBeDefined();
       expect(result.refresh_token.length).toBe(64);
       expect(result.user).toEqual({
-        id: 1, nickname: 'testuser', role: UserRole.USER,
+        id: 1, nickname: 'testuser', role: UserRole.USER, profileImage: null,
       });
       // 트랜잭션이 사용되었는지 확인
       expect(mockDataSource.transaction).toHaveBeenCalled();
@@ -367,13 +367,13 @@ describe('AuthService', () => {
       expect(result.access_token).toBe('access.token');
       expect(result.refresh_token).toBeDefined();
       expect(result.user).toEqual({
-        id: 1, nickname: 'testuser', role: UserRole.USER,
+        id: 1, nickname: 'testuser', role: UserRole.USER, profileImage: null,
       });
     });
 
     it('동일 코드를 두 번 사용하면 두 번째에 UnauthorizedException을 던져야 한다', async () => {
       mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER,
+        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER, profileImage: null,
       });
       mockJwtService.sign.mockReturnValue('access.token');
       mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
@@ -466,7 +466,7 @@ describe('AuthService', () => {
       expect(result.access_token).toBe('mocked.jwt.token');
       expect(result.refresh_token).toBeDefined();
       expect(result.user).toEqual({
-        id: 1, nickname: 'adminuser', email: 'admin@example.com', role: UserRole.ADMIN,
+        id: 1, nickname: 'adminuser', email: 'admin@example.com', role: UserRole.ADMIN, profileImage: null,
       });
     });
 
