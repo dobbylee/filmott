@@ -9,11 +9,14 @@ import {
   Query,
   ParseIntPipe,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   HttpCode,
   HttpStatus,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -84,6 +87,27 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deactivate(@CurrentUser() user: JwtPayload) {
     await this.usersService.deactivate(user.id);
+  }
+
+  // 프로필 이미지 업로드 (multipart/form-data)
+  @UseGuards(JwtAuthGuard)
+  @Post('me/profile-image')
+  @UseInterceptors(FileInterceptor('image'))
+  async uploadProfileImage(
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('이미지 파일을 선택해주세요.');
+    }
+    return this.usersService.updateProfileImage(user.id, file);
+  }
+
+  // 프로필 이미지 삭제
+  @UseGuards(JwtAuthGuard)
+  @Delete('me/profile-image')
+  async deleteProfileImage(@CurrentUser() user: JwtPayload) {
+    return this.usersService.removeProfileImage(user.id);
   }
 
   // ADMIN 전용: 유저 목록 조회 (검색, 상태 필터, 페이지네이션)

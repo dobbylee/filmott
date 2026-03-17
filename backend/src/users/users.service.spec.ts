@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Not } from 'typeorm';
 import { User } from './user.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { R2StorageService } from '../common/r2-storage.service';
 import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
 import { UserRole } from './enums/user-role.enum';
@@ -11,6 +12,14 @@ import { ConflictException, NotFoundException, BadRequestException } from '@nest
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt');
+jest.mock('sharp', () => {
+  const mockSharp = jest.fn(() => ({
+    resize: jest.fn().mockReturnThis(),
+    webp: jest.fn().mockReturnThis(),
+    toBuffer: jest.fn().mockResolvedValue(Buffer.from('resized-image')),
+  }));
+  return { __esModule: true, default: mockSharp };
+});
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -36,12 +45,19 @@ describe('UsersService', () => {
     delete: jest.fn(),
   };
 
+  const mockR2Storage = {
+    upload: jest.fn(),
+    delete: jest.fn(),
+    getPublicUrl: jest.fn().mockReturnValue('https://test.r2.dev'),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: getRepositoryToken(User), useValue: mockUsersRepo },
         { provide: getRepositoryToken(RefreshToken), useValue: mockRefreshTokenRepo },
+        { provide: R2StorageService, useValue: mockR2Storage },
       ],
     }).compile();
 
@@ -649,6 +665,155 @@ describe('UsersService', () => {
       await service.updateStatusByAdmin(5, UserStatus.SUSPENDED);
 
       expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({ userId: 5 });
+    });
+  });
+
+  describe('updateProfileImage', () => {
+    const mockFile = {
+      buffer: Buffer.from('test-image'),
+      mimetype: 'image/jpeg',
+      size: 1024,
+      originalname: 'test.jpg',
+      fieldname: 'image',
+    } as Express.Multer.File;
+
+    it('이미지를 리사이즈하고 R2에 업로드 후 SafeUser를 반환해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'hashed',
+        profileImage: undefined,
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockR2Storage.upload.mockResolvedValue('https://test.r2.dev/profiles/profile-1-123.webp');
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+
+      const fixedTimestamp = 1740000000000;
+      jest.spyOn(Date, 'now').mockReturnValue(fixedTimestamp);
+
+      const result = await service.updateProfileImage(1, mockFile);
+
+      expect(mockR2Storage.upload).toHaveBeenCalledWith(
+        `profiles/profile-1-${fixedTimestamp}.webp`,
+        Buffer.from('resized-image'),
+        'image/webp',
+      );
+      expect(result).not.toHaveProperty('password');
+      expect(result.profileImage).toBe('https://test.r2.dev/profiles/profile-1-123.webp');
+
+      jest.restoreAllMocks();
+    });
+
+    it('기존 R2 이미지가 있으면 삭제 후 새 이미지를 업로드해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'hashed',
+        profileImage: 'https://test.r2.dev/profiles/profile-1-old.webp',
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockR2Storage.upload.mockResolvedValue('https://test.r2.dev/profiles/profile-1-new.webp');
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+
+      await service.updateProfileImage(1, mockFile);
+
+      expect(mockR2Storage.delete).toHaveBeenCalledWith('profiles/profile-1-old.webp');
+      expect(mockR2Storage.upload).toHaveBeenCalled();
+    });
+
+    it('소셜 프로필 이미지(외부 URL)는 R2 삭제를 호출하지 않아야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'test',
+        email: 'test@test.com',
+        password: null,
+        profileImage: 'https://lh3.googleusercontent.com/photo.jpg',
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockR2Storage.upload.mockResolvedValue('https://test.r2.dev/profiles/profile-1-new.webp');
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+
+      await service.updateProfileImage(1, mockFile);
+
+      expect(mockR2Storage.delete).not.toHaveBeenCalled();
+      expect(mockR2Storage.upload).toHaveBeenCalled();
+    });
+
+    it('지원하지 않는 이미지 형식이면 BadRequestException을 던져야 한다', async () => {
+      const badFile = { ...mockFile, mimetype: 'application/pdf' } as Express.Multer.File;
+
+      await expect(service.updateProfileImage(1, badFile)).rejects.toThrow(BadRequestException);
+    });
+
+    it('이미지 크기가 5MB를 초과하면 BadRequestException을 던져야 한다', async () => {
+      const bigFile = { ...mockFile, size: 6 * 1024 * 1024 } as Express.Multer.File;
+
+      await expect(service.updateProfileImage(1, bigFile)).rejects.toThrow(BadRequestException);
+    });
+
+    it('사용자가 존재하지 않으면 NotFoundException을 던져야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.updateProfileImage(999, mockFile)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('removeProfileImage', () => {
+    it('R2 이미지를 삭제하고 profileImage를 null로 설정해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'hashed',
+        profileImage: 'https://test.r2.dev/profiles/profile-1-123.webp',
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+
+      const result = await service.removeProfileImage(1);
+
+      expect(mockR2Storage.delete).toHaveBeenCalledWith('profiles/profile-1-123.webp');
+      expect(result).not.toHaveProperty('password');
+      expect(result.profileImage).toBeUndefined();
+    });
+
+    it('소셜 프로필 이미지(외부 URL)는 R2 삭제 없이 null로 설정해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'test',
+        password: null,
+        profileImage: 'https://lh3.googleusercontent.com/photo.jpg',
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+
+      await service.removeProfileImage(1);
+
+      expect(mockR2Storage.delete).not.toHaveBeenCalled();
+    });
+
+    it('프로필 이미지가 없어도 정상 동작해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'test',
+        password: 'hashed',
+        profileImage: undefined,
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+
+      const result = await service.removeProfileImage(1);
+
+      expect(mockR2Storage.delete).not.toHaveBeenCalled();
+      expect(result).not.toHaveProperty('password');
+    });
+
+    it('사용자가 존재하지 않으면 NotFoundException을 던져야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.removeProfileImage(999)).rejects.toThrow(NotFoundException);
     });
   });
 });

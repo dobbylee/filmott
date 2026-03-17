@@ -5,9 +5,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Not, Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
+import sharp from 'sharp';
 import { User, SafeUser } from './user.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { R2StorageService } from '../common/r2-storage.service';
 import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
 import { UserRole } from './enums/user-role.enum';
@@ -23,6 +25,11 @@ export interface AdminUsersResult {
   totalPages: number;
 }
 
+/** 프로필 이미지 업로드 허용 MIME 타입 */
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+/** 프로필 이미지 업로드 최대 크기 (5MB) */
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -30,6 +37,7 @@ export class UsersService {
     private readonly usersRepo: Repository<User>,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepo: Repository<RefreshToken>,
+    private readonly r2Storage: R2StorageService,
   ) {}
 
   /**
@@ -315,5 +323,82 @@ export class UsersService {
 
     const { password: _, ...result } = savedUser;
     return result;
+  }
+
+  /**
+   * 프로필 이미지 업로드
+   * sharp로 200x200 리사이즈 + webp 변환 후 R2에 업로드
+   */
+  async updateProfileImage(
+    userId: number,
+    file: Express.Multer.File,
+  ): Promise<SafeUser> {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        '지원하지 않는 이미지 형식입니다. (jpeg, png, webp, gif만 허용)',
+      );
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      throw new BadRequestException('이미지 크기는 5MB 이하만 허용됩니다.');
+    }
+
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    // 기존 R2 이미지가 있으면 삭제 (소셜 프로필 외부 URL은 삭제 대상 아님)
+    if (user.profileImage) {
+      const oldKey = this.extractR2Key(user.profileImage);
+      if (oldKey) {
+        await this.r2Storage.delete(oldKey);
+      }
+    }
+
+    // sharp 리사이즈 + webp 변환
+    const resizedBuffer = await sharp(file.buffer)
+      .resize(200, 200, { fit: 'cover' })
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    const key = `profiles/profile-${userId}-${Date.now()}.webp`;
+    const url = await this.r2Storage.upload(key, resizedBuffer, 'image/webp');
+
+    user.profileImage = url;
+    const savedUser = await this.usersRepo.save(user);
+    const { password: _, ...result } = savedUser;
+    return result;
+  }
+
+  /**
+   * 프로필 이미지 삭제
+   */
+  async removeProfileImage(userId: number): Promise<SafeUser> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    if (user.profileImage) {
+      const key = this.extractR2Key(user.profileImage);
+      if (key) {
+        await this.r2Storage.delete(key);
+      }
+    }
+
+    user.profileImage = undefined;
+    const savedUser = await this.usersRepo.save(user);
+    const { password: _, ...result } = savedUser;
+    return result;
+  }
+
+  /**
+   * R2 Public URL에서 키를 추출한다.
+   * 외부 URL(소셜 프로필 이미지 등)은 null을 반환하여 삭제를 건너뛴다.
+   */
+  private extractR2Key(url: string): string | null {
+    const publicUrl = this.r2Storage.getPublicUrl();
+    if (!url.startsWith(publicUrl)) return null;
+    return url.slice(publicUrl.length + 1); // +1 for '/'
   }
 }

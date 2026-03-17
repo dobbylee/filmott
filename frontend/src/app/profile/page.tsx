@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import ProfileImageUploader from '@/components/profile/ProfileImageUploader';
 import NicknameEditor from '@/components/profile/NicknameEditor';
 import WatchlistStats from '@/components/profile/WatchlistStats';
 import DeleteAccountSection from '@/components/profile/DeleteAccountSection';
@@ -40,9 +41,7 @@ export default function ProfilePage() {
       {/* 프로필 헤더 */}
       <div className="flex flex-col items-center pt-4 pb-6">
         {/* 아바타 */}
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-fuchsia-700 to-indigo-600 text-3xl font-bold text-white shadow-lg shadow-fuchsia-500/20">
-          {user.nickname.charAt(0).toUpperCase()}
-        </div>
+        <ProfileImageUploader user={user} updateUser={updateUser} />
 
         {/* 닉네임 */}
         <NicknameEditor user={user} updateUser={updateUser} />

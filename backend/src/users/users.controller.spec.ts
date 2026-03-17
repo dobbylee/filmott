@@ -21,6 +21,8 @@ describe('UsersController', () => {
     verifyPassword: jest.fn(),
     findAllForAdmin: jest.fn(),
     updateStatusByAdmin: jest.fn(),
+    updateProfileImage: jest.fn(),
+    removeProfileImage: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -177,6 +179,63 @@ describe('UsersController', () => {
         UsersController.prototype.getAdminUsers,
       );
       expect(roles).toEqual([UserRole.ADMIN]);
+    });
+  });
+
+  describe('POST /users/me/profile-image (uploadProfileImage)', () => {
+    it('파일이 없으면 BadRequestException을 던져야 한다', async () => {
+      const mockUser = { id: 1, nickname: 'test' };
+
+      await expect(
+        controller.uploadProfileImage(mockUser, undefined as unknown as Express.Multer.File),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('파일이 있으면 updateProfileImage를 호출하고 결과를 반환해야 한다', async () => {
+      const mockUser = { id: 1, nickname: 'test' };
+      const mockFile = {
+        buffer: Buffer.from('test'),
+        mimetype: 'image/jpeg',
+        size: 1024,
+      } as Express.Multer.File;
+      const mockResult = { id: 1, nickname: 'test', profileImage: 'https://test.r2.dev/profiles/test.webp' };
+      mockUsersService.updateProfileImage.mockResolvedValue(mockResult);
+
+      const result = await controller.uploadProfileImage(mockUser, mockFile);
+
+      expect(mockUsersService.updateProfileImage).toHaveBeenCalledWith(1, mockFile);
+      expect(result).toEqual(mockResult);
+    });
+
+    it('JwtAuthGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        UsersController.prototype.uploadProfileImage,
+      );
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(JwtAuthGuard);
+    });
+  });
+
+  describe('DELETE /users/me/profile-image (deleteProfileImage)', () => {
+    it('removeProfileImage를 호출하고 결과를 반환해야 한다', async () => {
+      const mockUser = { id: 1, nickname: 'test' };
+      const mockResult = { id: 1, nickname: 'test', profileImage: undefined };
+      mockUsersService.removeProfileImage.mockResolvedValue(mockResult);
+
+      const result = await controller.deleteProfileImage(mockUser);
+
+      expect(mockUsersService.removeProfileImage).toHaveBeenCalledWith(1);
+      expect(result).toEqual(mockResult);
+    });
+
+    it('JwtAuthGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        UsersController.prototype.deleteProfileImage,
+      );
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(JwtAuthGuard);
     });
   });
 
