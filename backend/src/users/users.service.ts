@@ -126,11 +126,17 @@ export class UsersService {
       };
     }
 
-    const [reviewCount, watchedCount, wantToWatchCount] = await Promise.all([
+    const [reviewCount, watchlistCounts] = await Promise.all([
       this.reviewRepo.count({ where: { userId } }),
-      this.watchlistRepo.count({ where: { userId, status: 'watched' } }),
-      this.watchlistRepo.count({ where: { userId, status: 'want_to_watch' } }),
+      this.watchlistRepo
+        .createQueryBuilder('w')
+        .select("COUNT(*) FILTER (WHERE w.status = 'watched')", 'watched')
+        .addSelect("COUNT(*) FILTER (WHERE w.status = 'want_to_watch')", 'want')
+        .where('w.userId = :userId', { userId })
+        .getRawOne<{ watched: string; want: string }>(),
     ]);
+    const watchedCount = parseInt(watchlistCounts?.watched ?? '0', 10);
+    const wantToWatchCount = parseInt(watchlistCounts?.want ?? '0', 10);
 
     return {
       id: user.id,
@@ -283,6 +289,14 @@ export class UsersService {
 
     // 해당 유저의 모든 refresh token 삭제 (탈퇴 후 기존 토큰으로 접근 차단)
     await this.refreshTokenRepo.delete({ userId: id });
+
+    // R2 프로필 이미지가 있으면 삭제
+    if (user.profileImage) {
+      const key = this.extractR2Key(user.profileImage);
+      if (key) {
+        await this.r2Storage.delete(key);
+      }
+    }
 
     // Anonymize to release unique constraints
     const timestamp = Date.now();

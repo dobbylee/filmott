@@ -687,7 +687,7 @@ describe('AuthService', () => {
       expect(result.refresh_token).toBeDefined();
       expect(typeof result.refresh_token).toBe('string');
       expect(result.user).toEqual({
-        id: 2, nickname: 'newuser', email: 'new@example.com', role: UserRole.USER,
+        id: 2, nickname: 'newuser', email: 'new@example.com', role: UserRole.USER, profileImage: null,
       });
     });
   });

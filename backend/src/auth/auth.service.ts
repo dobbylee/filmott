@@ -352,6 +352,7 @@ export class AuthService {
         nickname: user.nickname,
         email: user.email,
         role: user.role,
+        profileImage: user.profileImage ?? null,
       },
     };
   }

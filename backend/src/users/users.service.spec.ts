@@ -51,8 +51,16 @@ describe('UsersService', () => {
     count: jest.fn(),
   };
 
+  const mockWatchlistQueryBuilder = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    getRawOne: jest.fn(),
+  };
+
   const mockWatchlistRepo = {
     count: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnValue(mockWatchlistQueryBuilder),
   };
 
   const mockR2Storage = {
@@ -421,6 +429,7 @@ describe('UsersService', () => {
         nickname: 'bob',
         email: 'bob@mail.com',
         providerId: 'google-123',
+        profileImage: undefined,
         status: UserStatus.ACTIVE,
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
@@ -449,6 +458,7 @@ describe('UsersService', () => {
         email: 'social@mail.com',
         provider: AuthProvider.GOOGLE,
         providerId: 'google-abc',
+        profileImage: undefined,
         status: UserStatus.ACTIVE,
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
@@ -465,11 +475,58 @@ describe('UsersService', () => {
       jest.restoreAllMocks();
     });
 
+    it('탈퇴 시 R2 프로필 이미지가 있으면 삭제해야 한다', async () => {
+      const mockUser: Record<string, unknown> = {
+        id: 6,
+        nickname: 'imguser',
+        email: 'img@mail.com',
+        providerId: null,
+        profileImage: 'https://test.r2.dev/profiles/profile-6-123.webp',
+        status: UserStatus.ACTIVE,
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 0 });
+
+      const fixedTimestamp = 1740000000000;
+      jest.spyOn(Date, 'now').mockReturnValue(fixedTimestamp);
+
+      await service.deactivate(6);
+
+      expect(mockR2Storage.delete).toHaveBeenCalledWith('profiles/profile-6-123.webp');
+      expect(mockUser.status).toEqual(UserStatus.DELETED);
+
+      jest.restoreAllMocks();
+    });
+
+    it('탈퇴 시 소셜 프로필 이미지(외부 URL)는 R2 삭제하지 않아야 한다', async () => {
+      const mockUser: Record<string, unknown> = {
+        id: 8,
+        nickname: 'socialimg',
+        email: 'socialimg@mail.com',
+        providerId: null,
+        profileImage: 'https://lh3.googleusercontent.com/photo.jpg',
+        status: UserStatus.ACTIVE,
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 0 });
+
+      const fixedTimestamp = 1740000000000;
+      jest.spyOn(Date, 'now').mockReturnValue(fixedTimestamp);
+
+      await service.deactivate(8);
+
+      expect(mockR2Storage.delete).not.toHaveBeenCalled();
+      expect(mockUser.status).toEqual(UserStatus.DELETED);
+
+      jest.restoreAllMocks();
+    });
+
     it('탈퇴 시 해당 유저의 모든 refresh token을 삭제해야 한다', async () => {
       const mockUser: Record<string, unknown> = {
         id: 7,
         nickname: 'alice',
         email: 'alice@mail.com',
+        profileImage: undefined,
         status: UserStatus.ACTIVE,
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
@@ -840,9 +897,7 @@ describe('UsersService', () => {
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
       mockReviewRepo.count.mockResolvedValue(5);
-      mockWatchlistRepo.count
-        .mockResolvedValueOnce(10) // watched
-        .mockResolvedValueOnce(3); // want_to_watch
+      mockWatchlistQueryBuilder.getRawOne.mockResolvedValue({ watched: '10', want: '3' });
 
       const result = await service.getPublicProfile(1);
 
@@ -856,8 +911,8 @@ describe('UsersService', () => {
         wantToWatchCount: 3,
       });
       expect(mockReviewRepo.count).toHaveBeenCalledWith({ where: { userId: 1 } });
-      expect(mockWatchlistRepo.count).toHaveBeenCalledWith({ where: { userId: 1, status: 'watched' } });
-      expect(mockWatchlistRepo.count).toHaveBeenCalledWith({ where: { userId: 1, status: 'want_to_watch' } });
+      expect(mockWatchlistRepo.createQueryBuilder).toHaveBeenCalledWith('w');
+      expect(mockWatchlistQueryBuilder.where).toHaveBeenCalledWith('w.userId = :userId', { userId: 1 });
     });
 
     it('DELETED 유저는 NotFoundException을 던져야 한다', async () => {
@@ -912,7 +967,7 @@ describe('UsersService', () => {
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
       mockReviewRepo.count.mockResolvedValue(0);
-      mockWatchlistRepo.count.mockResolvedValue(0);
+      mockWatchlistQueryBuilder.getRawOne.mockResolvedValue({ watched: '0', want: '0' });
 
       const result = await service.getPublicProfile(4);
 

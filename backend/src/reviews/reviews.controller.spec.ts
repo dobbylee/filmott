@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
 import { ReviewCommentsService } from './review-comments.service';
@@ -29,6 +30,7 @@ describe('ReviewsController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [ReviewsController],
       providers: [
         { provide: ReviewsService, useValue: mockReviewsService },
@@ -239,6 +241,15 @@ describe('ReviewsController', () => {
       await controller.findByUser(1);
 
       expect(mockReviewsService.findByUser).toHaveBeenCalledWith(1, 1, 20);
+    });
+
+    it('ThrottlerGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        ReviewsController.prototype.findByUser,
+      );
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(ThrottlerGuard);
     });
   });
 

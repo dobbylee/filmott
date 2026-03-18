@@ -306,8 +306,17 @@ describe('UsersController', () => {
         '__guards__',
         UsersController.prototype.getPublicProfile,
       );
-      // 가드가 없거나 JwtAuthGuard가 포함되지 않아야 함
+      // JwtAuthGuard가 포함되지 않아야 함
       expect(!guards || !guards.includes(JwtAuthGuard)).toBeTruthy();
+    });
+
+    it('ThrottlerGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        UsersController.prototype.getPublicProfile,
+      );
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(ThrottlerGuard);
     });
   });
 });

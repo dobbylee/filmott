@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   BadRequestException,
 } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { ReviewsService } from './reviews.service';
 import { ReviewCommentsService } from './review-comments.service';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -118,6 +119,7 @@ export class ReviewsController {
   // --- 파라미터 경로 GET (user/:userId, :id/stats) ---
 
   @Get('user/:userId')
+  @UseGuards(ThrottlerGuard)
   async findByUser(
     @Param('userId', ParseIntPipe) userId: number,
     @Query('page') page?: string,

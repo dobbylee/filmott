@@ -110,7 +110,7 @@ export class ReviewsService {
     const review = await this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
-      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage', 'user.status'])
+      .addSelect(['user.id', 'user.nickname', 'user.profileImage', 'user.status'])
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .where('review.userId = :userId', { userId })
       .andWhere('review.contentId = :contentId', { contentId })
@@ -129,7 +129,7 @@ export class ReviewsService {
     const qb = this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
-      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage', 'user.status'])
+      .addSelect(['user.id', 'user.nickname', 'user.profileImage', 'user.status'])
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .where('review.contentId = :contentId', { contentId })
       .skip(skip)
@@ -179,7 +179,7 @@ export class ReviewsService {
     return this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
-      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage', 'user.status'])
+      .addSelect(['user.id', 'user.nickname', 'user.profileImage', 'user.status'])
       .leftJoinAndSelect('review.content', 'content')
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .orderBy('review.createdAt', 'DESC')

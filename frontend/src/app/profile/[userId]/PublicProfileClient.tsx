@@ -49,6 +49,8 @@ export default function PublicProfileClient({ profile, reviews }: PublicProfileC
       setPage(nextPage);
       setTotal(res.data.total);
       setTotalPages(res.data.totalPages);
+    } catch {
+      alert('리뷰를 불러오는 데 실패했습니다.');
     } finally {
       setLoading(false);
     }

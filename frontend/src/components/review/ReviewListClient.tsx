@@ -19,16 +19,20 @@ export default function ReviewListClient({ reviews: initialReviews, contentId }:
   const [reviews, setReviews] = useState(initialReviews);
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
   const [sort, setSort] = useState<ReviewSort>('latest');
+  const [sortLoading, setSortLoading] = useState(false);
 
   useEffect(() => {
+    setSortLoading(true);
     if (!user) {
       // 비로그인 + 최신순이면 SSR 데이터 그대로 사용
       if (sort === 'latest') {
         setReviews(initialReviews);
+        setSortLoading(false);
       } else {
         api.get<ReviewsResponse>(`/reviews?contentId=${contentId}&page=1&sort=${sort}`)
           .then((res) => setReviews(res.data.data))
-          .catch(() => setReviews(initialReviews));
+          .catch(() => setReviews(initialReviews))
+          .finally(() => setSortLoading(false));
       }
       setLikedIds(new Set());
       return;
@@ -46,7 +50,8 @@ export default function ReviewListClient({ reviews: initialReviews, contentId }:
       .catch(() => {
         setReviews(initialReviews);
         setLikedIds(new Set());
-      });
+      })
+      .finally(() => setSortLoading(false));
   }, [user, contentId, initialReviews, sort]);
 
   const handleSortChange = (newSort: ReviewSort) => {
@@ -77,6 +82,7 @@ export default function ReviewListClient({ reviews: initialReviews, contentId }:
       <div className="flex justify-start">
         <ReviewSortSelector sort={sort} onSortChange={handleSortChange} />
       </div>
+      <div className={`space-y-3 transition-opacity duration-200 ${sortLoading ? 'opacity-50' : 'opacity-100'}`}>
       {filtered.map((review) => (
         <ReviewCard
           key={review.id}
@@ -86,6 +92,7 @@ export default function ReviewListClient({ reviews: initialReviews, contentId }:
           onDelete={() => handleDeleteReview(review.id)}
         />
       ))}
+      </div>
     </div>
   );
 }

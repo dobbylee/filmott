@@ -38,7 +38,7 @@ export default function ProfileImageUploader({ user, updateUser }: ProfileImageU
       });
       updateUser(data);
     } catch {
-      // 에러는 무시 (toast 등 추가 가능)
+      alert('이미지 업로드에 실패했습니다.');
     } finally {
       setIsUploading(false);
     }
@@ -54,7 +54,7 @@ export default function ProfileImageUploader({ user, updateUser }: ProfileImageU
       updateUser(data);
       setImgError(false);
     } catch {
-      // 에러는 무시
+      alert('이미지 삭제에 실패했습니다.');
     } finally {
       setIsUploading(false);
     }
