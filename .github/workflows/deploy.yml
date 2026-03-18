@@ -19,7 +19,20 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/filmott
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             docker compose -f docker-compose.prod.yml build --no-cache frontend backend
             docker compose -f docker-compose.prod.yml up -d frontend backend
+            # 백엔드 health check (최대 60초 대기, 실패 시 재시작)
+            for i in $(seq 1 12); do
+              sleep 5
+              if curl -sf http://backend:3001/api/ > /dev/null 2>&1 || docker exec filmott-backend-1 wget -q -O- http://localhost:3001/api/ > /dev/null 2>&1; then
+                echo "Backend is healthy"
+                break
+              fi
+              if [ $i -eq 12 ]; then
+                echo "Backend not responding, restarting..."
+                docker compose -f docker-compose.prod.yml restart backend
+              fi
+            done
             docker image prune -f

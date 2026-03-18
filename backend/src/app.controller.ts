@@ -9,9 +9,4 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
-
-  @Get('sentry-test')
-  sentryTest(): string {
-    throw new Error('Sentry test error from backend');
-  }
 }
