@@ -6,6 +6,7 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import AuthModal from '@/components/auth/AuthModal';
 import GoogleAnalytics from '@/components/analytics/GoogleAnalytics';
+import SentryInit from '@/components/analytics/SentryInit';
 import ServiceWorkerRegister from '@/components/pwa/ServiceWorkerRegister';
 import './globals.css';
 
@@ -95,6 +96,7 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning className={`dark ${outfit.variable} ${notoSansKR.variable}`}>
       <body className="antialiased min-h-screen bg-background text-foreground selection:bg-primary/30">
         <GoogleAnalytics />
+        <SentryInit />
         <ServiceWorkerRegister />
         <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark">
           <AuthProvider>
