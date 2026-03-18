@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -13,6 +15,8 @@ import { WatchlistModule } from './watchlist/watchlist.module';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
+
     // Load .env file globally
     ConfigModule.forRoot({ isGlobal: true }),
 
@@ -46,6 +50,12 @@ import { WatchlistModule } from './watchlist/watchlist.module';
     WatchlistModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: SentryGlobalFilter,
+    },
+    AppService,
+  ],
 })
 export class AppModule {}
