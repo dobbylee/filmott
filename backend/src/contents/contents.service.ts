@@ -85,7 +85,14 @@ export class ContentsService {
     }
 
     // TTL 초과 또는 캐시 미스: TMDB에서 fetch
-    const tmdbData = await this.tmdbService.getDetails(tmdbId, type);
+    let tmdbData;
+    try {
+      tmdbData = await this.tmdbService.getDetails(tmdbId, type);
+    } catch {
+      throw new NotFoundException(
+        `콘텐츠를 찾을 수 없습니다: ${type}/${tmdbId}`,
+      );
+    }
 
     if (!tmdbData || !tmdbData.id) {
       throw new NotFoundException(
