@@ -238,7 +238,7 @@ describe('ReviewsController', () => {
 
       await controller.findByUser(1);
 
-      expect(mockReviewsService.findByUser).toHaveBeenCalledWith(1, 1);
+      expect(mockReviewsService.findByUser).toHaveBeenCalledWith(1, 1, 20);
     });
   });
 

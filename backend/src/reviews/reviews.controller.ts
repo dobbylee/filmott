@@ -121,9 +121,11 @@ export class ReviewsController {
   async findByUser(
     @Param('userId', ParseIntPipe) userId: number,
     @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const p = this.parseIntOrDefault(page, 1, 'page');
-    return this.reviewsService.findByUser(userId, p);
+    const l = this.parseIntOrDefault(limit, 20, 'limit');
+    return this.reviewsService.findByUser(userId, p, l);
   }
 
   @Get(':id/stats')

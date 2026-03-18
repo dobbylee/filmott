@@ -154,8 +154,8 @@ export class ReviewsService {
     };
   }
 
-  async findByUser(userId: number, page = 1) {
-    const take = 20;
+  async findByUser(userId: number, page = 1, limit = 20) {
+    const take = Math.min(limit, 20);
     const skip = (page - 1) * take;
 
     const [reviews, total] = await this.reviewRepo.findAndCount({

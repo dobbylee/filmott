@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Calendar, FileText, Eye, Bookmark } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import api from '@/lib/api';
 import UserAvatar from '@/components/common/UserAvatar';
 import RecentReviewItem from '@/components/review/RecentReviewItem';
 import type { PublicProfile } from '@/types/auth';
-import type { ReviewsResponse } from '@/types/review';
+import type { Review, ReviewsResponse } from '@/types/review';
 
 interface PublicProfileClientProps {
   profile: PublicProfile;
@@ -27,6 +27,11 @@ function formatDate(dateStr: string): string {
 export default function PublicProfileClient({ profile, reviews }: PublicProfileClientProps) {
   const router = useRouter();
   const { user } = useAuth();
+  const [allReviews, setAllReviews] = useState<Review[]>(reviews.data);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(reviews.total);
+  const [totalPages, setTotalPages] = useState(reviews.totalPages);
+  const [loading, setLoading] = useState(false);
 
   // 자기 자신의 프로필이면 /profile로 리다이렉트
   useEffect(() => {
@@ -34,6 +39,20 @@ export default function PublicProfileClient({ profile, reviews }: PublicProfileC
       router.replace('/profile');
     }
   }, [user, profile.id, router]);
+
+  const loadMore = useCallback(async () => {
+    const nextPage = page + 1;
+    setLoading(true);
+    try {
+      const res = await api.get<ReviewsResponse>(`/reviews/user/${profile.id}?page=${nextPage}&limit=10`);
+      setAllReviews((prev) => [...prev, ...res.data.data]);
+      setPage(nextPage);
+      setTotal(res.data.total);
+      setTotalPages(res.data.totalPages);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, profile.id]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-12">
@@ -74,25 +93,26 @@ export default function PublicProfileClient({ profile, reviews }: PublicProfileC
       {/* 최근 리뷰 */}
       <div>
         <h2 className="mb-4 text-lg font-semibold text-white">최근 리뷰</h2>
-        {reviews.data.length === 0 ? (
+        {allReviews.length === 0 ? (
           <div className="flex min-h-[100px] items-center justify-center rounded-xl border border-white/5 bg-white/[0.02] text-sm text-white/40">
             아직 작성한 리뷰가 없습니다.
           </div>
         ) : (
           <div className="space-y-3">
-            {reviews.data.map((review) => (
+            {allReviews.map((review) => (
               <RecentReviewItem key={review.id} review={review} />
             ))}
           </div>
         )}
-        {reviews.totalPages > 1 && (
-          <div className="mt-4 text-center">
-            <Link
-              href={`/profile/${profile.id}/reviews`}
-              className="text-sm text-fuchsia-400 hover:text-fuchsia-300 transition-colors"
+        {page < totalPages && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={loadMore}
+              disabled={loading}
+              className="rounded-full border border-white/10 bg-white/5 px-8 py-2.5 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
             >
-              모든 리뷰 보기
-            </Link>
+              {loading ? '불러오는 중...' : `더보기 (${total - allReviews.length}개 남음)`}
+            </button>
           </div>
         )}
       </div>
