@@ -179,7 +179,7 @@ export class ContentsService {
   }
 
   /**
-   * 사이트맵용: DB에 저장된 모든 콘텐츠의 tmdbId, contentType, updatedAt 반환
+   * 사이트맵용: 최신 업데이트 순으로 최대 50000개 반환
    */
   async getSitemapContents(): Promise<
     Array<{ tmdbId: number; contentType: string; updatedAt: Date }>
@@ -188,6 +188,7 @@ export class ContentsService {
       .createQueryBuilder('c')
       .select(['c.tmdbId', 'c.contentType', 'c.updatedAt'])
       .orderBy('c.updatedAt', 'DESC')
+      .limit(50000)
       .getMany();
 
     return rows.map((r) => ({

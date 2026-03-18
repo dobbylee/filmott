@@ -12,6 +12,7 @@ describe('ContentsService', () => {
   const mockQueryBuilder = {
     select: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
     getMany: jest.fn(),
   };
 
