@@ -229,8 +229,7 @@ describe('RankingsService', () => {
 
       const result = await service.fetchTrending('movie', 'day');
 
-      const today = new Date();
-      const expectedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const expectedDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
       expect(result[0].targetDate).toBe(expectedDate);
     });
 
