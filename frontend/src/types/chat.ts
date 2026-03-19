@@ -1,10 +1,3 @@
-export interface ChatSession {
-  id: number;
-  title: string | null;
-  updatedAt: string;
-  lastMessage?: string;
-}
-
 export interface ChatMessageData {
   id: number;
   role: 'user' | 'assistant';

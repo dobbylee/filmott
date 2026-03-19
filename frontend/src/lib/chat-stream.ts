@@ -3,8 +3,13 @@ import type { ChatRecommendationWithPoster } from '@/types/chat';
 export interface ChatStreamCallbacks {
   onText: (content: string) => void;
   onRecommendations: (recs: ChatRecommendationWithPoster[]) => void;
-  onDone: (messageId: number) => void;
+  onDone: () => void;
   onError: (message: string) => void;
+}
+
+export interface ChatHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -62,15 +67,15 @@ async function fetchWithAuth(
 }
 
 export async function sendChatMessage(
-  sessionId: number,
   content: string,
+  history: ChatHistoryMessage[],
   callbacks: ChatStreamCallbacks,
 ): Promise<void> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
   const response = await fetchWithAuth(
-    `${apiUrl}/chat/sessions/${sessionId}/messages`,
-    JSON.stringify({ content }),
+    `${apiUrl}/chat/messages`,
+    JSON.stringify({ content, history }),
   );
 
   if (!response.ok) {
@@ -113,7 +118,7 @@ export async function sendChatMessage(
               callbacks.onRecommendations(data.recommendations);
               break;
             case 'done':
-              callbacks.onDone(data.messageId);
+              callbacks.onDone();
               break;
             case 'error':
               callbacks.onError(data.message);
