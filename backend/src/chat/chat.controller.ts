@@ -9,9 +9,9 @@ import {
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
-import { ChatService } from './chat.service';
+import { ChatService, SessionListItem } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -29,7 +29,7 @@ export class ChatController {
   }
 
   @Get('sessions')
-  async getSessions(@CurrentUser() user: JwtPayload) {
+  async getSessions(@CurrentUser() user: JwtPayload): Promise<SessionListItem[]> {
     return this.chatService.getSessions(user.id);
   }
 

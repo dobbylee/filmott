@@ -23,7 +23,7 @@ import {
 import { OTT_PROVIDERS } from '../common/ott-providers';
 import { recommendMoviesTool } from './tools/recommend-tool';
 
-interface SessionListItem {
+export interface SessionListItem {
   id: number;
   title: string | null;
   updatedAt: Date;
