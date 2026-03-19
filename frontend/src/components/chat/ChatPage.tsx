@@ -130,9 +130,11 @@ export default function ChatPage() {
     try {
       await sendChatMessage(content, history, {
         onText: (text) => {
+          streamingTextRef.current += text;
           setStreamingText((prev) => prev + text);
         },
         onRecommendations: (recs) => {
+          streamingRecsRef.current = recs;
           setStreamingRecs(recs);
         },
         onDone: () => {

@@ -90,7 +90,7 @@ export class EmbeddingService {
 
     const response = await openai.chat.completions.create({
       model: 'gpt-5-mini',
-      max_completion_tokens: 300,
+      max_completion_tokens: 2048,
       messages: [{ role: 'user', content: prompt }],
     });
 

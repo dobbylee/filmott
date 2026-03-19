@@ -119,42 +119,11 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 5. Function calling 정의
-    const tools: OpenAI.Chat.ChatCompletionTool[] = [
-      {
-        type: 'function',
-        function: {
-          name: 'recommend_movies',
-          description: '사용자에게 추천할 영화/시리즈 목록. 추천할 때 반드시 호출하세요.',
-          parameters: {
-            type: 'object',
-            properties: {
-              recommendations: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    tmdbId: { type: 'number', description: 'TMDB ID. 모르면 0' },
-                    contentType: { type: 'string', enum: ['movie', 'tv'] },
-                    title: { type: 'string', description: '한국어 제목' },
-                  },
-                  required: ['tmdbId', 'contentType', 'title'],
-                },
-              },
-            },
-            required: ['recommendations'],
-          },
-        },
-      },
-    ];
-
-    // 6. GPT 스트리밍 호출
+    // 5. GPT 스트리밍 호출 (function calling 없이 텍스트만)
     const stream = await this.openai.chat.completions.create({
-      model: 'gpt-5-mini',
-      max_completion_tokens: 4096,
+      model: 'gpt-4o-mini',
+      max_tokens: 2048,
       stream: true,
-      tool_choice: 'auto',
-      tools,
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages,
@@ -162,59 +131,73 @@ export class ChatService {
     });
 
     let fullText = '';
-    let toolCallArgs = '';
 
-    // 7. 스트리밍 이벤트 처리
+    // 6. 스트리밍 이벤트 처리
     try {
       for await (const chunk of stream) {
-        // SSE 연결 끊김 시 스트림 중단
         if (signal?.aborted) {
           stream.controller.abort();
           return;
         }
 
-        const choice = chunk.choices[0];
-        if (!choice) continue;
-
-        const delta = choice.delta;
-
-        // 텍스트 콘텐츠
-        if (delta?.content) {
-          fullText += delta.content;
-          emit('text', { content: delta.content });
-        }
-
-        // Function call arguments (점진적으로 누적됨)
-        if (delta?.tool_calls?.[0]?.function?.arguments) {
-          toolCallArgs += delta.tool_calls[0].function.arguments;
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) {
+          fullText += delta;
+          emit('text', { content: delta });
         }
       }
     } catch (error) {
-      // AbortError는 정상적인 연결 종료이므로 무시
       if (signal?.aborted) return;
       throw error;
     }
 
-    // 8. 스트리밍 완료 후 tool call 처리
-    if (toolCallArgs) {
-      try {
-        const parsed: { recommendations?: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string }[] } =
-          JSON.parse(toolCallArgs);
-        const recommendations = await this.resolveRecommendations(
-          parsed.recommendations || [],
-          similarContents,
-        );
-        if (recommendations.length > 0) {
-          emit('recommendations', { recommendations });
-        }
-      } catch { /* JSON 파싱 실패 무시 */ }
+    // 7. 텍스트에서 볼드(**제목**) 패턴으로 추천 작품 추출 → TMDB 검색 → 카드 생성
+    const titles = this.extractTitlesFromText(fullText);
+    if (titles.length > 0) {
+      const recommendations = await this.resolveRecommendations(
+        titles.map((t) => ({
+          tmdbId: 0,
+          contentType: 'movie' as const,
+          title: t.korean,
+          englishTitle: t.english,
+        })),
+        similarContents,
+      );
+      if (recommendations.length > 0) {
+        emit('recommendations', { recommendations });
+      }
     }
 
     emit('done', {});
   }
 
+  extractTitlesFromText(text: string): { korean: string; english: string | null }[] {
+    // **한국어 제목 (영어 원제)** 또는 **제목** 패턴에서 추출
+    const boldPattern = /\*\*(.+?)\*\*/g;
+    const results: { korean: string; english: string | null }[] = [];
+    const seen = new Set<string>();
+    let match: RegExpExecArray | null;
+
+    while ((match = boldPattern.exec(text)) !== null) {
+      const raw = match[1].trim();
+      if (raw.length < 2 || raw.length > 100) continue;
+
+      // "한국어 제목 (English Title)" 패턴 분리
+      const parenMatch = raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+      const korean = parenMatch ? parenMatch[1].trim() : raw;
+      const english = parenMatch ? parenMatch[2].trim() : null;
+
+      if (!seen.has(korean)) {
+        seen.add(korean);
+        results.push({ korean, english });
+      }
+    }
+
+    return results.slice(0, 5);
+  }
+
   async resolveRecommendations(
-    parsed: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string }[],
+    parsed: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string; englishTitle?: string | null }[],
     candidates: SimilarContent[],
   ): Promise<ChatRecommendation[]> {
     const settled = await Promise.allSettled(
@@ -231,7 +214,7 @@ export class ChatService {
   }
 
   private async resolveRecommendation(
-    rec: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string },
+    rec: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string; englishTitle?: string | null },
     candidates: SimilarContent[],
   ): Promise<ChatRecommendation | null> {
     // 1. 벡터 검색 후보에서 찾기
@@ -265,25 +248,51 @@ export class ChatService {
       }
     }
 
-    // 3. tmdbId가 0이거나 TMDB 조회 실패 → 제목으로 TMDB 검색 fallback
+    // 3. tmdbId가 0이거나 TMDB 조회 실패 → 제목으로 TMDB 검색 fallback (movie + tv 둘 다 검색)
     if (rec.title) {
       try {
-        const searchResult = await this.contentsService.searchContents(
-          rec.title,
-          rec.contentType,
-          1,
-        );
-        const firstResult = searchResult.results?.[0];
-        if (firstResult?.id) {
+        const [movieResult, tvResult] = await Promise.all([
+          this.contentsService.searchContents(rec.title, 'movie', 1).catch(() => null),
+          this.contentsService.searchContents(rec.title, 'tv', 1).catch(() => null),
+        ]);
+
+        // movie + tv 결과를 합쳐서 제목 정확도 + 인기순으로 정렬
+        const allResults = [
+          ...(movieResult?.results?.map((r) => ({ ...r, type: 'movie' as const })) ?? []),
+          ...(tvResult?.results?.map((r) => ({ ...r, type: 'tv' as const })) ?? []),
+        ];
+
+        const searchTitle = rec.title.toLowerCase();
+        const searchEnglish = rec.englishTitle?.toLowerCase();
+
+        const bestMatch = allResults
+          .sort((a, b) => {
+            const aTitle = (a.title ?? a.name ?? '').toLowerCase();
+            const bTitle = (b.title ?? b.name ?? '').toLowerCase();
+            const aOriginal = (a.original_title ?? a.original_name ?? '').toLowerCase();
+            const bOriginal = (b.original_title ?? b.original_name ?? '').toLowerCase();
+
+            // 정확 일치 우선 (한국어 또는 영어)
+            const aExact = aTitle === searchTitle || aOriginal === searchTitle
+              || (searchEnglish && (aOriginal === searchEnglish || aTitle === searchEnglish));
+            const bExact = bTitle === searchTitle || bOriginal === searchTitle
+              || (searchEnglish && (bOriginal === searchEnglish || bTitle === searchEnglish));
+            if (aExact && !bExact) return -1;
+            if (!aExact && bExact) return 1;
+
+            // 그 다음 vote_count 순
+            return (b.vote_count ?? 0) - (a.vote_count ?? 0);
+          })[0];
+
+        if (bestMatch?.id) {
           const content = await this.contentsService.findOrFetchByTmdbId(
-            firstResult.id,
-            rec.contentType,
+            bestMatch.id,
+            bestMatch.type,
           );
-          // 비동기 임베딩 캐싱 (await 하지 않음)
           this.embeddingService.cacheContentMetadata(content.id).catch(() => {});
           return {
             tmdbId: content.tmdbId,
-            contentType: rec.contentType,
+            contentType: bestMatch.type,
             title: content.title,
             posterUrl: content.posterUrl ?? null,
           };
