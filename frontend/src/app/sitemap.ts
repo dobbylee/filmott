@@ -42,8 +42,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
     if (res.ok) {
       const contents: SitemapContent[] = await res.json();
+      const maxContent = 50000 - staticPages.length;
 
-      contentPages = contents.map((c) => ({
+      contentPages = contents.slice(0, maxContent).map((c) => ({
         url: `${SITE_URL}/contents/${c.contentType}/${c.tmdbId}`,
         lastModified: new Date(c.updatedAt),
         changeFrequency: 'weekly' as const,
