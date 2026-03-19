@@ -73,28 +73,28 @@ export default function ChatPage() {
     loadSessions();
   }, [loadSessions]);
 
-  // URL에서 세션 ID 복원
-  useEffect(() => {
-    const sid = searchParams.get('session');
-    if (sid && user) {
-      const parsed = parseInt(sid, 10);
-      if (!isNaN(parsed) && parsed !== sessionId) {
-        setSessionId(parsed);
-        loadMessages(parsed);
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, user]);
-
   // 세션 메시지 이력 로드
   const loadMessages = useCallback(async (targetSessionId: number) => {
     try {
+      setError(null);
       const res = await api.get<ChatMessageData[]>(`/chat/sessions/${targetSessionId}/messages`);
       setMessages(res.data);
     } catch {
       setError('메시지 이력을 불러오지 못했습니다.');
     }
   }, []);
+
+  // URL에서 세션 ID 복원
+  useEffect(() => {
+    const sid = searchParams.get('session');
+    if (sid && user) {
+      const parsed = parseInt(sid, 10);
+      if (!isNaN(parsed)) {
+        setSessionId(parsed);
+        loadMessages(parsed);
+      }
+    }
+  }, [searchParams, user, loadMessages]);
 
   const createSession = async (): Promise<number> => {
     const res = await api.post<{ id: number }>('/chat/sessions');
