@@ -107,8 +107,8 @@ describe('EmbeddingService', () => {
       expect(result).toBe('어두운 분위기의 범죄 스릴러입니다.');
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-4o-mini',
-          max_tokens: 300,
+          model: 'gpt-5-mini',
+          max_completion_tokens: 300,
         }),
       );
     });
@@ -146,9 +146,7 @@ describe('EmbeddingService', () => {
     });
 
     it('force 옵션이 true이면 재생성해야 한다', async () => {
-      const existing = { id: 1, contentId: 100, description: '기존 설명', embedding: '[0.1]' };
-      // force=true이면 첫 findOne을 건너뛰고, line 117에서 한 번만 호출
-      mockMetadataRepo.findOne.mockResolvedValue(existing);
+      const existing = { id: 1, contentId: 100, description: '새로운 설명', embedding: '[0.1,0.2,0.3]' };
 
       const content = {
         id: 100,
@@ -169,20 +167,58 @@ describe('EmbeddingService', () => {
         data: [{ embedding: mockEmbedding }],
       });
 
-      mockMetadataRepo.save.mockResolvedValue({ ...existing, description: '새로운 설명' });
+      mockDataSource.query.mockResolvedValue([]);
+      mockMetadataRepo.findOne.mockResolvedValue(existing);
 
       await service.cacheContentMetadata(100, true);
 
       expect(mockCreate).toHaveBeenCalled();
+      expect(mockDataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('ON CONFLICT'),
+        [100, '새로운 설명', expect.stringContaining('[')],
+      );
     });
 
     it('콘텐츠가 존재하지 않으면 null을 반환해야 한다', async () => {
-      mockMetadataRepo.findOne.mockResolvedValue(null);
+      // force=false: 첫 findOne이 null이면 캐시 미스 → contentRepo.findOne 호출
+      mockMetadataRepo.findOne.mockResolvedValueOnce(null);
       mockContentRepo.findOne.mockResolvedValue(null);
 
       const result = await service.cacheContentMetadata(999);
 
       expect(result).toBeNull();
+    });
+
+    it('upsert 패턴으로 메타데이터를 저장해야 한다', async () => {
+      mockMetadataRepo.findOne
+        .mockResolvedValueOnce(null) // 캐시 미스
+        .mockResolvedValueOnce({ id: 1, contentId: 100, description: '설명' }); // upsert 후 조회
+
+      const content = {
+        id: 100,
+        title: '테스트',
+        genres: [],
+        overview: '설명',
+        credits: [],
+        releaseDate: new Date(),
+      } as unknown as Content;
+      mockContentRepo.findOne.mockResolvedValue(content);
+
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: '생성된 설명' } }],
+      });
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: [0.1, 0.2] }],
+      });
+      mockDataSource.query.mockResolvedValue([]);
+
+      const result = await service.cacheContentMetadata(100);
+
+      expect(mockDataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('ON CONFLICT'),
+        [100, '생성된 설명', '[0.1,0.2]'],
+      );
+      expect(result).toBeDefined();
     });
   });
 

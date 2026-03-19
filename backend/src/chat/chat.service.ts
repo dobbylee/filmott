@@ -16,6 +16,7 @@ import {
   WantToWatchContent,
 } from './prompts/system-prompt';
 import { OTT_PROVIDERS } from '../common/ott-providers';
+import { ContentsService } from '../contents/contents.service';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 
 export interface ChatRecommendation {
@@ -55,6 +56,7 @@ export class ChatService {
 
   constructor(
     private readonly embeddingService: EmbeddingService,
+    private readonly contentsService: ContentsService,
     @InjectRepository(Watchlist)
     private readonly watchlistRepo: Repository<Watchlist>,
     @InjectRepository(Review)
@@ -76,6 +78,7 @@ export class ChatService {
     content: string,
     history: ChatHistoryMessageDto[],
     emit: SseEmitter,
+    signal?: AbortSignal,
   ): Promise<void> {
     if (!this.openai) {
       throw new BadRequestException('AI 추천 기능이 현재 비활성화 상태입니다.');
@@ -115,8 +118,8 @@ export class ChatService {
 
     // 5. GPT 스트리밍 호출
     const stream = await this.openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 1024,
+      model: 'gpt-5-mini',
+      max_completion_tokens: 4096,
       stream: true,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -129,40 +132,52 @@ export class ChatService {
     let markerBuffer = '';
 
     // 6. 스트리밍 이벤트 처리
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (!delta) continue;
-
-      if (reachedMarker) {
-        markerBuffer += delta;
-        continue;
-      }
-
-      // ---RECOMMENDATIONS--- 마커 감지
-      const combined = fullText + delta;
-      const markerIndex = combined.indexOf('---RECOMMENDATIONS---');
-
-      if (markerIndex !== -1) {
-        reachedMarker = true;
-        // 마커 이전 텍스트만 emit
-        const beforeMarker = combined.substring(fullText.length, markerIndex);
-        if (beforeMarker) {
-          emit('text', { content: beforeMarker });
+    try {
+      for await (const chunk of stream) {
+        // SSE 연결 끊김 시 스트림 중단
+        if (signal?.aborted) {
+          stream.controller.abort();
+          return;
         }
-        // 마커 이후 텍스트를 버퍼에 추가
-        markerBuffer = combined.substring(markerIndex);
-        fullText = combined;
-        continue;
-      }
 
-      fullText += delta;
-      emit('text', { content: delta });
+        const delta = chunk.choices[0]?.delta?.content;
+        if (!delta) continue;
+
+        if (reachedMarker) {
+          markerBuffer += delta;
+          continue;
+        }
+
+        // ---RECOMMENDATIONS--- 마커 감지
+        const combined = fullText + delta;
+        const markerIndex = combined.indexOf('---RECOMMENDATIONS---');
+
+        if (markerIndex !== -1) {
+          reachedMarker = true;
+          // 마커 이전 텍스트만 emit
+          const beforeMarker = combined.substring(fullText.length, markerIndex);
+          if (beforeMarker) {
+            emit('text', { content: beforeMarker });
+          }
+          // 마커 이후 텍스트를 버퍼에 추가
+          markerBuffer = combined.substring(markerIndex);
+          fullText = combined;
+          continue;
+        }
+
+        fullText += delta;
+        emit('text', { content: delta });
+      }
+    } catch (error) {
+      // AbortError는 정상적인 연결 종료이므로 무시
+      if (signal?.aborted) return;
+      throw error;
     }
 
     // 7. 응답에서 추천 작품 추출
-    const completeText = fullText + (reachedMarker ? '' : '') ;
+    const completeText = fullText + (reachedMarker ? '' : '');
     const completeBuffer = reachedMarker ? markerBuffer : '';
-    const recommendations = this.extractRecommendations(
+    const recommendations = await this.extractRecommendations(
       completeBuffer || completeText,
       similarContents,
     );
@@ -174,10 +189,10 @@ export class ChatService {
     emit('done', {});
   }
 
-  extractRecommendations(
+  async extractRecommendations(
     text: string,
     candidates: SimilarContent[],
-  ): ChatRecommendation[] {
+  ): Promise<ChatRecommendation[]> {
     const markerStart = text.indexOf('---RECOMMENDATIONS---');
     const markerEnd = text.indexOf('---END---');
 
@@ -189,24 +204,97 @@ export class ChatService {
     ).trim();
 
     try {
-      const parsed: { tmdbId: number; contentType: 'movie' | 'tv' }[] = JSON.parse(jsonStr);
+      const parsed: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string }[] = JSON.parse(jsonStr);
 
-      return parsed
-        .map((rec) => {
-          const candidate = candidates.find((c) => c.tmdbId === rec.tmdbId);
-          if (!candidate) return null;
+      // 병렬 처리: 각 추천 항목을 동시에 처리
+      const settled = await Promise.allSettled(
+        parsed.map((rec) => this.resolveRecommendation(rec, candidates)),
+      );
 
-          return {
-            tmdbId: rec.tmdbId,
-            contentType: rec.contentType,
-            title: candidate.title,
-            posterUrl: candidate.posterUrl,
-          };
-        })
-        .filter((rec): rec is ChatRecommendation => rec !== null);
+      const results: ChatRecommendation[] = [];
+      for (const result of settled) {
+        if (result.status === 'fulfilled' && result.value) {
+          results.push(result.value);
+        }
+      }
+
+      return results;
     } catch {
       return [];
     }
+  }
+
+  private async resolveRecommendation(
+    rec: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string },
+    candidates: SimilarContent[],
+  ): Promise<ChatRecommendation | null> {
+    // 1. 벡터 검색 후보에서 찾기
+    const candidate = candidates.find((c) => c.tmdbId === rec.tmdbId);
+    if (candidate) {
+      return {
+        tmdbId: rec.tmdbId,
+        contentType: rec.contentType,
+        title: candidate.title,
+        posterUrl: candidate.posterUrl,
+      };
+    }
+
+    // 2. 후보에 없는 작품 → TMDB에서 조회 + DB 저장
+    if (rec.tmdbId && rec.tmdbId > 0) {
+      try {
+        const content = await this.contentsService.findOrFetchByTmdbId(
+          rec.tmdbId,
+          rec.contentType,
+        );
+        // 비동기 임베딩 캐싱 (await 하지 않음)
+        this.embeddingService.cacheContentMetadata(content.id).catch(() => {});
+        return {
+          tmdbId: rec.tmdbId,
+          contentType: rec.contentType,
+          title: content.title,
+          posterUrl: content.posterUrl ?? null,
+        };
+      } catch {
+        // TMDB ID 조회 실패 → 제목으로 fallback 검색
+      }
+    }
+
+    // 3. tmdbId가 0이거나 TMDB 조회 실패 → 제목으로 TMDB 검색 fallback
+    if (rec.title) {
+      try {
+        const searchResult = await this.contentsService.searchContents(
+          rec.title,
+          rec.contentType,
+          1,
+        );
+        const firstResult = searchResult.results?.[0];
+        if (firstResult?.id) {
+          const content = await this.contentsService.findOrFetchByTmdbId(
+            firstResult.id,
+            rec.contentType,
+          );
+          // 비동기 임베딩 캐싱 (await 하지 않음)
+          this.embeddingService.cacheContentMetadata(content.id).catch(() => {});
+          return {
+            tmdbId: content.tmdbId,
+            contentType: rec.contentType,
+            title: content.title,
+            posterUrl: content.posterUrl ?? null,
+          };
+        }
+      } catch {
+        // 검색도 실패 시 제목만으로 카드
+      }
+
+      return {
+        tmdbId: rec.tmdbId || 0,
+        contentType: rec.contentType,
+        title: rec.title,
+        posterUrl: null,
+      };
+    }
+
+    return null;
   }
 
   async buildUserContext(userId: number): Promise<UserContext> {

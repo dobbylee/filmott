@@ -84,8 +84,8 @@ export class EmbeddingService {
 연도: ${year}`;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 300,
+      model: 'gpt-5-mini',
+      max_completion_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -114,23 +114,16 @@ export class EmbeddingService {
     const embedding = await this.generateEmbedding(description);
     const embeddingStr = `[${embedding.join(',')}]`;
 
-    const existing = await this.metadataRepo.findOne({
-      where: { contentId },
-    });
+    // upsert: INSERT ... ON CONFLICT 로 이중 조회 제거
+    await this.dataSource.query(
+      `INSERT INTO content_metadata (content_id, description, embedding)
+       VALUES ($1, $2, $3::vector)
+       ON CONFLICT (content_id)
+       DO UPDATE SET description = EXCLUDED.description, embedding = EXCLUDED.embedding`,
+      [contentId, description, embeddingStr],
+    );
 
-    if (existing) {
-      existing.description = description;
-      existing.embedding = embeddingStr;
-      return this.metadataRepo.save(existing);
-    }
-
-    const metadata = this.metadataRepo.create({
-      contentId,
-      description,
-      embedding: embeddingStr,
-    });
-
-    return this.metadataRepo.save(metadata);
+    return this.metadataRepo.findOne({ where: { contentId } }) as Promise<ContentMetadata>;
   }
 
   async searchSimilar(
@@ -138,6 +131,8 @@ export class EmbeddingService {
     limit: number,
     excludeTmdbIds: number[],
   ): Promise<SimilarContent[]> {
+    if (!this.openai) return [];
+
     const embedding = await this.generateEmbedding(queryText);
     const embeddingStr = `[${embedding.join(',')}]`;
 

@@ -6,6 +6,7 @@ import { Content } from '../contents/content.entity';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
+import { ContentsModule } from '../contents/contents.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { EmbeddingService } from './embedding.service';
@@ -14,6 +15,7 @@ import { EmbeddingService } from './embedding.service';
   imports: [
     TypeOrmModule.forFeature([ContentMetadata, Content, Watchlist, Review, User]),
     ConfigModule,
+    ContentsModule,
   ],
   controllers: [ChatController],
   providers: [ChatService, EmbeddingService],

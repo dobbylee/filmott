@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { EmbeddingService, SimilarContent } from './embedding.service';
+import { ContentsService } from '../contents/contents.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
@@ -30,6 +31,12 @@ describe('ChatService', () => {
 
   const mockEmbeddingService = {
     searchSimilar: jest.fn(),
+    cacheContentMetadata: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockContentsService = {
+    findOrFetchByTmdbId: jest.fn(),
+    searchContents: jest.fn(),
   };
 
   const mockWatchlistRepo = {
@@ -57,6 +64,7 @@ describe('ChatService', () => {
       providers: [
         ChatService,
         { provide: EmbeddingService, useValue: mockEmbeddingService },
+        { provide: ContentsService, useValue: mockContentsService },
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
@@ -248,6 +256,7 @@ describe('ChatService', () => {
         providers: [
           ChatService,
           { provide: EmbeddingService, useValue: mockEmbeddingService },
+          { provide: ContentsService, useValue: mockContentsService },
           { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
           { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
           { provide: getRepositoryToken(User), useValue: mockUserRepo },
@@ -294,7 +303,7 @@ describe('ChatService', () => {
   });
 
   describe('extractRecommendations', () => {
-    it('응답에서 추천 JSON 블록을 파싱해야 한다', () => {
+    it('응답에서 추천 JSON 블록을 파싱해야 한다', async () => {
       const text = '추천 드립니다.\n---RECOMMENDATIONS---\n[{"tmdbId": 496243, "contentType": "movie"}]\n---END---';
       const candidates: SimilarContent[] = [
         {
@@ -310,7 +319,7 @@ describe('ChatService', () => {
         },
       ];
 
-      const result = service.extractRecommendations(text, candidates);
+      const result = await service.extractRecommendations(text, candidates);
 
       expect(result).toHaveLength(1);
       expect(result[0].tmdbId).toBe(496243);
@@ -318,21 +327,132 @@ describe('ChatService', () => {
       expect(result[0].posterUrl).toBe('/poster.jpg');
     });
 
-    it('마커가 없으면 빈 배열을 반환해야 한다', () => {
-      const result = service.extractRecommendations('일반 대화입니다.', []);
+    it('마커가 없으면 빈 배열을 반환해야 한다', async () => {
+      const result = await service.extractRecommendations('일반 대화입니다.', []);
       expect(result).toEqual([]);
     });
 
-    it('후보에 없는 tmdbId는 필터링해야 한다', () => {
+    it('후보에 없는 tmdbId는 필터링해야 한다', async () => {
       const text = '---RECOMMENDATIONS---\n[{"tmdbId": 999, "contentType": "movie"}]\n---END---';
-      const result = service.extractRecommendations(text, []);
+      // ContentsService.findOrFetchByTmdbId가 실패하는 시나리오 (후보에 없고 TMDB도 없음)
+      mockContentsService.findOrFetchByTmdbId.mockRejectedValueOnce(new Error('Not found'));
+      const result = await service.extractRecommendations(text, []);
       expect(result).toEqual([]);
     });
 
-    it('잘못된 JSON이면 빈 배열을 반환해야 한다', () => {
+    it('잘못된 JSON이면 빈 배열을 반환해야 한다', async () => {
       const text = '---RECOMMENDATIONS---\n{invalid json}\n---END---';
-      const result = service.extractRecommendations(text, []);
+      const result = await service.extractRecommendations(text, []);
       expect(result).toEqual([]);
+    });
+
+    it('후보에 없는 tmdbId는 ContentsService로 조회해야 한다', async () => {
+      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 12345, "contentType": "movie", "title": "새 영화"}]\n---END---';
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
+        id: 99,
+        title: '새 영화',
+        posterUrl: '/new-poster.jpg',
+      });
+
+      const result = await service.extractRecommendations(text, []);
+
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(12345, 'movie');
+      expect(result).toHaveLength(1);
+      expect(result[0].tmdbId).toBe(12345);
+      expect(result[0].title).toBe('새 영화');
+      expect(result[0].posterUrl).toBe('/new-poster.jpg');
+    });
+
+    it('여러 추천을 병렬로 처리해야 한다', async () => {
+      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 111, "contentType": "movie", "title": "영화1"},{"tmdbId": 222, "contentType": "tv", "title": "드라마1"}]\n---END---';
+      const candidates: SimilarContent[] = [
+        {
+          contentId: 1,
+          tmdbId: 111,
+          contentType: 'movie',
+          title: '영화1',
+          posterUrl: '/poster1.jpg',
+          genres: [],
+          voteAverage: 7.0,
+          description: '설명1',
+          similarity: 0.9,
+        },
+      ];
+
+      // tmdbId 222는 후보에 없으므로 findOrFetchByTmdbId 호출
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
+        id: 2,
+        tmdbId: 222,
+        title: '드라마1',
+        posterUrl: '/poster2.jpg',
+      });
+
+      const result = await service.extractRecommendations(text, candidates);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].tmdbId).toBe(111);
+      expect(result[1].tmdbId).toBe(222);
+    });
+
+    it('tmdbId가 0이면 제목으로 TMDB 검색 fallback해야 한다', async () => {
+      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 0, "contentType": "movie", "title": "기생충"}]\n---END---';
+
+      mockContentsService.searchContents.mockResolvedValueOnce({
+        results: [{ id: 496243, media_type: 'movie', title: '기생충' }],
+      });
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
+        id: 1,
+        tmdbId: 496243,
+        title: '기생충',
+        posterUrl: '/parasite.jpg',
+      });
+
+      const result = await service.extractRecommendations(text, []);
+
+      expect(mockContentsService.searchContents).toHaveBeenCalledWith('기생충', 'movie', 1);
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(496243, 'movie');
+      expect(result).toHaveLength(1);
+      expect(result[0].tmdbId).toBe(496243);
+      expect(result[0].posterUrl).toBe('/parasite.jpg');
+    });
+
+    it('TMDB ID 조회 실패 시 제목으로 검색 fallback해야 한다', async () => {
+      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 999, "contentType": "movie", "title": "미지의 영화"}]\n---END---';
+
+      // findOrFetchByTmdbId 첫 호출 실패 (tmdbId=999)
+      mockContentsService.findOrFetchByTmdbId.mockRejectedValueOnce(new Error('Not found'));
+      // searchContents로 제목 검색
+      mockContentsService.searchContents.mockResolvedValueOnce({
+        results: [{ id: 555, media_type: 'movie', title: '미지의 영화' }],
+      });
+      // 검색된 tmdbId로 다시 findOrFetchByTmdbId
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
+        id: 10,
+        tmdbId: 555,
+        title: '미지의 영화',
+        posterUrl: '/unknown.jpg',
+      });
+
+      const result = await service.extractRecommendations(text, []);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].tmdbId).toBe(555);
+      expect(result[0].title).toBe('미지의 영화');
+    });
+
+    it('제목 검색도 실패하면 제목만으로 카드를 생성해야 한다', async () => {
+      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 0, "contentType": "movie", "title": "존재하지 않는 영화"}]\n---END---';
+
+      mockContentsService.searchContents.mockResolvedValueOnce({
+        results: [],
+      });
+
+      const result = await service.extractRecommendations(text, []);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].tmdbId).toBe(0);
+      expect(result[0].title).toBe('존재하지 않는 영화');
+      expect(result[0].posterUrl).toBeNull();
     });
   });
 });

@@ -40,6 +40,7 @@ describe('ChatController', () => {
         flushHeaders: jest.fn(),
         write: jest.fn(),
         end: jest.fn(),
+        on: jest.fn(),
       };
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
@@ -64,6 +65,7 @@ describe('ChatController', () => {
         flushHeaders: jest.fn(),
         write: jest.fn(),
         end: jest.fn(),
+        on: jest.fn(),
       };
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
@@ -83,6 +85,7 @@ describe('ChatController', () => {
         '새 질문',
         history,
         expect.any(Function),
+        expect.any(AbortSignal),
       );
     });
 
@@ -92,6 +95,7 @@ describe('ChatController', () => {
         flushHeaders: jest.fn(),
         write: jest.fn(),
         end: jest.fn(),
+        on: jest.fn(),
       };
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
@@ -107,6 +111,7 @@ describe('ChatController', () => {
         '추천해줘',
         [],
         expect.any(Function),
+        expect.any(AbortSignal),
       );
     });
 
@@ -116,6 +121,7 @@ describe('ChatController', () => {
         flushHeaders: jest.fn(),
         write: jest.fn(),
         end: jest.fn(),
+        on: jest.fn(),
       };
 
       mockChatService.sendMessageStream.mockRejectedValue(new Error('API 오류'));
@@ -138,6 +144,7 @@ describe('ChatController', () => {
         flushHeaders: jest.fn(),
         write: jest.fn(),
         end: jest.fn(),
+        on: jest.fn(),
       };
 
       mockChatService.sendMessageStream.mockRejectedValue('문자열 에러');
@@ -168,6 +175,71 @@ describe('ChatController', () => {
     it('sendMessage 메서드에 Throttle 데코레이터가 있어야 한다', () => {
       const allMetadataKeys = Reflect.getMetadataKeys(ChatController.prototype.sendMessage);
       expect(allMetadataKeys.some((key: string) => key.toString().includes('THROTTLER'))).toBe(true);
+    });
+  });
+
+  describe('SSE 연결 끊김 처리', () => {
+    it('sendMessageStream에 AbortSignal을 전달해야 한다', async () => {
+      const closeHandler = jest.fn();
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn((event: string, handler: () => void) => {
+          if (event === 'close') closeHandler.mockImplementation(handler);
+        }),
+      };
+
+      mockChatService.sendMessageStream.mockResolvedValue(undefined);
+
+      await controller.sendMessage(
+        user,
+        { content: '추천해줘' },
+        mockRes as unknown as import('express').Response,
+      );
+
+      expect(mockRes.on).toHaveBeenCalledWith('close', expect.any(Function));
+      expect(mockChatService.sendMessageStream).toHaveBeenCalledWith(
+        1,
+        '추천해줘',
+        [],
+        expect.any(Function),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('연결 끊김 후 write를 호출하지 않아야 한다', async () => {
+      let closeCallback: (() => void) | undefined;
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn((event: string, handler: () => void) => {
+          if (event === 'close') closeCallback = handler;
+        }),
+      };
+
+      mockChatService.sendMessageStream.mockImplementation(
+        async (_userId: number, _content: string, _history: unknown[], emit: (event: string, data: unknown) => void) => {
+          // 첫 emit 후 연결 끊김 시뮬레이션
+          emit('text', { content: 'test' });
+          if (closeCallback) closeCallback();
+          emit('text', { content: 'should not write' });
+        },
+      );
+
+      await controller.sendMessage(
+        user,
+        { content: '추천해줘' },
+        mockRes as unknown as import('express').Response,
+      );
+
+      // 첫 번째 write만 실행되어야 함 (두 번째는 aborted 상태)
+      const writeCalls = mockRes.write.mock.calls;
+      expect(writeCalls).toHaveLength(1);
+      expect(writeCalls[0][0]).toContain('test');
     });
   });
 });

@@ -2,6 +2,7 @@ import {
   IsString,
   IsArray,
   IsOptional,
+  IsIn,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -11,6 +12,7 @@ import { Type } from 'class-transformer';
 
 export class ChatHistoryMessageDto {
   @IsString()
+  @IsIn(['user', 'assistant'])
   role!: 'user' | 'assistant';
 
   @IsString()

@@ -30,6 +30,8 @@ export class RebuildSchema1773120415728 implements MigrationInterface {
         "vote_average" numeric(3,1),
         "genres" jsonb NOT NULL DEFAULT '[]',
         "runtime" integer,
+        "watch_providers" jsonb,
+        "credits" jsonb,
         "created_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
         CONSTRAINT "UQ_contents_tmdb_id_type" UNIQUE ("tmdb_id", "content_type"),

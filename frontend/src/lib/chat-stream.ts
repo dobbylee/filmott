@@ -21,7 +21,7 @@ async function refreshAccessToken(): Promise<string | null> {
     const res = await fetch(`${apiUrl}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({ refresh_token: refreshToken }),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -94,6 +94,7 @@ export async function sendChatMessage(
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let currentEvent = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -103,8 +104,37 @@ export async function sendChatMessage(
     const lines = buffer.split('\n');
     buffer = lines.pop() || '';
 
-    let currentEvent = '';
     for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        currentEvent = line.slice(7);
+      } else if (line.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(line.slice(6));
+          switch (currentEvent) {
+            case 'text':
+              callbacks.onText(data.content);
+              break;
+            case 'recommendations':
+              callbacks.onRecommendations(data.recommendations);
+              break;
+            case 'done':
+              callbacks.onDone();
+              break;
+            case 'error':
+              callbacks.onError(data.message);
+              break;
+          }
+        } catch {
+          // JSON 파싱 실패 무시
+        }
+      }
+    }
+  }
+
+  // 스트림 종료 후 버퍼에 남은 데이터 처리
+  if (buffer.trim()) {
+    const remainingLines = buffer.split('\n');
+    for (const line of remainingLines) {
       if (line.startsWith('event: ')) {
         currentEvent = line.slice(7);
       } else if (line.startsWith('data: ')) {

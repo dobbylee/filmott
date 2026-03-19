@@ -37,6 +37,8 @@ export default function ChatPage() {
   // onDone 콜백에서 최신 streaming 상태를 참조하기 위한 ref
   const streamingTextRef = useRef('');
   const streamingRecsRef = useRef<ChatRecommendationWithPoster[] | null>(null);
+  // onDone 이중 호출 방지 플래그
+  const isDoneCalledRef = useRef(false);
 
   useEffect(() => {
     streamingTextRef.current = streamingText;
@@ -62,7 +64,23 @@ export default function ChatPage() {
     const saved = sessionStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        setMessages(JSON.parse(saved));
+        const parsed: unknown = JSON.parse(saved);
+        if (
+          Array.isArray(parsed) &&
+          parsed.every(
+            (item) =>
+              typeof item === 'object' &&
+              item !== null &&
+              'role' in item &&
+              'content' in item &&
+              (item.role === 'user' || item.role === 'assistant') &&
+              typeof item.content === 'string',
+          )
+        ) {
+          setMessages(parsed as ChatMessageData[]);
+        } else {
+          sessionStorage.removeItem(STORAGE_KEY);
+        }
       } catch {
         sessionStorage.removeItem(STORAGE_KEY);
       }
@@ -111,6 +129,7 @@ export default function ChatPage() {
     setIsStreaming(true);
     setStreamingText('');
     setStreamingRecs(null);
+    isDoneCalledRef.current = false;
 
     try {
       await sendChatMessage(content, history, {
@@ -121,6 +140,7 @@ export default function ChatPage() {
           setStreamingRecs(recs);
         },
         onDone: () => {
+          isDoneCalledRef.current = true;
           // 스트리밍 완료: 정식 메시지로 추가
           const cleanedText = cleanRecommendationMarkers(streamingTextRef.current);
           setMessages((prev) => [
@@ -138,6 +158,7 @@ export default function ChatPage() {
           setStreamingRecs(null);
         },
         onError: (message) => {
+          isDoneCalledRef.current = true;
           setError(message);
           setIsStreaming(false);
           setStreamingText('');
@@ -146,7 +167,7 @@ export default function ChatPage() {
       });
 
       // onDone이 호출되지 않은 경우 (연결 끊김 등) 받은 텍스트 보존
-      if (streamingTextRef.current && isStreaming) {
+      if (!isDoneCalledRef.current && streamingTextRef.current) {
         const cleanedText = cleanRecommendationMarkers(streamingTextRef.current);
         setMessages((prev) => [
           ...prev,
@@ -164,7 +185,7 @@ export default function ChatPage() {
       }
     } catch {
       // 에러 시에도 받은 텍스트가 있으면 보존
-      if (streamingTextRef.current) {
+      if (!isDoneCalledRef.current && streamingTextRef.current) {
         const cleanedText = cleanRecommendationMarkers(streamingTextRef.current);
         setMessages((prev) => [
           ...prev,
@@ -176,7 +197,7 @@ export default function ChatPage() {
             createdAt: new Date().toISOString(),
           },
         ]);
-      } else {
+      } else if (!isDoneCalledRef.current) {
         setError('메시지 전송 중 오류가 발생했습니다.');
       }
       setIsStreaming(false);
@@ -219,7 +240,7 @@ export default function ChatPage() {
           /* 환영 메시지 + 예시 질문 */
           <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center">
             {/* 휘발성 안내 */}
-            <p className="text-[11px] text-white/30 mb-4">
+            <p className="text-sm text-white/40 mb-4">
               대화는 탭을 닫으면 사라져요
             </p>
 

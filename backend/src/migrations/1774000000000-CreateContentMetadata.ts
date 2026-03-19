@@ -4,8 +4,17 @@ export class CreateContentMetadata1774000000000 implements MigrationInterface {
   name = 'CreateContentMetadata1774000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // pgvector 확장이 없으면 테이블 생성 스킵 (로컬 개발 환경)
+    const hasVector = await queryRunner.query(
+      `SELECT 1 FROM pg_extension WHERE extname = 'vector'`,
+    );
+    if (!hasVector.length) {
+      console.warn('pgvector 확장 미설치 — content_metadata 테이블 생성을 건너뜁니다.');
+      return;
+    }
+
     await queryRunner.query(`
-      CREATE TABLE "content_metadata" (
+      CREATE TABLE IF NOT EXISTS "content_metadata" (
         "id" SERIAL PRIMARY KEY,
         "content_id" INTEGER NOT NULL REFERENCES "contents"("id") ON DELETE CASCADE UNIQUE,
         "description" TEXT NOT NULL,
@@ -16,7 +25,7 @@ export class CreateContentMetadata1774000000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_content_metadata_embedding" ON "content_metadata"
+      CREATE INDEX IF NOT EXISTS "IDX_content_metadata_embedding" ON "content_metadata"
         USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)
     `);
   }
