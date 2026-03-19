@@ -12,6 +12,7 @@ import { ContentsModule } from './contents/contents.module';
 import { RankingsModule } from './rankings/rankings.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { WatchlistModule } from './watchlist/watchlist.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { WatchlistModule } from './watchlist/watchlist.module';
     RankingsModule,
     ReviewsModule,
     WatchlistModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [
