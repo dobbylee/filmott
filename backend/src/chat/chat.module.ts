@@ -1,23 +1,22 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { ChatSession } from './entities/chat-session.entity';
-import { ChatMessage } from './entities/chat-message.entity';
+import { ContentMetadata } from './entities/content-metadata.entity';
+import { Content } from '../contents/content.entity';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
-import { Content } from '../contents/content.entity';
-import { TmdbModule } from '../tmdb/tmdb.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
+import { EmbeddingService } from './embedding.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ChatSession, ChatMessage, Watchlist, Review, User, Content]),
+    TypeOrmModule.forFeature([ContentMetadata, Content, Watchlist, Review, User]),
     ConfigModule,
-    TmdbModule,
   ],
   controllers: [ChatController],
-  providers: [ChatService],
+  providers: [ChatService, EmbeddingService],
+  exports: [EmbeddingService],
 })
 export class ChatModule {}

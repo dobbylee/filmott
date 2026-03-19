@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,10 +8,6 @@ describe('ChatController', () => {
   let controller: ChatController;
 
   const mockChatService = {
-    createSession: jest.fn(),
-    getSessions: jest.fn(),
-    getMessages: jest.fn(),
-    deleteSession: jest.fn(),
     sendMessageStream: jest.fn(),
   };
 
@@ -38,53 +33,7 @@ describe('ChatController', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('POST /chat/sessions', () => {
-    it('새 세션을 생성해야 한다', async () => {
-      const created = { id: 1, title: null, createdAt: new Date() };
-      mockChatService.createSession.mockResolvedValue(created);
-
-      const result = await controller.createSession(user);
-
-      expect(result).toEqual(created);
-      expect(mockChatService.createSession).toHaveBeenCalledWith(1);
-    });
-  });
-
-  describe('GET /chat/sessions', () => {
-    it('세션 목록을 반환해야 한다', async () => {
-      const sessions = [
-        { id: 1, title: '테스트', updatedAt: new Date(), lastMessage: '안녕' },
-      ];
-      mockChatService.getSessions.mockResolvedValue(sessions);
-
-      const result = await controller.getSessions(user);
-
-      expect(result).toEqual(sessions);
-      expect(mockChatService.getSessions).toHaveBeenCalledWith(1);
-    });
-  });
-
-  describe('GET /chat/sessions/:id/messages', () => {
-    it('메시지 이력을 반환해야 한다', async () => {
-      const messages = [
-        { id: 1, role: 'user', content: '안녕', createdAt: new Date() },
-      ];
-      mockChatService.getMessages.mockResolvedValue(messages);
-
-      const result = await controller.getMessages(user, 1);
-
-      expect(result).toEqual(messages);
-      expect(mockChatService.getMessages).toHaveBeenCalledWith(1, 1);
-    });
-
-    it('다른 사용자의 세션 접근 시 에러를 전파해야 한다', async () => {
-      mockChatService.getMessages.mockRejectedValue(new ForbiddenException());
-
-      await expect(controller.getMessages(user, 1)).rejects.toThrow(ForbiddenException);
-    });
-  });
-
-  describe('POST /chat/sessions/:id/messages', () => {
+  describe('POST /chat/messages', () => {
     it('SSE 헤더를 설정하고 스트리밍해야 한다', async () => {
       const mockRes = {
         setHeader: jest.fn(),
@@ -97,7 +46,6 @@ describe('ChatController', () => {
 
       await controller.sendMessage(
         user,
-        1,
         { content: '추천해줘' },
         mockRes as unknown as import('express').Response,
       );
@@ -108,6 +56,58 @@ describe('ChatController', () => {
       expect(mockRes.setHeader).toHaveBeenCalledWith('X-Accel-Buffering', 'no');
       expect(mockRes.flushHeaders).toHaveBeenCalled();
       expect(mockRes.end).toHaveBeenCalled();
+    });
+
+    it('sendMessageStream에 올바른 인자를 전달해야 한다', async () => {
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+      };
+
+      mockChatService.sendMessageStream.mockResolvedValue(undefined);
+
+      const history = [
+        { role: 'user' as const, content: '이전 질문' },
+      ];
+
+      await controller.sendMessage(
+        user,
+        { content: '새 질문', history },
+        mockRes as unknown as import('express').Response,
+      );
+
+      expect(mockChatService.sendMessageStream).toHaveBeenCalledWith(
+        1,
+        '새 질문',
+        history,
+        expect.any(Function),
+      );
+    });
+
+    it('history가 없으면 빈 배열을 전달해야 한다', async () => {
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+      };
+
+      mockChatService.sendMessageStream.mockResolvedValue(undefined);
+
+      await controller.sendMessage(
+        user,
+        { content: '추천해줘' },
+        mockRes as unknown as import('express').Response,
+      );
+
+      expect(mockChatService.sendMessageStream).toHaveBeenCalledWith(
+        1,
+        '추천해줘',
+        [],
+        expect.any(Function),
+      );
     });
 
     it('에러 시 error 이벤트를 전송해야 한다', async () => {
@@ -122,7 +122,6 @@ describe('ChatController', () => {
 
       await controller.sendMessage(
         user,
-        1,
         { content: '추천해줘' },
         mockRes as unknown as import('express').Response,
       );
@@ -132,22 +131,26 @@ describe('ChatController', () => {
       );
       expect(mockRes.end).toHaveBeenCalled();
     });
-  });
 
-  describe('DELETE /chat/sessions/:id', () => {
-    it('세션을 삭제해야 한다', async () => {
-      mockChatService.deleteSession.mockResolvedValue(undefined);
+    it('Error가 아닌 에러 시 기본 메시지를 전송해야 한다', async () => {
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+      };
 
-      const result = await controller.deleteSession(user, 1);
+      mockChatService.sendMessageStream.mockRejectedValue('문자열 에러');
 
-      expect(result).toEqual({ message: '세션이 삭제되었습니다.' });
-      expect(mockChatService.deleteSession).toHaveBeenCalledWith(1, 1);
-    });
+      await controller.sendMessage(
+        user,
+        { content: '추천해줘' },
+        mockRes as unknown as import('express').Response,
+      );
 
-    it('존재하지 않는 세션 삭제 시 에러를 전파해야 한다', async () => {
-      mockChatService.deleteSession.mockRejectedValue(new NotFoundException());
-
-      await expect(controller.deleteSession(user, 999)).rejects.toThrow(NotFoundException);
+      expect(mockRes.write).toHaveBeenCalledWith(
+        expect.stringContaining('추천 중 오류가 발생했습니다'),
+      );
     });
   });
 
@@ -160,11 +163,6 @@ describe('ChatController', () => {
     it('컨트롤러 레벨에 ThrottlerGuard가 적용되어 있어야 한다', () => {
       const guards = Reflect.getMetadata('__guards__', ChatController);
       expect(guards).toContainEqual(ThrottlerGuard);
-    });
-
-    it('createSession 메서드에 Throttle 데코레이터가 있어야 한다', () => {
-      const allMetadataKeys = Reflect.getMetadataKeys(ChatController.prototype.createSession);
-      expect(allMetadataKeys.some((key: string) => key.toString().includes('THROTTLER'))).toBe(true);
     });
 
     it('sendMessage 메서드에 Throttle 데코레이터가 있어야 한다', () => {

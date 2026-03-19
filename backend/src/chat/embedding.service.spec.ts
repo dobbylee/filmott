@@ -1,0 +1,340 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
+import { EmbeddingService } from './embedding.service';
+import { ContentMetadata } from './entities/content-metadata.entity';
+import { Content } from '../contents/content.entity';
+
+// OpenAI SDK mock
+const mockCreate = jest.fn();
+const mockEmbeddingsCreate = jest.fn();
+
+jest.mock('openai', () => {
+  return {
+    __esModule: true,
+    default: jest.fn().mockImplementation(() => ({
+      chat: {
+        completions: {
+          create: mockCreate,
+        },
+      },
+      embeddings: {
+        create: mockEmbeddingsCreate,
+      },
+    })),
+  };
+});
+
+describe('EmbeddingService', () => {
+  let service: EmbeddingService;
+
+  const mockMetadataRepo = {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+    createQueryBuilder: jest.fn(),
+  };
+
+  const mockContentRepo = {
+    findOne: jest.fn(),
+    createQueryBuilder: jest.fn(),
+  };
+
+  const mockConfigService = {
+    get: jest.fn().mockReturnValue('test-openai-key'),
+  };
+
+  const mockDataSource = {
+    query: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        EmbeddingService,
+        { provide: getRepositoryToken(ContentMetadata), useValue: mockMetadataRepo },
+        { provide: getRepositoryToken(Content), useValue: mockContentRepo },
+        { provide: ConfigService, useValue: mockConfigService },
+        { provide: DataSource, useValue: mockDataSource },
+      ],
+    }).compile();
+
+    service = module.get<EmbeddingService>(EmbeddingService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('정의되어 있어야 한다', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('generateEmbedding', () => {
+    it('텍스트를 임베딩 벡터로 변환해야 한다', async () => {
+      const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: mockEmbedding }],
+      });
+
+      const result = await service.generateEmbedding('테스트 텍스트');
+
+      expect(result).toEqual(mockEmbedding);
+      expect(mockEmbeddingsCreate).toHaveBeenCalledWith({
+        model: 'text-embedding-3-small',
+        input: '테스트 텍스트',
+      });
+    });
+  });
+
+  describe('generateDescription', () => {
+    it('작품 정보를 기반으로 설명을 생성해야 한다', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: '어두운 분위기의 범죄 스릴러입니다.' } }],
+      });
+
+      const content = {
+        title: '기생충',
+        genres: [{ id: 18, name: '드라마' }, { id: 53, name: '스릴러' }],
+        overview: '전원 백수로 살아가는 기택 가족.',
+        credits: [{ name: '송강호' }, { name: '이선균' }],
+        releaseDate: new Date('2019-05-30'),
+      } as Content;
+
+      const result = await service.generateDescription(content);
+
+      expect(result).toBe('어두운 분위기의 범죄 스릴러입니다.');
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gpt-4o-mini',
+          max_tokens: 300,
+        }),
+      );
+    });
+
+    it('줄거리와 출연진이 없으면 "정보 없음"으로 처리해야 한다', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: '설명 없음.' } }],
+      });
+
+      const content = {
+        title: '테스트 영화',
+        genres: [],
+        overview: undefined,
+        credits: undefined,
+        releaseDate: undefined,
+      } as unknown as Content;
+
+      await service.generateDescription(content);
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      const userMessage = callArgs.messages[0].content;
+      expect(userMessage).toContain('정보 없음');
+    });
+  });
+
+  describe('cacheContentMetadata', () => {
+    it('이미 캐싱된 콘텐츠는 skip해야 한다', async () => {
+      const existing = { id: 1, contentId: 100, description: '기존 설명' };
+      mockMetadataRepo.findOne.mockResolvedValue(existing);
+
+      const result = await service.cacheContentMetadata(100);
+
+      expect(result).toEqual(existing);
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('force 옵션이 true이면 재생성해야 한다', async () => {
+      const existing = { id: 1, contentId: 100, description: '기존 설명', embedding: '[0.1]' };
+      // force=true이면 첫 findOne을 건너뛰고, line 117에서 한 번만 호출
+      mockMetadataRepo.findOne.mockResolvedValue(existing);
+
+      const content = {
+        id: 100,
+        title: '기생충',
+        genres: [{ id: 18, name: '드라마' }],
+        overview: '줄거리',
+        credits: [],
+        releaseDate: new Date('2019-05-30'),
+      } as unknown as Content;
+      mockContentRepo.findOne.mockResolvedValue(content);
+
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: '새로운 설명' } }],
+      });
+
+      const mockEmbedding = [0.1, 0.2, 0.3];
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: mockEmbedding }],
+      });
+
+      mockMetadataRepo.save.mockResolvedValue({ ...existing, description: '새로운 설명' });
+
+      await service.cacheContentMetadata(100, true);
+
+      expect(mockCreate).toHaveBeenCalled();
+    });
+
+    it('콘텐츠가 존재하지 않으면 null을 반환해야 한다', async () => {
+      mockMetadataRepo.findOne.mockResolvedValue(null);
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.cacheContentMetadata(999);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('searchSimilar', () => {
+    it('유사 작품을 검색하여 반환해야 한다', async () => {
+      const mockEmbedding = [0.1, 0.2, 0.3];
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: mockEmbedding }],
+      });
+
+      mockDataSource.query.mockResolvedValue([
+        {
+          content_id: 1,
+          description: '어두운 스릴러',
+          tmdb_id: 496243,
+          content_type: 'movie',
+          title: '기생충',
+          poster_url: '/poster.jpg',
+          genres: [{ id: 18, name: '드라마' }],
+          vote_average: 8.6,
+          similarity: 0.95,
+        },
+      ]);
+
+      const result = await service.searchSimilar('스릴러 추천', 15, []);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].tmdbId).toBe(496243);
+      expect(result[0].title).toBe('기생충');
+      expect(result[0].similarity).toBe(0.95);
+    });
+
+    it('제외할 tmdbId를 쿼리에 전달해야 한다', async () => {
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: [0.1] }],
+      });
+      mockDataSource.query.mockResolvedValue([]);
+
+      await service.searchSimilar('테스트', 10, [100, 200]);
+
+      expect(mockDataSource.query).toHaveBeenCalledWith(
+        expect.any(String),
+        [expect.any(String), [100, 200], 10],
+      );
+    });
+
+    it('제외 목록이 비어있으면 [-1]로 대체해야 한다', async () => {
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: [0.1] }],
+      });
+      mockDataSource.query.mockResolvedValue([]);
+
+      await service.searchSimilar('테스트', 10, []);
+
+      expect(mockDataSource.query).toHaveBeenCalledWith(
+        expect.any(String),
+        [expect.any(String), [-1], 10],
+      );
+    });
+  });
+
+  describe('batchCacheMetadata', () => {
+    it('조건에 맞는 콘텐츠를 배치 캐싱해야 한다', async () => {
+      const mockQb = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          { id: 1 },
+          { id: 2 },
+        ]),
+      };
+      mockContentRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const metadataQb = {
+        select: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          { contentId: 1 },
+        ]),
+      };
+      mockMetadataRepo.createQueryBuilder.mockReturnValue(metadataQb);
+
+      // id=1은 이미 캐싱됨, id=2만 캐싱
+      mockMetadataRepo.findOne.mockResolvedValue(null);
+      const content = {
+        id: 2,
+        title: '테스트',
+        genres: [],
+        overview: '설명',
+        credits: [],
+        releaseDate: new Date(),
+      } as unknown as Content;
+      mockContentRepo.findOne.mockResolvedValue(content);
+
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: '설명' } }],
+      });
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: [0.1] }],
+      });
+
+      const metadata = { id: 1, contentId: 2, description: '설명' };
+      mockMetadataRepo.create.mockReturnValue(metadata);
+      mockMetadataRepo.save.mockResolvedValue(metadata);
+
+      const result = await service.batchCacheMetadata({
+        minVoteCount: 1000,
+        minReleaseDate: null,
+      });
+
+      expect(result.cached).toBe(1);
+      expect(result.skipped).toBe(1);
+      expect(result.failed).toBe(0);
+    });
+
+    it('캐싱 실패 시 에러를 무시하고 계속 진행해야 한다', async () => {
+      const mockQb = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          { id: 1 },
+        ]),
+      };
+      mockContentRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const metadataQb = {
+        select: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockMetadataRepo.createQueryBuilder.mockReturnValue(metadataQb);
+
+      // cacheContentMetadata가 실패하도록 설정
+      mockMetadataRepo.findOne.mockResolvedValue(null);
+      mockContentRepo.findOne.mockResolvedValue({
+        id: 1,
+        title: '테스트',
+        genres: [],
+        overview: '설명',
+        credits: [],
+        releaseDate: new Date(),
+      });
+
+      mockCreate.mockRejectedValue(new Error('API 오류'));
+
+      const result = await service.batchCacheMetadata({
+        minVoteCount: 1000,
+        minReleaseDate: null,
+      });
+
+      expect(result.failed).toBe(1);
+      expect(result.cached).toBe(0);
+    });
+  });
+});

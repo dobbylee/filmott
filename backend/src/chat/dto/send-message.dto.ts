@@ -1,8 +1,32 @@
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsString,
+  IsArray,
+  IsOptional,
+  MaxLength,
+  MinLength,
+  ValidateNested,
+  ArrayMaxSize,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class ChatHistoryMessageDto {
+  @IsString()
+  role!: 'user' | 'assistant';
+
+  @IsString()
+  content!: string;
+}
 
 export class SendMessageDto {
   @IsString()
   @MinLength(1)
   @MaxLength(500)
   content!: string;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ChatHistoryMessageDto)
+  @ArrayMaxSize(20)
+  history?: ChatHistoryMessageDto[];
 }
