@@ -23,7 +23,7 @@ export class ChatSession {
   @JoinColumn({ name: 'user_id' })
   user!: User;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   title!: string | null;
 
   @OneToMany(() => ChatMessage, (msg) => msg.session)
