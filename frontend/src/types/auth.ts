@@ -6,6 +6,7 @@ export interface User {
   status?: string;
   role?: string;
   provider?: string;
+  subscribedOtts?: string[];
   createdAt?: string;
 }
 

@@ -162,7 +162,7 @@ export class AuthController {
   @Post('social/complete-signup')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   async completeSocialSignup(@Body() dto: CompleteSocialSignupDto) {
-    return this.authService.completeSocialSignup(dto.tempToken, dto.nickname);
+    return this.authService.completeSocialSignup(dto.tempToken, dto.nickname, dto.subscribedOtts);
   }
 
   // --- Private helpers ---

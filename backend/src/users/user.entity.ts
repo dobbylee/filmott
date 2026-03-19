@@ -41,6 +41,9 @@ export class User {
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
   role!: UserRole;
 
+  @Column({ name: 'subscribed_otts', type: 'jsonb', default: '[]' })
+  subscribedOtts!: string[];
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 }

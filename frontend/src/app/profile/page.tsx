@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import ProfileImageUploader from '@/components/profile/ProfileImageUploader';
 import NicknameEditor from '@/components/profile/NicknameEditor';
 import WatchlistStats from '@/components/profile/WatchlistStats';
+import OttSubscriptions from '@/components/profile/OttSubscriptions';
 import DeleteAccountSection from '@/components/profile/DeleteAccountSection';
 
 export default function ProfilePage() {
@@ -51,6 +52,9 @@ export default function ProfilePage() {
 
       {/* 워치리스트 통계 */}
       <WatchlistStats userId={user.id} />
+
+      {/* OTT 구독 정보 */}
+      <OttSubscriptions />
 
       {/* 로그아웃 */}
       <div className="mt-8 mb-8">

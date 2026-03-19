@@ -153,6 +153,7 @@ export class AuthService {
           nickname: user.nickname,
           role: user.role,
           profileImage: user.profileImage ?? null,
+          subscribedOtts: user.subscribedOtts ?? [],
         },
       };
     });
@@ -220,6 +221,7 @@ export class AuthService {
         nickname: user.nickname,
         role: user.role,
         profileImage: user.profileImage ?? null,
+        subscribedOtts: user.subscribedOtts ?? [],
       },
     };
   }
@@ -271,7 +273,7 @@ export class AuthService {
     return { type: 'new', tempToken };
   }
 
-  async completeSocialSignup(tempToken: string, nickname: string) {
+  async completeSocialSignup(tempToken: string, nickname: string, subscribedOtts?: string[]) {
     let payload: {
       provider: string;
       providerId: string;
@@ -306,6 +308,7 @@ export class AuthService {
       providerId: payload.providerId,
       email: payload.email,
       profileImage: payload.profileImage,
+      subscribedOtts: subscribedOtts ?? [],
     });
 
     const tokens = await this.generateTokens(user);
@@ -317,6 +320,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         profileImage: user.profileImage ?? null,
+        subscribedOtts: user.subscribedOtts ?? [],
       },
     };
   }
@@ -338,6 +342,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         profileImage: user.profileImage ?? null,
+        subscribedOtts: user.subscribedOtts ?? [],
       },
     };
   }
@@ -353,6 +358,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         profileImage: user.profileImage ?? null,
+        subscribedOtts: user.subscribedOtts ?? [],
       },
     };
   }

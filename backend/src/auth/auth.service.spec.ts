@@ -192,7 +192,7 @@ describe('AuthService', () => {
         (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
       );
       mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER, profileImage: null,
+        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER, profileImage: null, subscribedOtts: [],
       });
       mockJwtService.sign.mockReturnValue('new.jwt.token');
 
@@ -202,7 +202,7 @@ describe('AuthService', () => {
       expect(result.refresh_token).toBeDefined();
       expect(result.refresh_token.length).toBe(64);
       expect(result.user).toEqual({
-        id: 1, nickname: 'testuser', role: UserRole.USER, profileImage: null,
+        id: 1, nickname: 'testuser', role: UserRole.USER, profileImage: null, subscribedOtts: [],
       });
       // 트랜잭션이 사용되었는지 확인
       expect(mockDataSource.transaction).toHaveBeenCalled();
@@ -353,7 +353,7 @@ describe('AuthService', () => {
     it('일회용 코드를 생성하고 교환하여 토큰을 반환해야 한다', async () => {
       const userId = 1;
       mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER,
+        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER, subscribedOtts: [],
       });
       mockJwtService.sign.mockReturnValue('access.token');
       mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
@@ -367,7 +367,7 @@ describe('AuthService', () => {
       expect(result.access_token).toBe('access.token');
       expect(result.refresh_token).toBeDefined();
       expect(result.user).toEqual({
-        id: 1, nickname: 'testuser', role: UserRole.USER, profileImage: null,
+        id: 1, nickname: 'testuser', role: UserRole.USER, profileImage: null, subscribedOtts: [],
       });
     });
 
@@ -466,7 +466,7 @@ describe('AuthService', () => {
       expect(result.access_token).toBe('mocked.jwt.token');
       expect(result.refresh_token).toBeDefined();
       expect(result.user).toEqual({
-        id: 1, nickname: 'adminuser', email: 'admin@example.com', role: UserRole.ADMIN, profileImage: null,
+        id: 1, nickname: 'adminuser', email: 'admin@example.com', role: UserRole.ADMIN, profileImage: null, subscribedOtts: [],
       });
     });
 
@@ -614,6 +614,7 @@ describe('AuthService', () => {
         providerId: 'google-123',
         email: 'user@gmail.com',
         profileImage: null,
+        subscribedOtts: [],
       });
       expect(result.access_token).toBe('access.token');
       expect(result.user.nickname).toBe('mynickname');
@@ -640,6 +641,80 @@ describe('AuthService', () => {
 
       await expect(service.completeSocialSignup('wrong-type-token', 'nickname'))
         .rejects.toThrow(new BadRequestException('유효하지 않은 토큰 타입입니다.'));
+    });
+
+    it('subscribedOtts를 포함하여 유저를 생성해야 한다', async () => {
+      const mockPayload = {
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-ott',
+        email: 'ott@gmail.com',
+        nickname: 'Google OTT User',
+        profileImage: null,
+        type: 'social_signup',
+      };
+      mockJwtService.verify.mockReturnValue(mockPayload);
+      mockUsersService.findByProvider.mockResolvedValue(null);
+
+      const createdUser = {
+        id: 10,
+        nickname: 'ottuser',
+        email: 'ott@gmail.com',
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-ott',
+        subscribedOtts: ['netflix', 'tving'],
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      };
+      mockUsersService.createSocialUser.mockResolvedValue(createdUser);
+      mockJwtService.sign.mockReturnValue('access.token');
+      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.save.mockResolvedValue({});
+
+      const result = await service.completeSocialSignup('valid-temp-token', 'ottuser', ['netflix', 'tving']);
+
+      expect(mockUsersService.createSocialUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscribedOtts: ['netflix', 'tving'],
+        }),
+      );
+      expect(result.user.subscribedOtts).toEqual(['netflix', 'tving']);
+    });
+
+    it('subscribedOtts가 없으면 빈 배열로 전달해야 한다', async () => {
+      const mockPayload = {
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-no-ott',
+        email: 'noott@gmail.com',
+        nickname: 'No OTT User',
+        profileImage: null,
+        type: 'social_signup',
+      };
+      mockJwtService.verify.mockReturnValue(mockPayload);
+      mockUsersService.findByProvider.mockResolvedValue(null);
+
+      const createdUser = {
+        id: 11,
+        nickname: 'noottuser',
+        email: 'noott@gmail.com',
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-no-ott',
+        subscribedOtts: [],
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      };
+      mockUsersService.createSocialUser.mockResolvedValue(createdUser);
+      mockJwtService.sign.mockReturnValue('access.token');
+      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.save.mockResolvedValue({});
+
+      const result = await service.completeSocialSignup('valid-temp-token', 'noottuser');
+
+      expect(mockUsersService.createSocialUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscribedOtts: [],
+        }),
+      );
+      expect(result.user.subscribedOtts).toEqual([]);
     });
 
     it('P1-6: 이미 가입된 소셜 계정이면 ConflictException을 던져야 한다', async () => {
@@ -687,7 +762,7 @@ describe('AuthService', () => {
       expect(result.refresh_token).toBeDefined();
       expect(typeof result.refresh_token).toBe('string');
       expect(result.user).toEqual({
-        id: 2, nickname: 'newuser', email: 'new@example.com', role: UserRole.USER, profileImage: null,
+        id: 2, nickname: 'newuser', email: 'new@example.com', role: UserRole.USER, profileImage: null, subscribedOtts: [],
       });
     });
   });

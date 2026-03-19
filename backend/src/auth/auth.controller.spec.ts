@@ -464,7 +464,7 @@ describe('AuthController', () => {
 
       const result = await controller.completeSocialSignup(dto);
 
-      expect(mockAuthService.completeSocialSignup).toHaveBeenCalledWith('temp-token', 'newuser');
+      expect(mockAuthService.completeSocialSignup).toHaveBeenCalledWith('temp-token', 'newuser', undefined);
       expect(result).toEqual(response);
     });
   });

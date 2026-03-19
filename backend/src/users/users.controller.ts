@@ -20,6 +20,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateOttsDto } from './dto/update-otts.dto';
 import { AdminGetUsersDto } from './dto/admin-get-users.dto';
 import { AdminUpdateStatusDto } from './dto/admin-update-status.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -79,6 +80,16 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(user.id, updateUserDto);
+  }
+
+  // OTT 구독 정보 업데이트
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/otts')
+  async updateOtts(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateOttsDto,
+  ) {
+    return this.usersService.updateSubscribedOtts(user.id, dto.otts);
   }
 
   // Deactivate current user's account (status -> DELETED)

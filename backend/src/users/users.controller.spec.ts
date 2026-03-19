@@ -24,6 +24,7 @@ describe('UsersController', () => {
     updateProfileImage: jest.fn(),
     removeProfileImage: jest.fn(),
     getPublicProfile: jest.fn(),
+    updateSubscribedOtts: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -133,6 +134,32 @@ describe('UsersController', () => {
 
       expect(mockUsersService.update).toHaveBeenCalledWith(1, dto);
       expect(result).toEqual(updated);
+    });
+  });
+
+  describe('PATCH /users/me/otts (updateOtts)', () => {
+    it('OTT 구독 정보를 업데이트하고 결과를 반환해야 한다', async () => {
+      const mockUser = { id: 1, nickname: 'test' };
+      const mockResult = {
+        id: 1,
+        nickname: 'test',
+        subscribedOtts: ['netflix', 'tving'],
+      };
+      mockUsersService.updateSubscribedOtts.mockResolvedValue(mockResult);
+
+      const result = await controller.updateOtts(mockUser, { otts: ['netflix', 'tving'] });
+
+      expect(mockUsersService.updateSubscribedOtts).toHaveBeenCalledWith(1, ['netflix', 'tving']);
+      expect(result).toEqual(mockResult);
+    });
+
+    it('JwtAuthGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        UsersController.prototype.updateOtts,
+      );
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(JwtAuthGuard);
     });
   });
 

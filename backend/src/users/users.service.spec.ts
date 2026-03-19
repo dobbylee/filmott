@@ -11,6 +11,7 @@ import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
 import { UserRole } from './enums/user-role.enum';
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { VALID_OTT_IDS } from '../common/ott-providers';
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt');
@@ -252,6 +253,7 @@ describe('UsersService', () => {
         provider: AuthProvider.GOOGLE,
         providerId: 'google-123',
         profileImage: undefined,
+        subscribedOtts: [],
       });
     });
 
@@ -883,6 +885,141 @@ describe('UsersService', () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
 
       await expect(service.removeProfileImage(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updateSubscribedOtts', () => {
+    it('유효한 OTT 목록으로 업데이트해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'hashed',
+        subscribedOtts: [],
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+
+      const result = await service.updateSubscribedOtts(1, ['netflix', 'tving']);
+
+      expect(result).not.toHaveProperty('password');
+      expect(result.subscribedOtts).toEqual(['netflix', 'tving']);
+    });
+
+    it('빈 배열로 업데이트할 수 있어야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'hashed',
+        subscribedOtts: ['netflix'],
+      };
+      mockUsersRepo.findOne.mockResolvedValue(mockUser);
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+
+      const result = await service.updateSubscribedOtts(1, []);
+
+      expect(result.subscribedOtts).toEqual([]);
+    });
+
+    it('유효하지 않은 OTT ID가 포함되면 BadRequestException을 던져야 한다', async () => {
+      await expect(
+        service.updateSubscribedOtts(1, ['netflix', 'invalid_ott']),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('모든 유효한 OTT ID가 VALID_OTT_IDS에 포함되어야 한다', () => {
+      const validIds = ['netflix', 'disney_plus', 'watcha', 'wavve', 'tving', 'coupang_play'];
+      validIds.forEach((id) => {
+        expect(VALID_OTT_IDS).toContain(id);
+      });
+    });
+
+    it('사용자가 존재하지 않으면 NotFoundException을 던져야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateSubscribedOtts(999, ['netflix']),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('createSocialUser - subscribedOtts', () => {
+    it('subscribedOtts를 포함하여 소셜 유저를 생성해야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+      mockUsersRepo.create.mockReturnValue({
+        nickname: 'ottuser',
+        email: 'ott@test.com',
+        password: null,
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-ott',
+        subscribedOtts: ['netflix', 'tving'],
+      });
+      mockUsersRepo.save.mockResolvedValue({
+        id: 10,
+        nickname: 'ottuser',
+        email: 'ott@test.com',
+        password: null,
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-ott',
+        subscribedOtts: ['netflix', 'tving'],
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      });
+
+      const result = await service.createSocialUser({
+        nickname: 'ottuser',
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-ott',
+        email: 'ott@test.com',
+        profileImage: null,
+        subscribedOtts: ['netflix', 'tving'],
+      });
+
+      expect(result.subscribedOtts).toEqual(['netflix', 'tving']);
+      expect(mockUsersRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscribedOtts: ['netflix', 'tving'],
+        }),
+      );
+    });
+
+    it('subscribedOtts가 없으면 빈 배열로 생성해야 한다', async () => {
+      mockUsersRepo.findOne.mockResolvedValue(null);
+      mockUsersRepo.create.mockReturnValue({
+        nickname: 'noottuser',
+        email: null,
+        password: null,
+        provider: AuthProvider.KAKAO,
+        providerId: 'kakao-no-ott',
+        subscribedOtts: [],
+      });
+      mockUsersRepo.save.mockResolvedValue({
+        id: 11,
+        nickname: 'noottuser',
+        email: null,
+        password: null,
+        provider: AuthProvider.KAKAO,
+        providerId: 'kakao-no-ott',
+        subscribedOtts: [],
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      });
+
+      const result = await service.createSocialUser({
+        nickname: 'noottuser',
+        provider: AuthProvider.KAKAO,
+        providerId: 'kakao-no-ott',
+        email: null,
+        profileImage: null,
+      });
+
+      expect(result.subscribedOtts).toEqual([]);
+      expect(mockUsersRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscribedOtts: [],
+        }),
+      );
     });
   });
 

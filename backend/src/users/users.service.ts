@@ -18,6 +18,7 @@ import { UserRole } from './enums/user-role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AdminGetUsersDto } from './dto/admin-get-users.dto';
+import { VALID_OTT_IDS } from '../common/ott-providers';
 import * as bcrypt from 'bcrypt';
 
 export interface AdminUsersResult {
@@ -155,10 +156,10 @@ export class UsersService {
    */
   async findByIdWithStatus(
     id: number,
-  ): Promise<Pick<User, 'id' | 'nickname' | 'status' | 'role' | 'profileImage'> | null> {
+  ): Promise<Pick<User, 'id' | 'nickname' | 'status' | 'role' | 'profileImage' | 'subscribedOtts'> | null> {
     const user = await this.usersRepo.findOne({
       where: { id },
-      select: ['id', 'nickname', 'status', 'role', 'profileImage'],
+      select: ['id', 'nickname', 'status', 'role', 'profileImage', 'subscribedOtts'],
     });
     return user ?? null;
   }
@@ -212,6 +213,7 @@ export class UsersService {
     providerId: string;
     email: string | null;
     profileImage: string | null;
+    subscribedOtts?: string[];
   }): Promise<SafeUser> {
     if (this.isReservedNickname(data.nickname)) {
       throw new ConflictException('사용할 수 없는 닉네임입니다.');
@@ -229,6 +231,7 @@ export class UsersService {
       provider: data.provider,
       providerId: data.providerId,
       profileImage: data.profileImage ?? undefined,
+      subscribedOtts: data.subscribedOtts ?? [],
     });
 
     const savedUser = await this.usersRepo.save(newUser);
@@ -457,6 +460,27 @@ export class UsersService {
     }
 
     user.profileImage = undefined;
+    const savedUser = await this.usersRepo.save(user);
+    const { password: _, ...result } = savedUser;
+    return result;
+  }
+
+  /**
+   * OTT 구독 정보 업데이트
+   * OTT_PROVIDERS에 정의된 id만 허용
+   */
+  async updateSubscribedOtts(userId: number, otts: string[]): Promise<SafeUser> {
+    const invalidOtts = otts.filter((id) => !VALID_OTT_IDS.includes(id));
+    if (invalidOtts.length > 0) {
+      throw new BadRequestException(`유효하지 않은 OTT: ${invalidOtts.join(', ')}`);
+    }
+
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    user.subscribedOtts = otts;
     const savedUser = await this.usersRepo.save(user);
     const { password: _, ...result } = savedUser;
     return result;
