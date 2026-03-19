@@ -20,10 +20,6 @@ const EXAMPLE_QUESTIONS = [
   '밤에 혼자 볼 스릴러 추천',
 ];
 
-function cleanRecommendationMarkers(text: string): string {
-  return text.replace(/---RECOMMENDATIONS---[\s\S]*?---END---/g, '').trim();
-}
-
 export default function ChatPage() {
   const { user, openAuthModal } = useAuth();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
@@ -142,7 +138,7 @@ export default function ChatPage() {
         onDone: () => {
           isDoneCalledRef.current = true;
           // 스트리밍 완료: 정식 메시지로 추가
-          const cleanedText = cleanRecommendationMarkers(streamingTextRef.current);
+          const cleanedText = streamingTextRef.current;
           setMessages((prev) => [
             ...prev,
             {
@@ -168,7 +164,7 @@ export default function ChatPage() {
 
       // onDone이 호출되지 않은 경우 (연결 끊김 등) 받은 텍스트 보존
       if (!isDoneCalledRef.current && streamingTextRef.current) {
-        const cleanedText = cleanRecommendationMarkers(streamingTextRef.current);
+        const cleanedText = streamingTextRef.current;
         setMessages((prev) => [
           ...prev,
           {
@@ -186,7 +182,7 @@ export default function ChatPage() {
     } catch {
       // 에러 시에도 받은 텍스트가 있으면 보존
       if (!isDoneCalledRef.current && streamingTextRef.current) {
-        const cleanedText = cleanRecommendationMarkers(streamingTextRef.current);
+        const cleanedText = streamingTextRef.current;
         setMessages((prev) => [
           ...prev,
           {
@@ -279,7 +275,7 @@ export default function ChatPage() {
               <div className="flex justify-start">
                 <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 bg-white/5 border border-white/10">
                   {streamingText && (
-                    <StreamingText text={cleanRecommendationMarkers(streamingText)} />
+                    <StreamingText text={streamingText} />
                   )}
                   {streamingRecs && streamingRecs.length > 0 && (
                     <RecommendationCards recommendations={streamingRecs} />

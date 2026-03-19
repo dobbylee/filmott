@@ -55,6 +55,11 @@ export class EmbeddingService {
     return this.openai;
   }
 
+  async hasAnyMetadata(): Promise<boolean> {
+    const count = await this.metadataRepo.count();
+    return count > 0;
+  }
+
   async generateEmbedding(text: string): Promise<number[]> {
     const openai = this.ensureOpenAI();
     const response = await openai.embeddings.create({

@@ -92,12 +92,15 @@ export class ChatService {
 
     const subscribedOtts = user?.subscribedOtts ?? [];
 
-    // 2. 사용자 입력을 임베딩으로 변환 + 유사 작품 검색
-    const similarContents = await this.embeddingService.searchSimilar(
-      content,
-      15,
-      userContext.watchedTmdbIds,
-    );
+    // 2. content_metadata가 비어있으면 임베딩 검색 스킵
+    const hasMetadata = await this.embeddingService.hasAnyMetadata();
+    const similarContents = hasMetadata
+      ? await this.embeddingService.searchSimilar(
+          content,
+          15,
+          userContext.watchedTmdbIds,
+        )
+      : [];
 
     // 3. 시스템 프롬프트 구성 (검색 결과 포함)
     const systemPrompt = buildSystemPrompt(
@@ -116,11 +119,42 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 5. GPT 스트리밍 호출
+    // 5. Function calling 정의
+    const tools: OpenAI.Chat.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'recommend_movies',
+          description: '사용자에게 추천할 영화/시리즈 목록. 추천할 때 반드시 호출하세요.',
+          parameters: {
+            type: 'object',
+            properties: {
+              recommendations: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    tmdbId: { type: 'number', description: 'TMDB ID. 모르면 0' },
+                    contentType: { type: 'string', enum: ['movie', 'tv'] },
+                    title: { type: 'string', description: '한국어 제목' },
+                  },
+                  required: ['tmdbId', 'contentType', 'title'],
+                },
+              },
+            },
+            required: ['recommendations'],
+          },
+        },
+      },
+    ];
+
+    // 6. GPT 스트리밍 호출
     const stream = await this.openai.chat.completions.create({
       model: 'gpt-5-mini',
       max_completion_tokens: 4096,
       stream: true,
+      tool_choice: 'auto',
+      tools,
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages,
@@ -128,10 +162,9 @@ export class ChatService {
     });
 
     let fullText = '';
-    let reachedMarker = false;
-    let markerBuffer = '';
+    let toolCallArgs = '';
 
-    // 6. 스트리밍 이벤트 처리
+    // 7. 스트리밍 이벤트 처리
     try {
       for await (const chunk of stream) {
         // SSE 연결 끊김 시 스트림 중단
@@ -140,33 +173,21 @@ export class ChatService {
           return;
         }
 
-        const delta = chunk.choices[0]?.delta?.content;
-        if (!delta) continue;
+        const choice = chunk.choices[0];
+        if (!choice) continue;
 
-        if (reachedMarker) {
-          markerBuffer += delta;
-          continue;
+        const delta = choice.delta;
+
+        // 텍스트 콘텐츠
+        if (delta?.content) {
+          fullText += delta.content;
+          emit('text', { content: delta.content });
         }
 
-        // ---RECOMMENDATIONS--- 마커 감지
-        const combined = fullText + delta;
-        const markerIndex = combined.indexOf('---RECOMMENDATIONS---');
-
-        if (markerIndex !== -1) {
-          reachedMarker = true;
-          // 마커 이전 텍스트만 emit
-          const beforeMarker = combined.substring(fullText.length, markerIndex);
-          if (beforeMarker) {
-            emit('text', { content: beforeMarker });
-          }
-          // 마커 이후 텍스트를 버퍼에 추가
-          markerBuffer = combined.substring(markerIndex);
-          fullText = combined;
-          continue;
+        // Function call arguments (점진적으로 누적됨)
+        if (delta?.tool_calls?.[0]?.function?.arguments) {
+          toolCallArgs += delta.tool_calls[0].function.arguments;
         }
-
-        fullText += delta;
-        emit('text', { content: delta });
       }
     } catch (error) {
       // AbortError는 정상적인 연결 종료이므로 무시
@@ -174,54 +195,39 @@ export class ChatService {
       throw error;
     }
 
-    // 7. 응답에서 추천 작품 추출
-    const completeText = fullText + (reachedMarker ? '' : '');
-    const completeBuffer = reachedMarker ? markerBuffer : '';
-    const recommendations = await this.extractRecommendations(
-      completeBuffer || completeText,
-      similarContents,
-    );
-
-    if (recommendations.length > 0) {
-      emit('recommendations', { recommendations });
+    // 8. 스트리밍 완료 후 tool call 처리
+    if (toolCallArgs) {
+      try {
+        const parsed: { recommendations?: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string }[] } =
+          JSON.parse(toolCallArgs);
+        const recommendations = await this.resolveRecommendations(
+          parsed.recommendations || [],
+          similarContents,
+        );
+        if (recommendations.length > 0) {
+          emit('recommendations', { recommendations });
+        }
+      } catch { /* JSON 파싱 실패 무시 */ }
     }
 
     emit('done', {});
   }
 
-  async extractRecommendations(
-    text: string,
+  async resolveRecommendations(
+    parsed: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string }[],
     candidates: SimilarContent[],
   ): Promise<ChatRecommendation[]> {
-    const markerStart = text.indexOf('---RECOMMENDATIONS---');
-    const markerEnd = text.indexOf('---END---');
+    const settled = await Promise.allSettled(
+      parsed.map((rec) => this.resolveRecommendation(rec, candidates)),
+    );
 
-    if (markerStart === -1 || markerEnd === -1) return [];
-
-    const jsonStr = text.substring(
-      markerStart + '---RECOMMENDATIONS---'.length,
-      markerEnd,
-    ).trim();
-
-    try {
-      const parsed: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string }[] = JSON.parse(jsonStr);
-
-      // 병렬 처리: 각 추천 항목을 동시에 처리
-      const settled = await Promise.allSettled(
-        parsed.map((rec) => this.resolveRecommendation(rec, candidates)),
-      );
-
-      const results: ChatRecommendation[] = [];
-      for (const result of settled) {
-        if (result.status === 'fulfilled' && result.value) {
-          results.push(result.value);
-        }
-      }
-
-      return results;
-    } catch {
-      return [];
-    }
+    return settled
+      .filter(
+        (r): r is PromiseFulfilledResult<ChatRecommendation | null> =>
+          r.status === 'fulfilled',
+      )
+      .map((r) => r.value)
+      .filter((r): r is ChatRecommendation => r !== null);
   }
 
   private async resolveRecommendation(

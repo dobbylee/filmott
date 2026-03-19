@@ -30,6 +30,7 @@ describe('ChatService', () => {
   let service: ChatService;
 
   const mockEmbeddingService = {
+    hasAnyMetadata: jest.fn(),
     searchSimilar: jest.fn(),
     cacheContentMetadata: jest.fn().mockResolvedValue(undefined),
   };
@@ -191,9 +192,10 @@ describe('ChatService', () => {
       mockReviewRepo.createQueryBuilder.mockReturnValue(emptyQb);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(emptyQb);
       mockUserRepo.findOne.mockResolvedValue({ id: 1, subscribedOtts: ['netflix'] });
+      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
     };
 
-    it('SSE 이벤트를 올바른 순서로 emit해야 한다', async () => {
+    it('텍스트 + function call이 있으면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
       setupEmptyUserContext();
 
       const candidates: SimilarContent[] = [
@@ -211,12 +213,35 @@ describe('ChatService', () => {
       ];
       mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
 
-      // OpenAI 스트리밍 mock — async iterable
+      // OpenAI 스트리밍 mock: 텍스트 + tool_calls
       const chunks = [
-        { choices: [{ delta: { content: '좋은 영화를 추천해 드릴게요! ' } }] },
-        { choices: [{ delta: { content: '---RECOMMENDATIONS---\n' } }] },
-        { choices: [{ delta: { content: '[{"tmdbId": 496243, "contentType": "movie"}]' } }] },
-        { choices: [{ delta: { content: '\n---END---' } }] },
+        { choices: [{ delta: { content: '좋은 영화를 추천해 드릴게요!' } }] },
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                index: 0,
+                id: 'call_1',
+                function: {
+                  name: 'recommend_movies',
+                  arguments: '{"recommendations":[{"tmdbId":496243,',
+                },
+              }],
+            },
+          }],
+        },
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                index: 0,
+                function: {
+                  arguments: '"contentType":"movie","title":"기생충"}]}',
+                },
+              }],
+            },
+          }],
+        },
       ];
 
       mockStreamCreate.mockResolvedValue({
@@ -248,6 +273,52 @@ describe('ChatService', () => {
       // done 이벤트 확인
       const doneEvents = emittedEvents.filter((e) => e.event === 'done');
       expect(doneEvents).toHaveLength(1);
+    });
+
+    it('function call 없이 텍스트만 있으면 recommendations 이벤트를 emit하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      const chunks = [
+        { choices: [{ delta: { content: '네, 어떤 장르를 좋아하시나요?' } }] },
+      ];
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          for (const chunk of chunks) {
+            yield chunk;
+          }
+        },
+      });
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '안녕', [], emit);
+
+      const recEvents = emittedEvents.filter((e) => e.event === 'recommendations');
+      expect(recEvents).toHaveLength(0);
+
+      const doneEvents = emittedEvents.filter((e) => e.event === 'done');
+      expect(doneEvents).toHaveLength(1);
+    });
+
+    it('content_metadata가 비어있으면 임베딩 검색을 스킵해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(false);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '추천해줘', [], jest.fn());
+
+      expect(mockEmbeddingService.hasAnyMetadata).toHaveBeenCalled();
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
     it('OPENAI_API_KEY가 없으면 BadRequestException을 던져야 한다', async () => {
@@ -291,6 +362,13 @@ describe('ChatService', () => {
 
       expect(mockStreamCreate).toHaveBeenCalledWith(
         expect.objectContaining({
+          tools: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'function',
+              function: expect.objectContaining({ name: 'recommend_movies' }),
+            }),
+          ]),
+          tool_choice: 'auto',
           messages: expect.arrayContaining([
             expect.objectContaining({ role: 'system' }),
             expect.objectContaining({ role: 'user', content: '이전 질문' }),
@@ -302,9 +380,9 @@ describe('ChatService', () => {
     });
   });
 
-  describe('extractRecommendations', () => {
-    it('응답에서 추천 JSON 블록을 파싱해야 한다', async () => {
-      const text = '추천 드립니다.\n---RECOMMENDATIONS---\n[{"tmdbId": 496243, "contentType": "movie"}]\n---END---';
+  describe('resolveRecommendations', () => {
+    it('후보에 있는 작품을 올바르게 resolve해야 한다', async () => {
+      const parsed = [{ tmdbId: 496243, contentType: 'movie' as const, title: '기생충' }];
       const candidates: SimilarContent[] = [
         {
           contentId: 1,
@@ -319,7 +397,7 @@ describe('ChatService', () => {
         },
       ];
 
-      const result = await service.extractRecommendations(text, candidates);
+      const result = await service.resolveRecommendations(parsed, candidates);
 
       expect(result).toHaveLength(1);
       expect(result[0].tmdbId).toBe(496243);
@@ -327,34 +405,20 @@ describe('ChatService', () => {
       expect(result[0].posterUrl).toBe('/poster.jpg');
     });
 
-    it('마커가 없으면 빈 배열을 반환해야 한다', async () => {
-      const result = await service.extractRecommendations('일반 대화입니다.', []);
-      expect(result).toEqual([]);
-    });
-
-    it('후보에 없는 tmdbId는 필터링해야 한다', async () => {
-      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 999, "contentType": "movie"}]\n---END---';
-      // ContentsService.findOrFetchByTmdbId가 실패하는 시나리오 (후보에 없고 TMDB도 없음)
-      mockContentsService.findOrFetchByTmdbId.mockRejectedValueOnce(new Error('Not found'));
-      const result = await service.extractRecommendations(text, []);
-      expect(result).toEqual([]);
-    });
-
-    it('잘못된 JSON이면 빈 배열을 반환해야 한다', async () => {
-      const text = '---RECOMMENDATIONS---\n{invalid json}\n---END---';
-      const result = await service.extractRecommendations(text, []);
+    it('빈 배열이면 빈 배열을 반환해야 한다', async () => {
+      const result = await service.resolveRecommendations([], []);
       expect(result).toEqual([]);
     });
 
     it('후보에 없는 tmdbId는 ContentsService로 조회해야 한다', async () => {
-      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 12345, "contentType": "movie", "title": "새 영화"}]\n---END---';
+      const parsed = [{ tmdbId: 12345, contentType: 'movie' as const, title: '새 영화' }];
       mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
         id: 99,
         title: '새 영화',
         posterUrl: '/new-poster.jpg',
       });
 
-      const result = await service.extractRecommendations(text, []);
+      const result = await service.resolveRecommendations(parsed, []);
 
       expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(12345, 'movie');
       expect(result).toHaveLength(1);
@@ -363,8 +427,19 @@ describe('ChatService', () => {
       expect(result[0].posterUrl).toBe('/new-poster.jpg');
     });
 
+    it('후보에 없고 TMDB 조회도 실패하면 제목만 없는 항목은 필터링해야 한다', async () => {
+      const parsed = [{ tmdbId: 999, contentType: 'movie' as const }];
+      mockContentsService.findOrFetchByTmdbId.mockRejectedValueOnce(new Error('Not found'));
+
+      const result = await service.resolveRecommendations(parsed, []);
+      expect(result).toEqual([]);
+    });
+
     it('여러 추천을 병렬로 처리해야 한다', async () => {
-      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 111, "contentType": "movie", "title": "영화1"},{"tmdbId": 222, "contentType": "tv", "title": "드라마1"}]\n---END---';
+      const parsed = [
+        { tmdbId: 111, contentType: 'movie' as const, title: '영화1' },
+        { tmdbId: 222, contentType: 'tv' as const, title: '드라마1' },
+      ];
       const candidates: SimilarContent[] = [
         {
           contentId: 1,
@@ -379,7 +454,6 @@ describe('ChatService', () => {
         },
       ];
 
-      // tmdbId 222는 후보에 없으므로 findOrFetchByTmdbId 호출
       mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
         id: 2,
         tmdbId: 222,
@@ -387,7 +461,7 @@ describe('ChatService', () => {
         posterUrl: '/poster2.jpg',
       });
 
-      const result = await service.extractRecommendations(text, candidates);
+      const result = await service.resolveRecommendations(parsed, candidates);
 
       expect(result).toHaveLength(2);
       expect(result[0].tmdbId).toBe(111);
@@ -395,7 +469,7 @@ describe('ChatService', () => {
     });
 
     it('tmdbId가 0이면 제목으로 TMDB 검색 fallback해야 한다', async () => {
-      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 0, "contentType": "movie", "title": "기생충"}]\n---END---';
+      const parsed = [{ tmdbId: 0, contentType: 'movie' as const, title: '기생충' }];
 
       mockContentsService.searchContents.mockResolvedValueOnce({
         results: [{ id: 496243, media_type: 'movie', title: '기생충' }],
@@ -407,7 +481,7 @@ describe('ChatService', () => {
         posterUrl: '/parasite.jpg',
       });
 
-      const result = await service.extractRecommendations(text, []);
+      const result = await service.resolveRecommendations(parsed, []);
 
       expect(mockContentsService.searchContents).toHaveBeenCalledWith('기생충', 'movie', 1);
       expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(496243, 'movie');
@@ -417,15 +491,12 @@ describe('ChatService', () => {
     });
 
     it('TMDB ID 조회 실패 시 제목으로 검색 fallback해야 한다', async () => {
-      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 999, "contentType": "movie", "title": "미지의 영화"}]\n---END---';
+      const parsed = [{ tmdbId: 999, contentType: 'movie' as const, title: '미지의 영화' }];
 
-      // findOrFetchByTmdbId 첫 호출 실패 (tmdbId=999)
       mockContentsService.findOrFetchByTmdbId.mockRejectedValueOnce(new Error('Not found'));
-      // searchContents로 제목 검색
       mockContentsService.searchContents.mockResolvedValueOnce({
         results: [{ id: 555, media_type: 'movie', title: '미지의 영화' }],
       });
-      // 검색된 tmdbId로 다시 findOrFetchByTmdbId
       mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
         id: 10,
         tmdbId: 555,
@@ -433,7 +504,7 @@ describe('ChatService', () => {
         posterUrl: '/unknown.jpg',
       });
 
-      const result = await service.extractRecommendations(text, []);
+      const result = await service.resolveRecommendations(parsed, []);
 
       expect(result).toHaveLength(1);
       expect(result[0].tmdbId).toBe(555);
@@ -441,13 +512,13 @@ describe('ChatService', () => {
     });
 
     it('제목 검색도 실패하면 제목만으로 카드를 생성해야 한다', async () => {
-      const text = '---RECOMMENDATIONS---\n[{"tmdbId": 0, "contentType": "movie", "title": "존재하지 않는 영화"}]\n---END---';
+      const parsed = [{ tmdbId: 0, contentType: 'movie' as const, title: '존재하지 않는 영화' }];
 
       mockContentsService.searchContents.mockResolvedValueOnce({
         results: [],
       });
 
-      const result = await service.extractRecommendations(text, []);
+      const result = await service.resolveRecommendations(parsed, []);
 
       expect(result).toHaveLength(1);
       expect(result[0].tmdbId).toBe(0);

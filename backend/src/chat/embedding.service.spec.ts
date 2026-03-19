@@ -33,6 +33,7 @@ describe('EmbeddingService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    count: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
 
@@ -69,6 +70,25 @@ describe('EmbeddingService', () => {
 
   it('정의되어 있어야 한다', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('hasAnyMetadata', () => {
+    it('메타데이터가 존재하면 true를 반환해야 한다', async () => {
+      mockMetadataRepo.count.mockResolvedValue(5);
+
+      const result = await service.hasAnyMetadata();
+
+      expect(result).toBe(true);
+      expect(mockMetadataRepo.count).toHaveBeenCalled();
+    });
+
+    it('메타데이터가 없으면 false를 반환해야 한다', async () => {
+      mockMetadataRepo.count.mockResolvedValue(0);
+
+      const result = await service.hasAnyMetadata();
+
+      expect(result).toBe(false);
+    });
   });
 
   describe('generateEmbedding', () => {
