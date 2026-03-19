@@ -263,6 +263,7 @@ export class ContentsService {
       overview: tmdbData.overview ?? undefined,
       releaseDate: releaseDate ? new Date(releaseDate) : undefined,
       voteAverage: tmdbData.vote_average ?? undefined,
+      voteCount: tmdbData.vote_count ?? 0,
       genres: (tmdbData.genres ?? []).map((g) => ({
         id: g.id,
         name: GENRE_NAME_MAP[g.id] ?? g.name,

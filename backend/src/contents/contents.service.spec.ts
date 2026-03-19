@@ -77,6 +77,7 @@ describe('ContentsService', () => {
         overview: 'A great movie',
         release_date: '2024-01-15',
         vote_average: 8.5,
+        vote_count: 5000,
         genres: [{ id: 28, name: 'Action' }],
         runtime: 120,
         credits: { cast: [] },
@@ -96,6 +97,7 @@ describe('ContentsService', () => {
           tmdbId: 123,
           contentType: 'movie',
           title: 'New Movie',
+          voteCount: 5000,
         }),
       );
       expect(result).toEqual(savedContent);
@@ -538,6 +540,71 @@ describe('ContentsService', () => {
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           genres: [{ id: 99999, name: 'Exotic Genre' }],
+        }),
+      );
+    });
+  });
+
+  describe('mapTmdbToContent - voteCount 매핑', () => {
+    it('TMDB vote_count가 있으면 voteCount로 매핑해야 한다', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const tmdbData = {
+        id: 777,
+        title: 'Vote Count Movie',
+        original_title: 'Vote Count Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: 7.5,
+        vote_count: 12000,
+        genres: [],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+
+      await service.findOrFetchByTmdbId(777, 'movie');
+
+      expect(mockContentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          voteCount: 12000,
+        }),
+      );
+    });
+
+    it('TMDB vote_count가 없으면 기본값 0으로 매핑해야 한다', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const tmdbData = {
+        id: 778,
+        title: 'No Vote Count Movie',
+        original_title: 'No Vote Count Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        genres: [],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+
+      await service.findOrFetchByTmdbId(778, 'movie');
+
+      expect(mockContentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          voteCount: 0,
         }),
       );
     });

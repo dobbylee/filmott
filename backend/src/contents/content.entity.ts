@@ -61,6 +61,9 @@ export class Content {
   @Column({ name: 'vote_average', type: 'numeric', precision: 3, scale: 1, nullable: true })
   voteAverage?: number;
 
+  @Column({ name: 'vote_count', type: 'integer', default: 0 })
+  voteCount!: number;
+
   @Column({ type: 'jsonb', default: '[]' })
   genres!: { id: number; name: string }[];
 
