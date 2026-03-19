@@ -1,0 +1,230 @@
+'use client';
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Sparkles, MessageSquare } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import api from '@/lib/api';
+import { sendChatMessage } from '@/lib/chat-stream';
+import ChatMessageBubble from './ChatMessageBubble';
+import ChatInput from './ChatInput';
+import StreamingText from './StreamingText';
+import RecommendationCards from './RecommendationCards';
+import type { ChatMessageData, ChatRecommendationWithPoster } from '@/types/chat';
+
+const EXAMPLE_QUESTIONS = [
+  '비 오는 날에 볼 만한 잔잔한 영화',
+  '친구들이랑 볼 코미디 추천해줘',
+  '요즘 핫한 넷플릭스 시리즈 뭐가 있어?',
+  '밤에 혼자 볼 스릴러 추천',
+];
+
+export default function ChatPage() {
+  const { user, openAuthModal } = useAuth();
+  const [messages, setMessages] = useState<ChatMessageData[]>([]);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+  const [streamingRecs, setStreamingRecs] = useState<ChatRecommendationWithPoster[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = useCallback(() => {
+    if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === 'function') {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, streamingText, scrollToBottom]);
+
+  const createSession = async (): Promise<number> => {
+    const res = await api.post<{ id: number }>('/chat/sessions');
+    const newSessionId = res.data.id;
+    setSessionId(newSessionId);
+    return newSessionId;
+  };
+
+  const handleSend = async (content: string) => {
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+
+    setError(null);
+
+    // 세션이 없으면 생성
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      try {
+        currentSessionId = await createSession();
+      } catch {
+        setError('세션 생성에 실패했습니다. 다시 시도해주세요.');
+        return;
+      }
+    }
+
+    // 낙관적 UI: 사용자 메시지 추가
+    const userMessage: ChatMessageData = {
+      id: Date.now(),
+      role: 'user',
+      content,
+      recommendations: null,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsStreaming(true);
+    setStreamingText('');
+    setStreamingRecs(null);
+
+    try {
+      await sendChatMessage(currentSessionId, content, {
+        onText: (text) => {
+          setStreamingText((prev) => prev + text);
+        },
+        onRecommendations: (recs) => {
+          setStreamingRecs(recs);
+        },
+        onDone: (messageId) => {
+          // 스트리밍 완료: 정식 메시지로 추가
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: messageId,
+              role: 'assistant',
+              content: streamingTextRef.current,
+              recommendations: streamingRecsRef.current,
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+          setIsStreaming(false);
+          setStreamingText('');
+          setStreamingRecs(null);
+        },
+        onError: (message) => {
+          setError(message);
+          setIsStreaming(false);
+          setStreamingText('');
+          setStreamingRecs(null);
+        },
+      });
+    } catch {
+      setError('메시지 전송 중 오류가 발생했습니다.');
+      setIsStreaming(false);
+      setStreamingText('');
+      setStreamingRecs(null);
+    }
+  };
+
+  // onDone 콜백에서 최신 streaming 상태를 참조하기 위한 ref
+  const streamingTextRef = useRef('');
+  const streamingRecsRef = useRef<ChatRecommendationWithPoster[] | null>(null);
+
+  useEffect(() => {
+    streamingTextRef.current = streamingText;
+  }, [streamingText]);
+
+  useEffect(() => {
+    streamingRecsRef.current = streamingRecs;
+  }, [streamingRecs]);
+
+  const handleExampleClick = (question: string) => {
+    handleSend(question);
+  };
+
+  const hasConversation = messages.length > 0 || isStreaming;
+
+  return (
+    <div className="flex flex-col h-[calc(100dvh-80px)]">
+      {/* 메시지 영역 */}
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-6"
+      >
+        {!hasConversation ? (
+          /* 환영 메시지 + 예시 질문 */
+          <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center">
+            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-fuchsia-700/20 to-indigo-600/20 border border-fuchsia-500/20 mb-6">
+              <Sparkles className="w-8 h-8 text-fuchsia-400" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">
+              오늘 뭐 볼까?
+            </h2>
+            <p className="text-sm text-white/50 mb-8">
+              취향에 맞는 영화와 시리즈를 추천해드릴게요.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+              {EXAMPLE_QUESTIONS.map((question) => (
+                <button
+                  key={question}
+                  onClick={() => handleExampleClick(question)}
+                  className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white/70 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all"
+                >
+                  <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 text-fuchsia-400/60" />
+                  {question}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* 대화 메시지 목록 */
+          <div className="max-w-2xl mx-auto space-y-4">
+            {messages.map((msg) => (
+              <ChatMessageBubble key={msg.id} message={msg} />
+            ))}
+
+            {/* 스트리밍 중인 AI 응답 */}
+            {isStreaming && (streamingText || streamingRecs) && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 bg-white/5 border border-white/10">
+                  {streamingText && (
+                    <StreamingText text={streamingText} />
+                  )}
+                  {streamingRecs && streamingRecs.length > 0 && (
+                    <RecommendationCards recommendations={streamingRecs} />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 스트리밍 중이나 아직 텍스트가 없을 때 로딩 표시 */}
+            {isStreaming && !streamingText && !streamingRecs && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl px-4 py-3 bg-white/5 border border-white/10">
+                  <div className="flex gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-white/30 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 rounded-full bg-white/30 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 rounded-full bg-white/30 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* 에러 메시지 */}
+      {error && (
+        <div className="px-4 pb-2">
+          <div className="max-w-2xl mx-auto rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+            {error}
+          </div>
+        </div>
+      )}
+
+      {/* 입력 영역 */}
+      <div className="px-4 pb-4 pt-2">
+        <div className="max-w-2xl mx-auto">
+          <ChatInput onSend={handleSend} disabled={isStreaming} />
+          <p className="mt-2 text-center text-[11px] text-white/30">
+            AI가 추천한 정보는 정확하지 않을 수 있습니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
