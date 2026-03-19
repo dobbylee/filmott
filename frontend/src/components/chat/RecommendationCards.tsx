@@ -29,8 +29,8 @@ export default function RecommendationCards({ recommendations }: RecommendationC
         className="flex gap-3 overflow-x-auto px-1 pb-2"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {recommendations.map((rec) => (
-          <RecommendationCard key={`${rec.contentType}-${rec.tmdbId}`} recommendation={rec} />
+        {recommendations.map((rec, idx) => (
+          <RecommendationCard key={`${rec.contentType}-${rec.tmdbId}-${idx}`} recommendation={rec} />
         ))}
       </div>
 

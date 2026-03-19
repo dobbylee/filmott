@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Sparkles, MessageSquare, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
@@ -21,6 +22,8 @@ const EXAMPLE_QUESTIONS = [
 
 export default function ChatPage() {
   const { user, openAuthModal } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -70,6 +73,19 @@ export default function ChatPage() {
     loadSessions();
   }, [loadSessions]);
 
+  // URL에서 세션 ID 복원
+  useEffect(() => {
+    const sid = searchParams.get('session');
+    if (sid && user) {
+      const parsed = parseInt(sid, 10);
+      if (!isNaN(parsed) && parsed !== sessionId) {
+        setSessionId(parsed);
+        loadMessages(parsed);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
+
   // 세션 메시지 이력 로드
   const loadMessages = useCallback(async (targetSessionId: number) => {
     try {
@@ -84,6 +100,7 @@ export default function ChatPage() {
     const res = await api.post<{ id: number }>('/chat/sessions');
     const newSessionId = res.data.id;
     setSessionId(newSessionId);
+    router.replace(`/chat?session=${newSessionId}`, { scroll: false });
     await loadSessions();
     return newSessionId;
   };
@@ -94,6 +111,7 @@ export default function ChatPage() {
       return;
     }
     setSessionId(targetSessionId);
+    router.replace(`/chat?session=${targetSessionId}`, { scroll: false });
     setMessages([]);
     setStreamingText('');
     setStreamingRecs(null);
@@ -127,6 +145,7 @@ export default function ChatPage() {
     setError(null);
     setIsStreaming(false);
     setShowSidebar(false);
+    router.replace('/chat', { scroll: false });
   };
 
   const handleSend = async (content: string) => {

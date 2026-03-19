@@ -27,6 +27,13 @@ vi.mock('@/lib/chat-stream', () => ({
   sendChatMessage: (...args: unknown[]) => mockSendChatMessage(...args),
 }));
 
+// next/navigation mock
+const mockReplace = vi.fn();
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: mockReplace }),
+}));
+
 describe('ChatPage', () => {
   beforeEach(() => {
     mockUser = { id: 1, nickname: 'tester' };

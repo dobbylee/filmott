@@ -12,6 +12,7 @@ import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
+import { TmdbService } from '../tmdb/tmdb.service';
 
 // Anthropic SDK mock
 jest.mock('@anthropic-ai/sdk', () => {
@@ -63,6 +64,10 @@ describe('ChatService', () => {
     findOne: jest.fn(),
   };
 
+  const mockTmdbService = {
+    getDetails: jest.fn(),
+  };
+
   const mockConfigService = {
     get: jest.fn().mockReturnValue('test-api-key'),
   };
@@ -77,6 +82,7 @@ describe('ChatService', () => {
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },
+        { provide: TmdbService, useValue: mockTmdbService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();

@@ -7,6 +7,7 @@ import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
+import { TmdbModule } from '../tmdb/tmdb.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 
@@ -14,6 +15,7 @@ import { ChatService } from './chat.service';
   imports: [
     TypeOrmModule.forFeature([ChatSession, ChatMessage, Watchlist, Review, User, Content]),
     ConfigModule,
+    TmdbModule,
   ],
   controllers: [ChatController],
   providers: [ChatService],

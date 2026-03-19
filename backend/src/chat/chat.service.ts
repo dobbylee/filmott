@@ -14,6 +14,7 @@ import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
+import { TmdbService } from '../tmdb/tmdb.service';
 import {
   buildSystemPrompt,
   UserContext,
@@ -72,6 +73,7 @@ export class ChatService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(Content)
     private readonly contentRepo: Repository<Content>,
+    private readonly tmdbService: TmdbService,
     private readonly configService: ConfigService,
   ) {
     this.anthropic = new Anthropic({
@@ -228,14 +230,24 @@ export class ChatService {
         const input = block.input as { recommendations: ChatRecommendation[] };
         recommendations = input.recommendations;
 
-        // Content 테이블에서 posterUrl 조회
+        // Content 테이블에서 posterUrl 조회, 없으면 TMDB에서 가져오기
         const recsWithPoster = await Promise.all(
           recommendations.map(async (rec) => {
             const content = await this.contentRepo.findOne({
               where: { tmdbId: rec.tmdbId, contentType: rec.contentType },
               select: ['posterUrl'],
             });
-            return { ...rec, posterUrl: content?.posterUrl ?? null };
+            if (content?.posterUrl) {
+              return { ...rec, posterUrl: content.posterUrl };
+            }
+            // DB에 없으면 TMDB에서 poster_path 조회
+            try {
+              const tmdbData = await this.tmdbService.getDetails(rec.tmdbId, rec.contentType);
+              const posterPath = tmdbData.poster_path;
+              return { ...rec, posterUrl: posterPath ?? null };
+            } catch {
+              return { ...rec, posterUrl: null };
+            }
           }),
         );
         emit('recommendations', { recommendations: recsWithPoster });
