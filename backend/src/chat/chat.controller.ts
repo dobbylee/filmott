@@ -29,11 +29,13 @@ export class ChatController {
   }
 
   @Get('sessions')
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   async getSessions(@CurrentUser() user: JwtPayload): Promise<SessionListItem[]> {
     return this.chatService.getSessions(user.id);
   }
 
   @Get('sessions/:id/messages')
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   async getMessages(
     @CurrentUser() user: JwtPayload,
     @Param('id', ParseIntPipe) sessionId: number,
@@ -73,6 +75,7 @@ export class ChatController {
   }
 
   @Delete('sessions/:id')
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   async deleteSession(
     @CurrentUser() user: JwtPayload,
     @Param('id', ParseIntPipe) sessionId: number,

@@ -132,6 +132,22 @@ describe('sendChatMessage', () => {
     );
   });
 
+  it('500 응답 시 onError를 호출한다', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+      createMockResponse([], 500),
+    );
+
+    await sendChatMessage(1, '테스트', callbacks);
+
+    expect(callbacks.onError).toHaveBeenCalledWith('메시지 전송에 실패했습니다.');
+  });
+
+  it('네트워크 오류(fetch reject) 시 예외가 전파된다', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network Error'));
+
+    await expect(sendChatMessage(1, '테스트', callbacks)).rejects.toThrow('Network Error');
+  });
+
   it('여러 청크로 분할된 SSE를 올바르게 파싱한다', async () => {
     const chunk1 = 'event: text\ndata: {"content":"첫 번째"}\n\n';
     const chunk2 = 'event: text\ndata: {"content":" 두 번째"}\n\nevent: done\ndata: {"messageId":3}\n\n';

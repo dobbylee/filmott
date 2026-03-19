@@ -23,7 +23,7 @@ import {
   WantToWatchContent,
 } from './prompts/system-prompt';
 import { OTT_PROVIDERS } from '../common/ott-providers';
-import { recommendMoviesTool } from './tools/recommend-tool';
+import { searchTmdbTool, recommendMoviesTool } from './tools/recommend-tool';
 
 export interface SessionListItem {
   id: number;
@@ -173,7 +173,7 @@ export class ChatService {
     await this.verifySessionOwner(userId, sessionId);
 
     // 2. 사용자 메시지 DB 저장
-    await this.messageRepo.save(
+    const userMessage = await this.messageRepo.save(
       this.messageRepo.create({
         sessionId,
         role: 'user',
@@ -188,7 +188,8 @@ export class ChatService {
       await this.sessionRepo.update(sessionId, { title });
     }
 
-    // 4. userContext + subscribedOtts + chatHistory 수집
+    // 4. userContext + subscribedOtts + chatHistory 수집 (에러 시 사용자 메시지 삭제)
+    try {
     const [userContext, user, chatHistory] = await Promise.all([
       this.buildUserContext(userId),
       this.userRepo.findOne({ where: { id: userId }, select: ['id', 'subscribedOtts'] }),
@@ -198,76 +199,201 @@ export class ChatService {
     const subscribedOtts = user?.subscribedOtts ?? [];
     const systemPrompt = buildSystemPrompt(userContext, subscribedOtts, OTT_PROVIDERS);
 
-    // 5. Anthropic SDK 스트리밍 호출
+    // 5. Anthropic SDK — tool use 루프
     const formattedHistory: Anthropic.MessageParam[] = chatHistory.map((msg) => ({
       role: msg.role,
       content: msg.content,
     }));
 
-    const stream = this.anthropic.messages.stream({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: formattedHistory,
-      tools: [recommendMoviesTool],
-    });
-
+    const tools = [searchTmdbTool, recommendMoviesTool];
+    const watchedSet = new Set(userContext.watchedTmdbIds);
     let fullText = '';
-    let recommendations: ChatRecommendation[] | null = null;
+    let enrichedRecs: (ChatRecommendation & { posterUrl: string | null })[] = [];
+    let messages = [...formattedHistory];
+    const MAX_TOOL_ROUNDS = 5;
 
-    // 6. 스트리밍 이벤트 처리
-    stream.on('text', (textDelta) => {
-      fullText += textDelta;
-      emit('text', { content: textDelta });
-    });
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const stream = this.anthropic.messages.stream({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages,
+        tools,
+      });
 
-    // 7. 스트림 완료 대기
-    const finalMessage = await stream.finalMessage();
+      // 텍스트 스트리밍
+      stream.on('text', (textDelta) => {
+        fullText += textDelta;
+        emit('text', { content: textDelta });
+      });
 
-    // 8. tool_use 결과 추출 + posterUrl 조회
-    for (const block of finalMessage.content) {
-      if (block.type === 'tool_use' && block.name === 'recommend_movies') {
-        const input = block.input as { recommendations: ChatRecommendation[] };
-        recommendations = input.recommendations;
+      const response = await stream.finalMessage();
 
-        // Content 테이블에서 posterUrl 조회, 없으면 TMDB에서 가져오기
-        const recsWithPoster = await Promise.all(
-          recommendations.map(async (rec) => {
-            const content = await this.contentRepo.findOne({
-              where: { tmdbId: rec.tmdbId, contentType: rec.contentType },
-              select: ['posterUrl'],
-            });
-            if (content?.posterUrl) {
-              return { ...rec, posterUrl: content.posterUrl };
+      // stop_reason이 end_turn이면 루프 종료
+      if (response.stop_reason === 'end_turn') {
+        break;
+      }
+
+      // tool_use 처리
+      if (response.stop_reason === 'tool_use') {
+        const toolResults: Anthropic.MessageParam[] = [];
+        const assistantContent: Anthropic.ContentBlock[] = response.content;
+
+        for (const block of assistantContent) {
+          if (block.type === 'tool_use') {
+            if (block.name === 'search_tmdb') {
+              // TMDB 검색 실행
+              const input = block.input as {
+                query?: string;
+                type: 'movie' | 'tv';
+                genre_id?: number;
+                year?: number;
+                page?: number;
+              };
+              try {
+                const searchResult = await this.executeTmdbSearch(input);
+                toolResults.push({
+                  role: 'user',
+                  content: [{
+                    type: 'tool_result',
+                    tool_use_id: block.id,
+                    content: JSON.stringify(searchResult),
+                  }],
+                });
+              } catch {
+                toolResults.push({
+                  role: 'user',
+                  content: [{
+                    type: 'tool_result',
+                    tool_use_id: block.id,
+                    content: '검색에 실패했습니다.',
+                    is_error: true,
+                  }],
+                });
+              }
+            } else if (block.name === 'recommend_movies') {
+              // 추천 결과 처리 — 시청한 작품 제외 + posterUrl 보강
+              const input = block.input as { recommendations: ChatRecommendation[] };
+              const filtered = input.recommendations.filter((rec) => !watchedSet.has(rec.tmdbId));
+
+              enrichedRecs = await Promise.all(
+                filtered.map(async (rec) => {
+                  const content = await this.contentRepo.findOne({
+                    where: { tmdbId: rec.tmdbId, contentType: rec.contentType },
+                    select: ['posterUrl', 'title'],
+                  });
+                  if (content) {
+                    return { ...rec, title: content.title || rec.title, posterUrl: content.posterUrl ?? null };
+                  }
+                  try {
+                    const tmdbData = await this.tmdbService.getDetails(rec.tmdbId, rec.contentType);
+                    const title = tmdbData.title || tmdbData.name || rec.title;
+                    return { ...rec, title, posterUrl: tmdbData.poster_path ?? null };
+                  } catch {
+                    return { ...rec, posterUrl: null };
+                  }
+                }),
+              );
+              emit('recommendations', { recommendations: enrichedRecs });
+
+              // recommend_movies는 최종 결과이므로 tool_result를 보내고 루프 종료
+              toolResults.push({
+                role: 'user',
+                content: [{
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: '추천이 완료되었습니다.',
+                }],
+              });
             }
-            // DB에 없으면 TMDB에서 poster_path 조회
-            try {
-              const tmdbData = await this.tmdbService.getDetails(rec.tmdbId, rec.contentType);
-              const posterPath = tmdbData.poster_path;
-              return { ...rec, posterUrl: posterPath ?? null };
-            } catch {
-              return { ...rec, posterUrl: null };
-            }
-          }),
-        );
-        emit('recommendations', { recommendations: recsWithPoster });
+          }
+        }
+
+        // 대화에 assistant 응답 + tool results 추가
+        messages = [
+          ...messages,
+          { role: 'assistant', content: assistantContent },
+          ...toolResults,
+        ];
+
+        // recommend_movies가 호출되었으면 루프 종료
+        if (enrichedRecs.length > 0) {
+          break;
+        }
       }
     }
 
-    // 9. AI 응답 DB 저장
-    const assistantMessage = await this.messageRepo.save(
-      this.messageRepo.create({
-        sessionId,
-        role: 'assistant',
-        content: fullText || '(추천 도구를 사용했습니다)',
-        recommendations,
-      }),
-    );
+    // 9. AI 응답 DB 저장 (텍스트 또는 추천이 있을 때만)
+    if (fullText || enrichedRecs.length > 0) {
+      const assistantMessage = await this.messageRepo.save(
+        this.messageRepo.create({
+          sessionId,
+          role: 'assistant',
+          content: fullText || '',
+          recommendations: enrichedRecs.length > 0 ? enrichedRecs : null,
+        }),
+      );
 
-    // 10. 세션 updatedAt 갱신
-    await this.sessionRepo.update(sessionId, { updatedAt: new Date() });
+      // 10. 세션 updatedAt 갱신
+      await this.sessionRepo.update(sessionId, { updatedAt: new Date() });
 
-    emit('done', { messageId: assistantMessage.id });
+      emit('done', { messageId: assistantMessage.id });
+    } else {
+      emit('done', { messageId: 0 });
+    }
+    } catch (error) {
+      // API 호출 실패 시 사용자 메시지 삭제 (고아 메시지 방지)
+      await this.messageRepo.delete(userMessage.id);
+      throw error;
+    }
+  }
+
+  private async executeTmdbSearch(input: {
+    query?: string;
+    type: 'movie' | 'tv';
+    genre_id?: number;
+    year?: number;
+    page?: number;
+  }): Promise<{ results: { id: number; title: string; overview: string; release_date: string; vote_average: number; vote_count: number; genre_ids: number[] }[] }> {
+    if (input.query) {
+      // 제목 검색
+      const result = await this.tmdbService.searchByType(input.query, input.type, input.page ?? 1);
+      return {
+        results: result.results.slice(0, 10).map((r) => ({
+          id: r.id,
+          title: r.title || r.name || '',
+          overview: (r.overview || '').slice(0, 100),
+          release_date: r.release_date || r.first_air_date || '',
+          vote_average: r.vote_average ?? 0,
+          vote_count: r.vote_count ?? 0,
+          genre_ids: r.genre_ids ?? [],
+        })),
+      };
+    }
+    // 장르 기반 디스커버 검색 (인기 있는 작품 + 성인물 제외)
+    const result = await this.tmdbService.discoverByFilters(input.type, {
+      genres: input.genre_id?.toString(),
+      year: input.year,
+      page: input.page ?? 1,
+      sort: 'popularity.desc',
+      region: 'KR',
+    });
+    // vote_count 200 미만 제외 (잘 알려지지 않은 작품 필터링 강화)
+    const MIN_VOTES_FOR_RECOMMEND = 200;
+    return {
+      results: result.results
+        .filter((r) => (r.vote_count ?? 0) >= MIN_VOTES_FOR_RECOMMEND)
+        .slice(0, 10)
+        .map((r) => ({
+          id: r.id,
+          title: r.title || r.name || '',
+          overview: (r.overview || '').slice(0, 100),
+          release_date: r.release_date || r.first_air_date || '',
+          vote_average: r.vote_average ?? 0,
+          vote_count: r.vote_count ?? 0,
+          genre_ids: r.genre_ids ?? [],
+        })),
+    };
   }
 
   async buildUserContext(userId: number): Promise<UserContext> {

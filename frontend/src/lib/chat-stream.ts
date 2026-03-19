@@ -7,22 +7,71 @@ export interface ChatStreamCallbacks {
   onError: (message: string) => void;
 }
 
-export async function sendChatMessage(
-  sessionId: number,
-  content: string,
-  callbacks: ChatStreamCallbacks,
-): Promise<void> {
-  const token = localStorage.getItem('access_token');
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) return null;
 
-  const response = await fetch(`${apiUrl}/chat/sessions/${sessionId}/messages`, {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+  try {
+    const res = await fetch(`${apiUrl}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchWithAuth(
+  url: string,
+  body: string,
+): Promise<Response> {
+  let token = localStorage.getItem('access_token');
+
+  let response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify({ content }),
+    body,
   });
+
+  // 401이면 토큰 갱신 후 재시도
+  if (response.status === 401) {
+    token = await refreshAccessToken();
+    if (!token) return response;
+
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body,
+    });
+  }
+
+  return response;
+}
+
+export async function sendChatMessage(
+  sessionId: number,
+  content: string,
+  callbacks: ChatStreamCallbacks,
+): Promise<void> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+  const response = await fetchWithAuth(
+    `${apiUrl}/chat/sessions/${sessionId}/messages`,
+    JSON.stringify({ content }),
+  );
 
   if (!response.ok) {
     if (response.status === 401) {

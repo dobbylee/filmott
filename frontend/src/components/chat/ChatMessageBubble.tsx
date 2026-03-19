@@ -1,5 +1,6 @@
 'use client';
 
+import ReactMarkdown from 'react-markdown';
 import RecommendationCards from './RecommendationCards';
 import type { ChatMessageData } from '@/types/chat';
 
@@ -19,9 +20,15 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
             : 'bg-white/5 border border-white/10'
         }`}
       >
-        <p className="text-sm leading-relaxed text-white/90 whitespace-pre-wrap">
-          {message.content}
-        </p>
+        {isUser ? (
+          <p className="text-sm leading-relaxed text-white/90 whitespace-pre-wrap">
+            {message.content}
+          </p>
+        ) : (
+          <div className="text-sm leading-relaxed text-white/90 prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-white">
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          </div>
+        )}
 
         {!isUser && message.recommendations && message.recommendations.length > 0 && (
           <RecommendationCards recommendations={message.recommendations} />

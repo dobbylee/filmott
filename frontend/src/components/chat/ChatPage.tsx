@@ -73,15 +73,21 @@ export default function ChatPage() {
     loadSessions();
   }, [loadSessions]);
 
-  // 세션 메시지 이력 로드
+  // 세션 메시지 이력 로드 (실패 시 1회 재시도)
   const loadMessages = useCallback(async (targetSessionId: number) => {
-    try {
-      setError(null);
-      const res = await api.get<ChatMessageData[]>(`/chat/sessions/${targetSessionId}/messages`);
-      setMessages(res.data);
-    } catch {
-      setError('메시지 이력을 불러오지 못했습니다.');
+    setError(null);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await api.get<ChatMessageData[]>(`/chat/sessions/${targetSessionId}/messages`);
+        setMessages(res.data);
+        return;
+      } catch {
+        if (attempt === 0) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
     }
+    setError('메시지 이력을 불러오지 못했습니다.');
   }, []);
 
   // URL에서 세션 ID 복원
@@ -131,6 +137,7 @@ export default function ChatPage() {
         setStreamingText('');
         setStreamingRecs(null);
         setError(null);
+        router.replace('/chat', { scroll: false });
       }
     } catch {
       // 삭제 실패 무시
@@ -213,8 +220,39 @@ export default function ChatPage() {
           setStreamingRecs(null);
         },
       });
+
+      // onDone이 호출되지 않은 경우 (연결 끊김 등) 받은 텍스트 보존
+      if (streamingTextRef.current && isStreaming) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            role: 'assistant',
+            content: streamingTextRef.current,
+            recommendations: streamingRecsRef.current,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+        setIsStreaming(false);
+        setStreamingText('');
+        setStreamingRecs(null);
+      }
     } catch {
-      setError('메시지 전송 중 오류가 발생했습니다.');
+      // 에러 시에도 받은 텍스트가 있으면 보존
+      if (streamingTextRef.current) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            role: 'assistant',
+            content: streamingTextRef.current,
+            recommendations: streamingRecsRef.current,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      } else {
+        setError('메시지 전송 중 오류가 발생했습니다.');
+      }
       setIsStreaming(false);
       setStreamingText('');
       setStreamingRecs(null);

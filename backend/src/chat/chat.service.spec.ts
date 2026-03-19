@@ -2,9 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import {
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import type Anthropic from '@anthropic-ai/sdk';
 import { ChatService } from './chat.service';
 import { ChatSession } from './entities/chat-session.entity';
 import { ChatMessage } from './entities/chat-message.entity';
@@ -147,6 +149,27 @@ describe('ChatService', () => {
       await service.createSession(1);
 
       expect(mockSessionRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('세션이 52개이면 초과분(3개)을 한꺼번에 삭제해야 한다', async () => {
+      mockSessionRepo.count.mockResolvedValue(52);
+      mockSessionRepo.find.mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
+      mockSessionRepo.delete.mockResolvedValue({ affected: 3 });
+
+      const created = { id: 53, userId: 1, title: null, createdAt: new Date() };
+      mockSessionRepo.create.mockReturnValue(created);
+      mockSessionRepo.save.mockResolvedValue(created);
+
+      await service.createSession(1);
+
+      // excess = 52 - 50 + 1 = 3
+      expect(mockSessionRepo.find).toHaveBeenCalledWith({
+        where: { userId: 1 },
+        order: { updatedAt: 'ASC' },
+        take: 3,
+        select: ['id'],
+      });
+      expect(mockSessionRepo.delete).toHaveBeenCalledWith([1, 2, 3]);
     });
   });
 
@@ -392,23 +415,9 @@ describe('ChatService', () => {
         { role: 'user', content: '추천해줘', createdAt: new Date() },
       ]);
 
-      // Anthropic SDK mock stream
-      const mockFinalMessage = {
-        content: [
-          { type: 'text', text: '좋은 작품을 골라봤어요.' },
-          {
-            type: 'tool_use',
-            name: 'recommend_movies',
-            input: {
-              recommendations: [
-                { tmdbId: 496243, contentType: 'movie', title: '기생충', reason: '명작입니다.' },
-              ],
-            },
-          },
-        ],
-      };
-
-      const mockStream = {
+      // Anthropic SDK mock — tool use 루프: search_tmdb → recommend_movies
+      let callCount = 0;
+      const createMockStream = (finalMsg: { content: Anthropic.ContentBlock[]; stop_reason: string }) => ({
         on: jest.fn().mockImplementation(function (this: { _listeners: Record<string, ((...args: unknown[]) => void)[]> }, event: string, handler: (...args: unknown[]) => void) {
           if (!this._listeners) this._listeners = {};
           if (!this._listeners[event]) this._listeners[event] = [];
@@ -417,19 +426,60 @@ describe('ChatService', () => {
         }),
         _listeners: {} as Record<string, ((...args: unknown[]) => void)[]>,
         finalMessage: jest.fn().mockImplementation(async function (this: { _listeners: Record<string, ((...args: unknown[]) => void)[]> }) {
-          // text 이벤트 트리거
           if (this._listeners?.text) {
-            for (const handler of this._listeners.text) {
-              handler('좋은 작품을 골라봤어요.');
+            for (const block of finalMsg.content) {
+              if (block.type === 'text') {
+                for (const handler of this._listeners.text) {
+                  handler(block.text);
+                }
+              }
             }
           }
-          return mockFinalMessage;
+          return finalMsg;
         }),
+      });
+
+      // Round 1: AI calls search_tmdb
+      const searchResponse = {
+        content: [
+          { type: 'tool_use' as const, id: 'tool_1', name: 'search_tmdb', input: { type: 'movie', genre_id: 35 } },
+        ],
+        stop_reason: 'tool_use',
       };
 
-      // Anthropic SDK에 접근해서 stream mock 설정
+      // Round 2: AI calls recommend_movies with search results
+      const recommendResponse = {
+        content: [
+          { type: 'text' as const, text: '코미디 작품을 골라봤어요.' },
+          {
+            type: 'tool_use' as const,
+            id: 'tool_2',
+            name: 'recommend_movies',
+            input: {
+              recommendations: [
+                { tmdbId: 496243, contentType: 'movie', title: '기생충', reason: '명작입니다.' },
+              ],
+            },
+          },
+        ],
+        stop_reason: 'tool_use',
+      };
+
       const anthropicInstance = (service as unknown as { anthropic: { messages: { stream: jest.Mock } } }).anthropic;
-      anthropicInstance.messages.stream = jest.fn().mockReturnValue(mockStream);
+      anthropicInstance.messages.stream = jest.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return createMockStream(searchResponse as unknown as { content: Anthropic.ContentBlock[]; stop_reason: string });
+        return createMockStream(recommendResponse as unknown as { content: Anthropic.ContentBlock[]; stop_reason: string });
+      });
+
+      // TMDB search mock (discoverByFilters)
+      const mockTmdbService = (service as unknown as { tmdbService: { discoverByFilters: jest.Mock; searchByType: jest.Mock; getDetails: jest.Mock } }).tmdbService;
+      mockTmdbService.discoverByFilters = jest.fn().mockResolvedValue({
+        results: [{ id: 496243, title: '기생충', overview: '...', release_date: '2019-05-30', vote_average: 8.6, vote_count: 15000, genre_ids: [35, 18] }],
+      });
+
+      // Content repo for posterUrl
+      mockContentRepo.findOne.mockResolvedValue({ posterUrl: '/poster.jpg', title: '기생충' });
 
       const emittedEvents: { event: string; data: unknown }[] = [];
       const emit = (event: string, data: unknown) => {
@@ -437,7 +487,7 @@ describe('ChatService', () => {
       };
 
       // AI 응답 메시지 저장
-      const assistantMessage = { id: 2, sessionId: 1, role: 'assistant', content: '좋은 작품을 골라봤어요.' };
+      const assistantMessage = { id: 2, sessionId: 1, role: 'assistant', content: '코미디 작품을 골라봤어요.' };
       mockMessageRepo.create.mockReturnValue(assistantMessage);
       mockMessageRepo.save.mockResolvedValue(assistantMessage);
 
@@ -455,6 +505,19 @@ describe('ChatService', () => {
       const doneEvents = emittedEvents.filter((e) => e.event === 'done');
       expect(doneEvents).toHaveLength(1);
       expect((doneEvents[0].data as { messageId: number }).messageId).toBe(2);
+
+      // TMDB 검색이 호출되었는지 확인
+      expect(anthropicInstance.messages.stream).toHaveBeenCalledTimes(2);
+    });
+
+    it('ANTHROPIC_API_KEY가 없으면 BadRequestException을 던져야 한다', async () => {
+      mockConfigService.get.mockReturnValueOnce('');
+
+      const emit = jest.fn();
+
+      await expect(
+        service.sendMessageStream(1, 1, '안녕', emit),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('다른 사용자의 세션에 메시지 전송 시 ForbiddenException을 던져야 한다', async () => {
