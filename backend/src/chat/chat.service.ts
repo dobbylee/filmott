@@ -13,6 +13,7 @@ import { ChatMessage, ChatRecommendation } from './entities/chat-message.entity'
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
+import { Content } from '../contents/content.entity';
 import {
   buildSystemPrompt,
   UserContext,
@@ -69,6 +70,8 @@ export class ChatService {
     private readonly reviewRepo: Repository<Review>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Content)
+    private readonly contentRepo: Repository<Content>,
     private readonly configService: ConfigService,
   ) {
     this.anthropic = new Anthropic({
@@ -219,12 +222,23 @@ export class ChatService {
     // 7. 스트림 완료 대기
     const finalMessage = await stream.finalMessage();
 
-    // 8. tool_use 결과 추출
+    // 8. tool_use 결과 추출 + posterUrl 조회
     for (const block of finalMessage.content) {
       if (block.type === 'tool_use' && block.name === 'recommend_movies') {
         const input = block.input as { recommendations: ChatRecommendation[] };
         recommendations = input.recommendations;
-        emit('recommendations', { recommendations });
+
+        // Content 테이블에서 posterUrl 조회
+        const recsWithPoster = await Promise.all(
+          recommendations.map(async (rec) => {
+            const content = await this.contentRepo.findOne({
+              where: { tmdbId: rec.tmdbId, contentType: rec.contentType },
+              select: ['posterUrl'],
+            });
+            return { ...rec, posterUrl: content?.posterUrl ?? null };
+          }),
+        );
+        emit('recommendations', { recommendations: recsWithPoster });
       }
     }
 

@@ -11,6 +11,7 @@ import { ChatMessage } from './entities/chat-message.entity';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
+import { Content } from '../contents/content.entity';
 
 // Anthropic SDK mock
 jest.mock('@anthropic-ai/sdk', () => {
@@ -58,6 +59,10 @@ describe('ChatService', () => {
     findOne: jest.fn(),
   };
 
+  const mockContentRepo = {
+    findOne: jest.fn(),
+  };
+
   const mockConfigService = {
     get: jest.fn().mockReturnValue('test-api-key'),
   };
@@ -71,6 +76,7 @@ describe('ChatService', () => {
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
+        { provide: getRepositoryToken(Content), useValue: mockContentRepo },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();

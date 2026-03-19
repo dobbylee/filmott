@@ -45,8 +45,9 @@ export default function ChatPage() {
   }, [streamingRecs]);
 
   const scrollToBottom = useCallback(() => {
-    if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === 'function') {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
     }
   }, []);
 
