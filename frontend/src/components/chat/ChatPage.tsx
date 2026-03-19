@@ -208,7 +208,7 @@ export default function ChatPage() {
   const hasConversation = messages.length > 0 || isStreaming;
 
   return (
-    <div className="flex h-[calc(100dvh-80px)]">
+    <div className="mx-auto w-full max-w-7xl flex h-[calc(100dvh-80px)]">
       {/* 데스크톱 사이드바 */}
       <aside className="hidden md:flex w-64 flex-shrink-0 flex-col border-r border-white/10 bg-black/30">
         <ChatSessionList
