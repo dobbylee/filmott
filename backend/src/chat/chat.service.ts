@@ -75,10 +75,33 @@ export class ChatService {
     });
   }
 
+  private static readonly MAX_SESSIONS_PER_USER = 50;
+
   async createSession(userId: number): Promise<{ id: number; title: string | null; createdAt: Date }> {
+    // 사용자당 최대 세션 수 제한 — 초과 시 가장 오래된 세션 삭제
+    await this.cleanupOldSessions(userId);
+
     const session = this.sessionRepo.create({ userId, title: null });
     const saved = await this.sessionRepo.save(session);
     return { id: saved.id, title: saved.title, createdAt: saved.createdAt };
+  }
+
+  private async cleanupOldSessions(userId: number): Promise<void> {
+    const count = await this.sessionRepo.count({ where: { userId } });
+    if (count < ChatService.MAX_SESSIONS_PER_USER) return;
+
+    const excess = count - ChatService.MAX_SESSIONS_PER_USER + 1; // +1: 새 세션 공간 확보
+    const oldest = await this.sessionRepo.find({
+      where: { userId },
+      order: { updatedAt: 'ASC' },
+      take: excess,
+      select: ['id'],
+    });
+
+    if (oldest.length > 0) {
+      const ids = oldest.map((s) => s.id);
+      await this.sessionRepo.delete(ids);
+    }
   }
 
   async getSessions(userId: number): Promise<SessionListItem[]> {

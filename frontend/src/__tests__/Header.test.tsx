@@ -68,6 +68,25 @@ describe('Header', () => {
     expect(screen.queryByText('로그아웃')).not.toBeInTheDocument();
   });
 
+  it('로그인 상태에서 AI 추천 링크를 표시해야 한다', () => {
+    mockUser = { nickname: 'testuser' };
+
+    render(<Header />);
+
+    // 데스크톱 네비게이션에 AI 추천 링크
+    const aiLinks = screen.getAllByText('AI 추천');
+    expect(aiLinks.length).toBeGreaterThan(0);
+
+    const desktopLink = aiLinks.find((el) => el.closest('a')?.getAttribute('href') === '/chat');
+    expect(desktopLink).toBeDefined();
+  });
+
+  it('비로그인 상태에서 AI 추천 링크를 표시하지 않아야 한다', () => {
+    render(<Header />);
+
+    expect(screen.queryByText('AI 추천')).not.toBeInTheDocument();
+  });
+
   it('검색 폼 제출을 처리해야 한다', async () => {
     const user = userEvent.setup();
 

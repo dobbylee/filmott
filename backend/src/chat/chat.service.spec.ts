@@ -31,8 +31,10 @@ describe('ChatService', () => {
     create: jest.fn(),
     save: jest.fn(),
     findOne: jest.fn(),
+    find: jest.fn(),
     delete: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
 
@@ -86,6 +88,7 @@ describe('ChatService', () => {
 
   describe('createSession', () => {
     it('새 세션을 생성해야 한다', async () => {
+      mockSessionRepo.count.mockResolvedValue(0);
       const created = { id: 1, userId: 1, title: null, createdAt: new Date() };
       mockSessionRepo.create.mockReturnValue(created);
       mockSessionRepo.save.mockResolvedValue(created);
@@ -101,6 +104,37 @@ describe('ChatService', () => {
         userId: 1,
         title: null,
       });
+    });
+
+    it('세션이 50개 이상이면 가장 오래된 세션을 삭제해야 한다', async () => {
+      mockSessionRepo.count.mockResolvedValue(50);
+      mockSessionRepo.find.mockResolvedValue([{ id: 10 }]);
+      mockSessionRepo.delete.mockResolvedValue({ affected: 1 });
+
+      const created = { id: 51, userId: 1, title: null, createdAt: new Date() };
+      mockSessionRepo.create.mockReturnValue(created);
+      mockSessionRepo.save.mockResolvedValue(created);
+
+      await service.createSession(1);
+
+      expect(mockSessionRepo.find).toHaveBeenCalledWith({
+        where: { userId: 1 },
+        order: { updatedAt: 'ASC' },
+        take: 1,
+        select: ['id'],
+      });
+      expect(mockSessionRepo.delete).toHaveBeenCalledWith([10]);
+    });
+
+    it('세션이 50개 미만이면 삭제하지 않아야 한다', async () => {
+      mockSessionRepo.count.mockResolvedValue(10);
+      const created = { id: 11, userId: 1, title: null, createdAt: new Date() };
+      mockSessionRepo.create.mockReturnValue(created);
+      mockSessionRepo.save.mockResolvedValue(created);
+
+      await service.createSession(1);
+
+      expect(mockSessionRepo.find).not.toHaveBeenCalled();
     });
   });
 
