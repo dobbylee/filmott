@@ -59,7 +59,7 @@ describe('ChatService', () => {
   };
 
   const mockConfigService = {
-    getOrThrow: jest.fn().mockReturnValue('test-api-key'),
+    get: jest.fn().mockReturnValue('test-api-key'),
   };
 
   beforeEach(async () => {

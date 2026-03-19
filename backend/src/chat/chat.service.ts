@@ -1,5 +1,6 @@
 import {
   Injectable,
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -71,7 +72,7 @@ export class ChatService {
     private readonly configService: ConfigService,
   ) {
     this.anthropic = new Anthropic({
-      apiKey: this.configService.getOrThrow<string>('ANTHROPIC_API_KEY'),
+      apiKey: this.configService.get<string>('ANTHROPIC_API_KEY', ''),
     });
   }
 
@@ -157,6 +158,12 @@ export class ChatService {
     content: string,
     emit: SseEmitter,
   ): Promise<void> {
+    // 0. API key 검증
+    const apiKey = this.configService.get<string>('ANTHROPIC_API_KEY', '');
+    if (!apiKey) {
+      throw new BadRequestException('AI 추천 기능이 현재 비활성화 상태입니다.');
+    }
+
     // 1. 세션 소유자 검증
     await this.verifySessionOwner(userId, sessionId);
 
