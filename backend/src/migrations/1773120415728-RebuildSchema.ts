@@ -47,6 +47,7 @@ export class RebuildSchema1773120415728 implements MigrationInterface {
         "category" character varying(50) NOT NULL,
         "rank" integer NOT NULL,
         "content_id" integer,
+        "audience_count" bigint,
         "fetched_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
         CONSTRAINT "PK_rankings" PRIMARY KEY ("id")
       )

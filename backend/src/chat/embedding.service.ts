@@ -73,20 +73,33 @@ export class EmbeddingService {
     const openai = this.ensureOpenAI();
 
     const genreNames = (content.genres || []).map((g) => g.name).join(', ');
-    const credits = (content.credits || [])
+    const cast = (content.credits || [])
       .slice(0, 5)
       .map((c) => c.name)
       .join(', ');
     const year = content.releaseDate
       ? new Date(content.releaseDate).getFullYear()
       : '알 수 없음';
+    const contentType = content.contentType === 'tv' ? '시리즈' : '영화';
+
+    // OTT 플랫폼 추출
+    const ottNames = (content.watchProviders?.flatrate || [])
+      .map((p) => p.provider_name)
+      .join(', ');
 
     const prompt = `아래 작품 정보를 바탕으로 분위기, 감성, 테마, 시청 상황을 포함한 한국어 설명을 3~5문장으로 작성하세요.
+첫 문장에 연도, 국가, 타입, 플랫폼 정보를 자연스럽게 포함하세요.
 제목: ${content.title}
+타입: ${contentType}
 장르: ${genreNames}
 줄거리: ${content.overview || '정보 없음'}
-출연진: ${credits || '정보 없음'}
-연도: ${year}`;
+감독: ${content.director || '정보 없음'}
+출연진: ${cast || '정보 없음'}
+연도: ${year}
+제작 국가: ${content.originCountry || '정보 없음'}
+OTT 플랫폼: ${ottNames || '정보 없음'}
+평점: ${content.voteAverage ?? '정보 없음'}
+러닝타임: ${content.runtime ? content.runtime + '분' : '정보 없음'}`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-5-mini',

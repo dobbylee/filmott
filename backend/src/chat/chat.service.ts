@@ -97,7 +97,7 @@ export class ChatService {
     const similarContents = hasMetadata
       ? await this.embeddingService.searchSimilar(
           content,
-          15,
+          10,
           userContext.watchedTmdbIds,
         )
       : [];
@@ -151,20 +151,18 @@ export class ChatService {
       throw error;
     }
 
-    // 7. 텍스트에서 볼드(**제목**) 패턴으로 추천 작품 추출 → TMDB 검색 → 카드 생성
+    // 7. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
     const titles = this.extractTitlesFromText(fullText);
     if (titles.length > 0) {
-      const recommendations = await this.resolveRecommendations(
-        titles.map((t) => ({
-          tmdbId: 0,
-          contentType: 'movie' as const,
-          title: t.korean,
-          englishTitle: t.english,
-        })),
-        similarContents,
-      );
-      if (recommendations.length > 0) {
-        emit('recommendations', { recommendations });
+      const { matched, unmatched } = this.matchTitlesToCandidates(titles, similarContents);
+
+      if (matched.length > 0) {
+        emit('recommendations', { recommendations: matched });
+      }
+
+      // 후보 외 작품은 비동기로 TMDB 검색 + 캐싱 (카드 미표시, await 안 함)
+      if (unmatched.length > 0) {
+        this.cacheUnmatchedTitles(unmatched).catch(() => {});
       }
     }
 
@@ -196,120 +194,73 @@ export class ChatService {
     return results.slice(0, 5);
   }
 
-  async resolveRecommendations(
-    parsed: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string; englishTitle?: string | null }[],
+  matchTitlesToCandidates(
+    titles: { korean: string; english: string | null }[],
     candidates: SimilarContent[],
-  ): Promise<ChatRecommendation[]> {
-    const settled = await Promise.allSettled(
-      parsed.map((rec) => this.resolveRecommendation(rec, candidates)),
-    );
+  ): { matched: ChatRecommendation[]; unmatched: { korean: string; english: string | null }[] } {
+    const matched: ChatRecommendation[] = [];
+    const unmatched: { korean: string; english: string | null }[] = [];
 
-    return settled
-      .filter(
-        (r): r is PromiseFulfilledResult<ChatRecommendation | null> =>
-          r.status === 'fulfilled',
-      )
-      .map((r) => r.value)
-      .filter((r): r is ChatRecommendation => r !== null);
+    for (const title of titles) {
+      const korean = title.korean.toLowerCase();
+      const english = title.english?.toLowerCase();
+
+      // 1차: 정확 일치
+      let candidate = candidates.find((c) => {
+        const cTitle = c.title.toLowerCase();
+        return cTitle === korean || (english && cTitle === english);
+      });
+
+      // 2차: 포함 관계 (예: "오징어 게임" ↔ "오징어 게임: 시즌 2")
+      if (!candidate) {
+        candidate = candidates.find((c) => {
+          const cTitle = c.title.toLowerCase();
+          return cTitle.includes(korean) || korean.includes(cTitle)
+            || (english && (cTitle.includes(english) || english.includes(cTitle)));
+        });
+      }
+
+      if (candidate) {
+        matched.push({
+          tmdbId: candidate.tmdbId,
+          contentType: candidate.contentType as 'movie' | 'tv',
+          title: candidate.title,
+          posterUrl: candidate.posterUrl,
+        });
+      } else {
+        unmatched.push(title);
+      }
+    }
+
+    return { matched, unmatched };
   }
 
-  private async resolveRecommendation(
-    rec: { tmdbId: number; contentType: 'movie' | 'tv'; title?: string; englishTitle?: string | null },
-    candidates: SimilarContent[],
-  ): Promise<ChatRecommendation | null> {
-    // 1. 벡터 검색 후보에서 찾기
-    const candidate = candidates.find((c) => c.tmdbId === rec.tmdbId);
-    if (candidate) {
-      return {
-        tmdbId: rec.tmdbId,
-        contentType: rec.contentType,
-        title: candidate.title,
-        posterUrl: candidate.posterUrl,
-      };
-    }
-
-    // 2. 후보에 없는 작품 → TMDB에서 조회 + DB 저장
-    if (rec.tmdbId && rec.tmdbId > 0) {
+  private async cacheUnmatchedTitles(
+    titles: { korean: string; english: string | null }[],
+  ): Promise<void> {
+    for (const title of titles) {
       try {
-        const content = await this.contentsService.findOrFetchByTmdbId(
-          rec.tmdbId,
-          rec.contentType,
-        );
-        // 비동기 임베딩 캐싱 (await 하지 않음)
-        this.embeddingService.cacheContentMetadata(content.id).catch(() => {});
-        return {
-          tmdbId: rec.tmdbId,
-          contentType: rec.contentType,
-          title: content.title,
-          posterUrl: content.posterUrl ?? null,
-        };
-      } catch {
-        // TMDB ID 조회 실패 → 제목으로 fallback 검색
-      }
-    }
-
-    // 3. tmdbId가 0이거나 TMDB 조회 실패 → 제목으로 TMDB 검색 fallback (movie + tv 둘 다 검색)
-    if (rec.title) {
-      try {
+        const searchQuery = title.english || title.korean;
         const [movieResult, tvResult] = await Promise.all([
-          this.contentsService.searchContents(rec.title, 'movie', 1).catch(() => null),
-          this.contentsService.searchContents(rec.title, 'tv', 1).catch(() => null),
+          this.contentsService.searchContents(searchQuery, 'movie', 1).catch(() => null),
+          this.contentsService.searchContents(searchQuery, 'tv', 1).catch(() => null),
         ]);
 
-        // movie + tv 결과를 합쳐서 제목 정확도 + 인기순으로 정렬
-        const allResults = [
-          ...(movieResult?.results?.map((r) => ({ ...r, type: 'movie' as const })) ?? []),
-          ...(tvResult?.results?.map((r) => ({ ...r, type: 'tv' as const })) ?? []),
-        ];
+        const firstMatch =
+          (movieResult?.results?.[0] ? { id: movieResult.results[0].id, type: 'movie' as const } : null)
+          ?? (tvResult?.results?.[0] ? { id: tvResult.results[0].id, type: 'tv' as const } : null);
 
-        const searchTitle = rec.title.toLowerCase();
-        const searchEnglish = rec.englishTitle?.toLowerCase();
-
-        const bestMatch = allResults
-          .sort((a, b) => {
-            const aTitle = (a.title ?? a.name ?? '').toLowerCase();
-            const bTitle = (b.title ?? b.name ?? '').toLowerCase();
-            const aOriginal = (a.original_title ?? a.original_name ?? '').toLowerCase();
-            const bOriginal = (b.original_title ?? b.original_name ?? '').toLowerCase();
-
-            // 정확 일치 우선 (한국어 또는 영어)
-            const aExact = aTitle === searchTitle || aOriginal === searchTitle
-              || (searchEnglish && (aOriginal === searchEnglish || aTitle === searchEnglish));
-            const bExact = bTitle === searchTitle || bOriginal === searchTitle
-              || (searchEnglish && (bOriginal === searchEnglish || bTitle === searchEnglish));
-            if (aExact && !bExact) return -1;
-            if (!aExact && bExact) return 1;
-
-            // 그 다음 vote_count 순
-            return (b.vote_count ?? 0) - (a.vote_count ?? 0);
-          })[0];
-
-        if (bestMatch?.id) {
+        if (firstMatch) {
           const content = await this.contentsService.findOrFetchByTmdbId(
-            bestMatch.id,
-            bestMatch.type,
+            firstMatch.id,
+            firstMatch.type,
           );
           this.embeddingService.cacheContentMetadata(content.id).catch(() => {});
-          return {
-            tmdbId: content.tmdbId,
-            contentType: bestMatch.type,
-            title: content.title,
-            posterUrl: content.posterUrl ?? null,
-          };
         }
       } catch {
-        // 검색도 실패 시 제목만으로 카드
+        // 캐싱 실패 무시
       }
-
-      return {
-        tmdbId: rec.tmdbId || 0,
-        contentType: rec.contentType,
-        title: rec.title,
-        posterUrl: null,
-      };
     }
-
-    return null;
   }
 
   async buildUserContext(userId: number): Promise<UserContext> {

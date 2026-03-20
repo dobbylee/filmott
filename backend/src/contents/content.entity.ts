@@ -70,6 +70,12 @@ export class Content {
   @Column({ type: 'integer', nullable: true })
   runtime?: number;
 
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  director!: string | null;
+
+  @Column({ name: 'origin_country', type: 'varchar', length: 100, nullable: true })
+  originCountry!: string | null;
+
   @Column({ name: 'watch_providers', type: 'jsonb', nullable: true })
   watchProviders?: ContentWatchProviders | null;
 

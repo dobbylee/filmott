@@ -28,8 +28,12 @@ export interface TmdbItem {
   runtime?: number;
   number_of_episodes?: number;
   episode_run_time?: number[];
+  origin_country?: string[];
+  original_language?: string;
+  production_countries?: { iso_3166_1: string; name: string }[];
   credits?: {
     cast: TmdbCast[];
+    crew?: TmdbCrew[];
   };
   ['watch/providers']?: {
     results?: {
@@ -44,6 +48,14 @@ export interface TmdbCast {
   character: string;
   profile_path?: string;
   order: number;
+}
+
+export interface TmdbCrew {
+  id: number;
+  name: string;
+  job: string;
+  department: string;
+  profile_path?: string;
 }
 
 export interface TmdbWatchProviderCountry {

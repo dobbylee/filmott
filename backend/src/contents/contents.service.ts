@@ -249,6 +249,20 @@ export class ContentsService {
       runtime = tmdbData.episode_run_time[0];
     }
 
+    // 감독 추출 (crew에서 job === 'Director')
+    const director = tmdbData.credits?.crew
+      ?.filter((c) => c.job === 'Director')
+      .map((c) => c.name)
+      .slice(0, 2)
+      .join(', ') || null;
+
+    // 제작 국가 추출
+    const originCountry = (
+      tmdbData.origin_country
+      ?? tmdbData.production_countries?.map((c) => c.iso_3166_1)
+      ?? []
+    ).join(', ') || null;
+
     return {
       tmdbId: tmdbData.id,
       contentType: type,
@@ -269,6 +283,8 @@ export class ContentsService {
         name: GENRE_NAME_MAP[g.id] ?? g.name,
       })),
       runtime: runtime ?? undefined,
+      director,
+      originCountry,
     };
   }
 }
