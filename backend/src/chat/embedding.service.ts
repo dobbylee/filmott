@@ -108,8 +108,8 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 러닝타임: ${content.runtime ? content.runtime + '분' : '정보 없음'}`;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-5-mini',
-      max_completion_tokens: 2048,
+      model: 'gpt-4o-mini',
+      max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
     });
 
