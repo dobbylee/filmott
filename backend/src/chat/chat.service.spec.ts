@@ -9,6 +9,7 @@ import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
+import { ParsedIntent } from './intent-analyzer';
 
 // OpenAI SDK mock
 const mockStreamCreate = jest.fn();
@@ -25,6 +26,13 @@ jest.mock('openai', () => {
     })),
   };
 });
+
+// intent-analyzer mock
+const mockAnalyzeIntent = jest.fn<Promise<ParsedIntent>, [string, unknown]>();
+jest.mock('./intent-analyzer', () => ({
+  analyzeIntent: (...args: [string, unknown]) => mockAnalyzeIntent(...args),
+  // ParsedIntent 타입은 import로 사용하므로 re-export 불필요
+}));
 
 describe('ChatService', () => {
   let service: ChatService;
@@ -176,6 +184,14 @@ describe('ChatService', () => {
   });
 
   describe('sendMessageStream', () => {
+    const emptyIntent: ParsedIntent = {
+      ottProviderNames: [],
+      countries: [],
+      personNames: [],
+      dateRange: null,
+      contentType: null,
+    };
+
     const setupEmptyUserContext = () => {
       const emptyQb = {
         innerJoin: jest.fn().mockReturnThis(),
@@ -193,6 +209,7 @@ describe('ChatService', () => {
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(emptyQb);
       mockUserRepo.findOne.mockResolvedValue({ id: 1, subscribedOtts: ['netflix'] });
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
+      mockAnalyzeIntent.mockResolvedValue({ ...emptyIntent });
     };
 
     it('볼드 제목이 후보와 매칭되면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
@@ -347,6 +364,101 @@ describe('ChatService', () => {
           ]),
         }),
       );
+    });
+
+    it('OTT 키워드가 있는 메시지는 analyzeIntent 결과의 ottProviderNames를 filters로 전달해야 한다', async () => {
+      setupEmptyUserContext();
+      mockAnalyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        ottProviderNames: ['Netflix'],
+      });
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '넷플릭스 추천!' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '넷플릭스에서 볼만한 영화', [], jest.fn());
+
+      expect(mockAnalyzeIntent).toHaveBeenCalled();
+      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+        expect.any(String),
+        20,
+        expect.any(Array),
+        expect.objectContaining({ ottProviderNames: ['Netflix'] }),
+      );
+    });
+
+    it('키워드 없는 메시지는 filters 없이 searchSimilar를 호출해야 한다', async () => {
+      setupEmptyUserContext();
+      mockAnalyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '재미있는 영화 추천해줘', [], jest.fn());
+
+      expect(mockAnalyzeIntent).toHaveBeenCalled();
+      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+        expect.any(String),
+        20,
+        expect.any(Array),
+        undefined,
+      );
+    });
+
+    it('analyzeIntent가 국가/인물/연도 의도를 반환하면 해당 filters를 전달해야 한다', async () => {
+      setupEmptyUserContext();
+      mockAnalyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        countries: ['KR'],
+        personNames: ['봉준호'],
+        dateRange: { from: '2020-01-01', to: null },
+        contentType: 'movie',
+      });
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '봉준호 감독의 최신 한국 영화', [], jest.fn());
+
+      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+        expect.any(String),
+        20,
+        expect.any(Array),
+        expect.objectContaining({
+          countries: ['KR'],
+          personNames: ['봉준호'],
+          dateRange: { from: '2020-01-01', to: null },
+          contentType: 'movie',
+        }),
+      );
+    });
+
+    it('content_metadata가 없으면 analyzeIntent를 호출하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(false);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '추천해줘', [], jest.fn());
+
+      expect(mockAnalyzeIntent).not.toHaveBeenCalled();
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
   });
 

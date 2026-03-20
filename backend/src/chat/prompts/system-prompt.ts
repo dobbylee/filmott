@@ -1,5 +1,6 @@
 import { OttProvider } from '../../common/ott-providers';
 import { SimilarContent } from '../embedding.service';
+import { ParsedIntent } from '../intent-analyzer';
 
 export interface FavoriteContent {
   title: string;
@@ -32,6 +33,7 @@ export function buildSystemPrompt(
   subscribedOtts: string[],
   ottProviders: OttProvider[],
   candidates: SimilarContent[],
+  intent?: ParsedIntent,
 ): string {
   const ottNames = subscribedOtts
     .map((id) => ottProviders.find((p) => p.id === id)?.name)
@@ -80,12 +82,46 @@ export function buildSystemPrompt(
   const candidatesSection =
     candidates.length > 0
       ? candidates
-          .map(
-            (c, i) =>
-              `${i + 1}. [ID:${c.tmdbId}|${c.contentType}] ${c.title} (${c.voteAverage}점) - 장르: ${(c.genres || []).map((g) => g.name).join(', ')}\n   ${c.description}`,
-          )
+          .map((c, i) => {
+            const genreStr = (c.genres || []).map((g) => g.name).join(', ');
+            const directorStr = c.director ? ` | 감독: ${c.director}` : '';
+            const countryStr = c.originCountry ? ` | 국가: ${c.originCountry}` : '';
+            return `${i + 1}. [ID:${c.tmdbId}|${c.contentType}] ${c.title} (${c.voteAverage}점) - 장르: ${genreStr}${directorStr}${countryStr}\n   ${c.description}`;
+          })
           .join('\n')
       : '(추천 후보가 없습니다)';
+
+  // 필터 맥락 설명 구성
+  const filterDescriptions: string[] = [];
+  if (intent) {
+    if (intent.ottProviderNames.length > 0) {
+      filterDescriptions.push(`사용자가 ${intent.ottProviderNames.join(', ')}에서 볼 수 있는 작품을 요청했습니다.`);
+    }
+    if (intent.countries.length > 0) {
+      const countryLabels = intent.countries.join(', ');
+      filterDescriptions.push(`사용자가 ${countryLabels} 작품을 요청했습니다.`);
+    }
+    if (intent.personNames.length > 0) {
+      filterDescriptions.push(`사용자가 ${intent.personNames.join(', ')}의 작품을 요청했습니다.`);
+    }
+    if (intent.dateRange) {
+      if (intent.dateRange.from && intent.dateRange.to) {
+        filterDescriptions.push(`사용자가 ${intent.dateRange.from} ~ ${intent.dateRange.to} 기간의 작품을 요청했습니다.`);
+      } else if (intent.dateRange.from) {
+        filterDescriptions.push(`사용자가 ${intent.dateRange.from} 이후의 작품을 요청했습니다.`);
+      } else if (intent.dateRange.to) {
+        filterDescriptions.push(`사용자가 ${intent.dateRange.to} 이전의 작품을 요청했습니다.`);
+      }
+    }
+    if (intent.contentType) {
+      const typeLabel = intent.contentType === 'movie' ? '영화' : '시리즈';
+      filterDescriptions.push(`사용자가 ${typeLabel}를 요청했습니다.`);
+    }
+  }
+
+  const filterSection = filterDescriptions.length > 0
+    ? `\n## 검색 필터 맥락\n${filterDescriptions.join('\n')}\n아래 후보 목록은 이 조건이 반영된 결과입니다. 필터 조건에 맞는 작품을 우선 추천하세요.\n`
+    : '';
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -103,7 +139,7 @@ export function buildSystemPrompt(
 보고싶어요: ${wantToWatchSection}
 
 ${ottSection}
-
+${filterSection}
 ## 추천 후보 작품
 아래 목록에서 우선적으로 선택하세요. 목록에 적합한 작품이 없을 때만 본인 지식을 활용하세요.
 ${candidatesSection}

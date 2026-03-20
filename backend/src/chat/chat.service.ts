@@ -16,6 +16,7 @@ import {
   WantToWatchContent,
 } from './prompts/system-prompt';
 import { OTT_PROVIDERS } from '../common/ott-providers';
+import { analyzeIntent, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 
@@ -96,6 +97,14 @@ export class ChatService {
     // 2. 대화 맥락을 합쳐서 벡터 검색 (전체 user 메시지 + 현재 메시지)
     const hasMetadata = await this.embeddingService.hasAnyMetadata();
     let similarContents: SimilarContent[] = [];
+    let intent: ParsedIntent = {
+      ottProviderNames: [],
+      countries: [],
+      personNames: [],
+      dateRange: null,
+      contentType: null,
+    };
+
     if (hasMetadata) {
       const userMessages = (history || [])
         .filter((msg) => msg.role === 'user')
@@ -103,30 +112,47 @@ export class ChatService {
       userMessages.push(content);
       const searchQuery = userMessages.join(' ');
 
-      // "최신", "요즘", "올해", "신작", "새로 나온" 등 키워드 감지
-      const recentKeywords = /최신|요즘|올해|신작|새로\s*나온|최근/;
-      const recentOnly = recentKeywords.test(searchQuery);
-      const filters: SearchFilters | undefined = recentOnly
-        ? { dateRange: { from: new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), to: null } }
-        : undefined;
+      // 3. LLM 의도 분석 → ParsedIntent
+      intent = await analyzeIntent(searchQuery, this.openai);
+
+      // 4. ParsedIntent → SearchFilters 변환
+      const filters: SearchFilters = {};
+      if (intent.ottProviderNames.length > 0) {
+        filters.ottProviderNames = intent.ottProviderNames;
+      }
+      if (intent.countries.length > 0) {
+        filters.countries = intent.countries;
+      }
+      if (intent.personNames.length > 0) {
+        filters.personNames = intent.personNames;
+      }
+      if (intent.dateRange) {
+        filters.dateRange = intent.dateRange;
+      }
+      if (intent.contentType) {
+        filters.contentType = intent.contentType;
+      }
+
+      const hasFilters = Object.keys(filters).length > 0;
 
       similarContents = await this.embeddingService.searchSimilar(
         searchQuery,
         20,
         userContext.watchedTmdbIds,
-        filters,
+        hasFilters ? filters : undefined,
       );
     }
 
-    // 3. 시스템 프롬프트 구성 (검색 결과 포함)
+    // 5. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
     const systemPrompt = buildSystemPrompt(
       userContext,
       subscribedOtts,
       OTT_PROVIDERS,
       similarContents,
+      intent,
     );
 
-    // 4. 대화 이력 구성
+    // 6. 대화 이력 구성
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       ...(history || []).map((msg) => ({
         role: msg.role as 'user' | 'assistant',
@@ -135,7 +161,7 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 5. GPT 스트리밍 호출 (function calling 없이 텍스트만)
+    // 7. GPT 스트리밍 호출 (function calling 없이 텍스트만)
     const stream = await this.openai.chat.completions.create({
       model: 'gpt-4o-mini',
       max_tokens: 2048,
@@ -148,7 +174,7 @@ export class ChatService {
 
     let fullText = '';
 
-    // 6. 스트리밍 이벤트 처리
+    // 8. 스트리밍 이벤트 처리
     try {
       for await (const chunk of stream) {
         if (signal?.aborted) {
@@ -167,7 +193,7 @@ export class ChatService {
       throw error;
     }
 
-    // 7. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
+    // 9. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
     const titles = this.extractTitlesFromText(fullText);
     if (titles.length > 0) {
       const { matched, unmatched } = this.matchTitlesToCandidates(titles, similarContents);
