@@ -140,13 +140,42 @@ async function main() {
 
   console.log(`\n총 ${allItems.length}개 작품 대상\n`);
 
-  // 2. 각 작품: getContentDetail(메타데이터 갱신) → cacheContentMetadata(임베딩)
+  // 2. 이미 캐싱된 content_id 조회 (skip용)
+  const { DataSource } = require('typeorm');
+  const ds = app.get(DataSource);
+  const existingRows: { content_id: number }[] = await ds.query(
+    'SELECT content_id FROM content_metadata',
+  );
+  const existingContentIds = new Set(existingRows.map((r: { content_id: number }) => r.content_id));
+
+  // tmdbId → contentId 매핑 (이미 DB에 있는 것만)
+  const tmdbToContentId = new Map<string, number>();
+  const contentRows: { id: number; tmdb_id: number; content_type: string }[] = await ds.query(
+    'SELECT id, tmdb_id, content_type FROM contents',
+  );
+  for (const r of contentRows) {
+    tmdbToContentId.set(`${r.content_type}:${r.tmdb_id}`, r.id);
+  }
+
+  console.log(`이미 캐싱됨: ${existingContentIds.size}개 (skip 대상)\n`);
+
+  // 3. 각 작품: getContentDetail(메타데이터 갱신) → cacheContentMetadata(임베딩)
   let cached = 0;
   let skipped = 0;
   let failed = 0;
 
   for (let i = 0; i < allItems.length; i++) {
     const { id: tmdbId, type } = allItems[i];
+
+    // 이미 캐싱된 작품은 skip (TMDB API 호출 없이)
+    const contentId = tmdbToContentId.get(`${type}:${tmdbId}`);
+    if (contentId && existingContentIds.has(contentId)) {
+      skipped++;
+      if ((i + 1) % 500 === 0) {
+        console.log(`  ${i + 1}/${allItems.length} (캐싱=${cached}, 스킵=${skipped}, 실패=${failed})`);
+      }
+      continue;
+    }
 
     try {
       // getContentDetail로 최신 메타데이터 갱신 (director, originCountry, watchProviders, voteCount)
