@@ -33,6 +33,7 @@ export interface BatchResult {
 export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
   private readonly openai: OpenAI | null;
+  private hasMetadataCache: boolean | null = null;
 
   constructor(
     @InjectRepository(ContentMetadata)
@@ -56,8 +57,13 @@ export class EmbeddingService {
   }
 
   async hasAnyMetadata(): Promise<boolean> {
-    const count = await this.metadataRepo.count();
-    return count > 0;
+    if (this.hasMetadataCache !== null) return this.hasMetadataCache;
+
+    const rows: { exists: boolean }[] = await this.dataSource.query(
+      'SELECT EXISTS(SELECT 1 FROM content_metadata LIMIT 1) AS "exists"',
+    );
+    this.hasMetadataCache = rows[0]?.exists ?? false;
+    return this.hasMetadataCache;
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
@@ -140,6 +146,8 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
        DO UPDATE SET description = EXCLUDED.description, embedding = EXCLUDED.embedding`,
       [contentId, description, embeddingStr],
     );
+
+    this.hasMetadataCache = true;
 
     return this.metadataRepo.findOne({ where: { contentId } }) as Promise<ContentMetadata>;
   }

@@ -114,4 +114,12 @@ describe('RecommendationCard', () => {
     render(<RecommendationCard recommendation={{ ...recommendation, posterUrl: null }} />);
     expect(screen.getByText('포스터 없음')).toBeInTheDocument();
   });
+
+  it('reason이 비어있으면 추천 이유를 렌더링하지 않는다', () => {
+    render(<RecommendationCard recommendation={{ ...recommendation, reason: '' }} />);
+    expect(screen.getByText('기생충')).toBeInTheDocument();
+    // reason 단락이 렌더링되지 않아야 함
+    const paragraphs = document.querySelectorAll('.text-white\\/50');
+    expect(paragraphs).toHaveLength(0);
+  });
 });

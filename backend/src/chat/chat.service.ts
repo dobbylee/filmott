@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -52,6 +52,7 @@ type SseEmitter = (event: string, data: unknown) => void;
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
   private readonly openai: OpenAI | null;
 
   constructor(
@@ -178,7 +179,7 @@ export class ChatService {
 
     while ((match = boldPattern.exec(text)) !== null) {
       const raw = match[1].trim();
-      if (raw.length < 2 || raw.length > 100) continue;
+      if (raw.length < 3 || raw.length > 100) continue;
 
       // "한국어 제목 (English Title)" 패턴 분리
       const parenMatch = raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
@@ -257,8 +258,10 @@ export class ChatService {
           );
           this.embeddingService.cacheContentMetadata(content.id).catch(() => {});
         }
-      } catch {
-        // 캐싱 실패 무시
+      } catch (error) {
+        this.logger.warn(
+          `unmatched 제목 캐싱 실패 ("${title.korean}"): ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   }

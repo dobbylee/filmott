@@ -74,20 +74,34 @@ describe('EmbeddingService', () => {
 
   describe('hasAnyMetadata', () => {
     it('메타데이터가 존재하면 true를 반환해야 한다', async () => {
-      mockMetadataRepo.count.mockResolvedValue(5);
+      mockDataSource.query.mockResolvedValue([{ exists: true }]);
 
       const result = await service.hasAnyMetadata();
 
       expect(result).toBe(true);
-      expect(mockMetadataRepo.count).toHaveBeenCalled();
+      expect(mockDataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT EXISTS'),
+      );
     });
 
     it('메타데이터가 없으면 false를 반환해야 한다', async () => {
-      mockMetadataRepo.count.mockResolvedValue(0);
+      mockDataSource.query.mockResolvedValue([{ exists: false }]);
 
       const result = await service.hasAnyMetadata();
 
       expect(result).toBe(false);
+    });
+
+    it('결과를 캐싱하여 두 번째 호출에서는 DB 조회하지 않아야 한다', async () => {
+      mockDataSource.query.mockResolvedValue([{ exists: true }]);
+
+      await service.hasAnyMetadata();
+      mockDataSource.query.mockClear();
+
+      const result = await service.hasAnyMetadata();
+
+      expect(result).toBe(true);
+      expect(mockDataSource.query).not.toHaveBeenCalled();
     });
   });
 
@@ -128,7 +142,7 @@ describe('EmbeddingService', () => {
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           model: 'gpt-5-mini',
-          max_completion_tokens: 300,
+          max_completion_tokens: 2048,
         }),
       );
     });

@@ -100,9 +100,11 @@ export default function RecommendationCard({ recommendation }: RecommendationCar
       </p>
 
       {/* 추천 이유 */}
-      <p className="mt-1 text-[11px] leading-snug text-white/50 line-clamp-2">
-        {reason}
-      </p>
+      {reason && (
+        <p className="mt-1 text-[11px] leading-snug text-white/50 line-clamp-2">
+          {reason}
+        </p>
+      )}
     </Link>
   );
 }

@@ -77,11 +77,6 @@ export function buildSystemPrompt(
     ? `### 구독 중인 OTT\n${ottNames}\n\n해당 OTT에서 볼 수 있는 작품을 우선적으로 추천하세요. 다른 플랫폼의 작품도 추천할 수 있지만, 구독 중인 OTT에서 볼 수 있는 작품을 먼저 제안하세요.`
     : '';
 
-  const watchedIdsNote =
-    context.watchedTmdbIds.length > 0
-      ? `\n\n### 이미 시청한 작품 ID (추천 제외)\nTMDB IDs: ${context.watchedTmdbIds.join(', ')}`
-      : '';
-
   const candidatesSection =
     candidates.length > 0
       ? candidates
@@ -104,7 +99,7 @@ export function buildSystemPrompt(
 
 보고싶어요: ${wantToWatchSection}
 
-${ottSection}${watchedIdsNote}
+${ottSection}
 
 ## 추천 참고 작품
 아래 목록을 우선 활용하되, 더 적합한 작품이 있으면 자유롭게 추천 가능합니다.

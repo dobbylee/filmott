@@ -26,7 +26,7 @@ export class CreateContentMetadata1774000000000 implements MigrationInterface {
 
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "IDX_content_metadata_embedding" ON "content_metadata"
-        USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)
+        USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)
     `);
   }
 

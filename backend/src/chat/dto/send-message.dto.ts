@@ -16,6 +16,7 @@ export class ChatHistoryMessageDto {
   role!: 'user' | 'assistant';
 
   @IsString()
+  @MaxLength(2000)
   content!: string;
 }
 

@@ -182,6 +182,21 @@ describe('sendChatMessage', () => {
     expect(callBody.content).toBe('새 질문');
   });
 
+  it('response.body가 null이면 onError를 호출한다', async () => {
+    const nullBodyResponse = {
+      ok: true,
+      status: 200,
+      body: null,
+      headers: new Headers(),
+    } as Response;
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(nullBodyResponse);
+
+    await sendChatMessage('테스트', [], callbacks);
+
+    expect(callbacks.onError).toHaveBeenCalledWith('서버 응답을 읽을 수 없습니다.');
+  });
+
   it('스트림 종료 후 버퍼에 남은 데이터를 처리한다', async () => {
     // 마지막 청크가 개행 없이 끝나는 경우 (버퍼에 잔여 데이터)
     const chunk = 'event: text\ndata: {"content":"버퍼"}\nevent: done\ndata: {}';

@@ -195,7 +195,7 @@ describe('ChatService', () => {
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
     };
 
-    it('텍스트 + function call이 있으면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
+    it('볼드 제목이 후보와 매칭되면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
       setupEmptyUserContext();
 
       const candidates: SimilarContent[] = [
@@ -213,35 +213,10 @@ describe('ChatService', () => {
       ];
       mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
 
-      // OpenAI 스트리밍 mock: 텍스트 + tool_calls
+      // OpenAI 스트리밍 mock: 볼드 제목을 포함한 텍스트만
       const chunks = [
-        { choices: [{ delta: { content: '좋은 영화를 추천해 드릴게요!' } }] },
-        {
-          choices: [{
-            delta: {
-              tool_calls: [{
-                index: 0,
-                id: 'call_1',
-                function: {
-                  name: 'recommend_movies',
-                  arguments: '{"recommendations":[{"tmdbId":496243,',
-                },
-              }],
-            },
-          }],
-        },
-        {
-          choices: [{
-            delta: {
-              tool_calls: [{
-                index: 0,
-                function: {
-                  arguments: '"contentType":"movie","title":"기생충"}]}',
-                },
-              }],
-            },
-          }],
-        },
+        { choices: [{ delta: { content: '좋은 영화를 추천해 드릴게요!\n\n' } }] },
+        { choices: [{ delta: { content: '**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.' } }] },
       ];
 
       mockStreamCreate.mockResolvedValue({
@@ -264,7 +239,7 @@ describe('ChatService', () => {
       expect(textEvents.length).toBeGreaterThan(0);
       expect((textEvents[0].data as { content: string }).content).toContain('좋은 영화');
 
-      // recommendations 이벤트 확인
+      // recommendations 이벤트 확인 (후보 매칭 성공 시)
       const recEvents = emittedEvents.filter((e) => e.event === 'recommendations');
       expect(recEvents).toHaveLength(1);
       const recs = (recEvents[0].data as { recommendations: { tmdbId: number }[] }).recommendations;
@@ -362,13 +337,6 @@ describe('ChatService', () => {
 
       expect(mockStreamCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          tools: expect.arrayContaining([
-            expect.objectContaining({
-              type: 'function',
-              function: expect.objectContaining({ name: 'recommend_movies' }),
-            }),
-          ]),
-          tool_choice: 'auto',
           messages: expect.arrayContaining([
             expect.objectContaining({ role: 'system' }),
             expect.objectContaining({ role: 'user', content: '이전 질문' }),
@@ -380,150 +348,145 @@ describe('ChatService', () => {
     });
   });
 
-  describe('resolveRecommendations', () => {
-    it('후보에 있는 작품을 올바르게 resolve해야 한다', async () => {
-      const parsed = [{ tmdbId: 496243, contentType: 'movie' as const, title: '기생충' }];
-      const candidates: SimilarContent[] = [
-        {
-          contentId: 1,
-          tmdbId: 496243,
-          contentType: 'movie',
-          title: '기생충',
-          posterUrl: '/poster.jpg',
-          genres: [{ id: 18, name: '드라마' }],
-          voteAverage: 8.6,
-          description: '어두운 스릴러',
-          similarity: 0.95,
-        },
-      ];
-
-      const result = await service.resolveRecommendations(parsed, candidates);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].tmdbId).toBe(496243);
-      expect(result[0].title).toBe('기생충');
-      expect(result[0].posterUrl).toBe('/poster.jpg');
-    });
-
-    it('빈 배열이면 빈 배열을 반환해야 한다', async () => {
-      const result = await service.resolveRecommendations([], []);
-      expect(result).toEqual([]);
-    });
-
-    it('후보에 없는 tmdbId는 ContentsService로 조회해야 한다', async () => {
-      const parsed = [{ tmdbId: 12345, contentType: 'movie' as const, title: '새 영화' }];
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
-        id: 99,
-        title: '새 영화',
-        posterUrl: '/new-poster.jpg',
-      });
-
-      const result = await service.resolveRecommendations(parsed, []);
-
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(12345, 'movie');
-      expect(result).toHaveLength(1);
-      expect(result[0].tmdbId).toBe(12345);
-      expect(result[0].title).toBe('새 영화');
-      expect(result[0].posterUrl).toBe('/new-poster.jpg');
-    });
-
-    it('후보에 없고 TMDB 조회도 실패하면 제목만 없는 항목은 필터링해야 한다', async () => {
-      const parsed = [{ tmdbId: 999, contentType: 'movie' as const }];
-      mockContentsService.findOrFetchByTmdbId.mockRejectedValueOnce(new Error('Not found'));
-
-      const result = await service.resolveRecommendations(parsed, []);
-      expect(result).toEqual([]);
-    });
-
-    it('여러 추천을 병렬로 처리해야 한다', async () => {
-      const parsed = [
-        { tmdbId: 111, contentType: 'movie' as const, title: '영화1' },
-        { tmdbId: 222, contentType: 'tv' as const, title: '드라마1' },
-      ];
-      const candidates: SimilarContent[] = [
-        {
-          contentId: 1,
-          tmdbId: 111,
-          contentType: 'movie',
-          title: '영화1',
-          posterUrl: '/poster1.jpg',
-          genres: [],
-          voteAverage: 7.0,
-          description: '설명1',
-          similarity: 0.9,
-        },
-      ];
-
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
-        id: 2,
-        tmdbId: 222,
-        title: '드라마1',
-        posterUrl: '/poster2.jpg',
-      });
-
-      const result = await service.resolveRecommendations(parsed, candidates);
+  describe('extractTitlesFromText', () => {
+    it('볼드 제목을 올바르게 추출해야 한다', () => {
+      const text = '**기생충 (Parasite)** — 봉준호 감독 걸작.\n**인셉션 (Inception)** — 꿈 속의 꿈.';
+      const result = service.extractTitlesFromText(text);
 
       expect(result).toHaveLength(2);
-      expect(result[0].tmdbId).toBe(111);
-      expect(result[1].tmdbId).toBe(222);
+      expect(result[0].korean).toBe('기생충');
+      expect(result[0].english).toBe('Parasite');
+      expect(result[1].korean).toBe('인셉션');
+      expect(result[1].english).toBe('Inception');
     });
 
-    it('tmdbId가 0이면 제목으로 TMDB 검색 fallback해야 한다', async () => {
-      const parsed = [{ tmdbId: 0, contentType: 'movie' as const, title: '기생충' }];
+    it('영어 원제 없는 볼드 제목도 추출해야 한다', () => {
+      const text = '**기생충** — 감동적인 영화입니다.';
+      const result = service.extractTitlesFromText(text);
 
-      mockContentsService.searchContents.mockResolvedValueOnce({
-        results: [{ id: 496243, media_type: 'movie', title: '기생충' }],
-      });
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
-        id: 1,
+      expect(result).toHaveLength(1);
+      expect(result[0].korean).toBe('기생충');
+      expect(result[0].english).toBeNull();
+    });
+
+    it('최대 5개까지만 추출해야 한다', () => {
+      const text = '**작품1** **작품2** **작품3** **작품4** **작품5** **작품6**';
+      const result = service.extractTitlesFromText(text);
+
+      expect(result).toHaveLength(5);
+    });
+
+    it('중복 제목은 한 번만 추출해야 한다', () => {
+      const text = '**기생충 (Parasite)** 설명.\n**기생충** 다시 언급.';
+      const result = service.extractTitlesFromText(text);
+
+      expect(result).toHaveLength(1);
+    });
+
+    it('볼드 제목이 없으면 빈 배열을 반환해야 한다', () => {
+      const result = service.extractTitlesFromText('일반 텍스트입니다.');
+      expect(result).toEqual([]);
+    });
+
+    it('3자 미만의 볼드 텍스트는 무시해야 한다', () => {
+      const text = '**AB** 이것은 제목이 아닙니다. **기생충** 이것은 제목입니다.';
+      const result = service.extractTitlesFromText(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].korean).toBe('기생충');
+    });
+  });
+
+  describe('matchTitlesToCandidates', () => {
+    const candidates: SimilarContent[] = [
+      {
+        contentId: 1,
         tmdbId: 496243,
+        contentType: 'movie',
         title: '기생충',
-        posterUrl: '/parasite.jpg',
-      });
+        posterUrl: '/poster.jpg',
+        genres: [{ id: 18, name: '드라마' }],
+        voteAverage: 8.6,
+        description: '어두운 스릴러',
+        similarity: 0.95,
+      },
+      {
+        contentId: 2,
+        tmdbId: 27205,
+        contentType: 'movie',
+        title: 'Inception',
+        posterUrl: '/inception.jpg',
+        genres: [{ id: 28, name: '액션' }],
+        voteAverage: 8.8,
+        description: '꿈의 세계',
+        similarity: 0.92,
+      },
+    ];
 
-      const result = await service.resolveRecommendations(parsed, []);
+    it('한국어 제목으로 후보를 정확 매칭해야 한다', () => {
+      const titles = [{ korean: '기생충', english: 'Parasite' }];
+      const { matched, unmatched } = service.matchTitlesToCandidates(titles, candidates);
 
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith('기생충', 'movie', 1);
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(496243, 'movie');
-      expect(result).toHaveLength(1);
-      expect(result[0].tmdbId).toBe(496243);
-      expect(result[0].posterUrl).toBe('/parasite.jpg');
+      expect(matched).toHaveLength(1);
+      expect(matched[0].tmdbId).toBe(496243);
+      expect(matched[0].title).toBe('기생충');
+      expect(matched[0].posterUrl).toBe('/poster.jpg');
+      expect(unmatched).toHaveLength(0);
     });
 
-    it('TMDB ID 조회 실패 시 제목으로 검색 fallback해야 한다', async () => {
-      const parsed = [{ tmdbId: 999, contentType: 'movie' as const, title: '미지의 영화' }];
+    it('영어 원제로 후보를 정확 매칭해야 한다', () => {
+      const titles = [{ korean: '인셉션', english: 'Inception' }];
+      const { matched, unmatched } = service.matchTitlesToCandidates(titles, candidates);
 
-      mockContentsService.findOrFetchByTmdbId.mockRejectedValueOnce(new Error('Not found'));
-      mockContentsService.searchContents.mockResolvedValueOnce({
-        results: [{ id: 555, media_type: 'movie', title: '미지의 영화' }],
-      });
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValueOnce({
-        id: 10,
-        tmdbId: 555,
-        title: '미지의 영화',
-        posterUrl: '/unknown.jpg',
-      });
-
-      const result = await service.resolveRecommendations(parsed, []);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].tmdbId).toBe(555);
-      expect(result[0].title).toBe('미지의 영화');
+      expect(matched).toHaveLength(1);
+      expect(matched[0].tmdbId).toBe(27205);
+      expect(unmatched).toHaveLength(0);
     });
 
-    it('제목 검색도 실패하면 제목만으로 카드를 생성해야 한다', async () => {
-      const parsed = [{ tmdbId: 0, contentType: 'movie' as const, title: '존재하지 않는 영화' }];
+    it('포함 관계로 부분 매칭해야 한다', () => {
+      const candidatesWithSeason: SimilarContent[] = [
+        {
+          contentId: 3,
+          tmdbId: 12345,
+          contentType: 'tv',
+          title: '오징어 게임: 시즌 2',
+          posterUrl: '/squid2.jpg',
+          genres: [],
+          voteAverage: 8.0,
+          description: '설명',
+          similarity: 0.88,
+        },
+      ];
+      const titles = [{ korean: '오징어 게임', english: null }];
+      const { matched, unmatched } = service.matchTitlesToCandidates(titles, candidatesWithSeason);
 
-      mockContentsService.searchContents.mockResolvedValueOnce({
-        results: [],
-      });
+      expect(matched).toHaveLength(1);
+      expect(matched[0].tmdbId).toBe(12345);
+      expect(unmatched).toHaveLength(0);
+    });
 
-      const result = await service.resolveRecommendations(parsed, []);
+    it('매칭 실패 시 unmatched에 포함해야 한다', () => {
+      const titles = [{ korean: '존재하지 않는 영화', english: null }];
+      const { matched, unmatched } = service.matchTitlesToCandidates(titles, candidates);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].tmdbId).toBe(0);
-      expect(result[0].title).toBe('존재하지 않는 영화');
-      expect(result[0].posterUrl).toBeNull();
+      expect(matched).toHaveLength(0);
+      expect(unmatched).toHaveLength(1);
+      expect(unmatched[0].korean).toBe('존재하지 않는 영화');
+    });
+
+    it('빈 titles이면 matched/unmatched 모두 빈 배열이어야 한다', () => {
+      const { matched, unmatched } = service.matchTitlesToCandidates([], candidates);
+
+      expect(matched).toEqual([]);
+      expect(unmatched).toEqual([]);
+    });
+
+    it('빈 candidates이면 모두 unmatched가 되어야 한다', () => {
+      const titles = [{ korean: '기생충', english: null }];
+      const { matched, unmatched } = service.matchTitlesToCandidates(titles, []);
+
+      expect(matched).toHaveLength(0);
+      expect(unmatched).toHaveLength(1);
     });
   });
 });
