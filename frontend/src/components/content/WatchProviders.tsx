@@ -7,6 +7,18 @@ interface WatchProvidersProps {
   compact?: boolean;
 }
 
+// "Netflix Standard with Ads" → "Netflix"처럼 같은 서비스의 광고 버전을 제거
+const ADS_PROVIDER_IDS = new Set([
+  1796,  // Netflix Standard with Ads
+  1899,  // Disney+ Standard with Ads
+]);
+
+function deduplicateProviders(
+  providers: { provider_id: number; provider_name: string; logo_path: string }[],
+) {
+  return providers.filter((p) => !ADS_PROVIDER_IDS.has(p.provider_id));
+}
+
 export default function WatchProviders({ data, compact = false }: WatchProvidersProps) {
   if (!data) return null;
 
@@ -15,11 +27,11 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
 
   // compact 모드: 모든 provider를 합쳐 중복 제거 후 한 줄로 표시
   if (compact) {
-    const all = [
+    const all = deduplicateProviders([
       ...(data.flatrate ?? []),
       ...(data.rent ?? []),
       ...(data.buy ?? []),
-    ];
+    ]);
     const unique = all.filter(
       (p, i, arr) => arr.findIndex((x) => x.provider_id === p.provider_id) === i
     );
@@ -47,13 +59,13 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
 
   return (
     <div className="space-y-3">
-      {data.flatrate && data.flatrate.length > 0 && (
+      {data.flatrate && deduplicateProviders(data.flatrate).length > 0 && (
         <div>
           <h4 className="mb-1.5 text-xs font-medium text-muted-foreground">
             스트리밍
           </h4>
           <div className="flex flex-wrap gap-2">
-            {data.flatrate.map((p) => (
+            {deduplicateProviders(data.flatrate).map((p) => (
               <div key={p.provider_id} className="group relative">
                 <Image
                   src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
@@ -71,13 +83,13 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
         </div>
       )}
 
-      {data.rent && data.rent.length > 0 && (
+      {data.rent && deduplicateProviders(data.rent).length > 0 && (
         <div>
           <h4 className="mb-1.5 text-xs font-medium text-muted-foreground">
             대여
           </h4>
           <div className="flex flex-wrap gap-2">
-            {data.rent.map((p) => (
+            {deduplicateProviders(data.rent).map((p) => (
               <div key={p.provider_id} className="group relative">
                 <Image
                   src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
@@ -95,13 +107,13 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
         </div>
       )}
 
-      {data.buy && data.buy.length > 0 && (
+      {data.buy && deduplicateProviders(data.buy).length > 0 && (
         <div>
           <h4 className="mb-1.5 text-xs font-medium text-muted-foreground">
             구매
           </h4>
           <div className="flex flex-wrap gap-2">
-            {data.buy.map((p) => (
+            {deduplicateProviders(data.buy).map((p) => (
               <div key={p.provider_id} className="group relative">
                 <Image
                   src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
