@@ -156,14 +156,19 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     queryText: string,
     limit: number,
     excludeTmdbIds: number[],
+    recentOnly = false,
   ): Promise<SimilarContent[]> {
     if (!this.openai) return [];
 
     const embedding = await this.generateEmbedding(queryText);
     const embeddingStr = `[${embedding.join(',')}]`;
 
-    // excludeTmdbIds가 비어있으면 불가능한 ID로 대체 (-1)
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];
+
+    // 최신작 필터: 최근 2년 이내
+    const dateFilter = recentOnly
+      ? `AND c.release_date >= NOW() - INTERVAL '2 years'`
+      : '';
 
     const rows: {
       content_id: number;
@@ -182,6 +187,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
        FROM content_metadata cm
        JOIN contents c ON c.id = cm.content_id
        WHERE c.tmdb_id != ALL($2::int[])
+       ${dateFilter}
        ORDER BY cm.embedding <=> $1::vector
        LIMIT $3`,
       [embeddingStr, excludeIds, limit],

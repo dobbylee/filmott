@@ -102,10 +102,16 @@ export class ChatService {
         .map((msg) => msg.content);
       userMessages.push(content);
       const searchQuery = userMessages.join(' ');
+
+      // "최신", "요즘", "올해", "신작", "새로 나온" 등 키워드 감지
+      const recentKeywords = /최신|요즘|올해|신작|새로\s*나온|최근/;
+      const recentOnly = recentKeywords.test(searchQuery);
+
       similarContents = await this.embeddingService.searchSimilar(
         searchQuery,
         10,
         userContext.watchedTmdbIds,
+        recentOnly,
       );
     }
 
