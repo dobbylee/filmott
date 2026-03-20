@@ -125,6 +125,8 @@ export default function ChatPage() {
     setIsStreaming(true);
     setStreamingText('');
     setStreamingRecs(null);
+    streamingTextRef.current = '';
+    streamingRecsRef.current = null;
     isDoneCalledRef.current = false;
 
     try {

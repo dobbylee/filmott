@@ -109,7 +109,7 @@ export class ChatService {
 
       similarContents = await this.embeddingService.searchSimilar(
         searchQuery,
-        10,
+        20,
         userContext.watchedTmdbIds,
         recentOnly,
       );
