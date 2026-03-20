@@ -209,6 +209,8 @@ describe('ChatService', () => {
           voteAverage: 8.6,
           description: '어두운 스릴러',
           similarity: 0.95,
+          director: '봉준호',
+          originCountry: 'KR',
         },
       ];
       mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
@@ -409,6 +411,8 @@ describe('ChatService', () => {
         voteAverage: 8.6,
         description: '어두운 스릴러',
         similarity: 0.95,
+        director: '봉준호',
+        originCountry: 'KR',
       },
       {
         contentId: 2,
@@ -420,6 +424,8 @@ describe('ChatService', () => {
         voteAverage: 8.8,
         description: '꿈의 세계',
         similarity: 0.92,
+        director: '크리스토퍼 놀란',
+        originCountry: 'US',
       },
     ];
 
@@ -455,6 +461,8 @@ describe('ChatService', () => {
           voteAverage: 8.0,
           description: '설명',
           similarity: 0.88,
+          director: null,
+          originCountry: 'KR',
         },
       ];
       const titles = [{ korean: '오징어 게임', english: null }];

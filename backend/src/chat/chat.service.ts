@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { EmbeddingService, SimilarContent } from './embedding.service';
+import { EmbeddingService, SimilarContent, SearchFilters } from './embedding.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
@@ -106,12 +106,15 @@ export class ChatService {
       // "최신", "요즘", "올해", "신작", "새로 나온" 등 키워드 감지
       const recentKeywords = /최신|요즘|올해|신작|새로\s*나온|최근/;
       const recentOnly = recentKeywords.test(searchQuery);
+      const filters: SearchFilters | undefined = recentOnly
+        ? { dateRange: { from: new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), to: null } }
+        : undefined;
 
       similarContents = await this.embeddingService.searchSimilar(
         searchQuery,
         20,
         userContext.watchedTmdbIds,
-        recentOnly,
+        filters,
       );
     }
 

@@ -16,6 +16,16 @@ export interface SimilarContent {
   voteAverage: number;
   description: string;
   similarity: number;
+  director: string | null;
+  originCountry: string | null;
+}
+
+export interface SearchFilters {
+  ottProviderNames?: string[];
+  countries?: string[];
+  personNames?: string[];
+  dateRange?: { from: string | null; to: string | null };
+  contentType?: 'movie' | 'tv';
 }
 
 export interface CacheCriteria {
@@ -156,19 +166,115 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     queryText: string,
     limit: number,
     excludeTmdbIds: number[],
-    recentOnly = false,
+    filters?: SearchFilters,
   ): Promise<SimilarContent[]> {
     if (!this.openai) return [];
 
     const embedding = await this.generateEmbedding(queryText);
     const embeddingStr = `[${embedding.join(',')}]`;
-
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];
 
-    // 최신작 필터: 최근 2년 이내
-    const dateFilter = recentOnly
-      ? `AND c.release_date >= NOW() - INTERVAL '2 years'`
-      : '';
+    const hasFilters = filters && (
+      (filters.ottProviderNames?.length ?? 0) > 0 ||
+      (filters.countries?.length ?? 0) > 0 ||
+      (filters.personNames?.length ?? 0) > 0 ||
+      filters.dateRange !== undefined ||
+      filters.contentType !== undefined
+    );
+
+    // 1차: 전체 필터 적용
+    let results = await this.executeSearch(embeddingStr, limit, excludeIds, filters);
+
+    // 2차: 결과 부족 시 필터 단계적 완화
+    if (results.length < 5 && hasFilters) {
+      const relaxedFilters: SearchFilters = { ...filters };
+
+      if (results.length < 5 && (relaxedFilters.personNames?.length ?? 0) > 0) {
+        delete relaxedFilters.personNames;
+        results = await this.executeSearch(embeddingStr, limit, excludeIds, relaxedFilters);
+      }
+
+      if (results.length < 5 && (relaxedFilters.countries?.length ?? 0) > 0) {
+        delete relaxedFilters.countries;
+        results = await this.executeSearch(embeddingStr, limit, excludeIds, relaxedFilters);
+      }
+
+      if (results.length < 5 && (relaxedFilters.ottProviderNames?.length ?? 0) > 0) {
+        delete relaxedFilters.ottProviderNames;
+        results = await this.executeSearch(embeddingStr, limit, excludeIds, relaxedFilters);
+      }
+    }
+
+    return results;
+  }
+
+  private async executeSearch(
+    embeddingStr: string,
+    limit: number,
+    excludeIds: number[],
+    filters?: SearchFilters,
+  ): Promise<SimilarContent[]> {
+    const conditions: string[] = [];
+    const params: (string | number | number[] | string[])[] = [embeddingStr, excludeIds];
+    let paramIndex = 3;
+
+    // OTT 필터
+    if (filters?.ottProviderNames?.length) {
+      conditions.push(
+        `AND EXISTS (SELECT 1 FROM jsonb_array_elements(c.watch_providers->'flatrate') AS p WHERE p->>'provider_name' = ANY($${paramIndex}::text[]))`,
+      );
+      params.push(filters.ottProviderNames);
+      paramIndex++;
+    }
+
+    // 국가 필터
+    if (filters?.countries?.length) {
+      const countryConditions = filters.countries
+        .map(() => {
+          const cond = `c.origin_country LIKE $${paramIndex}`;
+          paramIndex++;
+          return cond;
+        });
+      conditions.push(`AND (${countryConditions.join(' OR ')})`);
+      filters.countries.forEach((country) => params.push(`%${country}%`));
+    }
+
+    // 인물 필터
+    if (filters?.personNames?.length) {
+      const personConditions = filters.personNames
+        .flatMap(() => {
+          const directorCond = `c.director LIKE $${paramIndex}`;
+          const creditsCond = `c.credits::text LIKE $${paramIndex}`;
+          paramIndex++;
+          return [directorCond, creditsCond];
+        });
+      conditions.push(`AND (${personConditions.join(' OR ')})`);
+      filters.personNames.forEach((name) => params.push(`%${name}%`));
+    }
+
+    // contentType 필터
+    if (filters?.contentType) {
+      conditions.push(`AND c.content_type = $${paramIndex}`);
+      params.push(filters.contentType);
+      paramIndex++;
+    }
+
+    // dateRange 필터
+    if (filters?.dateRange) {
+      if (filters.dateRange.from) {
+        conditions.push(`AND c.release_date >= $${paramIndex}`);
+        params.push(filters.dateRange.from);
+        paramIndex++;
+      }
+      if (filters.dateRange.to) {
+        conditions.push(`AND c.release_date <= $${paramIndex}`);
+        params.push(filters.dateRange.to);
+        paramIndex++;
+      }
+    }
+
+    params.push(limit);
+    const limitParam = `$${paramIndex}`;
 
     const rows: {
       content_id: number;
@@ -180,17 +286,20 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
       genres: { id: number; name: string }[];
       vote_average: number;
       similarity: number;
+      director: string | null;
+      origin_country: string | null;
     }[] = await this.dataSource.query(
       `SELECT cm.content_id, cm.description,
               c.tmdb_id, c.content_type, c.title, c.poster_url, c.genres, c.vote_average,
+              c.director, c.origin_country,
               1 - (cm.embedding <=> $1::vector) AS similarity
        FROM content_metadata cm
        JOIN contents c ON c.id = cm.content_id
        WHERE c.tmdb_id != ALL($2::int[])
-       ${dateFilter}
+       ${conditions.join('\n       ')}
        ORDER BY cm.embedding <=> $1::vector
-       LIMIT $3`,
-      [embeddingStr, excludeIds, limit],
+       LIMIT ${limitParam}`,
+      params,
     );
 
     return rows.map((row) => ({
@@ -203,6 +312,8 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
       voteAverage: Number(row.vote_average) || 0,
       description: row.description,
       similarity: Number(row.similarity) || 0,
+      director: row.director,
+      originCountry: row.origin_country,
     }));
   }
 

@@ -257,25 +257,35 @@ describe('EmbeddingService', () => {
   });
 
   describe('searchSimilar', () => {
-    it('유사 작품을 검색하여 반환해야 한다', async () => {
-      const mockEmbedding = [0.1, 0.2, 0.3];
-      mockEmbeddingsCreate.mockResolvedValue({
-        data: [{ embedding: mockEmbedding }],
-      });
+    const mockRow = {
+      content_id: 1,
+      description: '어두운 스릴러',
+      tmdb_id: 496243,
+      content_type: 'movie',
+      title: '기생충',
+      poster_url: '/poster.jpg',
+      genres: [{ id: 18, name: '드라마' }],
+      vote_average: 8.6,
+      similarity: 0.95,
+      director: '봉준호',
+      origin_country: 'KR',
+    };
 
-      mockDataSource.query.mockResolvedValue([
-        {
-          content_id: 1,
-          description: '어두운 스릴러',
-          tmdb_id: 496243,
-          content_type: 'movie',
-          title: '기생충',
-          poster_url: '/poster.jpg',
-          genres: [{ id: 18, name: '드라마' }],
-          vote_average: 8.6,
-          similarity: 0.95,
-        },
-      ]);
+    const fiveRows = Array.from({ length: 5 }, (_, i) => ({
+      ...mockRow,
+      content_id: i + 1,
+      tmdb_id: 496243 + i,
+      title: `영화${i + 1}`,
+    }));
+
+    beforeEach(() => {
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: [0.1, 0.2, 0.3] }],
+      });
+    });
+
+    it('유사 작품을 검색하여 반환해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue([mockRow]);
 
       const result = await service.searchSimilar('스릴러 추천', 15, []);
 
@@ -283,12 +293,11 @@ describe('EmbeddingService', () => {
       expect(result[0].tmdbId).toBe(496243);
       expect(result[0].title).toBe('기생충');
       expect(result[0].similarity).toBe(0.95);
+      expect(result[0].director).toBe('봉준호');
+      expect(result[0].originCountry).toBe('KR');
     });
 
     it('제외할 tmdbId를 쿼리에 전달해야 한다', async () => {
-      mockEmbeddingsCreate.mockResolvedValue({
-        data: [{ embedding: [0.1] }],
-      });
       mockDataSource.query.mockResolvedValue([]);
 
       await service.searchSimilar('테스트', 10, [100, 200]);
@@ -300,9 +309,6 @@ describe('EmbeddingService', () => {
     });
 
     it('제외 목록이 비어있으면 [-1]로 대체해야 한다', async () => {
-      mockEmbeddingsCreate.mockResolvedValue({
-        data: [{ embedding: [0.1] }],
-      });
       mockDataSource.query.mockResolvedValue([]);
 
       await service.searchSimilar('테스트', 10, []);
@@ -311,6 +317,154 @@ describe('EmbeddingService', () => {
         expect.any(String),
         [expect.any(String), [-1], 10],
       );
+    });
+
+    it('필터 없으면 기존과 동일하게 동작해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchSimilar('테스트', 10, []);
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).not.toContain('watch_providers');
+      expect(query).not.toContain('origin_country LIKE');
+      expect(query).not.toContain('content_type =');
+      expect(query).not.toContain('release_date >=');
+    });
+
+    it('OTT 필터가 쿼리에 포함되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchSimilar('넷플릭스 영화', 10, [], {
+        ottProviderNames: ['Netflix'],
+      });
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('watch_providers');
+      expect(query).toContain('provider_name');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain(10); // limit
+      expect(params).toContainEqual(['Netflix']);
+    });
+
+    it('국가 필터가 쿼리에 포함되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchSimilar('한국 영화', 10, [], {
+        countries: ['KR'],
+      });
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('origin_country LIKE');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain('%KR%');
+    });
+
+    it('인물 필터가 쿼리에 포함되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchSimilar('봉준호 영화', 10, [], {
+        personNames: ['봉준호'],
+      });
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('director LIKE');
+      expect(query).toContain('credits::text LIKE');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain('%봉준호%');
+    });
+
+    it('contentType 필터가 쿼리에 포함되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchSimilar('드라마 추천', 10, [], {
+        contentType: 'tv',
+      });
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('content_type =');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain('tv');
+    });
+
+    it('dateRange 필터가 쿼리에 포함되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchSimilar('최신 영화', 10, [], {
+        dateRange: { from: '2024-01-01', to: null },
+      });
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('release_date >=');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain('2024-01-01');
+    });
+
+    it('fallback: 결과 부족 시 필터를 단계적으로 완화해야 한다', async () => {
+      // 1차: 전체 필터 → 2개 결과 (부족)
+      // 2차: 인물 제거 → 3개 결과 (부족)
+      // 3차: 국가 제거 → 4개 결과 (부족)
+      // 4차: OTT 제거 → 6개 결과 (충분)
+      const twoRows = fiveRows.slice(0, 2);
+      const threeRows = fiveRows.slice(0, 3);
+      const fourRows = fiveRows.slice(0, 4);
+      const sixRows = Array.from({ length: 6 }, (_, i) => ({
+        ...mockRow,
+        content_id: i + 1,
+        tmdb_id: 496243 + i,
+        title: `영화${i + 1}`,
+      }));
+
+      mockDataSource.query
+        .mockResolvedValueOnce(twoRows)    // 전체 필터
+        .mockResolvedValueOnce(threeRows)  // -인물
+        .mockResolvedValueOnce(fourRows)   // -국가
+        .mockResolvedValueOnce(sixRows);   // -OTT
+
+      const result = await service.searchSimilar('넷플릭스 한국 봉준호 영화', 10, [], {
+        ottProviderNames: ['Netflix'],
+        countries: ['KR'],
+        personNames: ['봉준호'],
+      });
+
+      // 4번의 쿼리가 실행되어야 한다
+      expect(mockDataSource.query).toHaveBeenCalledTimes(4);
+      expect(result).toHaveLength(6);
+
+      // 임베딩은 1회만 생성해야 한다
+      expect(mockEmbeddingsCreate).toHaveBeenCalledTimes(1);
+
+      // 1차 쿼리: 모든 필터 포함
+      const firstQuery = mockDataSource.query.mock.calls[0][0] as string;
+      expect(firstQuery).toContain('provider_name');
+      expect(firstQuery).toContain('origin_country LIKE');
+      expect(firstQuery).toContain('director LIKE');
+
+      // 2차 쿼리: 인물 필터 제거
+      const secondQuery = mockDataSource.query.mock.calls[1][0] as string;
+      expect(secondQuery).toContain('provider_name');
+      expect(secondQuery).toContain('origin_country LIKE');
+      expect(secondQuery).not.toContain('director LIKE');
+
+      // 3차 쿼리: 국가 필터 제거
+      const thirdQuery = mockDataSource.query.mock.calls[2][0] as string;
+      expect(thirdQuery).toContain('provider_name');
+      expect(thirdQuery).not.toContain('origin_country LIKE');
+
+      // 4차 쿼리: OTT 필터 제거
+      const fourthQuery = mockDataSource.query.mock.calls[3][0] as string;
+      expect(fourthQuery).not.toContain('provider_name');
+    });
+
+    it('fallback: 결과가 충분하면 추가 쿼리를 실행하지 않아야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchSimilar('넷플릭스 한국 영화', 10, [], {
+        ottProviderNames: ['Netflix'],
+        countries: ['KR'],
+      });
+
+      // 1차 쿼리만 실행
+      expect(mockDataSource.query).toHaveBeenCalledTimes(1);
     });
   });
 
