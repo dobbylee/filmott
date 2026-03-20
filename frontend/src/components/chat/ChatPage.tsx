@@ -107,8 +107,8 @@ export default function ChatPage() {
 
     setError(null);
 
-    // 대화 이력 구성 (role + content만 추출)
-    const history: ChatHistoryMessage[] = messages.map((msg) => ({
+    // 대화 이력 구성 (최근 20개만 전송, role + content만 추출)
+    const history: ChatHistoryMessage[] = messages.slice(-20).map((msg) => ({
       role: msg.role,
       content: msg.content,
     }));
@@ -212,11 +212,11 @@ export default function ChatPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl flex flex-col h-[calc(100dvh-80px)]">
-      {/* 상단 바: AI 추천 타이틀 + 새 대화 버튼 */}
+      {/* 상단 바: 추천받기 타이틀 + 새 대화 버튼 */}
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-fuchsia-400" />
-          <span className="text-sm font-semibold text-white">AI 추천</span>
+          <span className="text-sm font-semibold text-white">추천받기</span>
         </div>
         {messages.length > 0 && (
           <button

@@ -93,15 +93,21 @@ export class ChatService {
 
     const subscribedOtts = user?.subscribedOtts ?? [];
 
-    // 2. content_metadata가 비어있으면 임베딩 검색 스킵
+    // 2. 대화 맥락을 합쳐서 벡터 검색 (전체 user 메시지 + 현재 메시지)
     const hasMetadata = await this.embeddingService.hasAnyMetadata();
-    const similarContents = hasMetadata
-      ? await this.embeddingService.searchSimilar(
-          content,
-          10,
-          userContext.watchedTmdbIds,
-        )
-      : [];
+    let similarContents: SimilarContent[] = [];
+    if (hasMetadata) {
+      const userMessages = (history || [])
+        .filter((msg) => msg.role === 'user')
+        .map((msg) => msg.content);
+      userMessages.push(content);
+      const searchQuery = userMessages.join(' ');
+      similarContents = await this.embeddingService.searchSimilar(
+        searchQuery,
+        10,
+        userContext.watchedTmdbIds,
+      );
+    }
 
     // 3. 시스템 프롬프트 구성 (검색 결과 포함)
     const systemPrompt = buildSystemPrompt(
