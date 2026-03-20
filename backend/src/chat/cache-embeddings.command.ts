@@ -138,6 +138,22 @@ async function main() {
   }, 50);
   allItems.push(...popularTv);
 
+  // 4. 최신 TV 시리즈 (3년 이내, vote_count >= 50, 한국 시청 가능)
+  const threeYearsAgo = new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000)
+    .toISOString().split('T')[0];
+  const recentTv = await collectTmdbIds(apiKey, '최신 TV (KR)', 'tv', {
+    sort_by: 'popularity.desc',
+    'vote_count.gte': 50,
+    'first_air_date.gte': threeYearsAgo,
+    watch_region: 'KR',
+  }, 25);
+  const tvSeen = new Set(popularTv.map((i) => i.id));
+  for (const item of recentTv) {
+    if (!tvSeen.has(item.id)) {
+      allItems.push(item);
+    }
+  }
+
   console.log(`\n총 ${allItems.length}개 작품 대상\n`);
 
   // 2. 이미 캐싱된 content_id 조회 (skip용)

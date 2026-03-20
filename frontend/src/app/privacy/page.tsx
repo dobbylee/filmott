@@ -51,6 +51,13 @@ export default function PrivacyPage() {
             <li><strong className="text-white/90">닉네임</strong>: 회원가입 시 이용자가 직접 입력 (서비스 내 고유 식별용)</li>
           </ul>
 
+          <h3 className="text-base font-medium text-white/90 mb-2">서비스 이용 중 생성되는 정보</h3>
+          <ul className="list-disc pl-5 mb-4">
+            <li><strong className="text-white/90">리뷰, 별점, 감상 기록</strong>: AI 추천 품질 향상을 위해 활용</li>
+            <li><strong className="text-white/90">OTT 구독 정보</strong>: 이용자가 직접 설정 (AI 추천 시 구독 플랫폼 우선 반영)</li>
+            <li><strong className="text-white/90">AI 추천 대화 내용</strong>: 서버에 저장되지 않으며, 브라우저 탭 종료 시 삭제됩니다</li>
+          </ul>
+
           <h3 className="text-base font-medium text-white/90 mb-2">자동으로 수집되는 정보</h3>
           <ul className="list-disc pl-5">
             <li><strong className="text-white/90">IP 주소</strong>: 서비스 접속 시 자동 수집</li>
@@ -62,7 +69,8 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold text-white mb-3">2. 개인정보의 수집 및 이용 목적</h2>
           <ul className="list-disc pl-5">
             <li><strong className="text-white/90">회원 관리</strong>: 본인 식별, 가입 및 탈퇴 처리</li>
-            <li><strong className="text-white/90">서비스 제공</strong>: 리뷰 작성, 별점 평가, 워치리스트 등 서비스 기능 제공</li>
+            <li><strong className="text-white/90">서비스 제공</strong>: 리뷰 작성, 별점 평가, 감상 기록 등 서비스 기능 제공</li>
+            <li><strong className="text-white/90">AI 추천</strong>: 이용자의 취향 데이터(리뷰, 별점, 감상 기록, OTT 구독)를 기반으로 맞춤 작품 추천</li>
             <li><strong className="text-white/90">서비스 개선</strong>: 접속 통계 분석, 오류 대응</li>
           </ul>
         </section>
@@ -114,13 +122,43 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-white mb-3">5. 개인정보의 제3자 제공</h2>
           <p>서비스는 이용자의 개인정보를 <strong className="text-white/90">제3자에게 제공하지 않습니다.</strong></p>
-          <p className="mt-2">다만, 소셜 로그인 과정에서 해당 플랫폼(Google, Kakao, Naver)의 인증 서비스를 이용하며, 이 과정은 각 플랫폼의 개인정보처리방침을 따릅니다.</p>
+          <p className="mt-2">다만, 다음의 경우 해당 서비스 제공자의 개인정보처리방침을 따릅니다.</p>
+          <ul className="list-disc pl-5 mt-2">
+            <li><strong className="text-white/90">소셜 로그인</strong>: Google, Kakao, Naver의 인증 서비스 이용</li>
+            <li><strong className="text-white/90">AI 추천</strong>: OpenAI API를 통해 추천 응답을 생성합니다. 이 과정에서 이용자의 취향 요약 데이터(좋아하는/싫어하는 작품, 장르 선호도)와 대화 내용이 OpenAI에 전송됩니다. 이름, 이메일 등 개인 식별 정보는 전송되지 않습니다.</li>
+          </ul>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold text-white mb-3">6. 개인정보의 처리 위탁</h2>
-          <p>현재 개인정보 처리를 외부에 위탁하지 않습니다.</p>
-          <p className="mt-2">향후 위탁이 필요한 경우, 위탁 내용을 본 방침에 공개하겠습니다.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="py-2 pr-4 text-left text-white/90">수탁자</th>
+                  <th className="py-2 pr-4 text-left text-white/90">위탁 업무</th>
+                  <th className="py-2 text-left text-white/90">전송 데이터</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-white/5">
+                  <td className="py-2 pr-4">OpenAI</td>
+                  <td className="py-2 pr-4">AI 추천 응답 생성</td>
+                  <td className="py-2">취향 요약, 대화 내용 (개인 식별 정보 미포함)</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-2 pr-4">Cloudflare</td>
+                  <td className="py-2 pr-4">CDN, DNS, 프로필 이미지 저장</td>
+                  <td className="py-2">접속 정보, 업로드 이미지</td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4">Google Analytics</td>
+                  <td className="py-2 pr-4">접속 통계 분석</td>
+                  <td className="py-2">익명화된 접속 데이터</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section>
