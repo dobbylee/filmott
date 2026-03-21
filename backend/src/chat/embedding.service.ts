@@ -233,7 +233,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
         .map(() => {
           const idx = paramIndex;
           paramIndex++;
-          return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ',%' OR c.origin_country LIKE '%,' || $${idx} OR c.origin_country LIKE '%,' || $${idx} || ',%')`;
+          return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ', %' OR c.origin_country LIKE '%, ' || $${idx} OR c.origin_country LIKE '%, ' || $${idx} || ', %')`;
         });
       conditions.push(`AND (${countryConditions.join(' OR ')})`);
       filters.countries.forEach((country) => params.push(country));
