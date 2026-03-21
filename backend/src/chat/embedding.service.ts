@@ -293,13 +293,14 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     }[] = await this.dataSource.query(
       `SELECT cm.content_id, cm.description,
               c.tmdb_id, c.content_type, c.title, c.poster_url, c.genres, c.vote_average,
-              c.director, c.origin_country,
-              1 - (cm.embedding <=> $1::vector) AS similarity
+              c.director, c.origin_country, c.vote_count,
+              1 - (cm.embedding <=> $1::vector) AS similarity,
+              (1 - (cm.embedding <=> $1::vector)) * 0.7 + LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, 0.3) AS weighted_score
        FROM content_metadata cm
        JOIN contents c ON c.id = cm.content_id
        WHERE c.tmdb_id != ALL($2::int[])
        ${conditions.join('\n       ')}
-       ORDER BY cm.embedding <=> $1::vector
+       ORDER BY weighted_score DESC
        LIMIT ${limitParam}`,
       params,
     );
