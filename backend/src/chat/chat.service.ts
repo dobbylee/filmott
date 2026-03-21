@@ -128,29 +128,27 @@ export class ChatService {
       // 5. 쿼리 정제: 메타데이터 키워드 제거 후 의미적 쿼리만 사용
       const semanticQuery = this.intentAnalyzer.buildSemanticQuery(searchQuery, intent);
 
-      // 6. 유저 선호 추출 + 3분기 검색
+      // 6. 유저 선호 추출 + 2분기 검색
       const userPref = extractUserPreference(userContext, subscribedOtts);
 
-      if (hasFilters) {
-        // A. 명시적 필터 있음: SQL 전체 검색 + 유저 선호 리랭킹
-        const filtersWithPref: ContentSearchFilters = {
-          ...filters,
-          preferredGenres: userPref.preferredGenres,
-          preferredCountries: userPref.preferredCountries,
-          preferredOttNames: userPref.ottProviderNames,
-        };
+      if (hasFilters || userPref.hasData) {
+        // A+B 통합: 명시적 필터 + 유저 선호를 합쳐서 SQL 전체 검색
+        const mergedFilters: ContentSearchFilters = { ...filters };
+
+        // 명시적 필터가 있는 필드에는 유저 선호를 합치지 않는다
+        // (예: "티빙에서 볼만한" 요청 시 유저 구독 넷플릭스를 추가하지 않음)
+        if (!mergedFilters.ottProviderNames?.length && userPref.ottProviderNames.length > 0) {
+          mergedFilters.ottProviderNames = userPref.ottProviderNames;
+        }
+        if (!mergedFilters.genres?.length && userPref.preferredGenres.length > 0) {
+          mergedFilters.genres = userPref.preferredGenres;
+        }
+        if (!mergedFilters.countries?.length && userPref.preferredCountries.length > 0) {
+          mergedFilters.countries = userPref.preferredCountries;
+        }
+
         similarContents = await this.contentSearchService.searchWithFilters(
-          semanticQuery, 20, userContext.watchedTmdbIds, filtersWithPref,
-        );
-      } else if (userPref.hasData) {
-        // B. 필터 없음 + 유저 데이터 있음: SQL 전체 검색 (유저 선호 리랭킹만)
-        const userFilters: ContentSearchFilters = {
-          preferredGenres: userPref.preferredGenres,
-          preferredCountries: userPref.preferredCountries,
-          preferredOttNames: userPref.ottProviderNames,
-        };
-        similarContents = await this.contentSearchService.searchWithFilters(
-          semanticQuery, 20, userContext.watchedTmdbIds, userFilters,
+          semanticQuery, 20, userContext.watchedTmdbIds, mergedFilters,
         );
       } else {
         // C. 필터 없음 + 신규 유저: 기존 벡터 검색 fallback

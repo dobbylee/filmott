@@ -3,18 +3,12 @@ import { DataSource } from 'typeorm';
 import { EmbeddingService, SimilarContent } from './embedding.service';
 
 export interface ContentSearchFilters {
-  // SQL WHERE 절 필터
   ottProviderNames?: string[];
   countries?: string[];
   personNames?: string[];
   dateRange?: { from: string | null; to: string | null };
   contentType?: 'movie' | 'tv';
   genres?: string[];
-
-  // 리랭킹 선호도 (ORDER BY 가중치, WHERE 절 아님)
-  preferredGenres?: string[];
-  preferredCountries?: string[];
-  preferredOttNames?: string[];
 }
 
 interface FilteredRow {
@@ -36,12 +30,7 @@ interface FilteredRow {
 
 const SCORE_WEIGHTS = {
   VECTOR_DEFAULT: 0.7,
-  VECTOR_WITH_PREF: 0.6,
   POPULARITY_DEFAULT: 0.3,
-  POPULARITY_WITH_PREF: 0.25,
-  GENRE_BONUS: 0.05,
-  COUNTRY_BONUS: 0.05,
-  OTT_BONUS: 0.05,
 } as const;
 
 @Injectable()
@@ -115,10 +104,6 @@ export class ContentSearchService {
     return results;
   }
 
-  /**
-   * SQL WHERE 절 필터만 확인한다.
-   * preferredGenres / preferredCountries / preferredOttNames는 ORDER BY 가중치이므로 포함하지 않는다.
-   */
   private hasActiveFilters(filters: ContentSearchFilters): boolean {
     return (
       (filters.ottProviderNames?.length ?? 0) > 0 ||
@@ -218,88 +203,14 @@ export class ContentSearchService {
       paramIndex++;
     }
 
-    // 리랭킹 선호도 파라미터 바인딩
-    const hasPreference = (filters.preferredGenres?.length ?? 0) > 0
-      || (filters.preferredCountries?.length ?? 0) > 0
-      || (filters.preferredOttNames?.length ?? 0) > 0;
-
-    let prefGenreIdx: number | null = null;
-    let prefCountryIdx: number | null = null;
-    let prefOttIdx: number | null = null;
-
-    if (hasPreference) {
-      if (filters.preferredGenres?.length) {
-        params.push(filters.preferredGenres);
-        prefGenreIdx = paramIndex;
-        paramIndex++;
-      }
-      if (filters.preferredCountries?.length) {
-        params.push(filters.preferredCountries);
-        prefCountryIdx = paramIndex;
-        paramIndex++;
-      }
-      if (filters.preferredOttNames?.length) {
-        params.push(filters.preferredOttNames);
-        prefOttIdx = paramIndex;
-        paramIndex++;
-      }
-    }
-
     params.push(limit);
     const limitParam = `$${paramIndex}`;
 
     const dynamicConditions = conditions.join('\n       ');
 
-    // 리랭킹 보너스 SQL 조각 생성
-    const genreBonusSql = prefGenreIdx !== null
-      ? `CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(genres) AS g WHERE g->>'name' = ANY($${prefGenreIdx}::text[])) THEN ${SCORE_WEIGHTS.GENRE_BONUS} ELSE 0 END`
-      : '0';
-    const countryBonusSql = prefCountryIdx !== null
-      ? `CASE WHEN EXISTS (
-  SELECT 1 FROM unnest($${prefCountryIdx}::text[]) AS pc
-  WHERE origin_country = pc
-     OR origin_country LIKE pc || ', %'
-     OR origin_country LIKE '%, ' || pc
-     OR origin_country LIKE '%, ' || pc || ', %'
-) THEN ${SCORE_WEIGHTS.COUNTRY_BONUS} ELSE 0 END`
-      : '0';
-    const ottBonusSql = prefOttIdx !== null
-      ? `CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(watch_providers->'flatrate') AS p WHERE p->>'provider_name' = ANY($${prefOttIdx}::text[])) THEN ${SCORE_WEIGHTS.OTT_BONUS} ELSE 0 END`
-      : '0';
-
-    // 1순위 스코어: 리랭킹 있으면 벡터 0.6 + 인기도 0.25 + 보너스 0.15, 없으면 기존 (0.7 + 0.3)
     const buildEmbeddingScore = (embIdx: number): string => {
-      if (hasPreference) {
-        return `(1 - (embedding <=> $${embIdx}::vector)) * ${SCORE_WEIGHTS.VECTOR_WITH_PREF} + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, ${SCORE_WEIGHTS.POPULARITY_WITH_PREF}) + ${genreBonusSql} + ${countryBonusSql} + ${ottBonusSql}`;
-      }
       return `(1 - (embedding <=> $${embIdx}::vector)) * ${SCORE_WEIGHTS.VECTOR_DEFAULT} + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, ${SCORE_WEIGHTS.POPULARITY_DEFAULT})`;
     };
-
-    // 2/3순위 스코어: 리랭킹 있으면 보너스만, 없으면 0
-    // 리랭킹 필드가 부분적으로만 존재할 때 총합이 1.0이 아닐 수 있으나,
-    // 동일 priority 내 상대 정렬에만 사용되므로 기능상 문제 없음
-    const buildFallbackScore = (): string => {
-      if (!hasPreference) return '0';
-      const parts: string[] = [];
-      if (prefGenreIdx !== null) {
-        parts.push(`CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(genres) AS g WHERE g->>'name' = ANY($${prefGenreIdx}::text[])) THEN 0.33 ELSE 0 END`);
-      }
-      if (prefCountryIdx !== null) {
-        parts.push(`CASE WHEN EXISTS (
-  SELECT 1 FROM unnest($${prefCountryIdx}::text[]) AS pc
-  WHERE origin_country = pc
-     OR origin_country LIKE pc || ', %'
-     OR origin_country LIKE '%, ' || pc
-     OR origin_country LIKE '%, ' || pc || ', %'
-) THEN 0.33 ELSE 0 END`);
-      }
-      if (prefOttIdx !== null) {
-        parts.push(`CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(watch_providers->'flatrate') AS p WHERE p->>'provider_name' = ANY($${prefOttIdx}::text[])) THEN 0.34 ELSE 0 END`);
-      }
-      return parts.length > 0 ? parts.join(' + ') : '0';
-    };
-
-    const fallbackScore = buildFallbackScore();
 
     // P0-2: CTE에서 embedding도 SELECT하여 1순위 블록에서 content_metadata 재조인 제거
     // P1-4: rankings를 LEFT JOIN으로 한 번만 조회 (WHERE + SELECT 이중 서브쿼리 제거)
@@ -344,7 +255,7 @@ SELECT * FROM (
   }-- ${embeddingParamIndex !== null ? '2' : '1'}순위: KOBIS 랭킹 작품 (임베딩 없음, 인기도순)
   (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
           genres, vote_average, vote_count, overview, director, origin_country,
-          description, 2 AS priority, ${fallbackScore} AS score
+          description, 2 AS priority, 0 AS score
    FROM filtered
    WHERE has_embedding = false AND is_kobis = true
    ORDER BY score DESC, vote_count DESC
@@ -355,7 +266,7 @@ SELECT * FROM (
   -- ${embeddingParamIndex !== null ? '3' : '2'}순위: 나머지 (임베딩 없음 + KOBIS 아님, 인기도순)
   (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
           genres, vote_average, vote_count, overview, director, origin_country,
-          description, 3 AS priority, ${fallbackScore} AS score
+          description, 3 AS priority, 0 AS score
    FROM filtered
    WHERE has_embedding = false AND is_kobis = false
    ORDER BY score DESC, vote_count DESC

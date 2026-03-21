@@ -604,7 +604,7 @@ describe('ChatService', () => {
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
-    it('필터 없음 + 유저 데이터 있음: ContentSearchService.searchWithFilters가 유저 선호로 호출되어야 한다', async () => {
+    it('필터 없음 + 유저 데이터 있음: ContentSearchService.searchWithFilters가 유저 선호를 WHERE 필터로 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockExtractUserPreference.mockReturnValue({
         preferredGenres: ['드라마', '스릴러'],
@@ -624,21 +624,17 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '비 오는 날에 볼 만한 잔잔한 영화', [], jest.fn());
 
+      // 유저 선호가 WHERE 필터 필드에 합쳐져서 전달되어야 한다
       expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
         '잔잔한 영화',
         20,
         expect.any(Array),
         expect.objectContaining({
-          preferredGenres: ['드라마', '스릴러'],
-          preferredCountries: ['KR'],
-          preferredOttNames: ['Netflix'],
+          ottProviderNames: ['Netflix'],
+          genres: ['드라마', '스릴러'],
+          countries: ['KR'],
         }),
       );
-      // SQL WHERE 필터 없이 리랭킹만 전달되어야 한다
-      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
-      expect(calledFilters.ottProviderNames).toBeUndefined();
-      expect(calledFilters.countries).toBeUndefined();
-      expect(calledFilters.genres).toBeUndefined();
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
@@ -670,7 +666,7 @@ describe('ChatService', () => {
       expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();
     });
 
-    it('필터 있음: 기존 필터 + 유저 선호가 함께 전달되어야 한다', async () => {
+    it('필터 있음: 명시적 필터가 유저 선호보다 우선해야 한다', async () => {
       setupEmptyUserContext();
       mockExtractUserPreference.mockReturnValue({
         preferredGenres: ['드라마'],
@@ -694,20 +690,12 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '디즈니플러스 미국 히어로 영화', [], jest.fn());
 
-      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
-        '히어로 영화',
-        20,
-        expect.any(Array),
-        expect.objectContaining({
-          // 명시적 SQL 필터
-          ottProviderNames: ['Disney Plus'],
-          countries: ['US'],
-          // 유저 선호 리랭킹
-          preferredGenres: ['드라마'],
-          preferredCountries: ['KR'],
-          preferredOttNames: ['Netflix'],
-        }),
-      );
+      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      // 명시적 필터가 있는 필드에는 유저 선호가 합쳐지지 않는다
+      expect(calledFilters.ottProviderNames).toEqual(['Disney Plus']);
+      expect(calledFilters.countries).toEqual(['US']);
+      // 명시적 필터가 없는 필드에는 유저 선호가 WHERE 필터로 적용된다
+      expect(calledFilters.genres).toEqual(['드라마']);
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
