@@ -52,11 +52,7 @@ function extractGenresFromFavorites(favorites: FavoriteContent[]): string[] {
   return sorted.slice(0, MAX_GENRES).map(([genre]) => genre);
 }
 
-interface FavoriteWithCountry extends FavoriteContent {
-  originCountry?: string | null;
-}
-
-function extractCountries(favorites: FavoriteWithCountry[]): string[] {
+function extractCountries(favorites: FavoriteContent[]): string[] {
   const countryCount = new Map<string, number>();
 
   for (const fav of favorites) {
@@ -96,9 +92,7 @@ export function extractUserPreference(
     preferredGenres = extractGenresFromFavorites(context.favorites);
   }
 
-  const preferredCountries = extractCountries(
-    context.favorites as FavoriteWithCountry[],
-  );
+  const preferredCountries = extractCountries(context.favorites);
 
   const ottProviderNames = mapOttNames(subscribedOtts, ottProviders);
 

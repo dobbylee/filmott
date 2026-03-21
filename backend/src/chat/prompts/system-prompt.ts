@@ -7,6 +7,7 @@ export interface FavoriteContent {
   year: string;
   genres: string;
   rating: number;
+  originCountry: string | null;
 }
 
 export interface GenreStat {
@@ -44,7 +45,10 @@ export function buildSystemPrompt(
     context.favorites.length > 0
       ? context.favorites
           .map(
-            (f) => `- ${f.title} (${f.year}, ${f.genres}) - ${f.rating}점`,
+            (f) => {
+              const countryStr = f.originCountry ? ` | ${f.originCountry}` : '';
+              return `- ${f.title} (${f.year}, ${f.genres}${countryStr}) - ${f.rating}점`;
+            },
           )
           .join('\n')
       : '(아직 높은 점수를 준 작품이 없습니다)';
@@ -53,7 +57,10 @@ export function buildSystemPrompt(
     context.disliked.length > 0
       ? context.disliked
           .map(
-            (d) => `- ${d.title} (${d.year}, ${d.genres}) - ${d.rating}점`,
+            (d) => {
+              const countryStr = d.originCountry ? ` | ${d.originCountry}` : '';
+              return `- ${d.title} (${d.year}, ${d.genres}${countryStr}) - ${d.rating}점`;
+            },
           )
           .join('\n')
       : '(아직 낮은 점수를 준 작품이 없습니다)';

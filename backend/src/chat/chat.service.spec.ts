@@ -114,12 +114,12 @@ describe('ChatService', () => {
     it('사용자 컨텍스트를 올바르게 구성해야 한다', async () => {
       const favoritesQb = mockQueryBuilder();
       favoritesQb.getRawMany.mockResolvedValue([
-        { title: '기생충', releaseDate: '2019-05-30', genres: '드라마, 스릴러', rating: 10 },
+        { title: '기생충', releaseDate: '2019-05-30', genres: '드라마, 스릴러', rating: 10, originCountry: 'KR' },
       ]);
 
       const dislikedQb = mockQueryBuilder();
       dislikedQb.getRawMany.mockResolvedValue([
-        { title: '영화X', releaseDate: '2020-01-01', genres: '액션', rating: 2 },
+        { title: '영화X', releaseDate: '2020-01-01', genres: '액션', rating: 2, originCountry: 'US' },
       ]);
 
       const genreStatsQb = mockQueryBuilder();
@@ -152,9 +152,11 @@ describe('ChatService', () => {
       expect(result.favorites[0].title).toBe('기생충');
       expect(result.favorites[0].year).toBe('2019');
       expect(result.favorites[0].rating).toBe(10);
+      expect(result.favorites[0].originCountry).toBe('KR');
 
       expect(result.disliked).toHaveLength(1);
       expect(result.disliked[0].rating).toBe(2);
+      expect(result.disliked[0].originCountry).toBe('US');
 
       expect(result.genreStats).toHaveLength(1);
       expect(result.genreStats[0].genre).toBe('드라마');

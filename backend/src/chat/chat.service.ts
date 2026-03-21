@@ -33,6 +33,7 @@ interface RawFavoriteRow {
   releaseDate: string | null;
   genres: string;
   rating: number;
+  originCountry: string | null;
 }
 
 interface RawGenreStatRow {
@@ -324,6 +325,7 @@ export class ChatService {
         'c.release_date AS "releaseDate"',
         "array_to_string(ARRAY(SELECT jsonb_array_elements(c.genres) ->> 'name'), ', ') AS \"genres\"",
         'r.rating AS "rating"',
+        'c.origin_country AS "originCountry"',
       ])
       .where('r.userId = :userId', { userId })
       .andWhere('r.rating >= 8')
@@ -339,6 +341,7 @@ export class ChatService {
         : '',
       genres: row.genres || '',
       rating: row.rating,
+      originCountry: row.originCountry ?? null,
     }));
   }
 
@@ -351,6 +354,7 @@ export class ChatService {
         'c.release_date AS "releaseDate"',
         "array_to_string(ARRAY(SELECT jsonb_array_elements(c.genres) ->> 'name'), ', ') AS \"genres\"",
         'r.rating AS "rating"',
+        'c.origin_country AS "originCountry"',
       ])
       .where('r.userId = :userId', { userId })
       .andWhere('r.rating <= 4')
@@ -366,6 +370,7 @@ export class ChatService {
         : '',
       genres: row.genres || '',
       rating: row.rating,
+      originCountry: row.originCountry ?? null,
     }));
   }
 

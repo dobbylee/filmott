@@ -15,9 +15,9 @@ function makeFavorite(
   title: string,
   genres: string,
   rating: number,
-  originCountry?: string | null,
-): FavoriteContent & { originCountry?: string | null } {
-  return { title, year: '2024', genres, rating, ...(originCountry !== undefined ? { originCountry } : {}) };
+  originCountry: string | null = null,
+): FavoriteContent {
+  return { title, year: '2024', genres, rating, originCountry };
 }
 
 function makeEmptyContext(): UserContext {
@@ -189,7 +189,7 @@ describe('extractUserPreference', () => {
           makeFavorite('인셉션', 'SF', 9, 'US'),
           makeFavorite('아멜리에', '로맨스', 8, 'FR'),
           makeFavorite('미나리', '드라마', 8, 'US'),
-        ] as (FavoriteContent & { originCountry?: string | null })[],
+        ],
       };
 
       const result = extractUserPreference(context, [], OTT_PROVIDERS);
@@ -216,7 +216,7 @@ describe('extractUserPreference', () => {
         favorites: [
           makeFavorite('기생충', '드라마', 10, 'KR'),
           makeFavorite('올드보이', '스릴러', 9, null),
-        ] as (FavoriteContent & { originCountry?: string | null })[],
+        ],
       };
 
       const result = extractUserPreference(context, [], OTT_PROVIDERS);
