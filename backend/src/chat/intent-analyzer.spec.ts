@@ -410,13 +410,27 @@ describe('IntentAnalyzerService', () => {
         dateRange: { from: '2024-01-01', to: null },
         contentType: 'tv',
       };
-      const result = service.buildSemanticQuery('최신 한국 드라마 추천해줘', intent);
+      const result = service.buildSemanticQuery('최신 한국 로맨스 드라마 추천해줘', intent);
 
       expect(result).not.toMatch(/최신/);
       expect(result).not.toMatch(/한국/);
       expect(result).not.toMatch(/추천해줘/);
-      // 드라마는 contentType 표현이므로 유지
+      // 장르/타입 표현은 유지
+      expect(result).toContain('로맨스');
       expect(result).toContain('드라마');
+    });
+
+    it('정제 결과가 너무 짧으면 원본을 반환해야 한다', () => {
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        countries: ['KR'],
+        dateRange: { from: '2024-01-01', to: null },
+        contentType: 'tv',
+      };
+      // "드라마"만 남으므로 (3자 이하) 원본 반환
+      const result = service.buildSemanticQuery('최신 한국 드라마 추천해줘', intent);
+
+      expect(result).toBe('최신 한국 드라마 추천해줘');
     });
 
     it('모든 키워드가 메타데이터인 경우 원본을 반환해야 한다', () => {
@@ -476,6 +490,89 @@ describe('IntentAnalyzerService', () => {
       const result = service.buildSemanticQuery('넷플릭스 봉준호 감독 스릴러 영화', intent);
 
       expect(result).not.toMatch(/\s{2,}/);
+    });
+
+    it('"추천" 단독도 제거해야 한다', () => {
+      const result = service.buildSemanticQuery('SF 영화 추천', emptyIntent);
+
+      expect(result).toBe('SF 영화');
+    });
+
+    it('인물 제거 후 고립된 "감독"을 제거해야 한다', () => {
+      const intent: ParsedIntent = { ...emptyIntent, personNames: ['봉준호'] };
+      // "봉준호 감독 사회 풍자 영화" → "사회 풍자 영화" (감독 제거, 충분한 길이)
+      const result = service.buildSemanticQuery('봉준호 감독 사회 풍자 영화', intent);
+
+      expect(result).not.toMatch(/감독/);
+      expect(result).not.toMatch(/봉준호/);
+      expect(result).toContain('사회');
+      expect(result).toContain('풍자');
+    });
+
+    it('인물 제거 후 고립된 "나오는"을 제거해야 한다', () => {
+      const intent: ParsedIntent = { ...emptyIntent, personNames: ['송강호'] };
+      const result = service.buildSemanticQuery('송강호 나오는 영화 재밌는 거', intent);
+
+      expect(result).not.toMatch(/나오는/);
+      expect(result).toContain('영화');
+      expect(result).toContain('재밌는 거');
+    });
+
+    it('인물이 없으면 "감독"을 유지해야 한다', () => {
+      const result = service.buildSemanticQuery('유명한 감독의 영화', emptyIntent);
+
+      expect(result).toContain('감독');
+    });
+
+    it('"중에"를 제거하고 앞뒤 공백을 보존해야 한다', () => {
+      const intent: ParsedIntent = { ...emptyIntent, countries: ['FR'] };
+      const result = service.buildSemanticQuery('프랑스 영화 중에 로맨틱한 거', intent);
+
+      expect(result).toBe('영화 로맨틱한 거');
+      expect(result).not.toMatch(/중에/);
+    });
+
+    it('분위기 쿼리에서 "거/것"을 보존해야 한다', () => {
+      const result1 = service.buildSemanticQuery('밤에 볼 만한 무서운 거', emptyIntent);
+      expect(result1).toBe('밤에 볼 만한 무서운 거');
+
+      const result2 = service.buildSemanticQuery('잠 안 올 때 볼 만한 것', emptyIntent);
+      expect(result2).toBe('잠 안 올 때 볼 만한 것');
+    });
+
+    it('"에서 볼 수 있는 거"를 제거해야 한다', () => {
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        ottProviderNames: ['Netflix'],
+      };
+      const result = service.buildSemanticQuery(
+        '넷플릭스에서 볼 수 있는 거 따뜻한 영화',
+        intent,
+      );
+
+      expect(result).not.toMatch(/에서 볼 수 있는/);
+      expect(result).toContain('따뜻한');
+      expect(result).toContain('영화');
+    });
+
+    it('복합 조건 쿼리에서 핵심 장르만 남겨야 한다', () => {
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        ottProviderNames: ['Netflix'],
+        countries: ['KR'],
+        dateRange: { from: '2024-01-01', to: null },
+        contentType: 'movie',
+      };
+      const result = service.buildSemanticQuery(
+        '넷플릭스에서 볼 수 있는 최신 한국 스릴러 영화',
+        intent,
+      );
+
+      expect(result).toContain('스릴러');
+      expect(result).toContain('영화');
+      expect(result).not.toMatch(/넷플릭스/);
+      expect(result).not.toMatch(/한국/);
+      expect(result).not.toMatch(/최신/);
     });
   });
 });

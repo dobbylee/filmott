@@ -92,7 +92,16 @@ const COUNTRY_NAMES: Record<string, string> = {
 const DATE_PATTERN = /(?:최신|요즘|올해|작년|재작년|신작|근작|최근|\d{4}년?(?:\s*대)?|\d{2}년대)/g;
 
 // 요청 표현 정규식 (독립적인 요청 표현만. "볼 만한", "볼 수 있는" 등 문맥 의존 표현 제외)
-const REQUEST_PATTERN = /(?:추천해\s*(?:줘|주세요|줄래|줄\s*수\s*있어)?|알려\s*(?:줘|주세요)|보여\s*(?:줘|주세요)|찾아\s*(?:줘|주세요)|있을까\??|있나요\??|뭐\s*있어\??|어때\??)/g;
+const REQUEST_PATTERN = /(?:추천해\s*(?:줘|주세요|줄래|줄\s*수\s*있어)?|추천|알려\s*(?:줘|주세요)|보여\s*(?:줘|주세요)|찾아\s*(?:줘|주세요)|있을까\??|있나요\??|뭐\s*있어\??|어때\??)/g;
+
+// 인물 제거 후 남는 고립 수식어 정규식
+const ORPHAN_PERSON_MODIFIER = /(?:감독(?:의)?|배우|나오는|주연의?|출연(?:하는|한)?)\s*/g;
+
+// 메타데이터 제거 후 남는 고립 잔여 표현 정규식 ("볼만한거" 등은 의미적 표현이므로 제외)
+// 문두: "이후 ..." / 문중: "... 중에 ..." / 문미: "... 이전"
+const ORPHAN_RESIDUAL_START = /^(?:중에|이후|이전)\s+/;
+const ORPHAN_RESIDUAL_MID = /\s+(?:중에|이후|이전)\s+/g;
+const ORPHAN_RESIDUAL_END = /\s+(?:중에|이후|이전)$/;
 
 @Injectable()
 export class IntentAnalyzerService {
@@ -180,8 +189,19 @@ export class IntentAnalyzerService {
     cleaned = cleaned.replace(REQUEST_PATTERN, '');
 
     // OTT/국가 제거 후 남은 잔여 구문 정리 ("에서 볼 수 있는" 등)
-    cleaned = cleaned.replace(/에서\s*볼\s*수\s*있는/g, '');
+    cleaned = cleaned.replace(/에서\s*볼\s*수\s*있는\s*(?:거|것)?/g, '');
     cleaned = cleaned.replace(/에서\s*볼\s*만한/g, '');
+    cleaned = cleaned.replace(/에서\s*볼만한/g, '');
+
+    // 인물 제거 후 남는 고립 수식어 제거 ("감독", "나오는" 등)
+    if (intent.personNames.length > 0) {
+      cleaned = cleaned.replace(ORPHAN_PERSON_MODIFIER, '');
+    }
+
+    // 메타데이터 제거 후 남는 고립 잔여 표현 제거
+    cleaned = cleaned.replace(ORPHAN_RESIDUAL_START, '');
+    cleaned = cleaned.replace(ORPHAN_RESIDUAL_MID, ' ');
+    cleaned = cleaned.replace(ORPHAN_RESIDUAL_END, '');
 
     // 문두/문미에 남은 고립 조사 제거 (문맥 중간의 조사는 유지)
     cleaned = cleaned.replace(/^\s*(?:에서|에|의|을|를|이|가|은|는)\s+/g, '');
@@ -190,7 +210,12 @@ export class IntentAnalyzerService {
     // 다중 공백 정리
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
-    // 정제 결과가 빈 문자열이면 원본 반환
-    return cleaned || originalQuery;
+    // 정제 결과가 너무 짧으면 (빈 문자열 또는 의미 부족) 원본 반환
+    // 벡터 검색에서 "영화", "드라마" 같은 단일 단어보다 원본이 더 유용
+    if (!cleaned || cleaned.length <= 3) {
+      return originalQuery;
+    }
+
+    return cleaned;
   }
 }
