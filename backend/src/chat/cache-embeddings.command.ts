@@ -16,6 +16,7 @@ interface DiscoverResponse {
 }
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const CONCURRENCY = 5;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -91,7 +92,76 @@ async function collectTmdbIds(
   return items;
 }
 
+interface CacheItemResult {
+  status: 'cached' | 'skipped' | 'failed';
+}
+
+async function processItem(
+  item: { id: number; type: 'movie' | 'tv' },
+  contentsService: ContentsService,
+  embeddingService: EmbeddingService,
+  existingContentIds: Set<number>,
+  tmdbToContentId: Map<string, number>,
+): Promise<CacheItemResult> {
+  const { id: tmdbId, type } = item;
+
+  const contentId = tmdbToContentId.get(`${type}:${tmdbId}`);
+  if (contentId && existingContentIds.has(contentId)) {
+    return { status: 'skipped' };
+  }
+
+  try {
+    await contentsService.getContentDetail(tmdbId, type);
+    await sleep(50);
+
+    const content = await contentsService.findOrFetchByTmdbId(tmdbId, type);
+
+    const result = await embeddingService.cacheContentMetadata(content.id);
+    return { status: result ? 'cached' : 'skipped' };
+  } catch {
+    return { status: 'failed' };
+  }
+}
+
+async function processBatchParallel(
+  items: { id: number; type: 'movie' | 'tv' }[],
+  contentsService: ContentsService,
+  embeddingService: EmbeddingService,
+  existingContentIds: Set<number>,
+  tmdbToContentId: Map<string, number>,
+  startTime: number,
+): Promise<{ cached: number; skipped: number; failed: number }> {
+  let cached = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (let i = 0; i < items.length; i += CONCURRENCY) {
+    const batch = items.slice(i, i + CONCURRENCY);
+
+    const results = await Promise.all(
+      batch.map((item) =>
+        processItem(item, contentsService, embeddingService, existingContentIds, tmdbToContentId),
+      ),
+    );
+
+    for (const r of results) {
+      if (r.status === 'cached') cached++;
+      else if (r.status === 'skipped') skipped++;
+      else failed++;
+    }
+
+    const processed = Math.min(i + CONCURRENCY, items.length);
+    if (processed % 50 < CONCURRENCY || processed === items.length) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+      console.log(`  ${processed}/${items.length} (캐싱=${cached}, 스킵=${skipped}, 실패=${failed}) [${elapsed}초]`);
+    }
+  }
+
+  return { cached, skipped, failed };
+}
+
 async function main() {
+  const mode = process.argv[2];
   const startTime = Date.now();
   const app = await NestFactory.createApplicationContext(AppModule);
   const configService = app.get(ConfigService);
@@ -105,58 +175,78 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('=== 임베딩 캐싱 배치 시작 ===\n');
-
-  // 1. TMDB discover로 대상 수집
-  const twoYearsAgo = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000)
-    .toISOString().split('T')[0];
+  console.log(`=== 임베딩 캐싱 배치 시작 (동시 ${CONCURRENCY}개) ===\n`);
 
   const allItems: { id: number; type: 'movie' | 'tv' }[] = [];
+  const globalSeen = new Set<string>();
 
-  const popularMovies = await collectTmdbIds(apiKey, '인기 영화', 'movie', {
-    sort_by: 'vote_count.desc',
-    'vote_count.gte': 1000,
-  }, 200);
-  allItems.push(...popularMovies);
-
-  const recentMovies = await collectTmdbIds(apiKey, '최신 영화', 'movie', {
-    sort_by: 'popularity.desc',
-    'vote_count.gte': 50,
-    'release_date.gte': twoYearsAgo,
-  }, 50);
-  // 중복 제거
-  const movieSeen = new Set(popularMovies.map((i) => i.id));
-  for (const item of recentMovies) {
-    if (!movieSeen.has(item.id)) {
-      allItems.push(item);
+  function addItems(items: { id: number; type: 'movie' | 'tv' }[]) {
+    for (const item of items) {
+      const key = `${item.type}:${item.id}`;
+      if (!globalSeen.has(key)) {
+        globalSeen.add(key);
+        allItems.push(item);
+      }
     }
   }
 
-  const popularTv = await collectTmdbIds(apiKey, '인기 TV', 'tv', {
-    sort_by: 'vote_count.desc',
-    'vote_count.gte': 500,
-  }, 50);
-  allItems.push(...popularTv);
+  if (mode === 'kr') {
+    // 한국 작품만 캐싱
+    console.log('[모드] 한국 작품 (vote_count >= 5)\n');
 
-  // 4. 최신 TV 시리즈 (4년 이내, vote_count >= 50, 한국 시청 가능)
-  const fourYearsAgo = new Date(Date.now() - 4 * 365 * 24 * 60 * 60 * 1000)
-    .toISOString().split('T')[0];
-  const recentTv = await collectTmdbIds(apiKey, '최신 TV (KR)', 'tv', {
-    sort_by: 'popularity.desc',
-    'vote_count.gte': 50,
-    'first_air_date.gte': fourYearsAgo,
-    watch_region: 'KR',
-  }, 25);
-  const tvSeen = new Set(popularTv.map((i) => i.id));
-  for (const item of recentTv) {
-    if (!tvSeen.has(item.id)) {
-      allItems.push(item);
-    }
+    const krMovies = await collectTmdbIds(apiKey, '한국 영화', 'movie', {
+      with_origin_country: 'KR',
+      sort_by: 'vote_count.desc',
+      'vote_count.gte': 5,
+    }, 500);
+    addItems(krMovies);
+
+    const krTv = await collectTmdbIds(apiKey, '한국 TV', 'tv', {
+      with_origin_country: 'KR',
+      sort_by: 'vote_count.desc',
+      'vote_count.gte': 5,
+    }, 500);
+    addItems(krTv);
+  } else {
+    // 기존 글로벌 캐싱
+    console.log('[모드] 글로벌\n');
+
+    const twoYearsAgo = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000)
+      .toISOString().split('T')[0];
+
+    const popularMovies = await collectTmdbIds(apiKey, '인기 영화', 'movie', {
+      sort_by: 'vote_count.desc',
+      'vote_count.gte': 1000,
+    }, 200);
+    addItems(popularMovies);
+
+    const recentMovies = await collectTmdbIds(apiKey, '최신 영화', 'movie', {
+      sort_by: 'popularity.desc',
+      'vote_count.gte': 50,
+      'release_date.gte': twoYearsAgo,
+    }, 50);
+    addItems(recentMovies);
+
+    const popularTv = await collectTmdbIds(apiKey, '인기 TV', 'tv', {
+      sort_by: 'vote_count.desc',
+      'vote_count.gte': 500,
+    }, 50);
+    addItems(popularTv);
+
+    const fourYearsAgo = new Date(Date.now() - 4 * 365 * 24 * 60 * 60 * 1000)
+      .toISOString().split('T')[0];
+    const recentTv = await collectTmdbIds(apiKey, '최신 TV (KR)', 'tv', {
+      sort_by: 'popularity.desc',
+      'vote_count.gte': 50,
+      'first_air_date.gte': fourYearsAgo,
+      watch_region: 'KR',
+    }, 25);
+    addItems(recentTv);
   }
 
   console.log(`\n총 ${allItems.length}개 작품 대상\n`);
 
-  // 2. 이미 캐싱된 content_id 조회 (skip용)
+  // 이미 캐싱된 content_id 조회 (skip용)
   const { DataSource } = require('typeorm');
   const ds = app.get(DataSource);
   const existingRows: { content_id: number }[] = await ds.query(
@@ -164,7 +254,6 @@ async function main() {
   );
   const existingContentIds = new Set(existingRows.map((r: { content_id: number }) => r.content_id));
 
-  // tmdbId → contentId 매핑 (이미 DB에 있는 것만)
   const tmdbToContentId = new Map<string, number>();
   const contentRows: { id: number; tmdb_id: number; content_type: string }[] = await ds.query(
     'SELECT id, tmdb_id, content_type FROM contents',
@@ -175,53 +264,14 @@ async function main() {
 
   console.log(`이미 캐싱됨: ${existingContentIds.size}개 (skip 대상)\n`);
 
-  // 3. 각 작품: getContentDetail(메타데이터 갱신) → cacheContentMetadata(임베딩)
-  let cached = 0;
-  let skipped = 0;
-  let failed = 0;
-
-  for (let i = 0; i < allItems.length; i++) {
-    const { id: tmdbId, type } = allItems[i];
-
-    // 이미 캐싱된 작품은 skip (TMDB API 호출 없이)
-    const contentId = tmdbToContentId.get(`${type}:${tmdbId}`);
-    if (contentId && existingContentIds.has(contentId)) {
-      skipped++;
-      if ((i + 1) % 500 === 0) {
-        console.log(`  ${i + 1}/${allItems.length} (캐싱=${cached}, 스킵=${skipped}, 실패=${failed})`);
-      }
-      continue;
-    }
-
-    try {
-      // getContentDetail로 최신 메타데이터 갱신 (director, originCountry, watchProviders, voteCount)
-      await contentsService.getContentDetail(tmdbId, type);
-      await sleep(50);
-
-      // DB에서 content ID 조회
-      const content = await contentsService.findOrFetchByTmdbId(tmdbId, type);
-
-      // 임베딩 캐싱 (이미 있으면 스킵)
-      const result = await embeddingService.cacheContentMetadata(content.id);
-      if (result) {
-        cached++;
-      } else {
-        skipped++;
-      }
-    } catch (error) {
-      failed++;
-      if (failed <= 10) {
-        console.error(`  [${type}/${tmdbId}] 실패: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-
-    if ((i + 1) % 50 === 0) {
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
-      console.log(`  ${i + 1}/${allItems.length} (캐싱=${cached}, 스킵=${skipped}, 실패=${failed}) [${elapsed}초]`);
-    }
-
-    await sleep(100); // OpenAI rate limit
-  }
+  const { cached, skipped, failed } = await processBatchParallel(
+    allItems,
+    contentsService,
+    embeddingService,
+    existingContentIds,
+    tmdbToContentId,
+    startTime,
+  );
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log('\n=== 임베딩 캐싱 배치 완료 ===');
