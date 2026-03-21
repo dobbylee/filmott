@@ -31,6 +31,7 @@ export interface SearchFilters {
 export interface CacheCriteria {
   minVoteCount: number;
   minReleaseDate: Date | null;
+  originCountry?: string;
 }
 
 export interface BatchResult {
@@ -331,6 +332,12 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     if (criteria.minReleaseDate) {
       qb.andWhere('c.releaseDate >= :minReleaseDate', {
         minReleaseDate: criteria.minReleaseDate,
+      });
+    }
+
+    if (criteria.originCountry) {
+      qb.andWhere('c.originCountry LIKE :country', {
+        country: `%${criteria.originCountry}%`,
       });
     }
 
