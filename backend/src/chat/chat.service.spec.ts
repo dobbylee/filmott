@@ -4,12 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { EmbeddingService, SimilarContent } from './embedding.service';
+import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
-import { ParsedIntent } from './intent-analyzer';
 
 // OpenAI SDK mock
 const mockStreamCreate = jest.fn();
@@ -27,13 +27,6 @@ jest.mock('openai', () => {
   };
 });
 
-// intent-analyzer mock
-const mockAnalyzeIntent = jest.fn<Promise<ParsedIntent>, [string, unknown]>();
-jest.mock('./intent-analyzer', () => ({
-  analyzeIntent: (...args: [string, unknown]) => mockAnalyzeIntent(...args),
-  // ParsedIntent 타입은 import로 사용하므로 re-export 불필요
-}));
-
 describe('ChatService', () => {
   let service: ChatService;
 
@@ -41,6 +34,11 @@ describe('ChatService', () => {
     hasAnyMetadata: jest.fn(),
     searchSimilar: jest.fn(),
     cacheContentMetadata: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockIntentAnalyzerService = {
+    analyzeIntent: jest.fn(),
+    buildSemanticQuery: jest.fn(),
   };
 
   const mockContentsService = {
@@ -73,6 +71,7 @@ describe('ChatService', () => {
       providers: [
         ChatService,
         { provide: EmbeddingService, useValue: mockEmbeddingService },
+        { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
         { provide: ContentsService, useValue: mockContentsService },
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
@@ -209,7 +208,8 @@ describe('ChatService', () => {
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(emptyQb);
       mockUserRepo.findOne.mockResolvedValue({ id: 1, subscribedOtts: ['netflix'] });
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
-      mockAnalyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.buildSemanticQuery.mockImplementation((query: string) => query);
     };
 
     it('볼드 제목이 후보와 매칭되면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
@@ -321,6 +321,7 @@ describe('ChatService', () => {
         providers: [
           ChatService,
           { provide: EmbeddingService, useValue: mockEmbeddingService },
+          { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
           { provide: ContentsService, useValue: mockContentsService },
           { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
           { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
@@ -368,10 +369,11 @@ describe('ChatService', () => {
 
     it('OTT 키워드가 있는 메시지는 analyzeIntent 결과의 ottProviderNames를 filters로 전달해야 한다', async () => {
       setupEmptyUserContext();
-      mockAnalyzeIntent.mockResolvedValue({
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
         ottProviderNames: ['Netflix'],
       });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('볼만한 영화');
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -382,9 +384,10 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '넷플릭스에서 볼만한 영화', [], jest.fn());
 
-      expect(mockAnalyzeIntent).toHaveBeenCalled();
+      expect(mockIntentAnalyzerService.analyzeIntent).toHaveBeenCalled();
+      expect(mockIntentAnalyzerService.buildSemanticQuery).toHaveBeenCalled();
       expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
-        expect.any(String),
+        '볼만한 영화',
         20,
         expect.any(Array),
         expect.objectContaining({ ottProviderNames: ['Netflix'] }),
@@ -393,7 +396,8 @@ describe('ChatService', () => {
 
     it('키워드 없는 메시지는 filters 없이 searchSimilar를 호출해야 한다', async () => {
       setupEmptyUserContext();
-      mockAnalyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('재미있는 영화');
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -404,9 +408,9 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '재미있는 영화 추천해줘', [], jest.fn());
 
-      expect(mockAnalyzeIntent).toHaveBeenCalled();
+      expect(mockIntentAnalyzerService.analyzeIntent).toHaveBeenCalled();
       expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
-        expect.any(String),
+        '재미있는 영화',
         20,
         expect.any(Array),
         undefined,
@@ -415,13 +419,15 @@ describe('ChatService', () => {
 
     it('analyzeIntent가 국가/인물/연도 의도를 반환하면 해당 filters를 전달해야 한다', async () => {
       setupEmptyUserContext();
-      mockAnalyzeIntent.mockResolvedValue({
+      const intentResult: ParsedIntent = {
         ...emptyIntent,
         countries: ['KR'],
         personNames: ['봉준호'],
         dateRange: { from: '2020-01-01', to: null },
         contentType: 'movie',
-      });
+      };
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue(intentResult);
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('감독 영화');
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -432,8 +438,12 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '봉준호 감독의 최신 한국 영화', [], jest.fn());
 
-      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+      expect(mockIntentAnalyzerService.buildSemanticQuery).toHaveBeenCalledWith(
         expect.any(String),
+        intentResult,
+      );
+      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+        '감독 영화',
         20,
         expect.any(Array),
         expect.objectContaining({
@@ -441,6 +451,53 @@ describe('ChatService', () => {
           personNames: ['봉준호'],
           dateRange: { from: '2020-01-01', to: null },
           contentType: 'movie',
+        }),
+      );
+    });
+
+    it('searchSimilar에 buildSemanticQuery로 정제된 쿼리를 전달해야 한다', async () => {
+      setupEmptyUserContext();
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        ottProviderNames: ['Netflix'],
+        countries: ['KR'],
+        personNames: ['봉준호'],
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('사회 풍자 영화');
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(
+        1,
+        '넷플릭스에서 봉준호 감독의 한국 사회 풍자 영화',
+        [],
+        jest.fn(),
+      );
+
+      // buildSemanticQuery가 원본 쿼리 + intent로 호출되는지 확인
+      expect(mockIntentAnalyzerService.buildSemanticQuery).toHaveBeenCalledWith(
+        '넷플릭스에서 봉준호 감독의 한국 사회 풍자 영화',
+        expect.objectContaining({
+          ottProviderNames: ['Netflix'],
+          countries: ['KR'],
+          personNames: ['봉준호'],
+        }),
+      );
+
+      // searchSimilar에 정제된 쿼리가 전달되는지 확인
+      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+        '사회 풍자 영화',
+        20,
+        expect.any(Array),
+        expect.objectContaining({
+          ottProviderNames: ['Netflix'],
+          countries: ['KR'],
+          personNames: ['봉준호'],
         }),
       );
     });
@@ -457,7 +514,7 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
-      expect(mockAnalyzeIntent).not.toHaveBeenCalled();
+      expect(mockIntentAnalyzerService.analyzeIntent).not.toHaveBeenCalled();
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
   });

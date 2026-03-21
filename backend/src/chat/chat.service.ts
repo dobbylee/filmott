@@ -16,7 +16,7 @@ import {
   WantToWatchContent,
 } from './prompts/system-prompt';
 import { OTT_PROVIDERS } from '../common/ott-providers';
-import { analyzeIntent, ParsedIntent } from './intent-analyzer';
+import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 
@@ -59,6 +59,7 @@ export class ChatService {
   constructor(
     private readonly embeddingService: EmbeddingService,
     private readonly contentsService: ContentsService,
+    private readonly intentAnalyzer: IntentAnalyzerService,
     @InjectRepository(Watchlist)
     private readonly watchlistRepo: Repository<Watchlist>,
     @InjectRepository(Review)
@@ -113,7 +114,7 @@ export class ChatService {
       const searchQuery = userMessages.join(' ');
 
       // 3. LLM 의도 분석 → ParsedIntent
-      intent = await analyzeIntent(searchQuery, this.openai);
+      intent = await this.intentAnalyzer.analyzeIntent(searchQuery);
 
       // 4. ParsedIntent → SearchFilters 변환
       const filters: SearchFilters = {};
@@ -135,15 +136,18 @@ export class ChatService {
 
       const hasFilters = Object.keys(filters).length > 0;
 
+      // 5. 임베딩 쿼리 정제: 메타데이터 키워드 제거 후 의미적 쿼리만 사용
+      const semanticQuery = this.intentAnalyzer.buildSemanticQuery(searchQuery, intent);
+
       similarContents = await this.embeddingService.searchSimilar(
-        searchQuery,
+        semanticQuery,
         20,
         userContext.watchedTmdbIds,
         hasFilters ? filters : undefined,
       );
     }
 
-    // 5. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
+    // 6. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
     const systemPrompt = buildSystemPrompt(
       userContext,
       subscribedOtts,
@@ -152,7 +156,7 @@ export class ChatService {
       intent,
     );
 
-    // 6. 대화 이력 구성
+    // 7. 대화 이력 구성
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       ...(history || []).map((msg) => ({
         role: msg.role as 'user' | 'assistant',
@@ -161,7 +165,7 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 7. GPT 스트리밍 호출 (function calling 없이 텍스트만)
+    // 8. GPT 스트리밍 호출 (function calling 없이 텍스트만)
     const stream = await this.openai.chat.completions.create({
       model: 'gpt-4o-mini',
       max_tokens: 2048,
@@ -174,7 +178,7 @@ export class ChatService {
 
     let fullText = '';
 
-    // 8. 스트리밍 이벤트 처리
+    // 9. 스트리밍 이벤트 처리
     try {
       for await (const chunk of stream) {
         if (signal?.aborted) {
@@ -193,7 +197,7 @@ export class ChatService {
       throw error;
     }
 
-    // 9. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
+    // 10. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
     const titles = this.extractTitlesFromText(fullText);
     if (titles.length > 0) {
       const { matched, unmatched } = this.matchTitlesToCandidates(titles, similarContents);

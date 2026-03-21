@@ -10,6 +10,7 @@ import { ContentsModule } from '../contents/contents.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { EmbeddingService } from './embedding.service';
+import { IntentAnalyzerService } from './intent-analyzer';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { EmbeddingService } from './embedding.service';
     ContentsModule,
   ],
   controllers: [ChatController],
-  providers: [ChatService, EmbeddingService],
+  providers: [ChatService, EmbeddingService, IntentAnalyzerService],
   exports: [EmbeddingService],
 })
 export class ChatModule {}
