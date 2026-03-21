@@ -108,6 +108,7 @@ describe('ChatService', () => {
   describe('buildUserContext', () => {
     const mockQueryBuilder = () => ({
       innerJoin: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -141,7 +142,12 @@ describe('ChatService', () => {
 
       const wantToWatchQb = mockQueryBuilder();
       wantToWatchQb.getRawMany.mockResolvedValue([
-        { title: '인셉션', releaseDate: '2010-07-16' },
+        { title: '인셉션', releaseDate: '2010-07-16', genres: 'SF, 액션', originCountry: 'US' },
+      ]);
+
+      const watchedGenresQb = mockQueryBuilder();
+      watchedGenresQb.getRawMany.mockResolvedValue([
+        { genre: '코미디', avgRating: '0', count: '3' },
       ]);
 
       mockReviewRepo.createQueryBuilder
@@ -151,7 +157,8 @@ describe('ChatService', () => {
 
       mockWatchlistRepo.createQueryBuilder
         .mockReturnValueOnce(watchedTmdbIdsQb)
-        .mockReturnValueOnce(wantToWatchQb);
+        .mockReturnValueOnce(wantToWatchQb)
+        .mockReturnValueOnce(watchedGenresQb);
 
       const result = await service.buildUserContext(1);
 
@@ -173,6 +180,12 @@ describe('ChatService', () => {
 
       expect(result.wantToWatch).toHaveLength(1);
       expect(result.wantToWatch[0].title).toBe('인셉션');
+      expect(result.wantToWatch[0].genres).toBe('SF, 액션');
+      expect(result.wantToWatch[0].originCountry).toBe('US');
+
+      expect(result.watchedGenres).toHaveLength(1);
+      expect(result.watchedGenres[0].genre).toBe('코미디');
+      expect(result.watchedGenres[0].count).toBe(3);
     });
 
     it('데이터가 없으면 빈 배열을 반환해야 한다', async () => {
@@ -185,6 +198,7 @@ describe('ChatService', () => {
 
       mockWatchlistRepo.createQueryBuilder
         .mockReturnValueOnce(mockQueryBuilder())
+        .mockReturnValueOnce(mockQueryBuilder())
         .mockReturnValueOnce(mockQueryBuilder());
 
       const result = await service.buildUserContext(1);
@@ -194,6 +208,7 @@ describe('ChatService', () => {
       expect(result.genreStats).toEqual([]);
       expect(result.watchedTmdbIds).toEqual([]);
       expect(result.wantToWatch).toEqual([]);
+      expect(result.watchedGenres).toEqual([]);
     });
   });
 
@@ -217,6 +232,7 @@ describe('ChatService', () => {
     const setupEmptyUserContext = () => {
       const emptyQb = {
         innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -696,6 +712,66 @@ describe('ChatService', () => {
       expect(calledFilters.countries).toEqual(['US']);
       // 명시적 필터가 없는 필드에는 유저 선호가 WHERE 필터로 적용된다
       expect(calledFilters.genres).toEqual(['드라마']);
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+    });
+
+    it('명시적 OTT 필터 있음: 유저 장르/국가 선호는 WHERE 필터에 합쳐져야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        preferredGenres: ['드라마', '로맨스'],
+        preferredCountries: ['KR'],
+        ottProviderNames: ['Netflix'],
+        hasData: true,
+      });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        ottProviderNames: ['Tving'],
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('로맨스 영화');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '티빙에서 볼만한 영화', [], jest.fn());
+
+      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      // 명시적 OTT(Tving)가 유저 구독 OTT(Netflix)를 덮어야 한다
+      expect(calledFilters.ottProviderNames).toEqual(['Tving']);
+      // 명시적 필터가 없는 장르/국가는 유저 선호가 WHERE 필터로 합쳐져야 한다
+      expect(calledFilters.genres).toEqual(['드라마', '로맨스']);
+      expect(calledFilters.countries).toEqual(['KR']);
+    });
+
+    it('유저 OTT 구독만 있고 장르/국가 선호 없는 경우 OTT 필터만 적용해야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        preferredGenres: [],
+        preferredCountries: [],
+        ottProviderNames: ['wavve'],
+        hasData: true,
+      });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('추천 영화');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '오늘 볼 영화 추천해줘', [], jest.fn());
+
+      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      // 유저 구독 OTT가 WHERE 필터로 적용되어야 한다
+      expect(calledFilters.ottProviderNames).toEqual(['wavve']);
+      // 선호 없는 장르/국가는 필터에 포함되지 않아야 한다
+      expect(calledFilters.genres).toBeUndefined();
+      expect(calledFilters.countries).toBeUndefined();
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 

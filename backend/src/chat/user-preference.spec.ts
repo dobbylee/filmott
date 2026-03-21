@@ -18,6 +18,14 @@ function makeFavorite(
   return { title, year: '2024', genres, rating, originCountry };
 }
 
+function makeWantToWatch(
+  title: string,
+  genres: string,
+  originCountry: string | null = null,
+): { title: string; year: string; genres: string; originCountry: string | null } {
+  return { title, year: '2024', genres, originCountry };
+}
+
 function makeEmptyContext(): UserContext {
   return {
     favorites: [],
@@ -25,6 +33,7 @@ function makeEmptyContext(): UserContext {
     genreStats: [],
     watchedTmdbIds: [],
     wantToWatch: [],
+    watchedGenres: [],
   };
 }
 
@@ -71,7 +80,24 @@ describe('extractUserPreference', () => {
       expect(result.preferredGenres).toEqual(['액션']);
     });
 
-    it('genreStats가 비어있으면 favorites에서 장르를 추출해야 한다', () => {
+    it('genreStats가 비어있으면 watchedGenres에서 빈도 기반으로 장르를 추출해야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        watchedGenres: [
+          makeGenreStat('드라마', 0, 5),
+          makeGenreStat('액션', 0, 3),
+          makeGenreStat('코미디', 0, 1),
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      expect(result.preferredGenres[0]).toBe('드라마');
+      expect(result.preferredGenres[1]).toBe('액션');
+      expect(result.preferredGenres).toContain('코미디');
+    });
+
+    it('genreStats, watchedGenres 모두 비어있으면 favorites에서 장르를 추출해야 한다', () => {
       const context: UserContext = {
         ...makeEmptyContext(),
         favorites: [
@@ -88,6 +114,25 @@ describe('extractUserPreference', () => {
       expect(result.preferredGenres[1]).toBe('스릴러');
       expect(result.preferredGenres).toContain('액션');
       expect(result.preferredGenres).toContain('공포');
+    });
+
+    it('genreStats, watchedGenres, favorites 모두 비어있으면 wantToWatch에서 장르를 추출해야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        wantToWatch: [
+          makeWantToWatch('기생충', '드라마, 스릴러', 'KR'),
+          makeWantToWatch('인셉션', 'SF, 액션', 'US'),
+          makeWantToWatch('올드보이', '드라마, 스릴러', 'KR'),
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      // 드라마: 2, 스릴러: 2, SF: 1, 액션: 1
+      expect(result.preferredGenres[0]).toBe('드라마');
+      expect(result.preferredGenres[1]).toBe('스릴러');
+      expect(result.preferredGenres).toContain('SF');
+      expect(result.preferredGenres).toContain('액션');
     });
 
     it('genreStats에서 eligible 장르가 없으면 favorites fallback을 사용해야 한다', () => {
@@ -168,6 +213,28 @@ describe('extractUserPreference', () => {
       expect(result.hasData).toBe(true);
     });
 
+    it('watchedGenres만 있어도 hasData=true여야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        watchedGenres: [makeGenreStat('드라마', 0, 3)],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      expect(result.hasData).toBe(true);
+    });
+
+    it('wantToWatch만 있어도 hasData=true여야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        wantToWatch: [makeWantToWatch('기생충', '드라마', 'KR')],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      expect(result.hasData).toBe(true);
+    });
+
     it('OTT 구독만 있어도 hasData=true여야 한다', () => {
       const result = extractUserPreference(
         makeEmptyContext(),
@@ -221,6 +288,43 @@ describe('extractUserPreference', () => {
       const result = extractUserPreference(context, []);
 
       expect(result.preferredCountries).toEqual(['KR']);
+    });
+
+    it('wantToWatch의 originCountry도 국가 추출에 반영되어야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        favorites: [
+          makeFavorite('기생충', '드라마', 10, 'KR'),
+        ],
+        wantToWatch: [
+          makeWantToWatch('인셉션', 'SF', 'US'),
+          makeWantToWatch('어벤져스', '액션', 'US'),
+          makeWantToWatch('괴물', '드라마', 'KR'),
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      // KR: 2 (기생충 + 괴물), US: 2 (인셉션 + 어벤져스)
+      expect(result.preferredCountries).toHaveLength(2);
+      expect(result.preferredCountries).toContain('KR');
+      expect(result.preferredCountries).toContain('US');
+    });
+
+    it('favorites 없이 wantToWatch만 있어도 국가를 추출해야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        wantToWatch: [
+          makeWantToWatch('인셉션', 'SF', 'US'),
+          makeWantToWatch('기생충', '드라마', 'KR'),
+          makeWantToWatch('어벤져스', '액션', 'US'),
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      // US: 2, KR: 1
+      expect(result.preferredCountries).toEqual(['US', 'KR']);
     });
 
     it('복합 originCountry "KR, US"를 개별 국가로 분리해야 한다', () => {

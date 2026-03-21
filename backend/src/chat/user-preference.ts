@@ -1,4 +1,4 @@
-import { UserContext, FavoriteContent, GenreStat } from './prompts/system-prompt';
+import { UserContext, FavoriteContent, GenreStat, WantToWatchContent } from './prompts/system-prompt';
 
 export interface UserPreference {
   preferredGenres: string[];       // 상위 5개 선호 장르 (DB 장르명)
@@ -41,6 +41,27 @@ function extractGenresFromStats(genreStats: GenreStat[]): string[] {
   return scored.slice(0, MAX_GENRES).map((s) => s.genre);
 }
 
+// 리뷰 없는 watched 작품의 장르 빈도 기반 추출 (평점 없으므로 count만 사용)
+function extractGenresFromWatchedGenres(watchedGenres: GenreStat[]): string[] {
+  const sorted = [...watchedGenres].sort((a, b) => b.count - a.count);
+  return sorted.slice(0, MAX_GENRES).map((g) => g.genre);
+}
+
+// wantToWatch 작품의 장르 빈도 기반 추출
+function extractGenresFromWantToWatch(wantToWatch: WantToWatchContent[]): string[] {
+  const genreCount = new Map<string, number>();
+
+  for (const item of wantToWatch) {
+    const genres = item.genres.split(',').map((g) => g.trim()).filter(Boolean);
+    for (const genre of genres) {
+      genreCount.set(genre, (genreCount.get(genre) ?? 0) + 1);
+    }
+  }
+
+  const sorted = [...genreCount.entries()].sort((a, b) => b[1] - a[1]);
+  return sorted.slice(0, MAX_GENRES).map(([genre]) => genre);
+}
+
 function extractGenresFromFavorites(favorites: FavoriteContent[]): string[] {
   const genreCount = new Map<string, number>();
 
@@ -55,12 +76,16 @@ function extractGenresFromFavorites(favorites: FavoriteContent[]): string[] {
   return sorted.slice(0, MAX_GENRES).map(([genre]) => genre);
 }
 
-function extractCountries(favorites: FavoriteContent[]): string[] {
+function extractCountries(
+  favorites: FavoriteContent[],
+  wantToWatch: WantToWatchContent[],
+): string[] {
   const countryCount = new Map<string, number>();
 
-  for (const fav of favorites) {
-    if (fav.originCountry) {
-      const countries = fav.originCountry.split(',').map((c) => c.trim());
+  const sources: { originCountry: string | null }[] = [...favorites, ...wantToWatch];
+  for (const item of sources) {
+    if (item.originCountry) {
+      const countries = item.originCountry.split(',').map((c) => c.trim());
       for (const country of countries) {
         countryCount.set(country, (countryCount.get(country) ?? 0) + 1);
       }
@@ -84,16 +109,31 @@ export function extractUserPreference(
   context: UserContext,
   subscribedOtts: string[],
 ): UserPreference {
+  // 장르 추출 우선순위:
+  // 1순위: genreStats (리뷰 평점 기반, 가중 점수)
+  // 2순위: watchedGenres (리뷰 없는 watched 작품, 빈도 기반)
+  // 3순위: favorites 장르 (고평점 작품 장르 빈도)
+  // 4순위: wantToWatch 장르 (보고싶어요 작품 장르 빈도)
   let preferredGenres = extractGenresFromStats(context.genreStats);
+  if (preferredGenres.length === 0 && context.watchedGenres.length > 0) {
+    preferredGenres = extractGenresFromWatchedGenres(context.watchedGenres);
+  }
   if (preferredGenres.length === 0 && context.favorites.length > 0) {
     preferredGenres = extractGenresFromFavorites(context.favorites);
   }
+  if (preferredGenres.length === 0 && context.wantToWatch.length > 0) {
+    preferredGenres = extractGenresFromWantToWatch(context.wantToWatch);
+  }
 
-  const preferredCountries = extractCountries(context.favorites);
+  const preferredCountries = extractCountries(context.favorites, context.wantToWatch);
 
   const ottProviderNames = mapOttNames(subscribedOtts);
 
-  const hasData = context.genreStats.length > 0 || context.favorites.length > 0 || subscribedOtts.length > 0;
+  const hasData = context.genreStats.length > 0
+    || context.favorites.length > 0
+    || context.watchedGenres.length > 0
+    || context.wantToWatch.length > 0
+    || subscribedOtts.length > 0;
 
   return {
     preferredGenres,

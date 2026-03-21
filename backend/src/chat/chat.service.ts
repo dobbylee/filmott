@@ -46,6 +46,8 @@ interface RawGenreStatRow {
 interface RawWantToWatchRow {
   title: string;
   releaseDate: string | null;
+  genres: string;
+  originCountry: string | null;
 }
 
 interface RawWatchedTmdbIdRow {
@@ -323,16 +325,17 @@ export class ChatService {
   }
 
   async buildUserContext(userId: number): Promise<UserContext> {
-    const [favorites, disliked, genreStats, watchedTmdbIds, wantToWatch] =
+    const [favorites, disliked, genreStats, watchedTmdbIds, wantToWatch, watchedGenres] =
       await Promise.all([
         this.getFavorites(userId),
         this.getDisliked(userId),
         this.getGenreStats(userId),
         this.getWatchedTmdbIds(userId),
         this.getWantToWatch(userId),
+        this.getWatchedGenres(userId),
       ]);
 
-    return { favorites, disliked, genreStats, watchedTmdbIds, wantToWatch };
+    return { favorites, disliked, genreStats, watchedTmdbIds, wantToWatch, watchedGenres };
   }
 
   private async getFavorites(userId: number): Promise<FavoriteContent[]> {
@@ -434,6 +437,8 @@ export class ChatService {
       .select([
         'c.title AS "title"',
         'c.release_date AS "releaseDate"',
+        "array_to_string(ARRAY(SELECT jsonb_array_elements(c.genres) ->> 'name'), ', ') AS \"genres\"",
+        'c.origin_country AS "originCountry"',
       ])
       .where('w.userId = :userId', { userId })
       .andWhere("w.status = 'want_to_watch'")
@@ -446,6 +451,32 @@ export class ChatService {
       year: row.releaseDate
         ? new Date(row.releaseDate).getFullYear().toString()
         : '',
+      genres: row.genres || '',
+      originCountry: row.originCountry ?? null,
+    }));
+  }
+
+  private async getWatchedGenres(userId: number): Promise<GenreStat[]> {
+    const rows: RawGenreStatRow[] = await this.watchlistRepo
+      .createQueryBuilder('w')
+      .innerJoin('w.content', 'c')
+      .leftJoin(Review, 'r', 'r.userId = w.userId AND r.contentId = w.contentId')
+      .select([
+        "jsonb_array_elements(c.genres) ->> 'name' AS \"genre\"",
+        "'0' AS \"avgRating\"",
+        'COUNT(*) AS "count"',
+      ])
+      .where('w.userId = :userId', { userId })
+      .andWhere("w.status = 'watched'")
+      .andWhere('r.id IS NULL')
+      .groupBy('"genre"')
+      .orderBy('"count"', 'DESC')
+      .getRawMany();
+
+    return rows.map((row) => ({
+      genre: row.genre,
+      avgRating: row.avgRating,
+      count: parseInt(row.count, 10),
     }));
   }
 

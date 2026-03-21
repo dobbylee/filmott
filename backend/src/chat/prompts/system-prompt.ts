@@ -19,6 +19,8 @@ export interface GenreStat {
 export interface WantToWatchContent {
   title: string;
   year: string;
+  genres: string;
+  originCountry: string | null;
 }
 
 export interface UserContext {
@@ -27,6 +29,7 @@ export interface UserContext {
   genreStats: GenreStat[];
   watchedTmdbIds: number[];
   wantToWatch: WantToWatchContent[];
+  watchedGenres: GenreStat[];
 }
 
 export function buildSystemPrompt(
@@ -78,7 +81,11 @@ export function buildSystemPrompt(
   const wantToWatchSection =
     context.wantToWatch.length > 0
       ? context.wantToWatch
-          .map((w) => `- ${w.title} (${w.year})`)
+          .map((w) => {
+            const countryStr = w.originCountry ? ` | ${w.originCountry}` : '';
+            const genreStr = w.genres ? `, ${w.genres}` : '';
+            return `- ${w.title} (${w.year}${genreStr}${countryStr})`;
+          })
           .join('\n')
       : '(보고싶어요 목록이 비어있습니다)';
 
