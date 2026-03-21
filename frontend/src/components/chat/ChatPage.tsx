@@ -14,10 +14,10 @@ import type { ChatMessageData, ChatRecommendationWithPoster } from '@/types/chat
 const STORAGE_KEY = 'filmott_chat_messages';
 
 const EXAMPLE_QUESTIONS = [
-  '비 오는 날에 볼 만한 잔잔한 영화',
-  '친구들이랑 볼 코미디 추천해줘',
-  '요즘 핫한 넷플릭스 시리즈 뭐가 있어?',
-  '밤에 혼자 볼 스릴러 추천',
+  '비 오는 날에 볼 만한 잔잔한 영화 알려줘',
+  '친구들이랑 볼 코미디 영화 추천해줘',
+  '넷플릭스에서 볼 수 있는 한국 드라마 알려줘',
+  '밤에 혼자 볼 스릴러 영화 추천해줘',
 ];
 
 export default function ChatPage() {

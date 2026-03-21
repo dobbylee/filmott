@@ -22,16 +22,25 @@ const EMPTY_INTENT: ParsedIntent = {
   genres: [],
 };
 
-const INTENT_SYSTEM_PROMPT = `사용자 메시지에서 영화/시리즈 추천에 필요한 조건을 JSON으로 추출하세요.
+function buildIntentSystemPrompt(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const oneYearAgo = `${year - 1}-01-01`;
+  const thisYear = `${year}-01-01`;
+
+  return `오늘 날짜: ${now.toISOString().split('T')[0]}
+
+사용자 메시지에서 영화/시리즈 추천에 필요한 조건을 JSON으로 추출하세요.
 - ottProviderNames: OTT 플랫폼 (Netflix, Tving, wavve, Watcha, Disney Plus, Coupang Play). 없으면 빈 배열.
 - countries: 제작 국가 ISO 코드 (KR, US, JP, GB 등). 없으면 빈 배열.
 - excludeCountries: 제외할 국가 ISO 코드. "외국"/"해외" → ["KR"] (한국 제외), "비영어권" → ["US", "GB", "CA", "AU"]. 없으면 빈 배열.
 - personNames: 감독/배우 이름. "기생충 감독" → "봉준호"처럼 작품으로 유추 가능하면 실제 이름으로. 없으면 빈 배열.
-- dateRange: 연도/연대/시기 조건. "최신"/"요즘"/"최근" → {"from":"2024-01-01","to":null}, "90년대" → {"from":"1990-01-01","to":"1999-12-31"}, "올해" → {"from":"2026-01-01","to":null}. 없으면 null.
+- dateRange: 연도/연대/시기 조건. "최신"/"요즘"/"최근" → {"from":"${oneYearAgo}","to":null}, "90년대" → {"from":"1990-01-01","to":"1999-12-31"}, "올해" → {"from":"${thisYear}","to":null}. 없으면 null.
 - contentType: "영화"/"무비" → "movie", "드라마"/"시리즈"/"TV"/"예능" → "tv". 이 단어가 메시지에 직접 포함된 경우에만 설정. 장르명(스릴러, 코미디, 로맨스, 액션, 호러, 공포, SF, 판타지, 애니메이션 등)으로는 절대 contentType을 추론하지 마세요. 확실하지 않으면 null.
 - genres: 사용자가 언급한 장르명을 배열로 추출. 사용자 표현 그대로 반환 (예: "호러" → ["호러"], "느와르" → ["느와르"], "SF 스릴러" → ["SF", "스릴러"]). 장르 언급이 없으면 빈 배열.
 
 JSON만 출력하세요.`;
+}
 
 interface RawIntentResponse {
   ottProviderNames?: unknown;
@@ -173,7 +182,7 @@ export class IntentAnalyzerService {
         max_tokens: 150,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: INTENT_SYSTEM_PROMPT },
+          { role: 'system', content: buildIntentSystemPrompt() },
           { role: 'user', content: userMessage },
         ],
       });
