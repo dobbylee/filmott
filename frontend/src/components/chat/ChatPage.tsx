@@ -251,10 +251,10 @@ export default function ChatPage() {
               오늘 뭐 볼까?
             </h2>
             <p className="text-sm text-white/50 mb-8">
-              취향에 맞는 영화와 시리즈를 추천해드릴게요.
+              취향에 맞는 영화와 시리즈를 추천해 드릴게요
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-6">
               {EXAMPLE_QUESTIONS.map((question) => (
                 <button
                   key={question}
@@ -266,6 +266,10 @@ export default function ChatPage() {
                 </button>
               ))}
             </div>
+
+            <p className="text-xs text-white/30 mt-10">
+              시청기록, 별점, 리뷰가 쌓일수록 추천 품질이 좋아져요
+            </p>
           </div>
         ) : (
           /* 대화 메시지 목록 */

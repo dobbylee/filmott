@@ -26,9 +26,10 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setText('');
-    // 높이 리셋
+    // 높이 리셋 + 모바일 확대 복원
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
+      textareaRef.current.blur();
     }
   };
 
@@ -54,7 +55,7 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
         placeholder="메시지를 입력하세요..."
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none bg-transparent text-sm text-white placeholder-white/40 outline-none disabled:opacity-50"
+        className="flex-1 resize-none bg-transparent text-base text-white placeholder-white/40 outline-none disabled:opacity-50"
         style={{ minHeight: '24px' }}
       />
       <button
