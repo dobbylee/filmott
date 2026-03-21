@@ -35,6 +35,7 @@ import { ChatModule } from './chat/chat.module';
         autoLoadEntities: true,
         synchronize: false,
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
+        migrationsRun: true,
         extra: {
           options: '-c timezone=Asia/Seoul',
         },
