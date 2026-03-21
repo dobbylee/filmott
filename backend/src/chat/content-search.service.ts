@@ -43,8 +43,16 @@ export class ContentSearchService {
     excludeTmdbIds: number[],
     filters: ContentSearchFilters,
   ): Promise<SimilarContent[]> {
-    const embedding = await this.embeddingService.generateEmbedding(queryText);
-    const embeddingStr = `[${embedding.join(',')}]`;
+    // P0-2: 임베딩 실패 시 null 반환 → 벡터 유사도 없이 2/3순위 결과만 반환
+    let embedding: number[] | null = null;
+    try {
+      embedding = await this.embeddingService.generateEmbedding(queryText);
+    } catch (error) {
+      this.logger.warn(
+        `임베딩 생성 실패, 벡터 유사도 없이 검색 진행: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];
 
     const hasFilters = this.hasActiveFilters(filters);
@@ -55,6 +63,7 @@ export class ContentSearchService {
     );
 
     // 2차: 결과 부족 시 필터 단계적 완화
+    // contentType, dateRange는 완화하지 않고 유지 (사용자 의도 보존)
     if (results.length < 5 && hasFilters) {
       const relaxedFilters: ContentSearchFilters = { ...filters };
 
@@ -96,21 +105,31 @@ export class ContentSearchService {
       (filters.countries?.length ?? 0) > 0 ||
       (filters.personNames?.length ?? 0) > 0 ||
       (filters.genres?.length ?? 0) > 0 ||
-      (filters.dateRange?.from || filters.dateRange?.to) !== undefined &&
-      (filters.dateRange?.from || filters.dateRange?.to) !== null ||
+      !!(filters.dateRange?.from || filters.dateRange?.to) ||
       filters.contentType !== undefined
     );
   }
 
+  // P1-6: 필터 구성 로직은 EmbeddingService와 중복되지만, 쿼리 구조가 다르므로(CTE vs 단일 쿼리)
+  // 무리한 추출은 오히려 복잡도를 높인다. 필터 조건 변경 시 양쪽 동기화 필요.
+  // 관련: EmbeddingService.searchSimilar()
   private async executeFilteredSearch(
-    embeddingStr: string,
+    embeddingStr: string | null,
     limit: number,
     excludeIds: number[],
     filters: ContentSearchFilters,
   ): Promise<SimilarContent[]> {
     const conditions: string[] = [];
-    const params: (string | number | number[] | string[])[] = [excludeIds, embeddingStr];
-    let paramIndex = 3;
+    const params: (string | number | number[] | string[])[] = [excludeIds];
+    let paramIndex = 2;
+
+    // embeddingStr이 있을 때만 파라미터에 추가
+    let embeddingParamIndex: number | null = null;
+    if (embeddingStr) {
+      params.push(embeddingStr);
+      embeddingParamIndex = paramIndex;
+      paramIndex++;
+    }
 
     // OTT 필터
     if (filters.ottProviderNames?.length) {
@@ -122,6 +141,8 @@ export class ContentSearchService {
     }
 
     // 국가 필터 (정확한 boundary 매칭)
+    // PostgreSQL `||`는 문자열 연결 연산자 (JavaScript의 OR 연산자와 다름)
+    // 예: $3 || ', %' → 'KR, %' (LIKE 패턴으로 "KR, US" 매칭)
     if (filters.countries?.length) {
       const countryConditions = filters.countries
         .map(() => {
@@ -182,41 +203,46 @@ export class ContentSearchService {
 
     const dynamicConditions = conditions.join('\n       ');
 
+    // P0-2: CTE에서 embedding도 SELECT하여 1순위 블록에서 content_metadata 재조인 제거
+    // P1-4: rankings를 LEFT JOIN으로 한 번만 조회 (WHERE + SELECT 이중 서브쿼리 제거)
     const query = `
 WITH filtered AS (
   SELECT c.id, c.tmdb_id, c.content_type, c.title, c.poster_url,
          c.genres, c.vote_average, c.vote_count, c.overview,
          c.director, c.origin_country,
          cm.description,
-         EXISTS (
-           SELECT 1 FROM rankings r
-           WHERE r.content_id = c.id
-           AND r.source = 'kobis'
-         ) AS is_kobis,
+         cm.embedding,
+         (r.id IS NOT NULL) AS is_kobis,
          (cm.content_id IS NOT NULL) AS has_embedding
   FROM contents c
   LEFT JOIN content_metadata cm ON cm.content_id = c.id
+  LEFT JOIN rankings r ON r.content_id = c.id AND r.source = 'kobis'
   WHERE c.tmdb_id != ALL($1::int[])
     AND (
       c.origin_country LIKE '%KR%'
       OR c.watch_providers IS NOT NULL
-      OR EXISTS (SELECT 1 FROM rankings r WHERE r.content_id = c.id AND r.source = 'kobis')
+      OR r.id IS NOT NULL
     )
     ${dynamicConditions}
 )
 SELECT * FROM (
+  ${embeddingParamIndex !== null
+    ? `-- 1순위: 임베딩 있는 결과 (벡터 유사도 + 인기도 가중 스코어)
+  -- 각 우선순위별로 최대 limit개씩 뽑은 뒤 최종 limit개로 자른다
   (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
           genres, vote_average, vote_count, overview, director, origin_country,
           description, 1 AS priority,
-          (1 - (cm_emb.embedding <=> $2::vector)) * 0.7 + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, 0.3) AS score
+          (1 - (embedding <=> $${embeddingParamIndex}::vector)) * 0.7 + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, 0.3) AS score
    FROM filtered
-   JOIN content_metadata cm_emb ON cm_emb.content_id = filtered.id
    WHERE has_embedding = true
    ORDER BY score DESC
    LIMIT ${limitParam})
 
   UNION ALL
 
+  `
+    : ''
+  }-- ${embeddingParamIndex !== null ? '2' : '1'}순위: KOBIS 랭킹 작품 (임베딩 없음, 인기도순)
   (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
           genres, vote_average, vote_count, overview, director, origin_country,
           description, 2 AS priority, 0 AS score
@@ -227,6 +253,7 @@ SELECT * FROM (
 
   UNION ALL
 
+  -- ${embeddingParamIndex !== null ? '3' : '2'}순위: 나머지 (임베딩 없음 + KOBIS 아님, 인기도순)
   (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
           genres, vote_average, vote_count, overview, director, origin_country,
           description, 3 AS priority, 0 AS score

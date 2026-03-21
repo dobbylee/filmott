@@ -430,7 +430,9 @@ export class ChatService {
     if (intent.ottProviderNames.length > 0) filters.ottProviderNames = intent.ottProviderNames;
     if (intent.countries.length > 0) filters.countries = intent.countries;
     if (intent.personNames.length > 0) filters.personNames = intent.personNames;
-    if (intent.dateRange) filters.dateRange = intent.dateRange;
+    if (intent.dateRange && (intent.dateRange.from || intent.dateRange.to)) {
+      filters.dateRange = intent.dateRange;
+    }
     if (intent.contentType) filters.contentType = intent.contentType;
     if (intent.genres.length > 0) filters.genres = intent.genres;
     return filters;

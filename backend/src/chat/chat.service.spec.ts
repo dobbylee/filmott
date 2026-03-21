@@ -529,6 +529,34 @@ describe('ChatService', () => {
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
+    it('dateRange.to만 있는 의도면 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
+      setupEmptyUserContext();
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        dateRange: { from: null, to: '1999-12-31' },
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('90년대 이전 영화');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '90년대 이전 영화', [], jest.fn());
+
+      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+        '90년대 이전 영화',
+        20,
+        expect.any(Array),
+        expect.objectContaining({
+          dateRange: { from: null, to: '1999-12-31' },
+        }),
+      );
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+    });
+
     it('genres 필터가 포함된 복합 의도 시 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({

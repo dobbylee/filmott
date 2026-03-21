@@ -365,8 +365,8 @@ describe('ContentSearchService', () => {
       );
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      // 가중 스코어 수식
-      expect(query).toContain('(1 - (cm_emb.embedding <=> $2::vector)) * 0.7');
+      // 가중 스코어 수식 (CTE에서 가져온 embedding 컬럼 직접 사용)
+      expect(query).toContain('(1 - (embedding <=> $2::vector)) * 0.7');
       expect(query).toContain('LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, 0.3)');
     });
 
@@ -417,6 +417,161 @@ describe('ContentSearchService', () => {
       expect(query).toContain('release_date >=');
       expect(query).toContain('release_date <=');
       expect(query).toContain("g->>'name'");
+    });
+
+    it('dateRange.to만 있으면 release_date <= 조건만 생성해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '90년대 이전 영화', 20, [],
+        { dateRange: { from: null, to: '1999-12-31' } },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('release_date <=');
+      expect(query).not.toContain('release_date >=');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain('1999-12-31');
+    });
+
+    it('contentType만 필터인 경우 fallback 없이 단일 쿼리를 실행해야 한다', async () => {
+      // contentType은 완화 단계에 없으므로 결과가 부족해도 추가 쿼리 없음
+      const twoRows = fiveRows.slice(0, 2);
+      mockDataSource.query.mockResolvedValue(twoRows);
+
+      const result = await service.searchWithFilters(
+        '드라마 추천', 10, [],
+        { contentType: 'tv' },
+      );
+
+      expect(mockDataSource.query).toHaveBeenCalledTimes(1);
+      expect(result).toHaveLength(2);
+    });
+
+    it('결과가 0개이면 빈 배열을 반환해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue([]);
+
+      const result = await service.searchWithFilters(
+        '존재하지 않는 영화', 10, [],
+        { ottProviderNames: ['Netflix'] },
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    it('복수 국가 필터가 OR 조건으로 적용되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '한국 또는 일본 영화', 20, [],
+        { countries: ['KR', 'JP'] },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      // 각 국가 조건이 OR로 묶임
+      expect(query).toContain('origin_country =');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain('KR');
+      expect(params).toContain('JP');
+    });
+
+    it('복수 인물 필터가 적용되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '송강호 최민식 영화', 20, [],
+        { personNames: ['송강호', '최민식'] },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('director LIKE');
+      expect(query).toContain('jsonb_array_elements(c.credits)');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain('%송강호%');
+      expect(params).toContain('%최민식%');
+    });
+
+    it('필터 없이 호출하면 fallback 없이 단일 쿼리를 실행해야 한다', async () => {
+      const twoRows = fiveRows.slice(0, 2);
+      mockDataSource.query.mockResolvedValue(twoRows);
+
+      await service.searchWithFilters('영화 추천', 10, [], {});
+
+      expect(mockDataSource.query).toHaveBeenCalledTimes(1);
+    });
+
+    it('generateEmbedding 실패 시 벡터 유사도 없이 2/3순위 결과만 반환해야 한다', async () => {
+      mockEmbeddingService.generateEmbedding.mockRejectedValue(
+        new Error('OpenAI API 오류'),
+      );
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      const result = await service.searchWithFilters(
+        '영화 추천', 20, [],
+        { contentType: 'movie' },
+      );
+
+      expect(result).toHaveLength(5);
+      // 쿼리에 벡터 유사도 블록이 없어야 한다
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).not.toContain('<=>');
+      expect(query).not.toContain('::vector');
+      // embedding 파라미터가 없어야 한다
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      const hasEmbeddingParam = params.some(
+        (p) => typeof p === 'string' && p.startsWith('[0.'),
+      );
+      expect(hasEmbeddingParam).toBe(false);
+    });
+
+    it('generateEmbedding 실패 시에도 contentType 필터가 유지되어야 한다', async () => {
+      mockEmbeddingService.generateEmbedding.mockRejectedValue(
+        new Error('OpenAI API 오류'),
+      );
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '드라마 추천', 20, [],
+        { contentType: 'tv', dateRange: { from: '2024-01-01', to: null } },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('content_type =');
+      expect(query).toContain('release_date >=');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain('tv');
+      expect(params).toContain('2024-01-01');
+    });
+
+    it('CTE에서 rankings LEFT JOIN으로 한 번만 조회해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '영화 추천', 20, [],
+        { contentType: 'movie' },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      // LEFT JOIN rankings가 CTE 내에 있어야 한다
+      expect(query).toContain('LEFT JOIN rankings r ON r.content_id = c.id');
+      // rankings에 대한 EXISTS 서브쿼리가 없어야 한다
+      expect(query).not.toContain('EXISTS (');
+      expect(query).not.toMatch(/EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+rankings/);
+    });
+
+    it('CTE에서 embedding 컬럼을 SELECT하여 재조인 없이 사용해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '영화 추천', 20, [],
+        { contentType: 'movie' },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      // CTE에 embedding이 포함되어야 한다
+      expect(query).toContain('cm.embedding');
+      // 1순위 블록에서 content_metadata 재조인이 없어야 한다
+      expect(query).not.toContain('JOIN content_metadata cm_emb');
     });
   });
 });

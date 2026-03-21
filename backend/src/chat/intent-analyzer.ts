@@ -202,8 +202,9 @@ export class IntentAnalyzerService {
           }
         }
 
-        // TV contentType이면 TV 전용 장르 확장
-        if (intent.contentType === 'tv') {
+        // TV 전용 장르 확장: contentType이 tv이거나 null(모든 타입 검색)일 때 확장
+        // movie에서 "액션 & 어드벤처" 등은 존재하지 않으므로 ANY 조건에서 자연스럽게 무시됨
+        if (intent.contentType !== 'movie') {
           for (const genre of [...mappedGenres]) {
             const tvGenre = TV_GENRE_EXPANSION[genre];
             if (tvGenre) {

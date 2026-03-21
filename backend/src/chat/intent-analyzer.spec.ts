@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
+import { IntentAnalyzerService, ParsedIntent, GENRE_ALIAS_MAP } from './intent-analyzer';
+import { GENRE_NAME_MAP } from '../common/constants';
 
 // OpenAI SDK mock
 const mockCreate = jest.fn();
@@ -372,6 +373,38 @@ describe('IntentAnalyzerService', () => {
       expect(result.genres).toEqual(['액션']);
       expect(result.genres).not.toContain('액션 & 어드벤처');
     });
+
+    it('contentType null일 때도 TV 전용 장르를 확장해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: null,
+        genres: ['액션'],
+      }));
+
+      const result = await service.analyzeIntent('액션물 추천해줘');
+
+      expect(result.genres).toContain('액션');
+      expect(result.genres).toContain('액션 & 어드벤처');
+    });
+
+    it('contentType null일 때 SF를 "SF" + "SF & 판타지"로 확장해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: null,
+        genres: ['SF'],
+      }));
+
+      const result = await service.analyzeIntent('SF 추천해줘');
+
+      expect(result.genres).toContain('SF');
+      expect(result.genres).toContain('SF & 판타지');
+    });
   });
 
   describe('fallback 처리', () => {
@@ -467,6 +500,21 @@ describe('IntentAnalyzerService', () => {
       const result = await service.analyzeIntent('테스트');
 
       expect(result.dateRange).toBeNull();
+    });
+
+    it('genres 필드가 없으면 빈 배열을 반환해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: null,
+        // genres 필드 자체가 없음
+      }));
+
+      const result = await service.analyzeIntent('재밌는 영화 추천');
+
+      expect(result.genres).toEqual([]);
     });
   });
 
@@ -757,6 +805,22 @@ describe('IntentAnalyzerService', () => {
       expect(result).not.toMatch(/스릴러/);
       expect(result).toContain('반전');
       expect(result).toContain('영화');
+    });
+  });
+
+  describe('GENRE_ALIAS_MAP / GENRE_NAME_MAP 동기화', () => {
+    it('GENRE_ALIAS_MAP의 모든 매핑 값이 GENRE_NAME_MAP의 values에 존재해야 한다', () => {
+      const validGenreNames = new Set(Object.values(GENRE_NAME_MAP));
+
+      for (const [alias, dbNames] of Object.entries(GENRE_ALIAS_MAP)) {
+        for (const dbName of dbNames) {
+          expect(validGenreNames.has(dbName)).toBe(true);
+          if (!validGenreNames.has(dbName)) {
+            // 실패 시 어떤 alias의 어떤 값이 문제인지 명확히 표시
+            fail(`GENRE_ALIAS_MAP["${alias}"]의 값 "${dbName}"이 GENRE_NAME_MAP에 존재하지 않음`);
+          }
+        }
+      }
     });
   });
 });
