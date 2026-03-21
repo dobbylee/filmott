@@ -3,12 +3,18 @@ import { DataSource } from 'typeorm';
 import { EmbeddingService, SimilarContent } from './embedding.service';
 
 export interface ContentSearchFilters {
+  // SQL WHERE 절 필터
   ottProviderNames?: string[];
   countries?: string[];
   personNames?: string[];
   dateRange?: { from: string | null; to: string | null };
   contentType?: 'movie' | 'tv';
   genres?: string[];
+
+  // 리랭킹 선호도 (ORDER BY 가중치, WHERE 절 아님)
+  preferredGenres?: string[];
+  preferredCountries?: string[];
+  preferredOttNames?: string[];
 }
 
 interface FilteredRow {
@@ -198,10 +204,74 @@ export class ContentSearchService {
       paramIndex++;
     }
 
+    // 리랭킹 선호도 파라미터 바인딩
+    const hasPreference = (filters.preferredGenres?.length ?? 0) > 0
+      || (filters.preferredCountries?.length ?? 0) > 0
+      || (filters.preferredOttNames?.length ?? 0) > 0;
+
+    let prefGenreIdx: number | null = null;
+    let prefCountryIdx: number | null = null;
+    let prefOttIdx: number | null = null;
+
+    if (hasPreference) {
+      if (filters.preferredGenres?.length) {
+        params.push(filters.preferredGenres);
+        prefGenreIdx = paramIndex;
+        paramIndex++;
+      }
+      if (filters.preferredCountries?.length) {
+        params.push(filters.preferredCountries);
+        prefCountryIdx = paramIndex;
+        paramIndex++;
+      }
+      if (filters.preferredOttNames?.length) {
+        params.push(filters.preferredOttNames);
+        prefOttIdx = paramIndex;
+        paramIndex++;
+      }
+    }
+
     params.push(limit);
     const limitParam = `$${paramIndex}`;
 
     const dynamicConditions = conditions.join('\n       ');
+
+    // 리랭킹 보너스 SQL 조각 생성
+    const genreBonusSql = prefGenreIdx !== null
+      ? `CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(genres) AS g WHERE g->>'name' = ANY($${prefGenreIdx}::text[])) THEN 0.05 ELSE 0 END`
+      : '0';
+    const countryBonusSql = prefCountryIdx !== null
+      ? `CASE WHEN origin_country = ANY($${prefCountryIdx}::text[]) THEN 0.05 ELSE 0 END`
+      : '0';
+    const ottBonusSql = prefOttIdx !== null
+      ? `CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(watch_providers->'flatrate') AS p WHERE p->>'provider_name' = ANY($${prefOttIdx}::text[])) THEN 0.05 ELSE 0 END`
+      : '0';
+
+    // 1순위 스코어: 리랭킹 있으면 벡터 0.6 + 인기도 0.25 + 보너스 0.15, 없으면 기존 (0.7 + 0.3)
+    const buildEmbeddingScore = (embIdx: number): string => {
+      if (hasPreference) {
+        return `(1 - (embedding <=> $${embIdx}::vector)) * 0.6 + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, 0.25) + ${genreBonusSql} + ${countryBonusSql} + ${ottBonusSql}`;
+      }
+      return `(1 - (embedding <=> $${embIdx}::vector)) * 0.7 + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, 0.3)`;
+    };
+
+    // 2/3순위 스코어: 리랭킹 있으면 보너스만, 없으면 0
+    const buildFallbackScore = (): string => {
+      if (!hasPreference) return '0';
+      const parts: string[] = [];
+      if (prefGenreIdx !== null) {
+        parts.push(`CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(genres) AS g WHERE g->>'name' = ANY($${prefGenreIdx}::text[])) THEN 0.33 ELSE 0 END`);
+      }
+      if (prefCountryIdx !== null) {
+        parts.push(`CASE WHEN origin_country = ANY($${prefCountryIdx}::text[]) THEN 0.33 ELSE 0 END`);
+      }
+      if (prefOttIdx !== null) {
+        parts.push(`CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(watch_providers->'flatrate') AS p WHERE p->>'provider_name' = ANY($${prefOttIdx}::text[])) THEN 0.34 ELSE 0 END`);
+      }
+      return parts.length > 0 ? parts.join(' + ') : '0';
+    };
+
+    const fallbackScore = buildFallbackScore();
 
     // P0-2: CTE에서 embedding도 SELECT하여 1순위 블록에서 content_metadata 재조인 제거
     // P1-4: rankings를 LEFT JOIN으로 한 번만 조회 (WHERE + SELECT 이중 서브쿼리 제거)
@@ -210,6 +280,7 @@ WITH filtered AS (
   SELECT c.id, c.tmdb_id, c.content_type, c.title, c.poster_url,
          c.genres, c.vote_average, c.vote_count, c.overview,
          c.director, c.origin_country,
+         c.watch_providers,
          cm.description,
          cm.embedding,
          (r.id IS NOT NULL) AS is_kobis,
@@ -232,7 +303,7 @@ SELECT * FROM (
   (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
           genres, vote_average, vote_count, overview, director, origin_country,
           description, 1 AS priority,
-          (1 - (embedding <=> $${embeddingParamIndex}::vector)) * 0.7 + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, 0.3) AS score
+          ${buildEmbeddingScore(embeddingParamIndex)} AS score
    FROM filtered
    WHERE has_embedding = true
    ORDER BY score DESC
@@ -245,10 +316,10 @@ SELECT * FROM (
   }-- ${embeddingParamIndex !== null ? '2' : '1'}순위: KOBIS 랭킹 작품 (임베딩 없음, 인기도순)
   (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
           genres, vote_average, vote_count, overview, director, origin_country,
-          description, 2 AS priority, 0 AS score
+          description, 2 AS priority, ${fallbackScore} AS score
    FROM filtered
    WHERE has_embedding = false AND is_kobis = true
-   ORDER BY vote_count DESC
+   ORDER BY score DESC, vote_count DESC
    LIMIT ${limitParam})
 
   UNION ALL
@@ -256,10 +327,10 @@ SELECT * FROM (
   -- ${embeddingParamIndex !== null ? '3' : '2'}순위: 나머지 (임베딩 없음 + KOBIS 아님, 인기도순)
   (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
           genres, vote_average, vote_count, overview, director, origin_country,
-          description, 3 AS priority, 0 AS score
+          description, 3 AS priority, ${fallbackScore} AS score
    FROM filtered
    WHERE has_embedding = false AND is_kobis = false
-   ORDER BY vote_count DESC
+   ORDER BY score DESC, vote_count DESC
    LIMIT ${limitParam})
 ) combined
 ORDER BY priority, score DESC
