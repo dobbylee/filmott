@@ -11,6 +11,13 @@ import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
+import { UserPreference } from './user-preference';
+
+// extractUserPreference mock
+const mockExtractUserPreference = jest.fn<UserPreference, []>();
+jest.mock('./user-preference', () => ({
+  extractUserPreference: (...args: unknown[]) => mockExtractUserPreference(...(args as [])),
+}));
 
 // OpenAI SDK mock
 const mockStreamCreate = jest.fn();
@@ -200,6 +207,13 @@ describe('ChatService', () => {
       genres: [],
     };
 
+    const defaultEmptyPreference: UserPreference = {
+      preferredGenres: [],
+      preferredCountries: [],
+      ottProviderNames: [],
+      hasData: false,
+    };
+
     const setupEmptyUserContext = () => {
       const emptyQb = {
         innerJoin: jest.fn().mockReturnThis(),
@@ -219,6 +233,7 @@ describe('ChatService', () => {
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
       mockIntentAnalyzerService.buildSemanticQuery.mockImplementation((query: string) => query);
+      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference });
     };
 
     it('볼드 제목이 후보와 매칭되면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
@@ -587,6 +602,136 @@ describe('ChatService', () => {
         }),
       );
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+    });
+
+    it('필터 없음 + 유저 데이터 있음: ContentSearchService.searchWithFilters가 유저 선호로 호출되어야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        preferredGenres: ['드라마', '스릴러'],
+        preferredCountries: ['KR'],
+        ottProviderNames: ['Netflix'],
+        hasData: true,
+      });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('잔잔한 영화');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '비 오는 날에 볼 만한 잔잔한 영화', [], jest.fn());
+
+      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+        '잔잔한 영화',
+        20,
+        expect.any(Array),
+        expect.objectContaining({
+          preferredGenres: ['드라마', '스릴러'],
+          preferredCountries: ['KR'],
+          preferredOttNames: ['Netflix'],
+        }),
+      );
+      // SQL WHERE 필터 없이 리랭킹만 전달되어야 한다
+      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      expect(calledFilters.ottProviderNames).toBeUndefined();
+      expect(calledFilters.countries).toBeUndefined();
+      expect(calledFilters.genres).toBeUndefined();
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+    });
+
+    it('필터 없음 + 신규 유저: EmbeddingService.searchSimilar가 호출되어야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        preferredGenres: [],
+        preferredCountries: [],
+        ottProviderNames: [],
+        hasData: false,
+      });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('재미있는 영화');
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '재미있는 영화 추천해줘', [], jest.fn());
+
+      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+        '재미있는 영화',
+        20,
+        expect.any(Array),
+      );
+      expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();
+    });
+
+    it('필터 있음: 기존 필터 + 유저 선호가 함께 전달되어야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        preferredGenres: ['드라마'],
+        preferredCountries: ['KR'],
+        ottProviderNames: ['Netflix'],
+        hasData: true,
+      });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        ottProviderNames: ['Disney Plus'],
+        countries: ['US'],
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('히어로 영화');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '디즈니플러스 미국 히어로 영화', [], jest.fn());
+
+      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+        '히어로 영화',
+        20,
+        expect.any(Array),
+        expect.objectContaining({
+          // 명시적 SQL 필터
+          ottProviderNames: ['Disney Plus'],
+          countries: ['US'],
+          // 유저 선호 리랭킹
+          preferredGenres: ['드라마'],
+          preferredCountries: ['KR'],
+          preferredOttNames: ['Netflix'],
+        }),
+      );
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+    });
+
+    it('extractUserPreference가 올바른 인자로 호출되어야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '추천해줘', [], jest.fn());
+
+      expect(mockExtractUserPreference).toHaveBeenCalledWith(
+        expect.objectContaining({
+          favorites: expect.any(Array),
+          genreStats: expect.any(Array),
+          watchedTmdbIds: expect.any(Array),
+        }),
+        ['netflix'],
+        expect.any(Array),
+      );
     });
   });
 

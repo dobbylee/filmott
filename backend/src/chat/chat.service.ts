@@ -17,6 +17,7 @@ import {
   WantToWatchContent,
 } from './prompts/system-prompt';
 import { OTT_PROVIDERS } from '../common/ott-providers';
+import { extractUserPreference } from './user-preference';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
@@ -127,12 +128,32 @@ export class ChatService {
       // 5. 쿼리 정제: 메타데이터 키워드 제거 후 의미적 쿼리만 사용
       const semanticQuery = this.intentAnalyzer.buildSemanticQuery(searchQuery, intent);
 
-      // 6. 분기: 필터 유무에 따라 SQL 전체 검색 / 기존 벡터 검색
+      // 6. 유저 선호 추출 + 3분기 검색
+      const userPref = extractUserPreference(userContext, subscribedOtts, OTT_PROVIDERS);
+
       if (hasFilters) {
+        // A. 명시적 필터 있음: SQL 전체 검색 + 유저 선호 리랭킹
+        const filtersWithPref: ContentSearchFilters = {
+          ...filters,
+          preferredGenres: userPref.preferredGenres,
+          preferredCountries: userPref.preferredCountries,
+          preferredOttNames: userPref.ottProviderNames,
+        };
         similarContents = await this.contentSearchService.searchWithFilters(
-          semanticQuery, 20, userContext.watchedTmdbIds, filters,
+          semanticQuery, 20, userContext.watchedTmdbIds, filtersWithPref,
+        );
+      } else if (userPref.hasData) {
+        // B. 필터 없음 + 유저 데이터 있음: SQL 전체 검색 (유저 선호 리랭킹만)
+        const userFilters: ContentSearchFilters = {
+          preferredGenres: userPref.preferredGenres,
+          preferredCountries: userPref.preferredCountries,
+          preferredOttNames: userPref.ottProviderNames,
+        };
+        similarContents = await this.contentSearchService.searchWithFilters(
+          semanticQuery, 20, userContext.watchedTmdbIds, userFilters,
         );
       } else {
+        // C. 필터 없음 + 신규 유저: 기존 벡터 검색 fallback
         similarContents = await this.embeddingService.searchSimilar(
           semanticQuery, 20, userContext.watchedTmdbIds,
         );
