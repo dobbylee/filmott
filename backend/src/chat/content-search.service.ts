@@ -34,6 +34,16 @@ interface FilteredRow {
   score: number;
 }
 
+const SCORE_WEIGHTS = {
+  VECTOR_DEFAULT: 0.7,
+  VECTOR_WITH_PREF: 0.6,
+  POPULARITY_DEFAULT: 0.3,
+  POPULARITY_WITH_PREF: 0.25,
+  GENRE_BONUS: 0.05,
+  COUNTRY_BONUS: 0.05,
+  OTT_BONUS: 0.05,
+} as const;
+
 @Injectable()
 export class ContentSearchService {
   private readonly logger = new Logger(ContentSearchService.name);
@@ -105,6 +115,10 @@ export class ContentSearchService {
     return results;
   }
 
+  /**
+   * SQL WHERE 절 필터만 확인한다.
+   * preferredGenres / preferredCountries / preferredOttNames는 ORDER BY 가중치이므로 포함하지 않는다.
+   */
   private hasActiveFilters(filters: ContentSearchFilters): boolean {
     return (
       (filters.ottProviderNames?.length ?? 0) > 0 ||
@@ -238,24 +252,32 @@ export class ContentSearchService {
 
     // 리랭킹 보너스 SQL 조각 생성
     const genreBonusSql = prefGenreIdx !== null
-      ? `CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(genres) AS g WHERE g->>'name' = ANY($${prefGenreIdx}::text[])) THEN 0.05 ELSE 0 END`
+      ? `CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(genres) AS g WHERE g->>'name' = ANY($${prefGenreIdx}::text[])) THEN ${SCORE_WEIGHTS.GENRE_BONUS} ELSE 0 END`
       : '0';
     const countryBonusSql = prefCountryIdx !== null
-      ? `CASE WHEN origin_country = ANY($${prefCountryIdx}::text[]) THEN 0.05 ELSE 0 END`
+      ? `CASE WHEN EXISTS (
+  SELECT 1 FROM unnest($${prefCountryIdx}::text[]) AS pc
+  WHERE origin_country = pc
+     OR origin_country LIKE pc || ', %'
+     OR origin_country LIKE '%, ' || pc
+     OR origin_country LIKE '%, ' || pc || ', %'
+) THEN ${SCORE_WEIGHTS.COUNTRY_BONUS} ELSE 0 END`
       : '0';
     const ottBonusSql = prefOttIdx !== null
-      ? `CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(watch_providers->'flatrate') AS p WHERE p->>'provider_name' = ANY($${prefOttIdx}::text[])) THEN 0.05 ELSE 0 END`
+      ? `CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(watch_providers->'flatrate') AS p WHERE p->>'provider_name' = ANY($${prefOttIdx}::text[])) THEN ${SCORE_WEIGHTS.OTT_BONUS} ELSE 0 END`
       : '0';
 
     // 1순위 스코어: 리랭킹 있으면 벡터 0.6 + 인기도 0.25 + 보너스 0.15, 없으면 기존 (0.7 + 0.3)
     const buildEmbeddingScore = (embIdx: number): string => {
       if (hasPreference) {
-        return `(1 - (embedding <=> $${embIdx}::vector)) * 0.6 + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, 0.25) + ${genreBonusSql} + ${countryBonusSql} + ${ottBonusSql}`;
+        return `(1 - (embedding <=> $${embIdx}::vector)) * ${SCORE_WEIGHTS.VECTOR_WITH_PREF} + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, ${SCORE_WEIGHTS.POPULARITY_WITH_PREF}) + ${genreBonusSql} + ${countryBonusSql} + ${ottBonusSql}`;
       }
-      return `(1 - (embedding <=> $${embIdx}::vector)) * 0.7 + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, 0.3)`;
+      return `(1 - (embedding <=> $${embIdx}::vector)) * ${SCORE_WEIGHTS.VECTOR_DEFAULT} + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, ${SCORE_WEIGHTS.POPULARITY_DEFAULT})`;
     };
 
     // 2/3순위 스코어: 리랭킹 있으면 보너스만, 없으면 0
+    // 리랭킹 필드가 부분적으로만 존재할 때 총합이 1.0이 아닐 수 있으나,
+    // 동일 priority 내 상대 정렬에만 사용되므로 기능상 문제 없음
     const buildFallbackScore = (): string => {
       if (!hasPreference) return '0';
       const parts: string[] = [];
@@ -263,7 +285,13 @@ export class ContentSearchService {
         parts.push(`CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(genres) AS g WHERE g->>'name' = ANY($${prefGenreIdx}::text[])) THEN 0.33 ELSE 0 END`);
       }
       if (prefCountryIdx !== null) {
-        parts.push(`CASE WHEN origin_country = ANY($${prefCountryIdx}::text[]) THEN 0.33 ELSE 0 END`);
+        parts.push(`CASE WHEN EXISTS (
+  SELECT 1 FROM unnest($${prefCountryIdx}::text[]) AS pc
+  WHERE origin_country = pc
+     OR origin_country LIKE pc || ', %'
+     OR origin_country LIKE '%, ' || pc
+     OR origin_country LIKE '%, ' || pc || ', %'
+) THEN 0.33 ELSE 0 END`);
       }
       if (prefOttIdx !== null) {
         parts.push(`CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(watch_providers->'flatrate') AS p WHERE p->>'provider_name' = ANY($${prefOttIdx}::text[])) THEN 0.34 ELSE 0 END`);

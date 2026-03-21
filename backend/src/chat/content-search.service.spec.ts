@@ -597,7 +597,7 @@ describe('ContentSearchService', () => {
         expect(params).toContainEqual(['드라마', '스릴러']);
       });
 
-      it('preferredCountries가 있으면 국가 보너스 SQL이 포함되어야 한다', async () => {
+      it('preferredCountries가 있으면 국가 보너스 SQL이 복합값 LIKE 매칭으로 포함되어야 한다', async () => {
         mockDataSource.query.mockResolvedValue(fiveRows);
 
         await service.searchWithFilters(
@@ -606,7 +606,10 @@ describe('ContentSearchService', () => {
         );
 
         const query = mockDataSource.query.mock.calls[0][0] as string;
-        expect(query).toContain('origin_country = ANY(');
+        // unnest 기반 복합값 매칭 (origin_country "KR, US"에서도 KR 매칭)
+        expect(query).toContain('unnest(');
+        expect(query).toContain('origin_country = pc');
+        expect(query).toContain("origin_country LIKE pc || ', %'");
         expect(query).toContain('THEN 0.05');
         const params = mockDataSource.query.mock.calls[0][1] as unknown[];
         expect(params).toContainEqual(['KR', 'JP']);
@@ -684,7 +687,7 @@ describe('ContentSearchService', () => {
         const query = mockDataSource.query.mock.calls[0][0] as string;
         // 3가지 보너스 모두 포함
         expect(query).toContain("g->>'name'");
-        expect(query).toContain('origin_country = ANY(');
+        expect(query).toContain('origin_country = pc');
         expect(query).toContain("p->>'provider_name'");
         // 벡터 유사도 가중치 0.6
         expect(query).toContain('* 0.6');

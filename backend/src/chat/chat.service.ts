@@ -129,7 +129,7 @@ export class ChatService {
       const semanticQuery = this.intentAnalyzer.buildSemanticQuery(searchQuery, intent);
 
       // 6. 유저 선호 추출 + 3분기 검색
-      const userPref = extractUserPreference(userContext, subscribedOtts, OTT_PROVIDERS);
+      const userPref = extractUserPreference(userContext, subscribedOtts);
 
       if (hasFilters) {
         // A. 명시적 필터 있음: SQL 전체 검색 + 유저 선호 리랭킹

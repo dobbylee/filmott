@@ -730,7 +730,6 @@ describe('ChatService', () => {
           watchedTmdbIds: expect.any(Array),
         }),
         ['netflix'],
-        expect.any(Array),
       );
     });
   });

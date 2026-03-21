@@ -1,7 +1,5 @@
-import { extractUserPreference, UserPreference } from './user-preference';
+import { extractUserPreference } from './user-preference';
 import { UserContext, FavoriteContent, GenreStat } from './prompts/system-prompt';
-import { OttProvider } from '../common/ott-providers';
-import { OTT_PROVIDERS } from '../common/ott-providers';
 
 function makeGenreStat(
   genre: string,
@@ -46,7 +44,7 @@ describe('extractUserPreference', () => {
         ],
       };
 
-      const result = extractUserPreference(context, [], OTT_PROVIDERS);
+      const result = extractUserPreference(context, []);
 
       expect(result.preferredGenres).toHaveLength(5);
       expect(result.preferredGenres[0]).toBe('드라마');
@@ -68,7 +66,7 @@ describe('extractUserPreference', () => {
         ],
       };
 
-      const result = extractUserPreference(context, [], OTT_PROVIDERS);
+      const result = extractUserPreference(context, []);
 
       expect(result.preferredGenres).toEqual(['액션']);
     });
@@ -83,7 +81,7 @@ describe('extractUserPreference', () => {
         ],
       };
 
-      const result = extractUserPreference(context, [], OTT_PROVIDERS);
+      const result = extractUserPreference(context, []);
 
       // 드라마: 2, 스릴러: 2, 액션: 1, 공포: 1
       expect(result.preferredGenres[0]).toBe('드라마');
@@ -103,7 +101,7 @@ describe('extractUserPreference', () => {
         ],
       };
 
-      const result = extractUserPreference(context, [], OTT_PROVIDERS);
+      const result = extractUserPreference(context, []);
 
       expect(result.preferredGenres).toEqual(['SF', '드라마']);
     });
@@ -114,31 +112,24 @@ describe('extractUserPreference', () => {
       const result = extractUserPreference(
         makeEmptyContext(),
         ['netflix', 'tving', 'wavve'],
-        OTT_PROVIDERS,
       );
 
       expect(result.ottProviderNames).toEqual(['Netflix', 'Tving', 'wavve']);
     });
 
-    it('알 수 없는 OTT ID는 OTT_PROVIDERS에서 name fallback을 사용해야 한다', () => {
-      const customProviders: OttProvider[] = [
-        { id: 'custom_ott', name: '커스텀OTT', tmdbProviderId: 9999, logoPath: '/test.jpg' },
-      ];
-
+    it('OTT_ID_TO_TMDB_NAME에 없는 ID는 결과에서 제외해야 한다', () => {
       const result = extractUserPreference(
         makeEmptyContext(),
-        ['custom_ott'],
-        customProviders,
+        ['custom_ott', 'netflix'],
       );
 
-      expect(result.ottProviderNames).toEqual(['커스텀OTT']);
+      expect(result.ottProviderNames).toEqual(['Netflix']);
     });
 
     it('빈 subscribedOtts는 빈 배열을 반환해야 한다', () => {
       const result = extractUserPreference(
         makeEmptyContext(),
         [],
-        OTT_PROVIDERS,
       );
 
       expect(result.ottProviderNames).toEqual([]);
@@ -150,7 +141,6 @@ describe('extractUserPreference', () => {
       const result = extractUserPreference(
         makeEmptyContext(),
         [],
-        OTT_PROVIDERS,
       );
 
       expect(result.hasData).toBe(false);
@@ -162,7 +152,7 @@ describe('extractUserPreference', () => {
         genreStats: [makeGenreStat('드라마', 8.0, 5)],
       };
 
-      const result = extractUserPreference(context, [], OTT_PROVIDERS);
+      const result = extractUserPreference(context, []);
 
       expect(result.hasData).toBe(true);
     });
@@ -173,7 +163,16 @@ describe('extractUserPreference', () => {
         favorites: [makeFavorite('기생충', '드라마', 10)],
       };
 
-      const result = extractUserPreference(context, [], OTT_PROVIDERS);
+      const result = extractUserPreference(context, []);
+
+      expect(result.hasData).toBe(true);
+    });
+
+    it('OTT 구독만 있어도 hasData=true여야 한다', () => {
+      const result = extractUserPreference(
+        makeEmptyContext(),
+        ['netflix'],
+      );
 
       expect(result.hasData).toBe(true);
     });
@@ -192,7 +191,7 @@ describe('extractUserPreference', () => {
         ],
       };
 
-      const result = extractUserPreference(context, [], OTT_PROVIDERS);
+      const result = extractUserPreference(context, []);
 
       expect(result.preferredCountries).toEqual(['KR', 'US']);
     });
@@ -205,7 +204,7 @@ describe('extractUserPreference', () => {
         ],
       };
 
-      const result = extractUserPreference(context, [], OTT_PROVIDERS);
+      const result = extractUserPreference(context, []);
 
       expect(result.preferredCountries).toEqual([]);
     });
@@ -219,9 +218,24 @@ describe('extractUserPreference', () => {
         ],
       };
 
-      const result = extractUserPreference(context, [], OTT_PROVIDERS);
+      const result = extractUserPreference(context, []);
 
       expect(result.preferredCountries).toEqual(['KR']);
+    });
+
+    it('복합 originCountry "KR, US"를 개별 국가로 분리해야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        favorites: [
+          makeFavorite('미나리', '드라마', 9, 'KR, US'),
+          makeFavorite('기생충', '드라마', 10, 'KR'),
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      // KR: 2 (미나리 + 기생충), US: 1 (미나리)
+      expect(result.preferredCountries).toEqual(['KR', 'US']);
     });
   });
 });

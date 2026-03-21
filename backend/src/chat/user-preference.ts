@@ -1,5 +1,4 @@
 import { UserContext, FavoriteContent, GenreStat } from './prompts/system-prompt';
-import { OttProvider } from '../common/ott-providers';
 
 export interface UserPreference {
   preferredGenres: string[];       // 상위 5개 선호 장르 (DB 장르명)
@@ -8,6 +7,7 @@ export interface UserPreference {
   hasData: boolean;                // 유저 데이터 존재 여부
 }
 
+// [동기화 주의] intent-analyzer.ts INTENT_SYSTEM_PROMPT의 OTT provider_name과 동일 유지
 const OTT_ID_TO_TMDB_NAME: Record<string, string> = {
   'netflix': 'Netflix',
   'disney_plus': 'Disney Plus',
@@ -21,6 +21,9 @@ const MAX_GENRES = 5;
 const MIN_GENRE_COUNT = 2;
 const MAX_COUNTRIES = 2;
 
+// 가중 점수 = avgRating * log2(count + 1)
+// 평점이 높고 많이 본 장르일수록 높은 점수
+// count >= MIN_GENRE_COUNT(2) 이상인 장르만 선호로 판별
 function extractGenresFromStats(genreStats: GenreStat[]): string[] {
   const eligible = genreStats.filter((g) => g.count >= MIN_GENRE_COUNT);
 
@@ -57,10 +60,10 @@ function extractCountries(favorites: FavoriteContent[]): string[] {
 
   for (const fav of favorites) {
     if (fav.originCountry) {
-      countryCount.set(
-        fav.originCountry,
-        (countryCount.get(fav.originCountry) ?? 0) + 1,
-      );
+      const countries = fav.originCountry.split(',').map((c) => c.trim());
+      for (const country of countries) {
+        countryCount.set(country, (countryCount.get(country) ?? 0) + 1);
+      }
     }
   }
 
@@ -68,24 +71,18 @@ function extractCountries(favorites: FavoriteContent[]): string[] {
   return sorted.slice(0, MAX_COUNTRIES).map(([country]) => country);
 }
 
+// OTT_ID_TO_TMDB_NAME에 없으면 null (한국어명은 TMDB provider_name과 매칭 불가)
 function mapOttNames(
   subscribedOtts: string[],
-  ottProviders: OttProvider[],
 ): string[] {
   return subscribedOtts
-    .map((id) => {
-      const tmdbName = OTT_ID_TO_TMDB_NAME[id];
-      if (tmdbName) return tmdbName;
-      const provider = ottProviders.find((p) => p.id === id);
-      return provider?.name ?? null;
-    })
+    .map((id) => OTT_ID_TO_TMDB_NAME[id] ?? null)
     .filter((name): name is string => name !== null);
 }
 
 export function extractUserPreference(
   context: UserContext,
   subscribedOtts: string[],
-  ottProviders: OttProvider[],
 ): UserPreference {
   let preferredGenres = extractGenresFromStats(context.genreStats);
   if (preferredGenres.length === 0 && context.favorites.length > 0) {
@@ -94,9 +91,9 @@ export function extractUserPreference(
 
   const preferredCountries = extractCountries(context.favorites);
 
-  const ottProviderNames = mapOttNames(subscribedOtts, ottProviders);
+  const ottProviderNames = mapOttNames(subscribedOtts);
 
-  const hasData = context.genreStats.length > 0 || context.favorites.length > 0;
+  const hasData = context.genreStats.length > 0 || context.favorites.length > 0 || subscribedOtts.length > 0;
 
   return {
     preferredGenres,
