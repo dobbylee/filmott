@@ -17,7 +17,7 @@ import {
   WantToWatchContent,
 } from './prompts/system-prompt';
 import { OTT_PROVIDERS } from '../common/ott-providers';
-import { extractUserPreference } from './user-preference';
+import { extractUserPreference, enrichQueryWithPreference } from './user-preference';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
@@ -150,8 +150,11 @@ export class ChatService {
           mergedFilters.countries = userPref.preferredCountries;
         }
 
+        // 임베딩 쿼리에 유저 선호 주입 (벡터 유사도 개인화)
+        const enrichedQuery = enrichQueryWithPreference(semanticQuery, userPref, intent);
+
         similarContents = await this.contentSearchService.searchWithFilters(
-          semanticQuery, 20, userContext.watchedTmdbIds, mergedFilters,
+          enrichedQuery, 20, userContext.watchedTmdbIds, mergedFilters,
         );
       } else {
         // C. 필터 없음 + 신규 유저: 기존 벡터 검색 fallback

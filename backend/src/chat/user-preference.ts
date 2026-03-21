@@ -105,6 +105,60 @@ function mapOttNames(
     .filter((name): name is string => name !== null);
 }
 
+// ISO 코드 → 한국어 국가명 (임베딩 쿼리 보강용)
+const ISO_TO_KOREAN: Record<string, string> = {
+  'KR': '한국', 'US': '미국', 'JP': '일본', 'GB': '영국',
+  'FR': '프랑스', 'DE': '독일', 'CN': '중국', 'TW': '대만',
+  'HK': '홍콩', 'IN': '인도', 'ES': '스페인', 'IT': '이탈리아',
+  'CA': '캐나다', 'AU': '호주', 'TH': '태국',
+};
+
+// TMDB provider_name → 한국어 OTT명 (임베딩 쿼리 보강용)
+const TMDB_NAME_TO_KOREAN: Record<string, string> = {
+  'Netflix': '넷플릭스',
+  'Disney Plus': '디즈니플러스',
+  'Watcha': '왓챠',
+  'wavve': '웨이브',
+  'Tving': '티빙',
+  'Coupang Play': '쿠팡플레이',
+};
+
+/**
+ * 임베딩 쿼리에 유저 선호를 주입하여 벡터 유사도를 개인화한다.
+ * 명시적 요청이 있는 필드에는 주입하지 않는다 (WHERE 필터 합산과 동일 원칙).
+ */
+export function enrichQueryWithPreference(
+  semanticQuery: string,
+  userPref: UserPreference,
+  intent: { ottProviderNames: string[]; countries: string[]; excludeCountries: string[] },
+): string {
+  const additions: string[] = [];
+
+  // OTT: 명시적 OTT 요청 없을 때만 유저 구독 OTT 주입
+  if (intent.ottProviderNames.length === 0 && userPref.ottProviderNames.length > 0) {
+    const koreanOtt = userPref.ottProviderNames
+      .map((name) => TMDB_NAME_TO_KOREAN[name])
+      .filter(Boolean);
+    if (koreanOtt.length > 0) {
+      additions.push(koreanOtt[0]); // 첫 번째 구독 OTT만 (너무 많으면 임베딩 희석)
+    }
+  }
+
+  // 국가: 명시적 국가/제외 요청 없을 때만 유저 선호 국가 주입
+  if (intent.countries.length === 0 && intent.excludeCountries.length === 0 && userPref.preferredCountries.length > 0) {
+    const koreanCountry = ISO_TO_KOREAN[userPref.preferredCountries[0]];
+    if (koreanCountry) {
+      additions.push(koreanCountry);
+    }
+  }
+
+  if (additions.length === 0) {
+    return semanticQuery;
+  }
+
+  return `${additions.join(' ')} ${semanticQuery}`;
+}
+
 export function extractUserPreference(
   context: UserContext,
   subscribedOtts: string[],

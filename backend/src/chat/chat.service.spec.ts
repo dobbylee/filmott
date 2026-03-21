@@ -17,6 +17,7 @@ import { UserPreference } from './user-preference';
 const mockExtractUserPreference = jest.fn<UserPreference, []>();
 jest.mock('./user-preference', () => ({
   extractUserPreference: (...args: unknown[]) => mockExtractUserPreference(...(args as [])),
+  enrichQueryWithPreference: (query: string) => query,
 }));
 
 // OpenAI SDK mock
