@@ -46,4 +46,4 @@ export const GENRE_NAME_MAP: Record<number, string> = {
  * 콘텐츠 상세 정보 캐시 TTL (24시간)
  * watchProviders, credits 등 부가 정보의 DB 캐시 유효 기간
  */
-export const CONTENT_DETAIL_TTL_MS = 24 * 60 * 60 * 1000;
+export const CONTENT_DETAIL_TTL_MS = 72 * 60 * 60 * 1000;

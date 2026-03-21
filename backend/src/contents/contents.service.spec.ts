@@ -212,18 +212,16 @@ describe('ContentsService', () => {
       expect(result.credits).toEqual(cachedContent.credits);
     });
 
-    it('TTL 초과 시 TMDB에서 재호출하고 DB를 업데이트해야 한다', async () => {
+    it('TTL 초과 시 캐시를 즉시 반환하고 백그라운드에서 갱신해야 한다', async () => {
       const expiredContent = {
         id: 3,
         tmdbId: 789,
         contentType: 'movie',
         title: 'Old Title',
-        updatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000), // 25시간 전
+        updatedAt: new Date(Date.now() - 73 * 60 * 60 * 1000), // 73시간 전 (TTL 72시간 초과)
         watchProviders: { flatrate: [] },
         credits: [],
       };
-      // 첫번째 findOne: TTL 캐시 확인 (초과)
-      // 두번째 findOne: upsertFromTmdb 내부
       mockContentRepo.findOne
         .mockResolvedValueOnce(expiredContent)
         .mockResolvedValueOnce(expiredContent);
@@ -249,11 +247,16 @@ describe('ContentsService', () => {
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
       mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
 
+      // TTL 초과 시 캐시된 데이터를 즉시 반환
       const result = await service.getContentDetail(789, 'movie');
 
+      expect(result.title).toBe('Old Title');
+      expect(result.watchProviders).toEqual(expiredContent.watchProviders);
+      expect(result.credits).toEqual(expiredContent.credits);
+
+      // 백그라운드 갱신이 비동기로 실행됨 (await 없이)
+      await new Promise((r) => setTimeout(r, 10));
       expect(mockTmdbService.getDetails).toHaveBeenCalledWith(789, 'movie');
-      expect(mockContentRepo.save).toHaveBeenCalled();
-      expect(result.credits).toHaveLength(1);
     });
 
     it('캐시에 watchProviders가 null이면 TMDB를 재호출해야 한다', async () => {

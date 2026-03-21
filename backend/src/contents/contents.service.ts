@@ -13,6 +13,7 @@ import { TMDB_IMAGE_BASE, GENRE_NAME_MAP, CONTENT_DETAIL_TTL_MS } from '../commo
 @Injectable()
 export class ContentsService {
   private readonly logger = new Logger(ContentsService.name);
+  private readonly refreshingIds = new Set<string>();
 
   constructor(
     @InjectRepository(Content)
@@ -64,7 +65,8 @@ export class ContentsService {
   }
 
   /**
-   * 상세: TTL 이내면 DB 캐시 반환, 초과 시 TMDB 재호출 후 업데이트
+   * 상세: TTL 이내면 DB 캐시 반환, 초과 시 백그라운드 갱신 + 캐시 즉시 반환
+   * 캐시 미스(신규 콘텐츠)인 경우만 동기 호출
    */
   async getContentDetail(tmdbId: number, type: 'movie' | 'tv') {
     // DB에서 기존 캐시 확인
@@ -72,19 +74,46 @@ export class ContentsService {
       where: { tmdbId, contentType: type },
     });
 
-    // TTL 이내이고 watchProviders/credits가 캐시되어 있으면 DB 캐시 반환
     if (cached && cached.watchProviders !== null && cached.credits !== null) {
       const age = Date.now() - new Date(cached.updatedAt).getTime();
+
       if (age < CONTENT_DETAIL_TTL_MS) {
+        // TTL 이내: 캐시 반환
         return {
           ...cached,
           watchProviders: cached.watchProviders,
           credits: cached.credits,
         };
       }
+
+      // TTL 초과: 캐시 즉시 반환 + 백그라운드 갱신
+      this.refreshInBackground(tmdbId, type);
+      return {
+        ...cached,
+        watchProviders: cached.watchProviders,
+        credits: cached.credits,
+      };
     }
 
-    // TTL 초과 또는 캐시 미스: TMDB에서 fetch
+    // 캐시 미스(신규 콘텐츠): 동기 호출
+    return this.fetchAndSave(tmdbId, type);
+  }
+
+  private refreshInBackground(tmdbId: number, type: 'movie' | 'tv'): void {
+    const key = `${type}:${tmdbId}`;
+    if (this.refreshingIds.has(key)) return;
+    this.refreshingIds.add(key);
+
+    this.fetchAndSave(tmdbId, type)
+      .catch((error) => {
+        this.logger.warn(
+          `백그라운드 갱신 실패 (${key}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      })
+      .finally(() => this.refreshingIds.delete(key));
+  }
+
+  private async fetchAndSave(tmdbId: number, type: 'movie' | 'tv') {
     let tmdbData;
     try {
       tmdbData = await this.tmdbService.getDetails(tmdbId, type);
@@ -100,12 +129,10 @@ export class ContentsService {
       );
     }
 
-    // OTT 정보, 출연진 추출
     const watchProviders =
       tmdbData['watch/providers']?.results?.KR ?? null;
     const credits = tmdbData.credits?.cast?.slice(0, 20) ?? [];
 
-    // DB에 저장/업데이트 (watchProviders, credits 포함)
     const content = await this.upsertFromTmdb(tmdbData, type);
     content.watchProviders = watchProviders;
     content.credits = credits;
