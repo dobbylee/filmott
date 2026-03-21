@@ -52,10 +52,10 @@ describe('ChatPage', () => {
 
   it('예시 질문 버튼들을 렌더링한다', () => {
     render(<ChatPage />);
-    expect(screen.getByText('비 오는 날에 볼 만한 잔잔한 영화')).toBeInTheDocument();
-    expect(screen.getByText('친구들이랑 볼 코미디 추천해줘')).toBeInTheDocument();
-    expect(screen.getByText('요즘 핫한 넷플릭스 시리즈 뭐가 있어?')).toBeInTheDocument();
-    expect(screen.getByText('밤에 혼자 볼 스릴러 추천')).toBeInTheDocument();
+    expect(screen.getByText('비 오는 날에 볼 만한 잔잔한 영화 알려줘')).toBeInTheDocument();
+    expect(screen.getByText('친구들이랑 볼 코미디 영화 추천해줘')).toBeInTheDocument();
+    expect(screen.getByText('넷플릭스에서 볼 수 있는 한국 드라마 알려줘')).toBeInTheDocument();
+    expect(screen.getByText('밤에 혼자 볼 스릴러 영화 추천해줘')).toBeInTheDocument();
   });
 
   it('첫 진입 시 "대화는 탭을 닫으면 사라져요" 안내를 표시한다', () => {
@@ -132,11 +132,11 @@ describe('ChatPage', () => {
 
     render(<ChatPage />);
 
-    fireEvent.click(screen.getByText('밤에 혼자 볼 스릴러 추천'));
+    fireEvent.click(screen.getByText('밤에 혼자 볼 스릴러 영화 추천해줘'));
 
     await waitFor(() => {
       expect(mockSendChatMessage).toHaveBeenCalledWith(
-        '밤에 혼자 볼 스릴러 추천',
+        '밤에 혼자 볼 스릴러 영화 추천해줘',
         expect.any(Array),
         expect.any(Object),
       );
