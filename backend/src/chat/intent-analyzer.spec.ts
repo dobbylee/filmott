@@ -19,6 +19,16 @@ jest.mock('openai', () => {
   };
 });
 
+const EMPTY_INTENT: ParsedIntent = {
+  ottProviderNames: [],
+  countries: [],
+  excludeCountries: [],
+  personNames: [],
+  dateRange: null,
+  contentType: null,
+  genres: [],
+};
+
 describe('IntentAnalyzerService', () => {
   let service: IntentAnalyzerService;
 
@@ -47,16 +57,22 @@ describe('IntentAnalyzerService', () => {
     });
   };
 
+  const mockIntent = (overrides: Partial<ParsedIntent> = {}): void => {
+    mockLlmResponse(JSON.stringify({
+      ottProviderNames: [],
+      countries: [],
+      excludeCountries: [],
+      personNames: [],
+      dateRange: null,
+      contentType: null,
+      genres: [],
+      ...overrides,
+    }));
+  };
+
   describe('analyzeIntent', () => {
     it('OTT 플랫폼을 올바르게 추출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: ['Netflix'],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-      }));
+      mockIntent({ ottProviderNames: ['Netflix'] });
 
       const result = await service.analyzeIntent('넷플릭스에서 볼만한 영화');
 
@@ -68,13 +84,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('제작 국가를 올바르게 추출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: ['KR'],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-      }));
+      mockIntent({ countries: ['KR'] });
 
       const result = await service.analyzeIntent('한국 영화 추천해줘');
 
@@ -82,14 +92,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('인물 이름을 올바르게 추출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: ['봉준호'],
-        dateRange: null,
-        contentType: null,
-      }));
+      mockIntent({ personNames: ['봉준호'] });
 
       const result = await service.analyzeIntent('기생충 감독의 다른 작품');
 
@@ -97,14 +100,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('연도 범위를 올바르게 추출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: { from: '1990-01-01', to: '1999-12-31' },
-        contentType: null,
-      }));
+      mockIntent({ dateRange: { from: '1990-01-01', to: '1999-12-31' } });
 
       const result = await service.analyzeIntent('90년대 느와르 영화');
 
@@ -112,14 +108,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('최신 키워드의 연도 범위를 올바르게 추출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: { from: '2024-01-01', to: null },
-        contentType: null,
-      }));
+      mockIntent({ dateRange: { from: '2024-01-01', to: null } });
 
       const result = await service.analyzeIntent('최신 영화 추천해줘');
 
@@ -127,14 +116,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('콘텐츠 타입을 올바르게 추출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: 'tv',
-      }));
+      mockIntent({ contentType: 'tv' });
 
       const result = await service.analyzeIntent('재밌는 드라마 추천해줘');
 
@@ -142,13 +124,12 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('복합 의도를 모두 추출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
+      mockIntent({
         ottProviderNames: ['Netflix'],
         countries: ['KR'],
-        personNames: [],
         dateRange: { from: '2024-01-01', to: null },
         contentType: 'tv',
-      }));
+      });
 
       const result = await service.analyzeIntent(
         '넷플릭스에서 볼 수 있는 한국 최신 드라마',
@@ -161,37 +142,15 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('의도가 없는 메시지는 빈 ParsedIntent를 반환해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-      }));
+      mockIntent();
 
       const result = await service.analyzeIntent('안녕하세요');
 
-      expect(result).toEqual<ParsedIntent>({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: [],
-      });
+      expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
     });
 
     it('gpt-4o-mini 모델을 response_format json_object로 호출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-      }));
+      mockIntent();
 
       await service.analyzeIntent('테스트');
 
@@ -207,14 +166,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('여러 OTT 플랫폼을 동시에 추출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: ['Netflix', 'Tving'],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-      }));
+      mockIntent({ ottProviderNames: ['Netflix', 'Tving'] });
 
       const result = await service.analyzeIntent('넷플릭스나 티빙에서 볼만한 영화');
 
@@ -222,14 +174,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('여러 인물을 동시에 추출해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: ['송강호', '최민식'],
-        dateRange: null,
-        contentType: null,
-      }));
+      mockIntent({ personNames: ['송강호', '최민식'] });
 
       const result = await service.analyzeIntent('송강호와 최민식이 나오는 영화');
 
@@ -248,28 +193,12 @@ describe('IntentAnalyzerService', () => {
 
       const result = await noKeyService.analyzeIntent('넷플릭스 영화');
 
-      expect(result).toEqual<ParsedIntent>({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: [],
-      });
+      expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
     it('장르를 올바르게 추출해야 한다 (호러 -> 공포)', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: ['호러'],
-      }));
+      mockIntent({ genres: ['호러'] });
 
       const result = await service.analyzeIntent('호러 영화 추천해줘');
 
@@ -277,15 +206,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('느와르를 범죄+액션으로 매핑해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: ['느와르'],
-      }));
+      mockIntent({ genres: ['느와르'] });
 
       const result = await service.analyzeIntent('90년대 느와르 영화');
 
@@ -293,138 +214,38 @@ describe('IntentAnalyzerService', () => {
       expect(result.genres).toContain('액션');
     });
 
-    it('TV 콘텐츠에서 액션을 "액션" + "액션 & 어드벤처"로 확장해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: 'tv',
-        genres: ['액션'],
-      }));
+    it.each([
+      { genre: '액션', expanded: '액션 & 어드벤처', type: 'tv' as const },
+      { genre: 'SF', expanded: 'SF & 판타지', type: 'tv' as const },
+      { genre: '판타지', expanded: 'SF & 판타지', type: 'tv' as const },
+      { genre: '액션', expanded: '액션 & 어드벤처', type: null },
+      { genre: 'SF', expanded: 'SF & 판타지', type: null },
+    ])('$genre -> $expanded 확장 (contentType=$type)', async ({ genre, expanded, type }) => {
+      mockIntent({ contentType: type, genres: [genre] });
 
-      const result = await service.analyzeIntent('액션 드라마 추천해줘');
+      const result = await service.analyzeIntent(
+        type === 'tv' ? `${genre} 드라마 추천해줘` : `${genre}물 추천해줘`,
+      );
 
-      expect(result.genres).toContain('액션');
-      expect(result.genres).toContain('액션 & 어드벤처');
-    });
-
-    it('TV 콘텐츠에서 SF를 "SF" + "SF & 판타지"로 확장해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: 'tv',
-        genres: ['SF'],
-      }));
-
-      const result = await service.analyzeIntent('SF 드라마 추천해줘');
-
-      expect(result.genres).toContain('SF');
-      expect(result.genres).toContain('SF & 판타지');
-    });
-
-    it('TV 콘텐츠에서 판타지를 "판타지" + "SF & 판타지"로 확장해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: 'tv',
-        genres: ['판타지'],
-      }));
-
-      const result = await service.analyzeIntent('판타지 드라마 추천해줘');
-
-      expect(result.genres).toContain('판타지');
-      expect(result.genres).toContain('SF & 판타지');
+      expect(result.genres).toContain(genre);
+      expect(result.genres).toContain(expanded);
     });
 
     it('매핑에 없는 장르명은 그대로 유지해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: ['뮤지컬'],
-      }));
+      mockIntent({ genres: ['뮤지컬'] });
 
       const result = await service.analyzeIntent('뮤지컬 영화 추천해줘');
 
       expect(result.genres).toEqual(['뮤지컬']);
     });
 
-    it('장르가 없는 메시지는 빈 배열을 반환해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: [],
-      }));
-
-      const result = await service.analyzeIntent('재밌는 영화 추천해줘');
-
-      expect(result.genres).toEqual([]);
-    });
-
     it('movie 타입에서는 TV 전용 장르를 확장하지 않아야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: 'movie',
-        genres: ['액션'],
-      }));
+      mockIntent({ contentType: 'movie', genres: ['액션'] });
 
       const result = await service.analyzeIntent('액션 영화 추천해줘');
 
       expect(result.genres).toEqual(['액션']);
       expect(result.genres).not.toContain('액션 & 어드벤처');
-    });
-
-    it('contentType null일 때도 TV 전용 장르를 확장해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: ['액션'],
-      }));
-
-      const result = await service.analyzeIntent('액션물 추천해줘');
-
-      expect(result.genres).toContain('액션');
-      expect(result.genres).toContain('액션 & 어드벤처');
-    });
-
-    it('contentType null일 때 SF를 "SF" + "SF & 판타지"로 확장해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: ['SF'],
-      }));
-
-      const result = await service.analyzeIntent('SF 추천해줘');
-
-      expect(result.genres).toContain('SF');
-      expect(result.genres).toContain('SF & 판타지');
     });
   });
 
@@ -434,15 +255,7 @@ describe('IntentAnalyzerService', () => {
 
       const result = await service.analyzeIntent('넷플릭스 영화 추천');
 
-      expect(result).toEqual<ParsedIntent>({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: [],
-      });
+      expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
     });
 
     it('LLM 호출 에러 시 빈 ParsedIntent를 반환해야 한다', async () => {
@@ -450,15 +263,7 @@ describe('IntentAnalyzerService', () => {
 
       const result = await service.analyzeIntent('넷플릭스 영화 추천');
 
-      expect(result).toEqual<ParsedIntent>({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: [],
-      });
+      expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
     });
 
     it('응답이 비어있으면 빈 ParsedIntent를 반환해야 한다', async () => {
@@ -468,15 +273,7 @@ describe('IntentAnalyzerService', () => {
 
       const result = await service.analyzeIntent('테스트');
 
-      expect(result).toEqual<ParsedIntent>({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: [],
-      });
+      expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
     });
 
     it('choices가 비어있으면 빈 ParsedIntent를 반환해야 한다', async () => {
@@ -484,15 +281,7 @@ describe('IntentAnalyzerService', () => {
 
       const result = await service.analyzeIntent('테스트');
 
-      expect(result).toEqual<ParsedIntent>({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        genres: [],
-      });
+      expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
     });
 
     it('잘못된 타입의 필드가 있으면 기본값으로 처리해야 한다', async () => {
@@ -514,34 +303,11 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('dateRange의 from/to가 모두 null이면 dateRange를 null로 처리해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: { from: null, to: null },
-        contentType: null,
-      }));
+      mockIntent({ dateRange: { from: null, to: null } });
 
       const result = await service.analyzeIntent('테스트');
 
       expect(result.dateRange).toBeNull();
-    });
-
-    it('genres 필드가 없으면 빈 배열을 반환해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        dateRange: null,
-        contentType: null,
-        // genres 필드 자체가 없음
-      }));
-
-      const result = await service.analyzeIntent('재밌는 영화 추천');
-
-      expect(result.genres).toEqual([]);
     });
   });
 
@@ -549,6 +315,7 @@ describe('IntentAnalyzerService', () => {
     const emptyIntent: ParsedIntent = {
       ottProviderNames: [],
       countries: [],
+      excludeCountries: [],
       personNames: [],
       dateRange: null,
       contentType: null,
