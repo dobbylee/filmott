@@ -86,7 +86,8 @@ export function buildSystemPrompt(
             const genreStr = (c.genres || []).map((g) => g.name).join(', ');
             const directorStr = c.director ? ` | 감독: ${c.director}` : '';
             const countryStr = c.originCountry ? ` | 국가: ${c.originCountry}` : '';
-            return `${i + 1}. [ID:${c.tmdbId}|${c.contentType}] ${c.title} (${c.voteAverage}점) - 장르: ${genreStr}${directorStr}${countryStr}\n   ${c.description}`;
+            const descriptionText = c.description || c.overview || '';
+            return `${i + 1}. [ID:${c.tmdbId}|${c.contentType}] ${c.title} (${c.voteAverage}점) - 장르: ${genreStr}${directorStr}${countryStr}\n   ${descriptionText}`;
           })
           .join('\n')
       : '(추천 후보가 없습니다)';
@@ -116,6 +117,9 @@ export function buildSystemPrompt(
     if (intent.contentType) {
       const typeLabel = intent.contentType === 'movie' ? '영화' : '시리즈';
       filterDescriptions.push(`사용자가 ${typeLabel}를 요청했습니다.`);
+    }
+    if (intent.genres && intent.genres.length > 0) {
+      filterDescriptions.push(`사용자가 ${intent.genres.join(', ')} 장르를 요청했습니다.`);
     }
   }
 

@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { EmbeddingService, SimilarContent, SearchFilters } from './embedding.service';
+import { EmbeddingService, SimilarContent } from './embedding.service';
+import { ContentSearchService, ContentSearchFilters } from './content-search.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
@@ -58,6 +59,7 @@ export class ChatService {
 
   constructor(
     private readonly embeddingService: EmbeddingService,
+    private readonly contentSearchService: ContentSearchService,
     private readonly contentsService: ContentsService,
     private readonly intentAnalyzer: IntentAnalyzerService,
     @InjectRepository(Watchlist)
@@ -117,38 +119,26 @@ export class ChatService {
       // 3. LLM 의도 분석 → 현재 메시지만 사용 (히스토리 포함 시 이전 맥락과 혼동)
       intent = await this.intentAnalyzer.analyzeIntent(content);
 
-      // 4. ParsedIntent → SearchFilters 변환
-      const filters: SearchFilters = {};
-      if (intent.ottProviderNames.length > 0) {
-        filters.ottProviderNames = intent.ottProviderNames;
-      }
-      if (intent.countries.length > 0) {
-        filters.countries = intent.countries;
-      }
-      if (intent.personNames.length > 0) {
-        filters.personNames = intent.personNames;
-      }
-      if (intent.dateRange) {
-        filters.dateRange = intent.dateRange;
-      }
-      if (intent.contentType) {
-        filters.contentType = intent.contentType;
-      }
-
+      // 4. ParsedIntent → ContentSearchFilters 변환
+      const filters = this.buildFiltersFromIntent(intent);
       const hasFilters = Object.keys(filters).length > 0;
 
-      // 5. 임베딩 쿼리 정제: 메타데이터 키워드 제거 후 의미적 쿼리만 사용
+      // 5. 쿼리 정제: 메타데이터 키워드 제거 후 의미적 쿼리만 사용
       const semanticQuery = this.intentAnalyzer.buildSemanticQuery(searchQuery, intent);
 
-      similarContents = await this.embeddingService.searchSimilar(
-        semanticQuery,
-        20,
-        userContext.watchedTmdbIds,
-        hasFilters ? filters : undefined,
-      );
+      // 6. 분기: 필터 유무에 따라 SQL 전체 검색 / 기존 벡터 검색
+      if (hasFilters) {
+        similarContents = await this.contentSearchService.searchWithFilters(
+          semanticQuery, 20, userContext.watchedTmdbIds, filters,
+        );
+      } else {
+        similarContents = await this.embeddingService.searchSimilar(
+          semanticQuery, 20, userContext.watchedTmdbIds,
+        );
+      }
     }
 
-    // 6. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
+    // 7. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
     const systemPrompt = buildSystemPrompt(
       userContext,
       subscribedOtts,
@@ -157,7 +147,7 @@ export class ChatService {
       intent,
     );
 
-    // 7. 대화 이력 구성
+    // 8. 대화 이력 구성
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       ...(history || []).map((msg) => ({
         role: msg.role as 'user' | 'assistant',
@@ -166,7 +156,7 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 8. GPT 스트리밍 호출 (function calling 없이 텍스트만)
+    // 9. GPT 스트리밍 호출 (function calling 없이 텍스트만)
     const stream = await this.openai.chat.completions.create({
       model: 'gpt-4o-mini',
       max_tokens: 2048,
@@ -179,7 +169,7 @@ export class ChatService {
 
     let fullText = '';
 
-    // 9. 스트리밍 이벤트 처리
+    // 10. 스트리밍 이벤트 처리
     try {
       for await (const chunk of stream) {
         if (signal?.aborted) {
@@ -198,7 +188,7 @@ export class ChatService {
       throw error;
     }
 
-    // 10. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
+    // 11. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
     const titles = this.extractTitlesFromText(fullText);
     if (titles.length > 0) {
       const { matched, unmatched } = this.matchTitlesToCandidates(titles, similarContents);
@@ -433,5 +423,16 @@ export class ChatService {
         ? new Date(row.releaseDate).getFullYear().toString()
         : '',
     }));
+  }
+
+  private buildFiltersFromIntent(intent: ParsedIntent): ContentSearchFilters {
+    const filters: ContentSearchFilters = {};
+    if (intent.ottProviderNames.length > 0) filters.ottProviderNames = intent.ottProviderNames;
+    if (intent.countries.length > 0) filters.countries = intent.countries;
+    if (intent.personNames.length > 0) filters.personNames = intent.personNames;
+    if (intent.dateRange) filters.dateRange = intent.dateRange;
+    if (intent.contentType) filters.contentType = intent.contentType;
+    if (intent.genres.length > 0) filters.genres = intent.genres;
+    return filters;
   }
 }

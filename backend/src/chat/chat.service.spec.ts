@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { EmbeddingService, SimilarContent } from './embedding.service';
+import { ContentSearchService } from './content-search.service';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
@@ -34,6 +35,10 @@ describe('ChatService', () => {
     hasAnyMetadata: jest.fn(),
     searchSimilar: jest.fn(),
     cacheContentMetadata: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockContentSearchService = {
+    searchWithFilters: jest.fn(),
   };
 
   const mockIntentAnalyzerService = {
@@ -71,6 +76,7 @@ describe('ChatService', () => {
       providers: [
         ChatService,
         { provide: EmbeddingService, useValue: mockEmbeddingService },
+        { provide: ContentSearchService, useValue: mockContentSearchService },
         { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
         { provide: ContentsService, useValue: mockContentsService },
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
@@ -323,6 +329,7 @@ describe('ChatService', () => {
         providers: [
           ChatService,
           { provide: EmbeddingService, useValue: mockEmbeddingService },
+          { provide: ContentSearchService, useValue: mockContentSearchService },
           { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
           { provide: ContentsService, useValue: mockContentsService },
           { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
@@ -369,14 +376,14 @@ describe('ChatService', () => {
       );
     });
 
-    it('OTT 키워드가 있는 메시지는 analyzeIntent 결과의 ottProviderNames를 filters로 전달해야 한다', async () => {
+    it('OTT 키워드가 있는 메시지는 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
         ottProviderNames: ['Netflix'],
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('볼만한 영화');
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
         [Symbol.asyncIterator]: async function* () {
@@ -388,15 +395,16 @@ describe('ChatService', () => {
 
       expect(mockIntentAnalyzerService.analyzeIntent).toHaveBeenCalled();
       expect(mockIntentAnalyzerService.buildSemanticQuery).toHaveBeenCalled();
-      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
         '볼만한 영화',
         20,
         expect.any(Array),
         expect.objectContaining({ ottProviderNames: ['Netflix'] }),
       );
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
-    it('키워드 없는 메시지는 filters 없이 searchSimilar를 호출해야 한다', async () => {
+    it('필터 없는 메시지는 EmbeddingService.searchSimilar를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('재미있는 영화');
@@ -415,11 +423,11 @@ describe('ChatService', () => {
         '재미있는 영화',
         20,
         expect.any(Array),
-        undefined,
       );
+      expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();
     });
 
-    it('analyzeIntent가 국가/인물/연도 의도를 반환하면 해당 filters를 전달해야 한다', async () => {
+    it('analyzeIntent가 국가/인물/연도 의도를 반환하면 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
       const intentResult: ParsedIntent = {
         ...emptyIntent,
@@ -430,7 +438,7 @@ describe('ChatService', () => {
       };
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue(intentResult);
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('감독 영화');
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
         [Symbol.asyncIterator]: async function* () {
@@ -444,7 +452,7 @@ describe('ChatService', () => {
         expect.any(String),
         intentResult,
       );
-      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
         '감독 영화',
         20,
         expect.any(Array),
@@ -455,9 +463,10 @@ describe('ChatService', () => {
           contentType: 'movie',
         }),
       );
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
-    it('searchSimilar에 buildSemanticQuery로 정제된 쿼리를 전달해야 한다', async () => {
+    it('searchWithFilters에 buildSemanticQuery로 정제된 쿼리를 전달해야 한다', async () => {
       setupEmptyUserContext();
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
@@ -466,7 +475,7 @@ describe('ChatService', () => {
         personNames: ['봉준호'],
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('사회 풍자 영화');
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
         [Symbol.asyncIterator]: async function* () {
@@ -491,8 +500,8 @@ describe('ChatService', () => {
         }),
       );
 
-      // searchSimilar에 정제된 쿼리가 전달되는지 확인
-      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+      // searchWithFilters에 정제된 쿼리가 전달되는지 확인
+      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
         '사회 풍자 영화',
         20,
         expect.any(Array),
@@ -517,6 +526,36 @@ describe('ChatService', () => {
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
       expect(mockIntentAnalyzerService.analyzeIntent).not.toHaveBeenCalled();
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+    });
+
+    it('genres 필터가 포함된 복합 의도 시 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
+      setupEmptyUserContext();
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        genres: ['공포', '스릴러'],
+        contentType: 'movie',
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('무서운 영화');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '공포 영화 추천!' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '호러 스릴러 영화 추천해줘', [], jest.fn());
+
+      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+        '무서운 영화',
+        20,
+        expect.any(Array),
+        expect.objectContaining({
+          genres: ['공포', '스릴러'],
+          contentType: 'movie',
+        }),
+      );
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
   });
