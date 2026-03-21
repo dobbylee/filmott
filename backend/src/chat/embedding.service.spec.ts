@@ -346,7 +346,7 @@ describe('EmbeddingService', () => {
       expect(params).toContainEqual(['Netflix']);
     });
 
-    it('국가 필터가 쿼리에 포함되어야 한다', async () => {
+    it('국가 필터가 정확한 boundary 매칭으로 쿼리에 포함되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       await service.searchSimilar('한국 영화', 10, [], {
@@ -354,12 +354,15 @@ describe('EmbeddingService', () => {
       });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('origin_country =');
       expect(query).toContain('origin_country LIKE');
       const params = mockDataSource.query.mock.calls[0][1] as unknown[];
-      expect(params).toContain('%KR%');
+      // 정확한 국가 코드가 파라미터로 전달 ('%KR%'가 아닌 'KR')
+      expect(params).toContain('KR');
+      expect(params).not.toContain('%KR%');
     });
 
-    it('인물 필터가 쿼리에 포함되어야 한다', async () => {
+    it('인물 필터가 director LIKE + credits jsonb 검색으로 쿼리에 포함되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       await service.searchSimilar('봉준호 영화', 10, [], {
@@ -368,7 +371,10 @@ describe('EmbeddingService', () => {
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('director LIKE');
-      expect(query).toContain('credits::text LIKE');
+      expect(query).toContain('jsonb_array_elements(c.credits)');
+      expect(query).toContain('cr->>\'name\'');
+      expect(query).toContain('cr->>\'character\'');
+      expect(query).not.toContain('credits::text LIKE');
       const params = mockDataSource.query.mock.calls[0][1] as unknown[];
       expect(params).toContain('%봉준호%');
     });
@@ -453,6 +459,17 @@ describe('EmbeddingService', () => {
       // 4차 쿼리: OTT 필터 제거
       const fourthQuery = mockDataSource.query.mock.calls[3][0] as string;
       expect(fourthQuery).not.toContain('provider_name');
+    });
+
+    it('dateRange가 null이면 hasFilters에서 제외되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue([mockRow]);
+
+      await service.searchSimilar('테스트', 10, [], {
+        dateRange: { from: null, to: null },
+      });
+
+      // dateRange가 null/null이면 필터로 간주하지 않음 → fallback 미실행
+      expect(mockDataSource.query).toHaveBeenCalledTimes(1);
     });
 
     it('fallback: 결과가 충분하면 추가 쿼리를 실행하지 않아야 한다', async () => {

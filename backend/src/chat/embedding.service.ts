@@ -178,7 +178,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
       (filters.ottProviderNames?.length ?? 0) > 0 ||
       (filters.countries?.length ?? 0) > 0 ||
       (filters.personNames?.length ?? 0) > 0 ||
-      filters.dateRange !== undefined ||
+      (filters.dateRange?.from || filters.dateRange?.to) ||
       filters.contentType !== undefined
     );
 
@@ -227,24 +227,25 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
       paramIndex++;
     }
 
-    // 국가 필터
+    // 국가 필터 (정확한 boundary 매칭: 쉼표 구분 문자열에서 오탐 방지)
     if (filters?.countries?.length) {
       const countryConditions = filters.countries
         .map(() => {
-          const cond = `c.origin_country LIKE $${paramIndex}`;
+          const idx = paramIndex;
           paramIndex++;
-          return cond;
+          return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ',%' OR c.origin_country LIKE '%,' || $${idx} OR c.origin_country LIKE '%,' || $${idx} || ',%')`;
         });
       conditions.push(`AND (${countryConditions.join(' OR ')})`);
-      filters.countries.forEach((country) => params.push(`%${country}%`));
+      filters.countries.forEach((country) => params.push(country));
     }
 
-    // 인물 필터
+    // 인물 필터 (director LIKE + credits jsonb name/character 필드만 검색)
     if (filters?.personNames?.length) {
       const personConditions = filters.personNames
         .flatMap(() => {
-          const directorCond = `c.director LIKE $${paramIndex}`;
-          const creditsCond = `c.credits::text LIKE $${paramIndex}`;
+          const idx = paramIndex;
+          const directorCond = `c.director LIKE $${idx}`;
+          const creditsCond = `EXISTS (SELECT 1 FROM jsonb_array_elements(c.credits) AS cr WHERE cr->>'name' LIKE $${idx} OR cr->>'character' LIKE $${idx})`;
           paramIndex++;
           return [directorCond, creditsCond];
         });
