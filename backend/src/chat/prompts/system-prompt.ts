@@ -116,6 +116,10 @@ export function buildSystemPrompt(
       const countryLabels = intent.countries.join(', ');
       filterDescriptions.push(`사용자가 ${countryLabels} 작품을 요청했습니다.`);
     }
+    if (intent.excludeCountries.length > 0) {
+      const excludeLabels = intent.excludeCountries.join(', ');
+      filterDescriptions.push(`사용자가 ${excludeLabels} 작품을 제외하고 요청했습니다. 해당 국가 작품은 절대 추천하지 마세요.`);
+    }
     if (intent.personNames.length > 0) {
       filterDescriptions.push(`사용자가 ${intent.personNames.join(', ')}의 작품을 요청했습니다.`);
     }

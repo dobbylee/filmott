@@ -107,6 +107,7 @@ export class ChatService {
     let intent: ParsedIntent = {
       ottProviderNames: [],
       countries: [],
+      excludeCountries: [],
       personNames: [],
       dateRange: null,
       contentType: null,
@@ -484,6 +485,7 @@ export class ChatService {
     const filters: ContentSearchFilters = {};
     if (intent.ottProviderNames.length > 0) filters.ottProviderNames = intent.ottProviderNames;
     if (intent.countries.length > 0) filters.countries = intent.countries;
+    if (intent.excludeCountries.length > 0) filters.excludeCountries = intent.excludeCountries;
     if (intent.personNames.length > 0) filters.personNames = intent.personNames;
     if (intent.dateRange && (intent.dateRange.from || intent.dateRange.to)) {
       filters.dateRange = intent.dateRange;

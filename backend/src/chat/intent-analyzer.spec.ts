@@ -52,6 +52,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: ['Netflix'],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -63,7 +64,7 @@ describe('IntentAnalyzerService', () => {
       expect(result.countries).toEqual([]);
       expect(result.personNames).toEqual([]);
       expect(result.dateRange).toBeNull();
-      expect(result.contentType).toBeNull();
+      expect(result.contentType).toBe('movie');
     });
 
     it('제작 국가를 올바르게 추출해야 한다', async () => {
@@ -84,6 +85,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: ['봉준호'],
         dateRange: null,
         contentType: null,
@@ -98,6 +100,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: { from: '1990-01-01', to: '1999-12-31' },
         contentType: null,
@@ -112,6 +115,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: { from: '2024-01-01', to: null },
         contentType: null,
@@ -126,6 +130,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: 'tv',
@@ -159,6 +164,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -169,6 +175,7 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -180,6 +187,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -202,6 +210,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: ['Netflix', 'Tving'],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -216,6 +225,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: ['송강호', '최민식'],
         dateRange: null,
         contentType: null,
@@ -241,6 +251,7 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -253,6 +264,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -268,6 +280,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -284,6 +297,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: 'tv',
@@ -300,6 +314,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: 'tv',
@@ -316,6 +331,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: 'tv',
@@ -332,6 +348,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -347,6 +364,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -362,6 +380,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: 'movie',
@@ -378,6 +397,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -394,6 +414,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -416,6 +437,7 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -431,6 +453,7 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -448,6 +471,7 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -463,6 +487,7 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,
@@ -492,6 +517,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: { from: null, to: null },
         contentType: null,
@@ -506,6 +532,7 @@ describe('IntentAnalyzerService', () => {
       mockLlmResponse(JSON.stringify({
         ottProviderNames: [],
         countries: [],
+        excludeCountries: [],
         personNames: [],
         dateRange: null,
         contentType: null,

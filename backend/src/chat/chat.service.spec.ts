@@ -216,6 +216,7 @@ describe('ChatService', () => {
     const emptyIntent: ParsedIntent = {
       ottProviderNames: [],
       countries: [],
+      excludeCountries: [],
       personNames: [],
       dateRange: null,
       contentType: null,

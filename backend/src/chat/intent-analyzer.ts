@@ -5,6 +5,7 @@ import OpenAI from 'openai';
 export interface ParsedIntent {
   ottProviderNames: string[];
   countries: string[];
+  excludeCountries: string[];
   personNames: string[];
   dateRange: { from: string | null; to: string | null } | null;
   contentType: 'movie' | 'tv' | null;
@@ -14,6 +15,7 @@ export interface ParsedIntent {
 const EMPTY_INTENT: ParsedIntent = {
   ottProviderNames: [],
   countries: [],
+  excludeCountries: [],
   personNames: [],
   dateRange: null,
   contentType: null,
@@ -23,6 +25,7 @@ const EMPTY_INTENT: ParsedIntent = {
 const INTENT_SYSTEM_PROMPT = `사용자 메시지에서 영화/시리즈 추천에 필요한 조건을 JSON으로 추출하세요.
 - ottProviderNames: OTT 플랫폼 (Netflix, Tving, wavve, Watcha, Disney Plus, Coupang Play). 없으면 빈 배열.
 - countries: 제작 국가 ISO 코드 (KR, US, JP, GB 등). 없으면 빈 배열.
+- excludeCountries: 제외할 국가 ISO 코드. "외국"/"해외" → ["KR"] (한국 제외), "비영어권" → ["US", "GB", "CA", "AU"]. 없으면 빈 배열.
 - personNames: 감독/배우 이름. "기생충 감독" → "봉준호"처럼 작품으로 유추 가능하면 실제 이름으로. 없으면 빈 배열.
 - dateRange: 연도/연대/시기 조건. "최신"/"요즘"/"최근" → {"from":"2024-01-01","to":null}, "90년대" → {"from":"1990-01-01","to":"1999-12-31"}, "올해" → {"from":"2026-01-01","to":null}. 없으면 null.
 - contentType: "영화"/"무비" → "movie", "드라마"/"시리즈"/"TV"/"예능" → "tv". 이 단어가 메시지에 직접 포함된 경우에만 설정. 장르명(스릴러, 코미디, 로맨스, 액션, 호러, 공포, SF, 판타지, 애니메이션 등)으로는 절대 contentType을 추론하지 마세요. 확실하지 않으면 null.
@@ -33,6 +36,7 @@ JSON만 출력하세요.`;
 interface RawIntentResponse {
   ottProviderNames?: unknown;
   countries?: unknown;
+  excludeCountries?: unknown;
   personNames?: unknown;
   dateRange?: unknown;
   contentType?: unknown;
@@ -55,6 +59,10 @@ function parseIntentResponse(raw: RawIntentResponse): ParsedIntent {
 
   const countries = isStringArray(raw.countries)
     ? raw.countries
+    : [];
+
+  const excludeCountries = isStringArray(raw.excludeCountries)
+    ? raw.excludeCountries
     : [];
 
   const personNames = isStringArray(raw.personNames)
@@ -80,7 +88,7 @@ function parseIntentResponse(raw: RawIntentResponse): ParsedIntent {
 
   const genres = isStringArray(raw.genres) ? raw.genres : [];
 
-  return { ottProviderNames, countries, personNames, dateRange, contentType, genres };
+  return { ottProviderNames, countries, excludeCountries, personNames, dateRange, contentType, genres };
 }
 
 // OTT명 정규식: 한/영 변형 포함
@@ -178,13 +186,18 @@ export class IntentAnalyzerService {
       const parsed: RawIntentResponse = JSON.parse(text);
       const intent = parseIntentResponse(parsed);
 
-      // contentType 후처리: 메시지에 명시적 타입 키워드가 없으면 null로 강제
+      // contentType 후처리: 메시지 키워드와 LLM 결과 교차 검증
+      const hasMovieKeyword = /영화|무비/i.test(userMessage);
+      const hasTvKeyword = /드라마|시리즈|TV|예능/i.test(userMessage);
       if (intent.contentType) {
-        const hasMovieKeyword = /영화|무비/i.test(userMessage);
-        const hasTvKeyword = /드라마|시리즈|TV|예능/i.test(userMessage);
+        // LLM이 타입을 추출했지만 메시지에 키워드가 없으면 null로 강제
         if (!hasMovieKeyword && !hasTvKeyword) {
           intent.contentType = null;
         }
+      } else {
+        // LLM이 타입을 놓쳤지만 메시지에 키워드가 있으면 보정
+        if (hasMovieKeyword && !hasTvKeyword) intent.contentType = 'movie';
+        if (hasTvKeyword && !hasMovieKeyword) intent.contentType = 'tv';
       }
 
       // genres 후처리: GENRE_ALIAS_MAP으로 DB 장르명 변환 + TV 확장

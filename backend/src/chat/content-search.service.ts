@@ -5,6 +5,7 @@ import { EmbeddingService, SimilarContent } from './embedding.service';
 export interface ContentSearchFilters {
   ottProviderNames?: string[];
   countries?: string[];
+  excludeCountries?: string[];
   personNames?: string[];
   dateRange?: { from: string | null; to: string | null };
   contentType?: 'movie' | 'tv';
@@ -108,6 +109,7 @@ export class ContentSearchService {
     return (
       (filters.ottProviderNames?.length ?? 0) > 0 ||
       (filters.countries?.length ?? 0) > 0 ||
+      (filters.excludeCountries?.length ?? 0) > 0 ||
       (filters.personNames?.length ?? 0) > 0 ||
       (filters.genres?.length ?? 0) > 0 ||
       !!(filters.dateRange?.from || filters.dateRange?.to) ||
@@ -157,6 +159,18 @@ export class ContentSearchService {
         });
       conditions.push(`AND (${countryConditions.join(' OR ')})`);
       filters.countries.forEach((country) => params.push(country));
+    }
+
+    // 국가 제외 필터 ("외국"/"해외" → KR 제외)
+    if (filters.excludeCountries?.length) {
+      const excludeConditions = filters.excludeCountries
+        .map(() => {
+          const idx = paramIndex;
+          paramIndex++;
+          return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ', %' OR c.origin_country LIKE '%, ' || $${idx} OR c.origin_country LIKE '%, ' || $${idx} || ', %')`;
+        });
+      conditions.push(`AND NOT (${excludeConditions.join(' OR ')})`);
+      filters.excludeCountries.forEach((country) => params.push(country));
     }
 
     // 인물 필터
