@@ -104,6 +104,7 @@ export class ChatService {
       personNames: [],
       dateRange: null,
       contentType: null,
+      genres: [],
     };
 
     if (hasMetadata) {

@@ -189,6 +189,7 @@ describe('ChatService', () => {
       personNames: [],
       dateRange: null,
       contentType: null,
+      genres: [],
     };
 
     const setupEmptyUserContext = () => {
@@ -228,6 +229,7 @@ describe('ChatService', () => {
           similarity: 0.95,
           director: '봉준호',
           originCountry: 'KR',
+          overview: null,
         },
       ];
       mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
@@ -582,6 +584,7 @@ describe('ChatService', () => {
         similarity: 0.95,
         director: '봉준호',
         originCountry: 'KR',
+        overview: null,
       },
       {
         contentId: 2,
@@ -595,6 +598,7 @@ describe('ChatService', () => {
         similarity: 0.92,
         director: '크리스토퍼 놀란',
         originCountry: 'US',
+        overview: null,
       },
     ];
 
@@ -632,6 +636,7 @@ describe('ChatService', () => {
           similarity: 0.88,
           director: null,
           originCountry: 'KR',
+          overview: null,
         },
       ];
       const titles = [{ korean: '오징어 게임', english: null }];

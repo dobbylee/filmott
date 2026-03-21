@@ -18,6 +18,7 @@ export interface SimilarContent {
   similarity: number;
   director: string | null;
   originCountry: string | null;
+  overview: string | null;
 }
 
 export interface SearchFilters {
@@ -317,6 +318,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
       similarity: Number(row.similarity) || 0,
       director: row.director,
       originCountry: row.origin_country,
+      overview: null,
     }));
   }
 

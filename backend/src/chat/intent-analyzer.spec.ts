@@ -171,6 +171,7 @@ describe('IntentAnalyzerService', () => {
         personNames: [],
         dateRange: null,
         contentType: null,
+        genres: [],
       });
     });
 
@@ -242,8 +243,134 @@ describe('IntentAnalyzerService', () => {
         personNames: [],
         dateRange: null,
         contentType: null,
+        genres: [],
       });
       expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('장르를 올바르게 추출해야 한다 (호러 -> 공포)', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: null,
+        genres: ['호러'],
+      }));
+
+      const result = await service.analyzeIntent('호러 영화 추천해줘');
+
+      expect(result.genres).toEqual(['공포']);
+    });
+
+    it('느와르를 범죄+액션으로 매핑해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: null,
+        genres: ['느와르'],
+      }));
+
+      const result = await service.analyzeIntent('90년대 느와르 영화');
+
+      expect(result.genres).toContain('범죄');
+      expect(result.genres).toContain('액션');
+    });
+
+    it('TV 콘텐츠에서 액션을 "액션" + "액션 & 어드벤처"로 확장해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: 'tv',
+        genres: ['액션'],
+      }));
+
+      const result = await service.analyzeIntent('액션 드라마 추천해줘');
+
+      expect(result.genres).toContain('액션');
+      expect(result.genres).toContain('액션 & 어드벤처');
+    });
+
+    it('TV 콘텐츠에서 SF를 "SF" + "SF & 판타지"로 확장해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: 'tv',
+        genres: ['SF'],
+      }));
+
+      const result = await service.analyzeIntent('SF 드라마 추천해줘');
+
+      expect(result.genres).toContain('SF');
+      expect(result.genres).toContain('SF & 판타지');
+    });
+
+    it('TV 콘텐츠에서 판타지를 "판타지" + "SF & 판타지"로 확장해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: 'tv',
+        genres: ['판타지'],
+      }));
+
+      const result = await service.analyzeIntent('판타지 드라마 추천해줘');
+
+      expect(result.genres).toContain('판타지');
+      expect(result.genres).toContain('SF & 판타지');
+    });
+
+    it('매핑에 없는 장르명은 그대로 유지해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: null,
+        genres: ['뮤지컬'],
+      }));
+
+      const result = await service.analyzeIntent('뮤지컬 영화 추천해줘');
+
+      expect(result.genres).toEqual(['뮤지컬']);
+    });
+
+    it('장르가 없는 메시지는 빈 배열을 반환해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: null,
+        genres: [],
+      }));
+
+      const result = await service.analyzeIntent('재밌는 영화 추천해줘');
+
+      expect(result.genres).toEqual([]);
+    });
+
+    it('movie 타입에서는 TV 전용 장르를 확장하지 않아야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: 'movie',
+        genres: ['액션'],
+      }));
+
+      const result = await service.analyzeIntent('액션 영화 추천해줘');
+
+      expect(result.genres).toEqual(['액션']);
+      expect(result.genres).not.toContain('액션 & 어드벤처');
     });
   });
 
@@ -259,6 +386,7 @@ describe('IntentAnalyzerService', () => {
         personNames: [],
         dateRange: null,
         contentType: null,
+        genres: [],
       });
     });
 
@@ -273,6 +401,7 @@ describe('IntentAnalyzerService', () => {
         personNames: [],
         dateRange: null,
         contentType: null,
+        genres: [],
       });
     });
 
@@ -289,6 +418,7 @@ describe('IntentAnalyzerService', () => {
         personNames: [],
         dateRange: null,
         contentType: null,
+        genres: [],
       });
     });
 
@@ -303,6 +433,7 @@ describe('IntentAnalyzerService', () => {
         personNames: [],
         dateRange: null,
         contentType: null,
+        genres: [],
       });
     });
 
@@ -346,6 +477,7 @@ describe('IntentAnalyzerService', () => {
       personNames: [],
       dateRange: null,
       contentType: null,
+      genres: [],
     };
 
     it('OTT명을 쿼리에서 제거해야 한다', () => {
@@ -573,6 +705,58 @@ describe('IntentAnalyzerService', () => {
       expect(result).not.toMatch(/넷플릭스/);
       expect(result).not.toMatch(/한국/);
       expect(result).not.toMatch(/최신/);
+    });
+
+    it('장르 키워드를 쿼리에서 제거해야 한다', () => {
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        genres: ['공포'],
+      };
+      const result = service.buildSemanticQuery('무서운 호러 영화', intent);
+
+      expect(result).not.toMatch(/호러/);
+      expect(result).not.toMatch(/공포/);
+      expect(result).toContain('무서운');
+      expect(result).toContain('영화');
+    });
+
+    it('느와르 장르 키워드를 제거해야 한다 (역방향 매핑)', () => {
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        genres: ['범죄', '액션'],
+      };
+      const result = service.buildSemanticQuery('90년대 느와르 영화 스타일', intent);
+
+      expect(result).not.toMatch(/느와르/);
+      expect(result).not.toMatch(/범죄/);
+      expect(result).not.toMatch(/액션/);
+      expect(result).toContain('영화');
+      expect(result).toContain('스타일');
+    });
+
+    it('genres가 비어있으면 장르 키워드를 제거하지 않아야 한다', () => {
+      const result = service.buildSemanticQuery('무서운 호러 영화', emptyIntent);
+
+      expect(result).toContain('호러');
+    });
+
+    it('복합 조건에서 장르 + 기타 메타데이터를 모두 제거해야 한다', () => {
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        ottProviderNames: ['Netflix'],
+        countries: ['KR'],
+        genres: ['스릴러'],
+      };
+      const result = service.buildSemanticQuery(
+        '넷플릭스에서 볼 수 있는 한국 스릴러 반전 영화',
+        intent,
+      );
+
+      expect(result).not.toMatch(/넷플릭스/);
+      expect(result).not.toMatch(/한국/);
+      expect(result).not.toMatch(/스릴러/);
+      expect(result).toContain('반전');
+      expect(result).toContain('영화');
     });
   });
 });

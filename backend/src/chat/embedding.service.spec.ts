@@ -269,6 +269,7 @@ describe('EmbeddingService', () => {
       similarity: 0.95,
       director: '봉준호',
       origin_country: 'KR',
+      overview: null,
     };
 
     const fiveRows = Array.from({ length: 5 }, (_, i) => ({
