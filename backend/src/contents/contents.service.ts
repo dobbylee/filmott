@@ -216,13 +216,17 @@ export class ContentsService {
     cast: TmdbPersonCredit[];
     crew: TmdbPersonCredit[];
   }> {
-    const credits = await this.tmdbService.getPersonCredits(personId);
+    const [credits, blockedIds] = await Promise.all([
+      this.tmdbService.getPersonCredits(personId),
+      this.getBlockedTmdbIds(),
+    ]);
 
     const filterAndSort = (items: TmdbPersonCredit[]) => {
       return items
         .filter(
           (item) =>
-            item.media_type === 'movie' || item.media_type === 'tv',
+            (item.media_type === 'movie' || item.media_type === 'tv') &&
+            !blockedIds.has(`${item.media_type}:${item.id}`),
         )
         .sort((a, b) => {
           const dateA = a.release_date || a.first_air_date || '';
@@ -263,14 +267,20 @@ export class ContentsService {
   /**
    * 차단된 콘텐츠 목록 조회 (관리자용)
    */
-  async getAdultContents(): Promise<
-    Pick<Content, 'id' | 'tmdbId' | 'contentType' | 'title' | 'posterUrl'>[]
-  > {
-    return this.contentRepo.find({
+  async getAdultContents(page = 1, limit = 20): Promise<{
+    data: Pick<Content, 'id' | 'tmdbId' | 'contentType' | 'title' | 'posterUrl'>[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const [data, total] = await this.contentRepo.findAndCount({
       where: { adult: true },
       select: ['id', 'tmdbId', 'contentType', 'title', 'posterUrl'],
       order: { updatedAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   /**
@@ -291,6 +301,44 @@ export class ContentsService {
 
     content.adult = adult;
     return this.contentRepo.save(content);
+  }
+
+  /**
+   * 인물의 전체 작품 일괄 차단 (관리자용)
+   */
+  async blockPersonContents(personId: number): Promise<{ blocked: number }> {
+    const credits = await this.tmdbService.getPersonCredits(personId);
+    const allCredits = [...credits.cast, ...credits.crew].filter(
+      (item) => item.media_type === 'movie' || item.media_type === 'tv',
+    );
+
+    // 중복 제거 (같은 작품에 cast+crew 양쪽 존재 가능)
+    const unique = new Map<string, TmdbPersonCredit>();
+    for (const item of allCredits) {
+      unique.set(`${item.media_type}:${item.id}`, item);
+    }
+
+    let blocked = 0;
+    for (const item of unique.values()) {
+      const type = item.media_type as 'movie' | 'tv';
+      let content = await this.contentRepo.findOne({
+        where: { tmdbId: item.id, contentType: type },
+      });
+      if (!content) {
+        try {
+          content = await this.findOrFetchByTmdbId(item.id, type);
+        } catch {
+          continue;
+        }
+      }
+      if (!content.adult) {
+        content.adult = true;
+        await this.contentRepo.save(content);
+        blocked++;
+      }
+    }
+
+    return { blocked };
   }
 
   /**

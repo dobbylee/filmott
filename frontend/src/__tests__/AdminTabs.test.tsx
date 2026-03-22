@@ -11,7 +11,7 @@ vi.mock('@/lib/api', () => ({
   default: {
     get: vi.fn().mockImplementation((url: string) => {
       if (url.includes('adult-list')) {
-        return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: { data: [], total: 0, page: 1, totalPages: 0 } });
       }
       return Promise.resolve({
         data: { users: [], total: 0, page: 1, totalPages: 0 },

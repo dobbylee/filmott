@@ -23,7 +23,7 @@ describe('ContentManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // 기본: 빈 차단 목록 반환
-    mockGet.mockResolvedValue({ data: [] });
+    mockGet.mockResolvedValue({ data: { data: [], total: 0, page: 1, totalPages: 0 } });
   });
 
   it('타입 셀렉트와 TMDB ID 입력 필드를 렌더링해야 한다', () => {
@@ -214,20 +214,23 @@ describe('ContentManagement', () => {
 
   // 차단 목록 관련 테스트
   it('마운트 시 차단 목록을 조회해야 한다', async () => {
-    mockGet.mockResolvedValue({ data: [] });
+    mockGet.mockResolvedValue({ data: { data: [], total: 0, page: 1, totalPages: 0 } });
     render(<ContentManagement />);
 
     await waitFor(() => {
-      expect(mockGet).toHaveBeenCalledWith('/contents/adult-list');
+      expect(mockGet).toHaveBeenCalledWith('/contents/adult-list?page=1&limit=20');
     });
   });
 
   it('차단된 콘텐츠가 있으면 목록을 표시해야 한다', async () => {
     mockGet.mockResolvedValue({
-      data: [
-        { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie' },
-        { id: 2, tmdbId: 456, contentType: 'tv', title: 'Adult TV Show' },
-      ],
+      data: {
+        data: [
+          { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie' },
+          { id: 2, tmdbId: 456, contentType: 'tv', title: 'Adult TV Show' },
+        ],
+        total: 2, page: 1, totalPages: 1,
+      },
     });
 
     render(<ContentManagement />);
@@ -242,7 +245,7 @@ describe('ContentManagement', () => {
   });
 
   it('차단된 콘텐츠가 없으면 안내 메시지를 표시해야 한다', async () => {
-    mockGet.mockResolvedValue({ data: [] });
+    mockGet.mockResolvedValue({ data: { data: [], total: 0, page: 1, totalPages: 0 } });
 
     render(<ContentManagement />);
 
@@ -252,7 +255,7 @@ describe('ContentManagement', () => {
   });
 
   it('차단 성공 후 목록을 새로고침해야 한다', async () => {
-    mockGet.mockResolvedValue({ data: [] });
+    mockGet.mockResolvedValue({ data: { data: [], total: 0, page: 1, totalPages: 0 } });
     mockPatch.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
     render(<ContentManagement />);
@@ -275,9 +278,12 @@ describe('ContentManagement', () => {
 
   it('목록에서 해제 버튼 클릭 시 확인 모달을 표시하고 API를 호출해야 한다', async () => {
     mockGet.mockResolvedValue({
-      data: [
-        { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie' },
-      ],
+      data: {
+        data: [
+          { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie' },
+        ],
+        total: 1, page: 1, totalPages: 1,
+      },
     });
     mockPatch.mockResolvedValue({ data: {} });
     const user = userEvent.setup();

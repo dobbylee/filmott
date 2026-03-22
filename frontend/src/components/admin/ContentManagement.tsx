@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, ShieldOff } from 'lucide-react';
+import { Shield, ShieldOff, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
 import { getErrorMessage } from '@/utils/error';
 import { revalidateContentDetail } from '@/app/contents/[type]/[tmdbId]/actions';
@@ -16,25 +16,40 @@ interface AdultContent {
   posterUrl?: string;
 }
 
+interface AdultListResponse {
+  data: AdultContent[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 interface ConfirmModal {
   isOpen: boolean;
-  action: 'block' | 'unblock';
+  action: 'block' | 'unblock' | 'block-person';
   item?: AdultContent;
+  personId?: number;
 }
 
 export default function ContentManagement() {
   const [contentType, setContentType] = useState<ContentType>('movie');
   const [tmdbId, setTmdbId] = useState('');
+  const [personId, setPersonId] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [confirmModal, setConfirmModal] = useState<ConfirmModal | null>(null);
   const [adultList, setAdultList] = useState<AdultContent[]>([]);
   const [listLoading, setListLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
-  const fetchAdultList = useCallback(async () => {
+  const fetchAdultList = useCallback(async (p = 1) => {
     try {
-      const { data } = await api.get<AdultContent[]>('/contents/adult-list');
-      setAdultList(data);
+      const { data } = await api.get<AdultListResponse>(`/contents/adult-list?page=${p}&limit=20`);
+      setAdultList(data.data);
+      setPage(data.page);
+      setTotalPages(data.totalPages);
+      setTotal(data.total);
     } catch {
       // 목록 로드 실패 시 빈 배열 유지
     } finally {
@@ -55,17 +70,39 @@ export default function ContentManagement() {
     setConfirmModal({ isOpen: true, action });
   };
 
+  const handleBlockPerson = () => {
+    if (!personId.trim()) {
+      setResult({ type: 'error', message: 'Person ID를 입력해주세요.' });
+      return;
+    }
+    setResult(null);
+    setConfirmModal({ isOpen: true, action: 'block-person', personId: Number(personId) });
+  };
+
   const confirmAction = async () => {
     if (!confirmModal) return;
     setLoading(true);
     setResult(null);
 
-    const isListUnblock = !!confirmModal.item;
-    const targetTmdbId = isListUnblock ? confirmModal.item!.tmdbId : Number(tmdbId);
-    const targetType = isListUnblock ? confirmModal.item!.contentType : contentType;
-    const adult = confirmModal.action === 'block';
-
     try {
+      if (confirmModal.action === 'block-person') {
+        const { data } = await api.post<{ blocked: number }>(
+          `/contents/adult/block-person/${confirmModal.personId}`,
+        );
+        setResult({
+          type: 'success',
+          message: `인물 #${confirmModal.personId}의 작품 ${data.blocked}개 차단 완료`,
+        });
+        setPersonId('');
+        await fetchAdultList(1);
+        return;
+      }
+
+      const isListUnblock = !!confirmModal.item;
+      const targetTmdbId = isListUnblock ? confirmModal.item!.tmdbId : Number(tmdbId);
+      const targetType = isListUnblock ? confirmModal.item!.contentType : contentType;
+      const adult = confirmModal.action === 'block';
+
       await api.patch('/contents/adult', {
         tmdbId: targetTmdbId,
         contentType: targetType,
@@ -82,7 +119,7 @@ export default function ContentManagement() {
       });
       if (!isListUnblock) setTmdbId('');
       await Promise.all([
-        fetchAdultList(),
+        fetchAdultList(page),
         revalidateContentDetail(targetType, String(targetTmdbId)),
       ]);
     } catch (err) {
@@ -101,11 +138,11 @@ export default function ContentManagement() {
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
       <h2 className="mb-4 text-lg font-bold text-white">콘텐츠 관리</h2>
-      <p className="mb-5 text-sm text-white/40">
+
+      {/* 개별 차단 폼 */}
+      <p className="mb-3 text-sm text-white/40">
         TMDB ID와 타입을 입력하여 성인물 차단/해제를 설정합니다.
       </p>
-
-      {/* 입력 폼 */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="content-type" className="text-xs text-white/50">타입</label>
@@ -153,6 +190,32 @@ export default function ContentManagement() {
         </div>
       </div>
 
+      {/* 인물 일괄 차단 폼 */}
+      <div className="mb-4 flex flex-col gap-3 border-t border-white/5 pt-4 sm:flex-row sm:items-end">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <label htmlFor="person-id" className="text-xs text-white/50">인물 일괄 차단 (TMDB Person ID)</label>
+          <input
+            id="person-id"
+            type="number"
+            value={personId}
+            onChange={(e) => {
+              setPersonId(e.target.value);
+              setResult(null);
+            }}
+            placeholder="Person ID 입력"
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+          />
+        </div>
+        <button
+          onClick={handleBlockPerson}
+          disabled={loading}
+          className="flex items-center gap-1.5 rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          <UserX className="h-4 w-4" />
+          전체 작품 차단
+        </button>
+      </div>
+
       {/* 결과 메시지 */}
       {result && (
         <p className={`text-sm ${result.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
@@ -162,7 +225,30 @@ export default function ContentManagement() {
 
       {/* 차단 목록 */}
       <div className="mt-6 border-t border-white/10 pt-5">
-        <h3 className="mb-3 text-sm font-semibold text-white/70">차단된 콘텐츠</h3>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white/70">
+            차단된 콘텐츠 {total > 0 && <span className="text-white/40">({total})</span>}
+          </h3>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fetchAdultList(page - 1)}
+                disabled={page <= 1}
+                className="rounded p-1 text-white/40 hover:text-white/70 disabled:opacity-30"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-xs text-white/40">{page} / {totalPages}</span>
+              <button
+                onClick={() => fetchAdultList(page + 1)}
+                disabled={page >= totalPages}
+                className="rounded p-1 text-white/40 hover:text-white/70 disabled:opacity-30"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
         {listLoading ? (
           <p className="text-sm text-white/30">불러오는 중...</p>
         ) : adultList.length === 0 ? (
@@ -198,23 +284,27 @@ export default function ContentManagement() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-zinc-900 p-6">
             <h3 className="mb-3 text-base font-bold text-white">
-              {confirmModal.action === 'block' ? '성인물 차단' : '차단 해제'}
+              {confirmModal.action === 'block-person'
+                ? '인물 전체 작품 차단'
+                : confirmModal.action === 'block' ? '성인물 차단' : '차단 해제'}
             </h3>
             <p className="mb-5 text-sm text-white/60">
-              {confirmModal.item
-                ? `"${confirmModal.item.title}" (${confirmModal.item.contentType === 'movie' ? '영화' : 'TV'} #${confirmModal.item.tmdbId})의 차단을 해제하시겠습니까?`
-                : confirmModal.action === 'block'
-                  ? `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId}을(를) 성인물로 차단하시겠습니까?`
-                  : `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId}의 성인물 차단을 해제하시겠습니까?`}
+              {confirmModal.action === 'block-person'
+                ? `인물 #${confirmModal.personId}의 전체 작품을 차단하시겠습니까?`
+                : confirmModal.item
+                  ? `"${confirmModal.item.title}" (${confirmModal.item.contentType === 'movie' ? '영화' : 'TV'} #${confirmModal.item.tmdbId})의 차단을 해제하시겠습니까?`
+                  : confirmModal.action === 'block'
+                    ? `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId}을(를) 성인물로 차단하시겠습니까?`
+                    : `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId}의 성인물 차단을 해제하시겠습니까?`}
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={confirmAction}
                 disabled={loading}
                 className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-50 ${
-                  confirmModal.action === 'block'
-                    ? 'bg-red-600 hover:opacity-90'
-                    : 'bg-green-600 hover:opacity-90'
+                  confirmModal.action === 'unblock'
+                    ? 'bg-green-600 hover:opacity-90'
+                    : 'bg-red-600 hover:opacity-90'
                 }`}
               >
                 {loading ? '처리 중...' : '확인'}

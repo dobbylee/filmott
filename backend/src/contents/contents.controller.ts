@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Query, Body, ParseIntPipe, BadRequestException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, Body, ParseIntPipe, BadRequestException, UseGuards } from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { SearchContentsDto } from './dto/search-contents.dto';
 import { DiscoverContentsDto } from './dto/discover-contents.dto';
@@ -62,8 +62,22 @@ export class ContentsController {
   @Get('adult-list')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  async getAdultContents() {
-    return this.contentsService.getAdultContents();
+  async getAdultContents(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const p = page ? parseInt(page, 10) : 1;
+    const l = limit ? Math.min(parseInt(limit, 10), 100) : 20;
+    return this.contentsService.getAdultContents(p, l);
+  }
+
+  @Post('adult/block-person/:personId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async blockPersonContents(
+    @Param('personId', ParseIntPipe) personId: number,
+  ) {
+    return this.contentsService.blockPersonContents(personId);
   }
 
   @Get(':type/:tmdbId')

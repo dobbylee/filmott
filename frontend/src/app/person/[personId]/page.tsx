@@ -130,7 +130,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
       ),
       fetchApi<PersonCreditsResult>(
         `/contents/person/${personId}/credits`,
-        { next: { revalidate: 3600 } },
+        { cache: 'no-store' },
       ),
     ]);
   } catch {

@@ -19,6 +19,7 @@ describe('ContentsService', () => {
   const mockContentRepo = {
     findOne: jest.fn(),
     find: jest.fn(),
+    findAndCount: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
@@ -908,29 +909,28 @@ describe('ContentsService', () => {
   });
 
   describe('getAdultContents', () => {
-    it('adult=true인 콘텐츠 목록을 반환해야 한다', async () => {
+    it('adult=true인 콘텐츠를 페이징하여 반환해야 한다', async () => {
       const adultList = [
         { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie', posterUrl: '/poster.jpg' },
         { id: 2, tmdbId: 456, contentType: 'tv', title: 'Adult TV', posterUrl: null },
       ];
-      mockContentRepo.find.mockResolvedValue(adultList);
+      mockContentRepo.findAndCount.mockResolvedValue([adultList, 2]);
 
-      const result = await service.getAdultContents();
+      const result = await service.getAdultContents(1, 20);
 
-      expect(mockContentRepo.find).toHaveBeenCalledWith({
-        where: { adult: true },
-        select: ['id', 'tmdbId', 'contentType', 'title', 'posterUrl'],
-        order: { updatedAt: 'DESC' },
-      });
-      expect(result).toEqual(adultList);
+      expect(result.data).toEqual(adultList);
+      expect(result.total).toBe(2);
+      expect(result.page).toBe(1);
+      expect(result.totalPages).toBe(1);
     });
 
     it('차단된 콘텐츠가 없으면 빈 배열을 반환해야 한다', async () => {
-      mockContentRepo.find.mockResolvedValue([]);
+      mockContentRepo.findAndCount.mockResolvedValue([[], 0]);
 
       const result = await service.getAdultContents();
 
-      expect(result).toEqual([]);
+      expect(result.data).toEqual([]);
+      expect(result.total).toBe(0);
     });
   });
 
