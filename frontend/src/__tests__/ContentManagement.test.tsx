@@ -6,6 +6,10 @@ import ContentManagement from '@/components/admin/ContentManagement';
 const mockPatch = vi.fn();
 const mockGet = vi.fn();
 
+vi.mock('@/app/contents/[type]/[tmdbId]/actions', () => ({
+  revalidateContentDetail: vi.fn(),
+}));
+
 vi.mock('@/lib/api', () => ({
   default: {
     get: (...args: unknown[]) => mockGet(...args),

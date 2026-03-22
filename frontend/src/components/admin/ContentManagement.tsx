@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Shield, ShieldOff } from 'lucide-react';
 import api from '@/lib/api';
 import { getErrorMessage } from '@/utils/error';
+import { revalidateContentDetail } from '@/app/contents/[type]/[tmdbId]/actions';
 
 type ContentType = 'movie' | 'tv';
 
@@ -72,7 +73,10 @@ export default function ContentManagement() {
           : `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId} 차단 해제 완료`,
       });
       setTmdbId('');
-      await fetchAdultList();
+      await Promise.all([
+        fetchAdultList(),
+        revalidateContentDetail(contentType, String(Number(tmdbId))),
+      ]);
     } catch (err) {
       setResult({ type: 'error', message: getErrorMessage(err) });
     } finally {
@@ -93,7 +97,10 @@ export default function ContentManagement() {
         contentType: item.contentType,
         adult: false,
       });
-      await fetchAdultList();
+      await Promise.all([
+        fetchAdultList(),
+        revalidateContentDetail(item.contentType, String(item.tmdbId)),
+      ]);
       setResult({
         type: 'success',
         message: `"${item.title}" 차단 해제 완료`,

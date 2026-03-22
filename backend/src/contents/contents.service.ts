@@ -52,9 +52,12 @@ export class ContentsService {
 
     if (type === 'movie' || type === 'tv') {
       const result = await this.tmdbService.searchByType(query, type, page);
+      const originalCount = result.results.length;
       result.results = result.results.filter(
         (item) => !blockedIds.has(`${type}:${item.id}`),
       );
+      const removed = originalCount - result.results.length;
+      result.total_results = Math.max(0, result.total_results - removed);
       return result;
     }
 
@@ -72,7 +75,10 @@ export class ContentsService {
       (item) => !blockedIds.has(`tv:${item.id}`),
     );
 
-    const contentTotal = movieResult.total_results + tvResult.total_results;
+    const movieRemoved = movieResult.results.length - filteredMovies.length;
+    const tvRemoved = tvResult.results.length - filteredTv.length;
+    const contentTotal = movieResult.total_results + tvResult.total_results - movieRemoved - tvRemoved;
+
     return {
       page,
       total_pages: Math.max(movieResult.total_pages, tvResult.total_pages),
@@ -187,9 +193,12 @@ export class ContentsService {
       }),
       this.getBlockedTmdbIds(),
     ]);
+    const originalCount = result.results.length;
     result.results = result.results.filter(
       (item) => !blockedIds.has(`${type}:${item.id}`),
     );
+    const removed = originalCount - result.results.length;
+    result.total_results = Math.max(0, result.total_results - removed);
     return result;
   }
 
