@@ -19,6 +19,7 @@ interface AdultContent {
 interface ConfirmModal {
   isOpen: boolean;
   action: 'block' | 'unblock';
+  item?: AdultContent;
 }
 
 export default function ContentManagement() {
@@ -59,23 +60,30 @@ export default function ContentManagement() {
     setLoading(true);
     setResult(null);
 
+    const isListUnblock = !!confirmModal.item;
+    const targetTmdbId = isListUnblock ? confirmModal.item!.tmdbId : Number(tmdbId);
+    const targetType = isListUnblock ? confirmModal.item!.contentType : contentType;
+    const adult = confirmModal.action === 'block';
+
     try {
-      const adult = confirmModal.action === 'block';
       await api.patch('/contents/adult', {
-        tmdbId: Number(tmdbId),
-        contentType,
+        tmdbId: targetTmdbId,
+        contentType: targetType,
         adult,
       });
+      const label = targetType === 'movie' ? '영화' : 'TV';
       setResult({
         type: 'success',
-        message: adult
-          ? `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId} 성인물 차단 완료`
-          : `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId} 차단 해제 완료`,
+        message: isListUnblock
+          ? `"${confirmModal.item!.title}" 차단 해제 완료`
+          : adult
+            ? `${label} #${tmdbId} 성인물 차단 완료`
+            : `${label} #${tmdbId} 차단 해제 완료`,
       });
-      setTmdbId('');
+      if (!isListUnblock) setTmdbId('');
       await Promise.all([
         fetchAdultList(),
-        revalidateContentDetail(contentType, String(Number(tmdbId))),
+        revalidateContentDetail(targetType, String(targetTmdbId)),
       ]);
     } catch (err) {
       setResult({ type: 'error', message: getErrorMessage(err) });
@@ -85,29 +93,9 @@ export default function ContentManagement() {
     }
   };
 
-  const handleUnblock = async (item: AdultContent) => {
-    const confirmed = window.confirm(
-      `"${item.title}" (${item.contentType === 'movie' ? '영화' : 'TV'} #${item.tmdbId})의 차단을 해제하시겠습니까?`,
-    );
-    if (!confirmed) return;
-
-    try {
-      await api.patch('/contents/adult', {
-        tmdbId: item.tmdbId,
-        contentType: item.contentType,
-        adult: false,
-      });
-      await Promise.all([
-        fetchAdultList(),
-        revalidateContentDetail(item.contentType, String(item.tmdbId)),
-      ]);
-      setResult({
-        type: 'success',
-        message: `"${item.title}" 차단 해제 완료`,
-      });
-    } catch (err) {
-      setResult({ type: 'error', message: getErrorMessage(err) });
-    }
+  const handleUnblock = (item: AdultContent) => {
+    setResult(null);
+    setConfirmModal({ isOpen: true, action: 'unblock', item });
   };
 
   return (
@@ -213,9 +201,11 @@ export default function ContentManagement() {
               {confirmModal.action === 'block' ? '성인물 차단' : '차단 해제'}
             </h3>
             <p className="mb-5 text-sm text-white/60">
-              {confirmModal.action === 'block'
-                ? `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId}을(를) 성인물로 차단하시겠습니까?`
-                : `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId}의 성인물 차단을 해제하시겠습니까?`}
+              {confirmModal.item
+                ? `"${confirmModal.item.title}" (${confirmModal.item.contentType === 'movie' ? '영화' : 'TV'} #${confirmModal.item.tmdbId})의 차단을 해제하시겠습니까?`
+                : confirmModal.action === 'block'
+                  ? `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId}을(를) 성인물로 차단하시겠습니까?`
+                  : `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId}의 성인물 차단을 해제하시겠습니까?`}
             </p>
             <div className="flex justify-end gap-3">
               <button

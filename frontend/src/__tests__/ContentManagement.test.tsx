@@ -273,14 +273,13 @@ describe('ContentManagement', () => {
     });
   });
 
-  it('목록에서 해제 버튼 클릭 시 차단 해제 API를 호출해야 한다', async () => {
+  it('목록에서 해제 버튼 클릭 시 확인 모달을 표시하고 API를 호출해야 한다', async () => {
     mockGet.mockResolvedValue({
       data: [
         { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie' },
       ],
     });
     mockPatch.mockResolvedValue({ data: {} });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
 
     render(<ContentManagement />);
@@ -289,10 +288,15 @@ describe('ContentManagement', () => {
       expect(screen.getByText('Adult Movie')).toBeInTheDocument();
     });
 
-    // 목록 내 해제 버튼 클릭 (폼의 해제 버튼과 목록의 해제 버튼 구분)
+    // 목록 내 해제 버튼 클릭
     const unblockButtons = screen.getAllByText('해제');
-    // 마지막 해제 버튼이 목록의 해제 버튼
     await user.click(unblockButtons[unblockButtons.length - 1]);
+
+    // 모달이 표시되어야 한다
+    expect(screen.getByText(/Adult Movie.*차단을 해제하시겠습니까/)).toBeInTheDocument();
+
+    // 모달에서 확인 클릭
+    await user.click(screen.getByText('확인'));
 
     await waitFor(() => {
       expect(mockPatch).toHaveBeenCalledWith('/contents/adult', {
