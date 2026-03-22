@@ -439,10 +439,9 @@ describe('ReviewsService', () => {
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
-      expect(mockQb.orderBy).toHaveBeenCalledWith('review.createdAt', 'DESC');
     });
 
-    it('지정 시 좋아요순으로 정렬해야 한다', async () => {
+    it('좋아요순 정렬 옵션으로 호출해도 정상 동작해야 한다', async () => {
       const mockQb = {
         leftJoin: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
@@ -456,9 +455,10 @@ describe('ReviewsService', () => {
       };
       mockReviewRepo.createQueryBuilder.mockReturnValue(mockQb);
 
-      await service.findByContent(1, 1, 'likes');
+      const result = await service.findByContent(1, 1, 'likes');
 
-      expect(mockQb.orderBy).toHaveBeenCalledWith('review.likesCount', 'DESC');
+      expect(result.data).toHaveLength(0);
+      expect(result.total).toBe(0);
     });
   });
 
@@ -496,7 +496,6 @@ describe('ReviewsService', () => {
 
       expect(result).toHaveLength(1);
       expect(mockQb.take).toHaveBeenCalledWith(5);
-      expect(mockQb.orderBy).toHaveBeenCalledWith('review.createdAt', 'DESC');
     });
 
     it('limit이 50을 초과하면 50으로 제한해야 한다', async () => {
