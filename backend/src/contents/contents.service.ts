@@ -44,15 +44,34 @@ export class ContentsService {
    * 검색: TMDB API 호출 후 결과 반환 (캐싱은 하지 않음, 목록은 가볍게)
    */
   async searchContents(query: string, type?: 'movie' | 'tv' | 'person', page = 1) {
-    if (type === 'movie' || type === 'tv' || type === 'person') {
+    const blockedIds = await this.getBlockedTmdbIds();
+
+    if (type === 'person') {
       return this.tmdbService.searchByType(query, type, page);
     }
+
+    if (type === 'movie' || type === 'tv') {
+      const result = await this.tmdbService.searchByType(query, type, page);
+      result.results = result.results.filter(
+        (item) => !blockedIds.has(`${type}:${item.id}`),
+      );
+      return result;
+    }
+
     // "전체" 검색: 인물(page 1 고정) + 영화/시리즈(페이징) 각각 호출
     const [personResult, movieResult, tvResult] = await Promise.all([
       this.tmdbService.searchByType(query, 'person', 1),
       this.tmdbService.searchByType(query, 'movie', page),
       this.tmdbService.searchByType(query, 'tv', page),
     ]);
+
+    const filteredMovies = movieResult.results.filter(
+      (item) => !blockedIds.has(`movie:${item.id}`),
+    );
+    const filteredTv = tvResult.results.filter(
+      (item) => !blockedIds.has(`tv:${item.id}`),
+    );
+
     const contentTotal = movieResult.total_results + tvResult.total_results;
     return {
       page,
@@ -60,7 +79,7 @@ export class ContentsService {
       total_results: personResult.total_results + contentTotal,
       personTotal: personResult.total_results,
       contentTotal,
-      results: [...personResult.results, ...movieResult.results, ...tvResult.results],
+      results: [...personResult.results, ...filteredMovies, ...filteredTv],
     };
   }
 
@@ -158,13 +177,20 @@ export class ContentsService {
       page?: number;
     } = {},
   ) {
-    return this.tmdbService.discoverByFilters(type, {
-      genres: options.genres,
-      watchProviders: options.providers,
-      year: options.year,
-      sort: options.sort,
-      page: options.page,
-    });
+    const [result, blockedIds] = await Promise.all([
+      this.tmdbService.discoverByFilters(type, {
+        genres: options.genres,
+        watchProviders: options.providers,
+        year: options.year,
+        sort: options.sort,
+        page: options.page,
+      }),
+      this.getBlockedTmdbIds(),
+    ]);
+    result.results = result.results.filter(
+      (item) => !blockedIds.has(`${type}:${item.id}`),
+    );
+    return result;
   }
 
   /**
@@ -226,6 +252,19 @@ export class ContentsService {
   }
 
   /**
+   * 차단된 콘텐츠 목록 조회 (관리자용)
+   */
+  async getAdultContents(): Promise<
+    Pick<Content, 'id' | 'tmdbId' | 'contentType' | 'title' | 'posterUrl'>[]
+  > {
+    return this.contentRepo.find({
+      where: { adult: true },
+      select: ['id', 'tmdbId', 'contentType', 'title', 'posterUrl'],
+      order: { updatedAt: 'DESC' },
+    });
+  }
+
+  /**
    * 관리자 수동 성인물 차단/해제
    */
   async toggleAdult(
@@ -272,12 +311,21 @@ export class ContentsService {
     });
 
     if (existing) {
-      Object.assign(existing, mapped);
+      const { adult: _adult, ...fieldsToUpdate } = mapped;
+      Object.assign(existing, fieldsToUpdate);
       return this.contentRepo.save(existing);
     }
 
     const content = this.contentRepo.create(mapped);
     return this.contentRepo.save(content);
+  }
+
+  private async getBlockedTmdbIds(): Promise<Set<string>> {
+    const blocked = await this.contentRepo.find({
+      where: { adult: true },
+      select: ['tmdbId', 'contentType'],
+    });
+    return new Set(blocked.map((c) => `${c.contentType}:${c.tmdbId}`));
   }
 
   private mapTmdbToContent(

@@ -1,11 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Shield, ShieldOff } from 'lucide-react';
 import api from '@/lib/api';
 import { getErrorMessage } from '@/utils/error';
 
 type ContentType = 'movie' | 'tv';
+
+interface AdultContent {
+  id: number;
+  tmdbId: number;
+  contentType: string;
+  title: string;
+  posterUrl?: string;
+}
 
 interface ConfirmModal {
   isOpen: boolean;
@@ -18,6 +26,23 @@ export default function ContentManagement() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [confirmModal, setConfirmModal] = useState<ConfirmModal | null>(null);
+  const [adultList, setAdultList] = useState<AdultContent[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+
+  const fetchAdultList = useCallback(async () => {
+    try {
+      const { data } = await api.get<AdultContent[]>('/contents/adult-list');
+      setAdultList(data);
+    } catch {
+      // 목록 로드 실패 시 빈 배열 유지
+    } finally {
+      setListLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAdultList();
+  }, [fetchAdultList]);
 
   const handleAction = (action: 'block' | 'unblock') => {
     if (!tmdbId.trim()) {
@@ -47,11 +72,34 @@ export default function ContentManagement() {
           : `${contentType === 'movie' ? '영화' : 'TV'} #${tmdbId} 차단 해제 완료`,
       });
       setTmdbId('');
+      await fetchAdultList();
     } catch (err) {
       setResult({ type: 'error', message: getErrorMessage(err) });
     } finally {
       setLoading(false);
       setConfirmModal(null);
+    }
+  };
+
+  const handleUnblock = async (item: AdultContent) => {
+    const confirmed = window.confirm(
+      `"${item.title}" (${item.contentType === 'movie' ? '영화' : 'TV'} #${item.tmdbId})의 차단을 해제하시겠습니까?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.patch('/contents/adult', {
+        tmdbId: item.tmdbId,
+        contentType: item.contentType,
+        adult: false,
+      });
+      await fetchAdultList();
+      setResult({
+        type: 'success',
+        message: `"${item.title}" 차단 해제 완료`,
+      });
+    } catch (err) {
+      setResult({ type: 'error', message: getErrorMessage(err) });
     }
   };
 
@@ -116,6 +164,39 @@ export default function ContentManagement() {
           {result.message}
         </p>
       )}
+
+      {/* 차단 목록 */}
+      <div className="mt-6 border-t border-white/10 pt-5">
+        <h3 className="mb-3 text-sm font-semibold text-white/70">차단된 콘텐츠</h3>
+        {listLoading ? (
+          <p className="text-sm text-white/30">불러오는 중...</p>
+        ) : adultList.length === 0 ? (
+          <p className="text-sm text-white/30">차단된 콘텐츠가 없습니다</p>
+        ) : (
+          <div className="space-y-2">
+            {adultList.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/50 uppercase">
+                    {item.contentType}
+                  </span>
+                  <span className="text-xs text-white/40">#{item.tmdbId}</span>
+                  <span className="truncate text-sm text-white/80">{item.title}</span>
+                </div>
+                <button
+                  onClick={() => handleUnblock(item)}
+                  className="shrink-0 ml-2 rounded-md border border-green-500/30 px-2.5 py-1 text-xs font-medium text-green-300 transition-colors hover:bg-green-500/10"
+                >
+                  해제
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 확인 모달 */}
       {confirmModal?.isOpen && (

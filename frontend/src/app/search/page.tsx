@@ -38,7 +38,7 @@ async function PaginatedResults({
 }) {
   const data = await fetchApi<TmdbSearchResult>(
     `/contents/search?q=${encodeURIComponent(query)}&type=${type}&page=${page}`,
-    { next: { revalidate: 300 } },
+    { cache: 'no-store' },
   );
 
   return (
@@ -62,7 +62,7 @@ async function LoadMoreResults({
 }) {
   const data = await fetchApi<TmdbSearchResult>(
     `/contents/search?q=${encodeURIComponent(query)}${type ? `&type=${type}` : ''}&page=1`,
-    { next: { revalidate: 300 } },
+    { cache: 'no-store' },
   );
 
   const personResults: TmdbSearchItem[] = [];

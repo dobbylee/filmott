@@ -9,8 +9,13 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/api', () => ({
   default: {
-    get: vi.fn().mockResolvedValue({
-      data: { users: [], total: 0, page: 1, totalPages: 0 },
+    get: vi.fn().mockImplementation((url: string) => {
+      if (url.includes('adult-list')) {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({
+        data: { users: [], total: 0, page: 1, totalPages: 0 },
+      });
     }),
     post: vi.fn(),
     patch: vi.fn(),

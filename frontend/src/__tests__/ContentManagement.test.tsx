@@ -4,10 +4,11 @@ import userEvent from '@testing-library/user-event';
 import ContentManagement from '@/components/admin/ContentManagement';
 
 const mockPatch = vi.fn();
+const mockGet = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   default: {
-    get: vi.fn(),
+    get: (...args: unknown[]) => mockGet(...args),
     post: vi.fn(),
     patch: (...args: unknown[]) => mockPatch(...args),
     delete: vi.fn(),
@@ -17,6 +18,8 @@ vi.mock('@/lib/api', () => ({
 describe('ContentManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 기본: 빈 차단 목록 반환
+    mockGet.mockResolvedValue({ data: [] });
   });
 
   it('타입 셀렉트와 TMDB ID 입력 필드를 렌더링해야 한다', () => {
@@ -25,7 +28,6 @@ describe('ContentManagement', () => {
     expect(screen.getByLabelText('타입')).toBeInTheDocument();
     expect(screen.getByLabelText('TMDB ID')).toBeInTheDocument();
     expect(screen.getByText('차단')).toBeInTheDocument();
-    expect(screen.getByText('해제')).toBeInTheDocument();
   });
 
   it('TMDB ID 없이 차단 버튼 클릭 시 에러 메시지를 표시해야 한다', async () => {
@@ -41,7 +43,9 @@ describe('ContentManagement', () => {
     const user = userEvent.setup();
     render(<ContentManagement />);
 
-    await user.click(screen.getByText('해제'));
+    // 폼의 해제 버튼 (ShieldOff 아이콘 옆)
+    const buttons = screen.getAllByText('해제');
+    await user.click(buttons[0]);
 
     expect(screen.getByText('TMDB ID를 입력해주세요.')).toBeInTheDocument();
   });
@@ -64,7 +68,10 @@ describe('ContentManagement', () => {
 
     const tmdbIdInput = screen.getByLabelText('TMDB ID');
     await user.type(tmdbIdInput, '12345');
-    await user.click(screen.getByText('해제'));
+
+    // 폼의 해제 버튼
+    const buttons = screen.getAllByText('해제');
+    await user.click(buttons[0]);
 
     expect(screen.getByText('차단 해제')).toBeInTheDocument();
     expect(screen.getByText(/영화 #12345의 성인물 차단을 해제하시겠습니까\?/)).toBeInTheDocument();
@@ -102,7 +109,10 @@ describe('ContentManagement', () => {
 
     const tmdbIdInput = screen.getByLabelText('TMDB ID');
     await user.type(tmdbIdInput, '67890');
-    await user.click(screen.getByText('해제'));
+
+    // 폼의 해제 버튼
+    const buttons = screen.getAllByText('해제');
+    await user.click(buttons[0]);
 
     // 모달에서 확인 클릭
     await user.click(screen.getByText('확인'));
@@ -195,6 +205,97 @@ describe('ContentManagement', () => {
 
     await waitFor(() => {
       expect(tmdbIdInput).toHaveValue(null);
+    });
+  });
+
+  // 차단 목록 관련 테스트
+  it('마운트 시 차단 목록을 조회해야 한다', async () => {
+    mockGet.mockResolvedValue({ data: [] });
+    render(<ContentManagement />);
+
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalledWith('/contents/adult-list');
+    });
+  });
+
+  it('차단된 콘텐츠가 있으면 목록을 표시해야 한다', async () => {
+    mockGet.mockResolvedValue({
+      data: [
+        { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie' },
+        { id: 2, tmdbId: 456, contentType: 'tv', title: 'Adult TV Show' },
+      ],
+    });
+
+    render(<ContentManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Adult Movie')).toBeInTheDocument();
+      expect(screen.getByText('Adult TV Show')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('#123')).toBeInTheDocument();
+    expect(screen.getByText('#456')).toBeInTheDocument();
+  });
+
+  it('차단된 콘텐츠가 없으면 안내 메시지를 표시해야 한다', async () => {
+    mockGet.mockResolvedValue({ data: [] });
+
+    render(<ContentManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('차단된 콘텐츠가 없습니다')).toBeInTheDocument();
+    });
+  });
+
+  it('차단 성공 후 목록을 새로고침해야 한다', async () => {
+    mockGet.mockResolvedValue({ data: [] });
+    mockPatch.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    render(<ContentManagement />);
+
+    // 초기 로드
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    const tmdbIdInput = screen.getByLabelText('TMDB ID');
+    await user.type(tmdbIdInput, '12345');
+    await user.click(screen.getByText('차단'));
+    await user.click(screen.getByText('확인'));
+
+    // 차단 성공 후 목록 새로고침
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('목록에서 해제 버튼 클릭 시 차단 해제 API를 호출해야 한다', async () => {
+    mockGet.mockResolvedValue({
+      data: [
+        { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie' },
+      ],
+    });
+    mockPatch.mockResolvedValue({ data: {} });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+
+    render(<ContentManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Adult Movie')).toBeInTheDocument();
+    });
+
+    // 목록 내 해제 버튼 클릭 (폼의 해제 버튼과 목록의 해제 버튼 구분)
+    const unblockButtons = screen.getAllByText('해제');
+    // 마지막 해제 버튼이 목록의 해제 버튼
+    await user.click(unblockButtons[unblockButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockPatch).toHaveBeenCalledWith('/contents/adult', {
+        tmdbId: 123,
+        contentType: 'movie',
+        adult: false,
+      });
     });
   });
 });

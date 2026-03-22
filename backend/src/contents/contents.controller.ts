@@ -59,6 +59,13 @@ export class ContentsController {
     return this.contentsService.toggleAdult(dto.tmdbId, dto.contentType, dto.adult);
   }
 
+  @Get('adult-list')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async getAdultContents() {
+    return this.contentsService.getAdultContents();
+  }
+
   @Get(':type/:tmdbId')
   async getDetail(
     @Param('type') type: string,

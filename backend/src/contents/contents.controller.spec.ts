@@ -14,6 +14,7 @@ describe('ContentsController', () => {
     getPersonCredits: jest.fn(),
     getSitemapContents: jest.fn(),
     toggleAdult: jest.fn(),
+    getAdultContents: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -175,6 +176,29 @@ describe('ContentsController', () => {
 
       expect(mockContentsService.toggleAdult).toHaveBeenCalledWith(456, 'tv', false);
       expect(result).toEqual(updatedContent);
+    });
+  });
+
+  describe('getAdultContents', () => {
+    it('차단된 콘텐츠 목록을 반환해야 한다', async () => {
+      const adultList = [
+        { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie', posterUrl: '/poster.jpg' },
+        { id: 2, tmdbId: 456, contentType: 'tv', title: 'Adult TV', posterUrl: null },
+      ];
+      mockContentsService.getAdultContents.mockResolvedValue(adultList);
+
+      const result = await controller.getAdultContents();
+
+      expect(mockContentsService.getAdultContents).toHaveBeenCalled();
+      expect(result).toEqual(adultList);
+    });
+
+    it('차단된 콘텐츠가 없으면 빈 배열을 반환해야 한다', async () => {
+      mockContentsService.getAdultContents.mockResolvedValue([]);
+
+      const result = await controller.getAdultContents();
+
+      expect(result).toEqual([]);
     });
   });
 

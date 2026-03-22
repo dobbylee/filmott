@@ -27,6 +27,12 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+const mockRevalidate = vi.fn();
+
+vi.mock('@/app/contents/[type]/[tmdbId]/actions', () => ({
+  revalidateContentDetail: (...args: unknown[]) => mockRevalidate(...args),
+}));
+
 describe('AdultBlockButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,6 +82,7 @@ describe('AdultBlockButton', () => {
   it('차단 클릭 후 확인 시 PATCH API를 호출해야 한다', async () => {
     mockUser = { nickname: 'admin', role: 'ADMIN' };
     mockPatch.mockResolvedValue({ data: { adult: true } });
+    mockRevalidate.mockResolvedValue(undefined);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
 
@@ -95,6 +102,24 @@ describe('AdultBlockButton', () => {
 
     // 차단 후 "차단 해제" 버튼으로 변경
     expect(screen.getByText('차단 해제')).toBeInTheDocument();
+  });
+
+  it('차단 성공 후 revalidateContentDetail을 호출해야 한다', async () => {
+    mockUser = { nickname: 'admin', role: 'ADMIN' };
+    mockPatch.mockResolvedValue({ data: { adult: true } });
+    mockRevalidate.mockResolvedValue(undefined);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+
+    render(
+      <AdultBlockButton tmdbId={456} contentType="tv" initialAdult={false} />,
+    );
+
+    await user.click(screen.getByText('성인물 차단'));
+
+    await waitFor(() => {
+      expect(mockRevalidate).toHaveBeenCalledWith('tv', '456');
+    });
   });
 
   it('해제 클릭 후 확인 시 PATCH API를 호출해야 한다', async () => {

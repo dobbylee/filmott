@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
+import { revalidateContentDetail } from '@/app/contents/[type]/[tmdbId]/actions';
 
 interface AdultBlockButtonProps {
   tmdbId: number;
@@ -40,6 +41,7 @@ export default function AdultBlockButton({
         adult: !isAdult,
       });
       setIsAdult(!isAdult);
+      await revalidateContentDetail(contentType, String(tmdbId));
     } catch {
       alert(`${action}에 실패했습니다.`);
     } finally {
