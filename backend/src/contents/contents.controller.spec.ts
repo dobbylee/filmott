@@ -13,6 +13,7 @@ describe('ContentsController', () => {
     getPersonDetail: jest.fn(),
     getPersonCredits: jest.fn(),
     getSitemapContents: jest.fn(),
+    toggleAdult: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -144,6 +145,36 @@ describe('ContentsController', () => {
       const result = await controller.getSitemapContents();
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('toggleAdult', () => {
+    it('올바른 파라미터로 toggleAdult를 호출해야 한다', async () => {
+      const updatedContent = { id: 1, tmdbId: 123, contentType: 'movie', title: 'Test', adult: true };
+      mockContentsService.toggleAdult.mockResolvedValue(updatedContent);
+
+      const result = await controller.toggleAdult({
+        tmdbId: 123,
+        contentType: 'movie',
+        adult: true,
+      });
+
+      expect(mockContentsService.toggleAdult).toHaveBeenCalledWith(123, 'movie', true);
+      expect(result).toEqual(updatedContent);
+    });
+
+    it('차단 해제 시 adult: false로 호출해야 한다', async () => {
+      const updatedContent = { id: 1, tmdbId: 456, contentType: 'tv', title: 'Test TV', adult: false };
+      mockContentsService.toggleAdult.mockResolvedValue(updatedContent);
+
+      const result = await controller.toggleAdult({
+        tmdbId: 456,
+        contentType: 'tv',
+        adult: false,
+      });
+
+      expect(mockContentsService.toggleAdult).toHaveBeenCalledWith(456, 'tv', false);
+      expect(result).toEqual(updatedContent);
     });
   });
 

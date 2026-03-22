@@ -1,7 +1,12 @@
-import { Controller, Get, Param, Query, ParseIntPipe, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Query, Body, ParseIntPipe, BadRequestException, UseGuards } from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { SearchContentsDto } from './dto/search-contents.dto';
 import { DiscoverContentsDto } from './dto/discover-contents.dto';
+import { ToggleAdultDto } from './dto/toggle-adult.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../users/enums/user-role.enum';
 
 @Controller('contents')
 export class ContentsController {
@@ -45,6 +50,13 @@ export class ContentsController {
   @Get('sitemap')
   async getSitemapContents() {
     return this.contentsService.getSitemapContents();
+  }
+
+  @Patch('adult')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async toggleAdult(@Body() dto: ToggleAdultDto) {
+    return this.contentsService.toggleAdult(dto.tmdbId, dto.contentType, dto.adult);
   }
 
   @Get(':type/:tmdbId')

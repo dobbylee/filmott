@@ -226,6 +226,26 @@ export class ContentsService {
   }
 
   /**
+   * 관리자 수동 성인물 차단/해제
+   */
+  async toggleAdult(
+    tmdbId: number,
+    contentType: 'movie' | 'tv',
+    adult: boolean,
+  ): Promise<Content> {
+    let content = await this.contentRepo.findOne({
+      where: { tmdbId, contentType },
+    });
+
+    if (!content) {
+      content = await this.findOrFetchByTmdbId(tmdbId, contentType);
+    }
+
+    content.adult = adult;
+    return this.contentRepo.save(content);
+  }
+
+  /**
    * TMDB 데이터를 Content 엔티티로 변환하여 저장
    */
   private async saveFromTmdb(

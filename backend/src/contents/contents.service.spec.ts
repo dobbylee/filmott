@@ -823,6 +823,85 @@ describe('ContentsService', () => {
     });
   });
 
+  describe('toggleAdult', () => {
+    it('DB에 콘텐츠가 존재하면 adult 값을 업데이트해야 한다', async () => {
+      const existingContent = {
+        id: 1,
+        tmdbId: 123,
+        contentType: 'movie',
+        title: 'Test Movie',
+        adult: false,
+      };
+      mockContentRepo.findOne.mockResolvedValue(existingContent);
+      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c));
+
+      const result = await service.toggleAdult(123, 'movie', true);
+
+      expect(mockContentRepo.findOne).toHaveBeenCalledWith({
+        where: { tmdbId: 123, contentType: 'movie' },
+      });
+      expect(result.adult).toBe(true);
+      expect(mockContentRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ adult: true }),
+      );
+    });
+
+    it('DB에 콘텐츠가 없으면 TMDB에서 가져온 후 adult를 설정해야 한다', async () => {
+      // toggleAdult 내부 findOne: null (콘텐츠 미존재)
+      // findOrFetchByTmdbId 내부 findOne: null (DB 미존재)
+      mockContentRepo.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      const tmdbData = {
+        id: 456,
+        title: 'New Movie',
+        original_title: 'New Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        genres: [],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      const fetchedContent = {
+        id: 2,
+        tmdbId: 456,
+        contentType: 'movie',
+        title: 'New Movie',
+        adult: false,
+      };
+      mockContentRepo.create.mockReturnValue(fetchedContent);
+      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c));
+
+      const result = await service.toggleAdult(456, 'movie', true);
+
+      expect(mockTmdbService.getDetails).toHaveBeenCalledWith(456, 'movie');
+      expect(result.adult).toBe(true);
+    });
+
+    it('차단 해제 시 adult를 false로 설정해야 한다', async () => {
+      const existingContent = {
+        id: 1,
+        tmdbId: 789,
+        contentType: 'tv',
+        title: 'Adult TV Show',
+        adult: true,
+      };
+      mockContentRepo.findOne.mockResolvedValue(existingContent);
+      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c));
+
+      const result = await service.toggleAdult(789, 'tv', false);
+
+      expect(result.adult).toBe(false);
+    });
+  });
+
   describe('getSitemapContents', () => {
     it('DB에서 모든 콘텐츠의 tmdbId, contentType, updatedAt을 반환해야 한다', async () => {
       const mockRows = [
