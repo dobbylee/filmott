@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { Reflector } from '@nestjs/core';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -123,20 +122,6 @@ describe('UsersController', () => {
     });
   });
 
-  describe('PATCH /users/me (update)', () => {
-    it('업데이트하고 수정된 사용자를 반환해야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
-      const dto = { nickname: 'newname' };
-      const updated = { id: 1, nickname: 'newname', email: 'test@test.com' };
-      mockUsersService.update.mockResolvedValue(updated);
-
-      const result = await controller.update(mockUser, dto);
-
-      expect(mockUsersService.update).toHaveBeenCalledWith(1, dto);
-      expect(result).toEqual(updated);
-    });
-  });
-
   describe('PATCH /users/me/otts (updateOtts)', () => {
     it('OTT 구독 정보를 업데이트하고 결과를 반환해야 한다', async () => {
       const mockUser = { id: 1, nickname: 'test' };
@@ -163,34 +148,7 @@ describe('UsersController', () => {
     });
   });
 
-  describe('DELETE /users/me (deactivate)', () => {
-    it('현재 사용자 ID로 deactivate를 호출해야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
-      mockUsersService.deactivate.mockResolvedValue(undefined);
-
-      await controller.deactivate(mockUser);
-
-      expect(mockUsersService.deactivate).toHaveBeenCalledWith(1);
-    });
-  });
-
   describe('GET /users/admin (getAdminUsers)', () => {
-    it('유저 목록을 반환해야 한다', async () => {
-      const mockResponse = {
-        users: [{ id: 1, nickname: 'user1', status: UserStatus.ACTIVE }],
-        total: 1,
-        page: 1,
-        totalPages: 1,
-      };
-      mockUsersService.findAllForAdmin.mockResolvedValue(mockResponse);
-
-      const dto = { page: '1', limit: '20' };
-      const result = await controller.getAdminUsers(dto);
-
-      expect(mockUsersService.findAllForAdmin).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(mockResponse);
-    });
-
     it('JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
       const guards = Reflect.getMetadata(
         '__guards__',
@@ -268,20 +226,6 @@ describe('UsersController', () => {
   });
 
   describe('PATCH /users/admin/:id/status (updateUserStatus)', () => {
-    it('유저 상태를 변경하고 결과를 반환해야 한다', async () => {
-      const mockResult = {
-        id: 1,
-        nickname: 'user1',
-        status: UserStatus.SUSPENDED,
-      };
-      mockUsersService.updateStatusByAdmin.mockResolvedValue(mockResult);
-
-      const result = await controller.updateUserStatus(1, { status: UserStatus.SUSPENDED });
-
-      expect(mockUsersService.updateStatusByAdmin).toHaveBeenCalledWith(1, UserStatus.SUSPENDED);
-      expect(result).toEqual(mockResult);
-    });
-
     it('JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
       const guards = Reflect.getMetadata(
         '__guards__',

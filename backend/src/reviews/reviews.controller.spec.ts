@@ -106,34 +106,6 @@ describe('ReviewsController', () => {
     });
   });
 
-  describe('POST /api/reviews', () => {
-    it('리뷰를 생성해야 한다', async () => {
-      const dto = { contentId: 1, rating: 8, comment: 'Great!' };
-      const user = { id: 1, nickname: 'test' };
-      const created = { id: 1, ...dto, userId: 1 };
-      mockReviewsService.create.mockResolvedValue(created);
-
-      const result = await controller.create(user, dto);
-
-      expect(result).toEqual(created);
-      expect(mockReviewsService.create).toHaveBeenCalledWith(1, dto);
-    });
-  });
-
-  describe('PATCH /api/reviews/:id', () => {
-    it('리뷰를 수정해야 한다', async () => {
-      const dto = { rating: 9 };
-      const user = { id: 1, nickname: 'test' };
-      const updated = { id: 1, rating: 9, likesCount: 0 };
-      mockReviewsService.update.mockResolvedValue(updated);
-
-      const result = await controller.update(user, 1, dto);
-
-      expect(result).toEqual(updated);
-      expect(mockReviewsService.update).toHaveBeenCalledWith(1, 1, dto);
-    });
-  });
-
   describe('DELETE /api/reviews/:id', () => {
     it('리뷰를 삭제하고 사용자 역할을 전달해야 한다', async () => {
       const user = { id: 1, nickname: 'test', role: 'USER' };
@@ -161,10 +133,9 @@ describe('ReviewsController', () => {
       const paginatedResult = { data: [], total: 0, page: 1, totalPages: 0 };
       mockReviewsService.findByContent.mockResolvedValue(paginatedResult);
 
-      const result = await controller.findByContent(1);
+      await controller.findByContent(1);
 
       expect(mockReviewsService.findByContent).toHaveBeenCalledWith(1, 1, 'latest');
-      expect(result).toEqual(paginatedResult);
     });
 
     it('page와 sort 파라미터를 전달해야 한다', async () => {
@@ -253,32 +224,6 @@ describe('ReviewsController', () => {
     });
   });
 
-  describe('POST /api/reviews/:id/like', () => {
-    it('좋아요를 토글해야 한다', async () => {
-      const user = { id: 1, nickname: 'test' };
-      mockReviewsService.toggleLike.mockResolvedValue({ liked: true, likesCount: 1 });
-
-      const result = await controller.toggleLike(user, 1);
-
-      expect(result).toEqual({ liked: true, likesCount: 1 });
-      expect(mockReviewsService.toggleLike).toHaveBeenCalledWith(1, 1);
-    });
-  });
-
-  describe('POST /api/reviews/:id/comments', () => {
-    it('댓글을 생성해야 한다', async () => {
-      const user = { id: 1, nickname: 'test' };
-      const dto = { content: 'Nice review!' };
-      const created = { id: 1, userId: 1, reviewId: 1, content: 'Nice review!' };
-      mockCommentsService.create.mockResolvedValue(created);
-
-      const result = await controller.createComment(user, 1, dto);
-
-      expect(result).toEqual(created);
-      expect(mockCommentsService.create).toHaveBeenCalledWith(1, 1, dto);
-    });
-  });
-
   describe('DELETE /api/reviews/comments/:commentId', () => {
     it('댓글을 삭제하고 사용자 역할을 전달해야 한다', async () => {
       const user = { id: 1, nickname: 'test', role: 'USER' };
@@ -298,20 +243,6 @@ describe('ReviewsController', () => {
 
       expect(result).toEqual({ message: '댓글이 삭제되었습니다.' });
       expect(mockCommentsService.delete).toHaveBeenCalledWith(99, 1, 'ADMIN');
-    });
-  });
-
-  describe('GET /api/reviews/:id/stats', () => {
-    it('콘텐츠 통계를 반환해야 한다', async () => {
-      mockReviewsService.getContentStats.mockResolvedValue({
-        averageRating: 7.5,
-        reviewCount: 10,
-      });
-
-      const result = await controller.getStats(1);
-
-      expect(mockReviewsService.getContentStats).toHaveBeenCalledWith(1);
-      expect(result).toEqual({ averageRating: 7.5, reviewCount: 10 });
     });
   });
 

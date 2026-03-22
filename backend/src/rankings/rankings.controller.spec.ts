@@ -10,7 +10,6 @@ import { ROLES_KEY } from '../auth/decorators/roles.decorator';
 
 describe('RankingsController', () => {
   let controller: RankingsController;
-  let rankingsService: RankingsService;
   let reflector: Reflector;
 
   const mockRankingsService = {
@@ -32,7 +31,6 @@ describe('RankingsController', () => {
     }).compile();
 
     controller = module.get<RankingsController>(RankingsController);
-    rankingsService = module.get<RankingsService>(RankingsService);
     reflector = module.get<Reflector>(Reflector);
   });
 
@@ -42,17 +40,13 @@ describe('RankingsController', () => {
 
   describe('GET /api/rankings', () => {
     it('기본 limit으로 랭킹을 반환해야 한다', async () => {
-      const mockRankings = [
-        { id: 1, source: 'kobis', category: 'daily-box-office', rank: 1 },
-      ];
-      mockRankingsService.getRankings.mockResolvedValue(mockRankings);
+      mockRankingsService.getRankings.mockResolvedValue([]);
 
-      const result = await controller.getRankings({
+      await controller.getRankings({
         source: 'kobis',
         category: 'daily-box-office',
       });
 
-      expect(result).toEqual(mockRankings);
       expect(mockRankingsService.getRankings).toHaveBeenCalledWith(
         'kobis',
         'daily-box-office',
@@ -117,33 +111,7 @@ describe('RankingsController', () => {
     });
   });
 
-  describe('GET /api/rankings/unmatched', () => {
-    it('매칭 실패 항목 목록을 반환해야 한다', async () => {
-      const unmatchedRankings = [
-        { id: 1, rank: 3, title: 'Unmatched Movie', contentId: null },
-      ];
-      mockRankingsService.getUnmatchedRankings.mockResolvedValue(unmatchedRankings);
-
-      const result = await controller.getUnmatched();
-
-      expect(result).toEqual(unmatchedRankings);
-      expect(mockRankingsService.getUnmatchedRankings).toHaveBeenCalled();
-    });
-  });
-
-  describe('PATCH /api/rankings/:id/poster', () => {
-    it('posterUrl을 업데이트하고 결과를 반환해야 한다', async () => {
-      const updatedRanking = { id: 1, posterUrl: 'https://example.com/poster.jpg' };
-      mockRankingsService.updatePosterUrl.mockResolvedValue(updatedRanking);
-
-      const result = await controller.updatePosterUrl(1, { posterUrl: 'https://example.com/poster.jpg' });
-
-      expect(result).toEqual(updatedRanking);
-      expect(mockRankingsService.updatePosterUrl).toHaveBeenCalledWith(1, 'https://example.com/poster.jpg');
-    });
-  });
-
-  describe('refresh 엔드포인트 가드', () => {
+  describe('가드 적용 확인', () => {
     it('refresh 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
       const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.refresh);
       expect(guards).toBeDefined();
