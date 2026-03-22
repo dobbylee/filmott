@@ -869,7 +869,7 @@ describe('ContentsService', () => {
       expect(result.title).toBe('Blocked Movie Updated');
     });
 
-    it('기존 콘텐츠가 adult=false일 때 TMDB adult=true여도 기존 값을 유지해야 한다', async () => {
+    it('기존 콘텐츠가 adult=false일 때 TMDB adult=true이면 adult=true로 반영해야 한다', async () => {
       const existingContent = {
         id: 11,
         tmdbId: 998,
@@ -903,7 +903,7 @@ describe('ContentsService', () => {
       await service.getContentDetail(998, 'movie');
 
       const savedContent = mockContentRepo.save.mock.calls[0][0];
-      expect(savedContent.adult).toBe(false);
+      expect(savedContent.adult).toBe(true);
     });
   });
 

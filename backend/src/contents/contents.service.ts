@@ -320,8 +320,9 @@ export class ContentsService {
     });
 
     if (existing) {
-      const { adult: _adult, ...fieldsToUpdate } = mapped;
+      const { adult: tmdbAdult, ...fieldsToUpdate } = mapped;
       Object.assign(existing, fieldsToUpdate);
+      existing.adult = existing.adult || (tmdbAdult ?? false);
       return this.contentRepo.save(existing);
     }
 
