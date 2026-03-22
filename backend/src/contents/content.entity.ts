@@ -82,6 +82,9 @@ export class Content {
   @Column({ type: 'jsonb', nullable: true })
   credits?: ContentCredit[] | null;
 
+  @Column({ type: 'boolean', default: false })
+  adult!: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

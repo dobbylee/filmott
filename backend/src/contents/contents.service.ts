@@ -312,6 +312,7 @@ export class ContentsService {
       runtime: runtime ?? undefined,
       director,
       originCountry,
+      adult: tmdbData.adult ?? false,
     };
   }
 }

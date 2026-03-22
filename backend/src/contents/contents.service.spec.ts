@@ -726,6 +726,103 @@ describe('ContentsService', () => {
     });
   });
 
+  describe('mapTmdbToContent - adult 매핑', () => {
+    it('TMDB adult가 true이면 adult: true로 매핑해야 한다', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const tmdbData = {
+        id: 900,
+        title: 'Adult Movie',
+        original_title: 'Adult Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        adult: true,
+        genres: [],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+
+      await service.findOrFetchByTmdbId(900, 'movie');
+
+      expect(mockContentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adult: true,
+        }),
+      );
+    });
+
+    it('TMDB adult가 false이면 adult: false로 매핑해야 한다', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const tmdbData = {
+        id: 901,
+        title: 'Normal Movie',
+        original_title: 'Normal Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        adult: false,
+        genres: [],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+
+      await service.findOrFetchByTmdbId(901, 'movie');
+
+      expect(mockContentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adult: false,
+        }),
+      );
+    });
+
+    it('TMDB adult가 없으면 기본값 false로 매핑해야 한다', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+
+      const tmdbData = {
+        id: 902,
+        title: 'No Adult Field Movie',
+        original_title: 'No Adult Field Movie',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        genres: [],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
+
+      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+
+      await service.findOrFetchByTmdbId(902, 'movie');
+
+      expect(mockContentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adult: false,
+        }),
+      );
+    });
+  });
+
   describe('getSitemapContents', () => {
     it('DB에서 모든 콘텐츠의 tmdbId, contentType, updatedAt을 반환해야 한다', async () => {
       const mockRows = [
