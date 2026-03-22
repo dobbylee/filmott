@@ -130,8 +130,8 @@ describe('ContentsService', () => {
       expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'tv', 1);
       expect(result.page).toBe(1);
       expect(result.total_pages).toBe(2); // max(2, 1)
-      expect(result.personTotal).toBe(2);
-      expect(result.contentTotal).toBe(8); // 5 + 3
+      expect((result as { personTotal: number }).personTotal).toBe(2);
+      expect((result as { contentTotal: number }).contentTotal).toBe(8); // 5 + 3
       expect(result.total_results).toBe(10); // 2 + 5 + 3
       expect(result.results).toHaveLength(3);
     });

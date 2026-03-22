@@ -72,7 +72,7 @@ describe('UsersController', () => {
 
   describe('POST /users/me/verify-password (verifyPassword)', () => {
     it('비밀번호가 올바르면 verified: true를 반환해야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
+      const mockUser = { id: 1, nickname: 'test', role: 'USER' };
       mockUsersService.verifyPassword.mockResolvedValue(true);
 
       const result = await controller.verifyPassword(mockUser, 'correct!Password1');
@@ -82,20 +82,20 @@ describe('UsersController', () => {
     });
 
     it('비밀번호가 비어있으면 BadRequestException을 던져야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
+      const mockUser = { id: 1, nickname: 'test', role: 'USER' };
 
       await expect(controller.verifyPassword(mockUser, '')).rejects.toThrow(BadRequestException);
       expect(mockUsersService.verifyPassword).not.toHaveBeenCalled();
     });
 
     it('비밀번호가 undefined이면 BadRequestException을 던져야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
+      const mockUser = { id: 1, nickname: 'test', role: 'USER' };
 
       await expect(controller.verifyPassword(mockUser, undefined as any)).rejects.toThrow(BadRequestException);
     });
 
     it('비밀번호가 틀리면 BadRequestException을 던져야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
+      const mockUser = { id: 1, nickname: 'test', role: 'USER' };
       mockUsersService.verifyPassword.mockResolvedValue(false);
 
       await expect(controller.verifyPassword(mockUser, 'wrong!Pass1')).rejects.toThrow(BadRequestException);
@@ -104,7 +104,7 @@ describe('UsersController', () => {
 
   describe('GET /users/me (getProfile)', () => {
     it('현재 사용자 프로필을 반환해야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
+      const mockUser = { id: 1, nickname: 'test', role: 'USER' };
       const profile = { id: 1, nickname: 'test', email: 'test@test.com' };
       mockUsersService.findById.mockResolvedValue(profile);
 
@@ -115,7 +115,7 @@ describe('UsersController', () => {
     });
 
     it('사용자를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
-      const mockUser = { id: 999, nickname: 'ghost' };
+      const mockUser = { id: 999, nickname: 'ghost', role: 'USER' };
       mockUsersService.findById.mockResolvedValue(null);
 
       await expect(controller.getProfile(mockUser)).rejects.toThrow(NotFoundException);
@@ -124,7 +124,7 @@ describe('UsersController', () => {
 
   describe('PATCH /users/me/otts (updateOtts)', () => {
     it('OTT 구독 정보를 업데이트하고 결과를 반환해야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
+      const mockUser = { id: 1, nickname: 'test', role: 'USER' };
       const mockResult = {
         id: 1,
         nickname: 'test',
@@ -170,7 +170,7 @@ describe('UsersController', () => {
 
   describe('POST /users/me/profile-image (uploadProfileImage)', () => {
     it('파일이 없으면 BadRequestException을 던져야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
+      const mockUser = { id: 1, nickname: 'test', role: 'USER' };
 
       await expect(
         controller.uploadProfileImage(mockUser, undefined as unknown as Express.Multer.File),
@@ -178,7 +178,7 @@ describe('UsersController', () => {
     });
 
     it('파일이 있으면 updateProfileImage를 호출하고 결과를 반환해야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
+      const mockUser = { id: 1, nickname: 'test', role: 'USER' };
       const mockFile = {
         buffer: Buffer.from('test'),
         mimetype: 'image/jpeg',
@@ -205,7 +205,7 @@ describe('UsersController', () => {
 
   describe('DELETE /users/me/profile-image (deleteProfileImage)', () => {
     it('removeProfileImage를 호출하고 결과를 반환해야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test' };
+      const mockUser = { id: 1, nickname: 'test', role: 'USER' };
       const mockResult = { id: 1, nickname: 'test', profileImage: undefined };
       mockUsersService.removeProfileImage.mockResolvedValue(mockResult);
 

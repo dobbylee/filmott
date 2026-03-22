@@ -86,15 +86,23 @@ export default function ContentManagement() {
 
     try {
       if (confirmModal.action === 'block-person') {
-        const { data } = await api.post<{ blocked: number }>(
-          `/contents/adult/block-person/${confirmModal.personId}`,
-        );
+        const { data } = await api.post<{
+          blocked: number;
+          failed: number;
+          total: number;
+          blockedContents: { tmdbId: number; contentType: string }[];
+        }>(`/contents/adult/block-person/${confirmModal.personId}`);
         setResult({
           type: 'success',
           message: `인물 #${confirmModal.personId}의 작품 ${data.blocked}개 차단 완료`,
         });
         setPersonId('');
-        await fetchAdultList(1);
+        await Promise.all([
+          fetchAdultList(1),
+          ...data.blockedContents.map((c) =>
+            revalidateContentDetail(c.contentType, String(c.tmdbId)),
+          ),
+        ]);
         return;
       }
 

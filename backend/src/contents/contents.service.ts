@@ -310,6 +310,7 @@ export class ContentsService {
     blocked: number;
     failed: number;
     total: number;
+    blockedContents: { tmdbId: number; contentType: string }[];
   }> {
     const credits = await this.tmdbService.getPersonCredits(personId);
     const allCredits = [...credits.cast, ...credits.crew].filter(
@@ -376,15 +377,31 @@ export class ContentsService {
       }
     }
 
-    // 일괄 update
+    // 일괄 update (updatedAt 수동 갱신 — update()는 @UpdateDateColumn 미동작)
     if (toBlockIds.length > 0) {
       await this.contentRepo.update(
         { id: In(toBlockIds) },
-        { adult: true },
+        { adult: true, updatedAt: new Date() },
       );
     }
 
-    return { blocked: toBlockIds.length, failed, total: unique.size };
+    // 차단된 콘텐츠 정보 반환 (프론트에서 캐시 무효화용)
+    const blockedContents = toBlockIds.length > 0
+      ? await this.contentRepo.find({
+          where: { id: In(toBlockIds) },
+          select: ['tmdbId', 'contentType'],
+        })
+      : [];
+
+    return {
+      blocked: toBlockIds.length,
+      failed,
+      total: unique.size,
+      blockedContents: blockedContents.map((c) => ({
+        tmdbId: c.tmdbId,
+        contentType: c.contentType,
+      })),
+    };
   }
 
   /**

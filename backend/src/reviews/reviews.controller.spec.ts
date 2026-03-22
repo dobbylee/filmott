@@ -47,7 +47,7 @@ describe('ReviewsController', () => {
 
   describe('GET /api/reviews/my', () => {
     it('콘텐츠에 대한 내 리뷰를 반환해야 한다', async () => {
-      const user = { id: 1, nickname: 'test' };
+      const user = { id: 1, nickname: 'test', role: 'USER' };
       const review = { id: 1, userId: 1, contentId: 5, rating: 8, commentsCount: 2 };
       mockReviewsService.findMyReview.mockResolvedValue(review);
 
@@ -58,7 +58,7 @@ describe('ReviewsController', () => {
     });
 
     it('내 리뷰가 존재하지 않으면 null을 반환해야 한다', async () => {
-      const user = { id: 1, nickname: 'test' };
+      const user = { id: 1, nickname: 'test', role: 'USER' };
       mockReviewsService.findMyReview.mockResolvedValue(null);
 
       const result = await controller.findMyReview(user, 99);
@@ -69,7 +69,7 @@ describe('ReviewsController', () => {
 
   describe('GET /api/reviews/liked-ids', () => {
     it('reviewIds가 제공되면 reviewIds로 좋아요한 ID를 반환해야 한다', async () => {
-      const user = { id: 1, nickname: 'test' };
+      const user = { id: 1, nickname: 'test', role: 'USER' };
       mockReviewsService.getLikedReviewIdsByIds.mockResolvedValue([2, 4]);
 
       const result = await controller.getLikedIds(user, undefined, '2,4,6');
@@ -79,7 +79,7 @@ describe('ReviewsController', () => {
     });
 
     it('contentId가 제공되면 contentId로 좋아요한 ID를 반환해야 한다', async () => {
-      const user = { id: 1, nickname: 'test' };
+      const user = { id: 1, nickname: 'test', role: 'USER' };
       mockReviewsService.getLikedReviewIds.mockResolvedValue([1, 3]);
 
       const result = await controller.getLikedIds(user, '5');
@@ -89,7 +89,7 @@ describe('ReviewsController', () => {
     });
 
     it('contentId가 0으로 파싱되면 빈 배열을 반환해야 한다', async () => {
-      const user = { id: 1, nickname: 'test' };
+      const user = { id: 1, nickname: 'test', role: 'USER' };
 
       const result = await controller.getLikedIds(user, '0');
 
@@ -98,7 +98,7 @@ describe('ReviewsController', () => {
     });
 
     it('contentId와 reviewIds 모두 제공되지 않으면 빈 배열을 반환해야 한다', async () => {
-      const user = { id: 1, nickname: 'test' };
+      const user = { id: 1, nickname: 'test', role: 'USER' };
 
       const result = await controller.getLikedIds(user, undefined, undefined);
 
@@ -199,7 +199,7 @@ describe('ReviewsController', () => {
     });
 
     it('getLikedIds에서 숫자가 아닌 contentId에 대해 BadRequestException을 던져야 한다', async () => {
-      const user = { id: 1, nickname: 'test' };
+      const user = { id: 1, nickname: 'test', role: 'USER' };
 
       await expect(controller.getLikedIds(user, 'abc')).rejects.toThrow(BadRequestException);
     });

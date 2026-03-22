@@ -339,7 +339,7 @@ describe('ContentManagement', () => {
     });
 
     it('모달 확인 시 POST API 호출 후 성공 메시지를 표시해야 한다', async () => {
-      mockPost.mockResolvedValue({ data: { blocked: 5, failed: 0, total: 5 } });
+      mockPost.mockResolvedValue({ data: { blocked: 5, failed: 0, total: 5, blockedContents: [] } });
       const user = userEvent.setup();
       render(<ContentManagement />);
 

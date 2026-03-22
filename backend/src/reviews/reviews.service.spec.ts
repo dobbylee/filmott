@@ -160,7 +160,7 @@ describe('ReviewsService', () => {
         delete: jest.fn().mockResolvedValue({ affected: 5 }),
         save: jest.fn().mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
       };
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager));
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager));
 
       const result = await service.update(1, 1, { rating: 9 });
 
@@ -185,7 +185,7 @@ describe('ReviewsService', () => {
         delete: jest.fn().mockResolvedValue({ affected: 5 }),
         save: jest.fn().mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
       };
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager));
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager));
 
       const result = await service.update(1, 1, { comment: 'Updated comment' });
 
@@ -211,7 +211,7 @@ describe('ReviewsService', () => {
         delete: jest.fn().mockResolvedValue({ affected: 3 }),
         save: jest.fn().mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
       };
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager));
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager));
 
       const result = await service.update(1, 1, { rating: 9, comment: 'New comment' });
 
@@ -590,7 +590,7 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
       );
       mockReviewLikeRepo.create.mockReturnValue({ reviewId: 1, userId: 1 });
 
@@ -616,7 +616,7 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
       );
 
       const result = await service.toggleLike(1, 1);
@@ -641,7 +641,7 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
       );
       mockReviewLikeRepo.create.mockReturnValue({ reviewId: 1, userId: 1 });
 
@@ -667,7 +667,7 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
       );
 
       const result = await service.toggleLike(1, 1);
