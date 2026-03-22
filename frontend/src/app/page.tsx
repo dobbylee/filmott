@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { fetchApi } from '@/lib/fetcher';
 import RankingCarousel from '@/components/ranking/RankingCarousel';
 import RecentReviewItem from '@/components/review/RecentReviewItem';
+import AiRecommendCta from '@/components/common/AiRecommendCta';
 import type { RankingItem } from '@/components/ranking/RankingCard';
 import type { Review } from '@/types/review';
 import SectionError from '@/components/common/SectionError';
@@ -121,6 +122,8 @@ export default function HomePage() {
       <Suspense fallback={<SectionSkeleton title="박스오피스" />}>
         <BoxOfficeSection />
       </Suspense>
+
+      <AiRecommendCta />
 
       <Suspense fallback={<SectionSkeleton title="지금 뜨는 작품" />}>
         <TrendingSection />

@@ -87,11 +87,13 @@ export default function Header() {
         <nav className="hidden md:flex items-center gap-6">
           <Link href="/discover?type=movie" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">영화</Link>
           <Link href="/discover?type=tv" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">시리즈</Link>
+          {user ? (
+            <Link href="/chat" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">추천받기</Link>
+          ) : (
+            <button onClick={() => openAuthModal()} className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">추천받기</button>
+          )}
           {user && (
-            <>
-              <Link href="/chat" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">추천받기</Link>
-              <Link href="/profile/watchlist?status=watched" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">내 기록</Link>
-            </>
+            <Link href="/profile/watchlist?status=watched" className="text-[15px] font-medium text-white/70 hover:text-white transition-colors">내 기록</Link>
           )}
         </nav>
 
@@ -167,11 +169,17 @@ export default function Header() {
             <Link href="/discover?type=tv" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
               <Tv className="h-5 w-5" /> 시리즈
             </Link>
+            {user ? (
+              <Link href="/chat" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+                <Sparkles className="h-5 w-5" /> 추천받기
+              </Link>
+            ) : (
+              <button onClick={() => { setShowMobileMenu(false); openAuthModal(); }} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+                <Sparkles className="h-5 w-5" /> 추천받기
+              </button>
+            )}
             {user && (
               <>
-                <Link href="/chat" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-                  <Sparkles className="h-5 w-5" /> 추천받기
-                </Link>
                 <Link href="/profile/watchlist?status=watched" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
                   <Layers className="h-5 w-5" /> 내 기록
                 </Link>

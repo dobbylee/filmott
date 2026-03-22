@@ -81,10 +81,10 @@ describe('Header', () => {
     expect(desktopLink).toBeDefined();
   });
 
-  it('비로그인 상태에서 추천받기 링크를 표시하지 않아야 한다', () => {
+  it('비로그인 상태에서도 추천받기 버튼을 표시해야 한다', () => {
     render(<Header />);
 
-    expect(screen.queryByText('추천받기')).not.toBeInTheDocument();
+    expect(screen.getAllByText('추천받기').length).toBeGreaterThan(0);
   });
 
   it('검색 폼 제출을 처리해야 한다', async () => {
