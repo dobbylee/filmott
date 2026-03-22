@@ -571,6 +571,33 @@ describe('ContentSearchService', () => {
       expect(query).not.toMatch(/EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+rankings/);
     });
 
+    it('precomputedEmbedding이 있으면 generateEmbedding을 호출하지 않아야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+      const precomputed = [0.5, 0.6, 0.7];
+
+      await service.searchWithFilters(
+        '영야성하 비슷한 드라마', 20, [],
+        { contentType: 'tv' },
+        precomputed,
+      );
+
+      expect(mockEmbeddingService.generateEmbedding).not.toHaveBeenCalled();
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      // precomputedEmbedding이 쿼리 파라미터에 포함되어야 한다
+      expect(params).toContain('[0.5,0.6,0.7]');
+    });
+
+    it('precomputedEmbedding이 없으면 generateEmbedding을 호출해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '스릴러 추천', 20, [],
+        { contentType: 'movie' },
+      );
+
+      expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledWith('스릴러 추천');
+    });
+
     it('CTE에서 embedding 컬럼을 SELECT하여 재조인 없이 사용해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 

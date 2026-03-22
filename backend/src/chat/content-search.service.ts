@@ -48,15 +48,18 @@ export class ContentSearchService {
     limit: number,
     excludeTmdbIds: number[],
     filters: ContentSearchFilters,
+    precomputedEmbedding?: number[],
   ): Promise<SimilarContent[]> {
     // P0-2: 임베딩 실패 시 null 반환 → 벡터 유사도 없이 2/3순위 결과만 반환
-    let embedding: number[] | null = null;
-    try {
-      embedding = await this.embeddingService.generateEmbedding(queryText);
-    } catch (error) {
-      this.logger.warn(
-        `임베딩 생성 실패, 벡터 유사도 없이 검색 진행: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    let embedding: number[] | null = precomputedEmbedding ?? null;
+    if (!embedding) {
+      try {
+        embedding = await this.embeddingService.generateEmbedding(queryText);
+      } catch (error) {
+        this.logger.warn(
+          `임베딩 생성 실패, 벡터 유사도 없이 검색 진행: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
     const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];

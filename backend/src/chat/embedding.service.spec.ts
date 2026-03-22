@@ -473,6 +473,26 @@ describe('EmbeddingService', () => {
       expect(mockDataSource.query).toHaveBeenCalledTimes(1);
     });
 
+    it('precomputedEmbedding이 있으면 generateEmbedding을 호출하지 않아야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+      const precomputed = [0.5, 0.6, 0.7];
+
+      await service.searchSimilar('테스트', 10, [], undefined, precomputed);
+
+      // generateEmbedding 호출 없이 precomputed 벡터를 사용해야 한다
+      expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params[0]).toBe('[0.5,0.6,0.7]');
+    });
+
+    it('precomputedEmbedding이 없으면 generateEmbedding을 호출해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchSimilar('테스트', 10, []);
+
+      expect(mockEmbeddingsCreate).toHaveBeenCalledTimes(1);
+    });
+
     it('adult 콘텐츠를 검색 결과에서 제외해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 

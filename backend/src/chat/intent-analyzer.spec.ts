@@ -24,6 +24,7 @@ const EMPTY_INTENT: ParsedIntent = {
   countries: [],
   excludeCountries: [],
   personNames: [],
+  referenceTitles: [],
   dateRange: null,
   contentType: null,
   genres: [],
@@ -231,6 +232,39 @@ describe('IntentAnalyzerService', () => {
       expect(result.genres).toContain(expanded);
     });
 
+    it('참조 작품명을 올바르게 추출해야 한다', async () => {
+      mockIntent({ referenceTitles: ['영야성하'] });
+
+      const result = await service.analyzeIntent('영야성하 같은 드라마 추천해줘');
+
+      expect(result.referenceTitles).toEqual(['영야성하']);
+    });
+
+    it('여러 참조 작품명을 추출해야 한다', async () => {
+      mockIntent({ referenceTitles: ['기생충', '옥자'] });
+
+      const result = await service.analyzeIntent('기생충이나 옥자 같은 영화');
+
+      expect(result.referenceTitles).toEqual(['기생충', '옥자']);
+    });
+
+    it('referenceTitles가 잘못된 타입이면 빈 배열로 처리해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        excludeCountries: [],
+        personNames: [],
+        referenceTitles: '기생충',
+        dateRange: null,
+        contentType: null,
+        genres: [],
+      }));
+
+      const result = await service.analyzeIntent('기생충 같은 영화');
+
+      expect(result.referenceTitles).toEqual([]);
+    });
+
     it('매핑에 없는 장르명은 그대로 유지해야 한다', async () => {
       mockIntent({ genres: ['뮤지컬'] });
 
@@ -317,6 +351,7 @@ describe('IntentAnalyzerService', () => {
       countries: [],
       excludeCountries: [],
       personNames: [],
+      referenceTitles: [],
       dateRange: null,
       contentType: null,
       genres: [],
@@ -580,6 +615,33 @@ describe('IntentAnalyzerService', () => {
       const result = service.buildSemanticQuery('무서운 호러 영화', emptyIntent);
 
       expect(result).toContain('호러');
+    });
+
+    it('참조 작품명을 쿼리에서 제거해야 한다', () => {
+      const intent: ParsedIntent = { ...emptyIntent, referenceTitles: ['영야성하'] };
+      const result = service.buildSemanticQuery('영야성하 같은 분위기 드라마', intent);
+
+      expect(result).not.toMatch(/영야성하/);
+      expect(result).not.toMatch(/같은/);
+      expect(result).toContain('분위기');
+      expect(result).toContain('드라마');
+    });
+
+    it('참조 작품 제거 후 "비슷한" 고립 수식어를 제거해야 한다', () => {
+      const intent: ParsedIntent = { ...emptyIntent, referenceTitles: ['기생충'] };
+      const result = service.buildSemanticQuery('기생충 비슷한 사회 풍자 영화', intent);
+
+      expect(result).not.toMatch(/기생충/);
+      expect(result).not.toMatch(/비슷한/);
+      expect(result).toContain('사회');
+      expect(result).toContain('풍자');
+      expect(result).toContain('영화');
+    });
+
+    it('참조 작품이 없으면 "같은"을 유지해야 한다', () => {
+      const result = service.buildSemanticQuery('같은 분위기 영화', emptyIntent);
+
+      expect(result).toContain('같은');
     });
 
     it('복합 조건에서 장르 + 기타 메타데이터를 모두 제거해야 한다', () => {

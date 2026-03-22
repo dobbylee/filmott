@@ -169,10 +169,11 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     limit: number,
     excludeTmdbIds: number[],
     filters?: SearchFilters,
+    precomputedEmbedding?: number[],
   ): Promise<SimilarContent[]> {
     if (!this.openai) return [];
 
-    const embedding = await this.generateEmbedding(queryText);
+    const embedding = precomputedEmbedding ?? await this.generateEmbedding(queryText);
     const embeddingStr = `[${embedding.join(',')}]`;
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];
 

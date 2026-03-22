@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { EmbeddingService, SimilarContent } from './embedding.service';
@@ -74,6 +74,7 @@ export class ChatService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(Content)
     private readonly contentRepo: Repository<Content>,
+    private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY', '');
@@ -109,6 +110,7 @@ export class ChatService {
       countries: [],
       excludeCountries: [],
       personNames: [],
+      referenceTitles: [],
       dateRange: null,
       contentType: null,
       genres: [],
@@ -131,7 +133,14 @@ export class ChatService {
       // 5. 쿼리 정제: 메타데이터 키워드 제거 후 의미적 쿼리만 사용
       const semanticQuery = this.intentAnalyzer.buildSemanticQuery(searchQuery, intent);
 
-      // 6. 유저 선호 추출 + 2분기 검색
+      // 6. 참조 작품 임베딩 해결
+      const referenceResult = await this.resolveReferenceEmbedding(intent.referenceTitles);
+      const referenceEmbedding = referenceResult?.embedding ?? null;
+      const referenceExcludeTmdbIds = referenceResult?.tmdbId
+        ? [...userContext.watchedTmdbIds, referenceResult.tmdbId]
+        : userContext.watchedTmdbIds;
+
+      // 7. 유저 선호 추출 + 2분기 검색
       const userPref = extractUserPreference(userContext, subscribedOtts);
 
       if (hasFilters || userPref.hasData) {
@@ -154,17 +163,20 @@ export class ChatService {
         const enrichedQuery = enrichQueryWithPreference(semanticQuery, userPref, intent);
 
         similarContents = await this.contentSearchService.searchWithFilters(
-          enrichedQuery, 20, userContext.watchedTmdbIds, mergedFilters,
+          enrichedQuery, 20, referenceExcludeTmdbIds, mergedFilters,
+          referenceEmbedding ?? undefined,
         );
       } else {
         // C. 필터 없음 + 신규 유저: 기존 벡터 검색 fallback
         similarContents = await this.embeddingService.searchSimilar(
-          semanticQuery, 20, userContext.watchedTmdbIds,
+          semanticQuery, 20, referenceExcludeTmdbIds,
+          undefined,
+          referenceEmbedding ?? undefined,
         );
       }
     }
 
-    // 7. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
+    // 8. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
     const systemPrompt = buildSystemPrompt(
       userContext,
       subscribedOtts,
@@ -173,7 +185,7 @@ export class ChatService {
       intent,
     );
 
-    // 8. 대화 이력 구성
+    // 9. 대화 이력 구성
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       ...(history || []).map((msg) => ({
         role: msg.role as 'user' | 'assistant',
@@ -182,7 +194,7 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 9. GPT 스트리밍 호출 (function calling 없이 텍스트만)
+    // 10. GPT 스트리밍 호출 (function calling 없이 텍스트만)
     const stream = await this.openai.chat.completions.create({
       model: 'gpt-4o-mini',
       max_tokens: 2048,
@@ -195,7 +207,7 @@ export class ChatService {
 
     let fullText = '';
 
-    // 10. 스트리밍 이벤트 처리
+    // 11. 스트리밍 이벤트 처리
     try {
       for await (const chunk of stream) {
         if (signal?.aborted) {
@@ -214,7 +226,7 @@ export class ChatService {
       throw error;
     }
 
-    // 11. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
+    // 12. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
     const titles = this.extractTitlesFromText(fullText);
     if (titles.length > 0) {
       const { matched, unmatched } = this.matchTitlesToCandidates(titles, similarContents);
@@ -482,6 +494,74 @@ export class ChatService {
       avgRating: row.avgRating,
       count: parseInt(row.count, 10),
     }));
+  }
+
+  private async resolveReferenceEmbedding(
+    referenceTitles: string[],
+  ): Promise<{ embedding: number[]; tmdbId: number } | null> {
+    if (referenceTitles.length === 0) return null;
+
+    for (const title of referenceTitles) {
+      try {
+        // 1. DB에서 title ILIKE 검색 + content_metadata embedding 조회
+        interface ReferenceRow {
+          content_id: number;
+          tmdb_id: number;
+          embedding: string;
+        }
+        const rows: ReferenceRow[] = await this.dataSource.query(
+          `SELECT c.id AS content_id, c.tmdb_id, cm.embedding::text
+           FROM contents c
+           JOIN content_metadata cm ON cm.content_id = c.id
+           WHERE c.title ILIKE $1
+           LIMIT 1`,
+          [title],
+        );
+
+        if (rows.length > 0 && rows[0].embedding) {
+          try {
+            const embedding = JSON.parse(rows[0].embedding) as number[];
+            this.logger.log(`참조 작품 임베딩 사용: "${title}" (tmdbId: ${rows[0].tmdb_id})`);
+            return { embedding, tmdbId: rows[0].tmdb_id };
+          } catch {
+            this.logger.warn(`참조 작품 임베딩 파싱 실패: "${title}" (tmdbId: ${rows[0].tmdb_id})`);
+          }
+        }
+
+        // 2. DB에 없으면 TMDB 검색 → findOrFetchByTmdbId → 임베딩 캐싱
+        const [movieResult, tvResult] = await Promise.all([
+          this.contentsService.searchContents(title, 'movie', 1).catch(() => null),
+          this.contentsService.searchContents(title, 'tv', 1).catch(() => null),
+        ]);
+
+        const firstMatch =
+          (movieResult?.results?.[0] ? { id: movieResult.results[0].id, type: 'movie' as const } : null)
+          ?? (tvResult?.results?.[0] ? { id: tvResult.results[0].id, type: 'tv' as const } : null);
+
+        if (firstMatch) {
+          const content = await this.contentsService.findOrFetchByTmdbId(
+            firstMatch.id,
+            firstMatch.type,
+          );
+          const metadata = await this.embeddingService.cacheContentMetadata(content.id);
+          if (metadata?.embedding) {
+            try {
+              const embedding = JSON.parse(metadata.embedding) as number[];
+              this.logger.log(`참조 작품 TMDB 검색 후 임베딩 생성: "${title}" (tmdbId: ${content.tmdbId})`);
+              return { embedding, tmdbId: content.tmdbId };
+            } catch {
+              this.logger.warn(`참조 작품 TMDB 임베딩 파싱 실패: "${title}" (tmdbId: ${content.tmdbId})`);
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.warn(
+          `참조 작품 임베딩 해결 실패 ("${title}"): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return null;
   }
 
   private buildFiltersFromIntent(intent: ParsedIntent): ContentSearchFilters {

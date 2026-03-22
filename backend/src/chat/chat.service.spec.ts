@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { ChatService } from './chat.service';
 import { EmbeddingService, SimilarContent } from './embedding.service';
 import { ContentSearchService } from './content-search.service';
@@ -75,6 +76,10 @@ describe('ChatService', () => {
     findOne: jest.fn(),
   };
 
+  const mockDataSource = {
+    query: jest.fn().mockResolvedValue([]),
+  };
+
   const mockConfigService = {
     get: jest.fn().mockReturnValue('test-openai-key'),
   };
@@ -91,6 +96,7 @@ describe('ChatService', () => {
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },
+        { provide: DataSource, useValue: mockDataSource },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
@@ -219,6 +225,7 @@ describe('ChatService', () => {
       countries: [],
       excludeCountries: [],
       personNames: [],
+      referenceTitles: [],
       dateRange: null,
       contentType: null,
       genres: [],
@@ -371,6 +378,7 @@ describe('ChatService', () => {
           { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
           { provide: getRepositoryToken(User), useValue: mockUserRepo },
           { provide: getRepositoryToken(Content), useValue: mockContentRepo },
+          { provide: DataSource, useValue: mockDataSource },
           { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('') } },
         ],
       }).compile();
@@ -435,6 +443,7 @@ describe('ChatService', () => {
         20,
         expect.any(Array),
         expect.objectContaining({ ottProviderNames: ['Netflix'] }),
+        undefined,
       );
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
@@ -458,6 +467,8 @@ describe('ChatService', () => {
         '재미있는 영화',
         20,
         expect.any(Array),
+        undefined,
+        undefined,
       );
       expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();
     });
@@ -497,6 +508,7 @@ describe('ChatService', () => {
           dateRange: { from: '2020-01-01', to: null },
           contentType: 'movie',
         }),
+        undefined,
       );
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
@@ -545,6 +557,7 @@ describe('ChatService', () => {
           countries: ['KR'],
           personNames: ['봉준호'],
         }),
+        undefined,
       );
     });
 
@@ -588,6 +601,7 @@ describe('ChatService', () => {
         expect.objectContaining({
           dateRange: { from: null, to: '1999-12-31' },
         }),
+        undefined,
       );
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
@@ -618,6 +632,7 @@ describe('ChatService', () => {
           genres: ['공포', '스릴러'],
           contentType: 'movie',
         }),
+        undefined,
       );
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
@@ -652,6 +667,7 @@ describe('ChatService', () => {
           genres: ['드라마', '스릴러'],
           countries: ['KR'],
         }),
+        undefined,
       );
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
@@ -680,6 +696,8 @@ describe('ChatService', () => {
         '재미있는 영화',
         20,
         expect.any(Array),
+        undefined,
+        undefined,
       );
       expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();
     });
@@ -948,6 +966,136 @@ describe('ChatService', () => {
 
       expect(matched).toHaveLength(0);
       expect(unmatched).toHaveLength(1);
+    });
+  });
+
+  describe('resolveReferenceEmbedding 통합', () => {
+    const setupForReferenceTest = () => {
+      const emptyQb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      };
+      mockReviewRepo.createQueryBuilder.mockReturnValue(emptyQb);
+      mockWatchlistRepo.createQueryBuilder.mockReturnValue(emptyQb);
+      mockUserRepo.findOne.mockResolvedValue({ id: 1, subscribedOtts: [] });
+      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
+      mockExtractUserPreference.mockReturnValue({
+        preferredGenres: [], preferredCountries: [], ottProviderNames: [], hasData: false,
+      });
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+    };
+
+    it('referenceTitles가 있으면 DB에서 임베딩을 조회하고 searchWithFilters에 전달해야 한다', async () => {
+      setupForReferenceTest();
+
+      const fakeEmbedding = [0.1, 0.2, 0.3];
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ottProviderNames: [], countries: [], excludeCountries: [],
+        personNames: [], referenceTitles: ['기생충'],
+        dateRange: null, contentType: 'movie', genres: [],
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
+
+      // DB에서 임베딩 찾음
+      mockDataSource.query.mockResolvedValue([
+        { content_id: 1, tmdb_id: 496243, embedding: JSON.stringify(fakeEmbedding) },
+      ]);
+
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      await service.sendMessageStream(1, '기생충 같은 영화', [], jest.fn());
+
+      // ILIKE 쿼리 호출 확인
+      expect(mockDataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('ILIKE'),
+        ['기생충'],
+      );
+
+      // precomputedEmbedding이 searchWithFilters에 전달됨
+      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+        expect.any(String), 20, expect.any(Array),
+        expect.any(Object),
+        fakeEmbedding,
+      );
+    });
+
+    it('DB에서 못 찾으면 TMDB fallback으로 임베딩을 생성해야 한다', async () => {
+      setupForReferenceTest();
+
+      const fakeEmbedding = [0.4, 0.5, 0.6];
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ottProviderNames: [], countries: [], excludeCountries: [],
+        personNames: [], referenceTitles: ['영야성하'],
+        dateRange: null, contentType: 'tv', genres: [],
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
+
+      // DB에서 못 찾음
+      mockDataSource.query.mockResolvedValue([]);
+
+      // TMDB 검색 성공
+      mockContentsService.searchContents
+        .mockResolvedValueOnce({ results: [] }) // movie 검색 실패
+        .mockResolvedValueOnce({ results: [{ id: 12345 }] }); // tv 검색 성공
+
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 100, tmdbId: 12345 });
+      mockEmbeddingService.cacheContentMetadata.mockResolvedValue({
+        embedding: JSON.stringify(fakeEmbedding),
+      });
+
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      await service.sendMessageStream(1, '영야성하 같은 드라마', [], jest.fn());
+
+      // TMDB 검색 호출 확인
+      expect(mockContentsService.searchContents).toHaveBeenCalledWith('영야성하', 'movie', 1);
+      expect(mockContentsService.searchContents).toHaveBeenCalledWith('영야성하', 'tv', 1);
+
+      // findOrFetchByTmdbId + cacheContentMetadata 호출 확인
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(12345, 'tv');
+      expect(mockEmbeddingService.cacheContentMetadata).toHaveBeenCalledWith(100);
+
+      // precomputedEmbedding 전달 확인
+      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+        expect.any(String), 20, expect.any(Array),
+        expect.any(Object),
+        fakeEmbedding,
+      );
+    });
+
+    it('참조 작품의 tmdbId가 제외 목록에 포함되어야 한다', async () => {
+      setupForReferenceTest();
+
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ottProviderNames: [], countries: [], excludeCountries: [],
+        personNames: [], referenceTitles: ['기생충'],
+        dateRange: null, contentType: null, genres: [],
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
+
+      mockDataSource.query.mockResolvedValue([
+        { content_id: 1, tmdb_id: 496243, embedding: JSON.stringify([0.1]) },
+      ]);
+
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      await service.sendMessageStream(1, '기생충 같은 영화', [], jest.fn());
+
+      // searchSimilar의 excludeTmdbIds에 496243이 포함되어야 함
+      const excludeArg = mockEmbeddingService.searchSimilar.mock.calls[0][2] as number[];
+      expect(excludeArg).toContain(496243);
     });
   });
 });
