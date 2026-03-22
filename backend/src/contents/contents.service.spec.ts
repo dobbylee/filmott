@@ -934,6 +934,81 @@ describe('ContentsService', () => {
     });
   });
 
+  describe('searchContents - 차단 필터링', () => {
+    it('타입 지정 검색 시 차단된 콘텐츠를 결과에서 제외해야 한다', async () => {
+      mockContentRepo.find.mockResolvedValue([
+        { tmdbId: 2, contentType: 'movie' },
+      ]);
+
+      const searchResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 3,
+        results: [{ id: 1 }, { id: 2 }, { id: 3 }],
+      };
+      mockTmdbService.searchByType.mockResolvedValue(searchResult);
+
+      const result = await service.searchContents('test', 'movie', 1);
+
+      expect(result.results).toHaveLength(2);
+      expect(result.results.map((r: { id: number }) => r.id)).toEqual([1, 3]);
+    });
+
+    it('전체 검색 시 같은 타입의 차단된 콘텐츠만 제외해야 한다', async () => {
+      mockContentRepo.find.mockResolvedValue([
+        { tmdbId: 5, contentType: 'tv' },
+      ]);
+
+      const personResult = {
+        page: 1, total_pages: 1, total_results: 0, results: [],
+      };
+      const movieResult = {
+        page: 1, total_pages: 1, total_results: 1, results: [{ id: 5 }],
+      };
+      const tvResult = {
+        page: 1, total_pages: 1, total_results: 2, results: [{ id: 5 }, { id: 6 }],
+      };
+
+      mockTmdbService.searchByType
+        .mockResolvedValueOnce(personResult)
+        .mockResolvedValueOnce(movieResult)
+        .mockResolvedValueOnce(tvResult);
+
+      const result = await service.searchContents('test');
+
+      // tv:5는 차단, movie:5는 유지 (contentType이 다르므로)
+      const movieResults = result.results.filter(
+        (r: { media_type?: string; id: number }) => r.media_type !== 'person',
+      );
+      // movie id:5 유지 + tv id:6 유지 = results에 id:5, id:6 포함
+      const resultIds = result.results.map((r: { id: number }) => r.id);
+      expect(resultIds).toContain(5); // movie:5는 차단 아님
+      expect(resultIds).toContain(6); // tv:6도 차단 아님
+      expect(result.results).toHaveLength(2); // movie 1개 + tv 1개 (tv:5 제외)
+    });
+  });
+
+  describe('discoverContents - 차단 필터링', () => {
+    it('차단된 콘텐츠를 탐색 결과에서 제외해야 한다', async () => {
+      mockContentRepo.find.mockResolvedValue([
+        { tmdbId: 10, contentType: 'movie' },
+      ]);
+
+      const discoverResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 2,
+        results: [{ id: 10 }, { id: 11 }],
+      };
+      mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
+
+      const result = await service.discoverContents('movie', { page: 1 });
+
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].id).toBe(11);
+    });
+  });
+
   describe('getSitemapContents', () => {
     it('DB에서 모든 콘텐츠의 tmdbId, contentType, updatedAt을 반환해야 한다', async () => {
       const mockRows = [
