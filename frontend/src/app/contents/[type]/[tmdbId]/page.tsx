@@ -7,6 +7,7 @@ import CastCarousel from '@/components/content/CastCarousel';
 import ReviewListClient from '@/components/review/ReviewListClient';
 import ReviewFormWrapper from '@/components/review/ReviewFormWrapper';
 import WatchlistStatusButton from '@/components/watchlist/WatchlistStatusButton';
+import AdultBlockButton from '@/components/content/AdultBlockButton';
 import type { ContentDetail, WatchProviderData } from '@/types/content';
 import type { ReviewsResponse, ContentStats } from '@/types/review';
 import ErrorWithRetry from '@/components/common/ErrorWithRetry';
@@ -255,10 +256,15 @@ export default async function ContentDetailPage({
               )}
 
               {/* 기록하기 버튼 */}
-              <div className="mt-6">
+              <div className="mt-6 flex flex-wrap items-center gap-3">
                 <WatchlistStatusButton
                   tmdbId={Number(tmdbId)}
                   contentType={type as 'movie' | 'tv'}
+                />
+                <AdultBlockButton
+                  tmdbId={Number(tmdbId)}
+                  contentType={type}
+                  initialAdult={content.adult ?? false}
                 />
               </div>
             </div>
