@@ -22,6 +22,7 @@ describe('ContentsService', () => {
     findAndCount: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    update: jest.fn(),
     createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
   };
 
@@ -1113,6 +1114,120 @@ describe('ContentsService', () => {
       const result = await service.getSitemapContents();
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('blockPersonContents', () => {
+    const blockQueryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+    };
+
+    it('cast와 crew 중복을 제거하고 정상 차단해야 한다', async () => {
+      const creditsData = {
+        cast: [
+          { id: 100, media_type: 'movie', title: 'Movie A' },
+          { id: 200, media_type: 'tv', name: 'TV B' },
+        ],
+        crew: [
+          { id: 100, media_type: 'movie', title: 'Movie A', job: 'Director' },
+          { id: 300, media_type: 'movie', title: 'Movie C', job: 'Producer' },
+        ],
+      };
+      mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
+
+      // 일괄 조회: DB에 movie:100, tv:200이 존재 (adult=false)
+      const existingContents = [
+        { id: 1, tmdbId: 100, contentType: 'movie', adult: false },
+        { id: 2, tmdbId: 200, contentType: 'tv', adult: false },
+      ];
+      mockContentRepo.createQueryBuilder.mockReturnValue(blockQueryBuilder);
+      blockQueryBuilder.getMany.mockResolvedValue(existingContents);
+
+      // movie:300은 DB에 없으므로 fetch
+      mockContentRepo.findOne.mockResolvedValueOnce(null);
+      const fetchedContent = { id: 3, tmdbId: 300, contentType: 'movie', adult: false };
+      mockTmdbService.getDetails.mockResolvedValue({
+        id: 300, title: 'Movie C', original_title: 'Movie C',
+        poster_path: null, backdrop_path: null, overview: null,
+        release_date: null, vote_average: null, genres: [], runtime: null,
+        credits: { cast: [] }, 'watch/providers': { results: {} },
+      });
+      mockContentRepo.create.mockReturnValue(fetchedContent);
+      mockContentRepo.save.mockResolvedValue(fetchedContent);
+      mockContentRepo.update.mockResolvedValue({ affected: 3 });
+
+      const result = await service.blockPersonContents(12345);
+
+      // 중복 제거: movie:100, tv:200, movie:300 = 3개
+      expect(result.total).toBe(3);
+      expect(result.blocked).toBe(3);
+      expect(result.failed).toBe(0);
+      expect(mockContentRepo.update).toHaveBeenCalled();
+    });
+
+    it('이미 adult=true인 항목을 건너뛰어야 한다', async () => {
+      const creditsData = {
+        cast: [
+          { id: 100, media_type: 'movie', title: 'Already Blocked' },
+          { id: 200, media_type: 'movie', title: 'Not Blocked' },
+        ],
+        crew: [],
+      };
+      mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
+
+      const existingContents = [
+        { id: 1, tmdbId: 100, contentType: 'movie', adult: true },
+        { id: 2, tmdbId: 200, contentType: 'movie', adult: false },
+      ];
+      mockContentRepo.createQueryBuilder.mockReturnValue(blockQueryBuilder);
+      blockQueryBuilder.getMany.mockResolvedValue(existingContents);
+      mockContentRepo.update.mockResolvedValue({ affected: 1 });
+
+      const result = await service.blockPersonContents(99999);
+
+      // id:100은 이미 adult=true → 건너뜀, id:200만 차단
+      expect(result.blocked).toBe(1);
+      expect(result.total).toBe(2);
+    });
+
+    it('TMDB fetch 실패 시 failed 카운트를 증가시키고 계속 진행해야 한다', async () => {
+      const creditsData = {
+        cast: [
+          { id: 100, media_type: 'movie', title: 'Movie A' },
+          { id: 200, media_type: 'movie', title: 'Fetch Fail Movie' },
+        ],
+        crew: [],
+      };
+      mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
+
+      // 일괄 조회: DB에 아무것도 없음
+      mockContentRepo.createQueryBuilder.mockReturnValue(blockQueryBuilder);
+      blockQueryBuilder.getMany.mockResolvedValue([]);
+
+      // movie:100 fetch 성공
+      mockContentRepo.findOne.mockResolvedValueOnce(null);
+      const fetchedContent = { id: 1, tmdbId: 100, contentType: 'movie', adult: false };
+      mockTmdbService.getDetails.mockResolvedValueOnce({
+        id: 100, title: 'Movie A', original_title: 'Movie A',
+        poster_path: null, backdrop_path: null, overview: null,
+        release_date: null, vote_average: null, genres: [], runtime: null,
+        credits: { cast: [] }, 'watch/providers': { results: {} },
+      });
+      mockContentRepo.create.mockReturnValueOnce(fetchedContent);
+      mockContentRepo.save.mockResolvedValueOnce(fetchedContent);
+
+      // movie:200 fetch 실패
+      mockContentRepo.findOne.mockResolvedValueOnce(null);
+      mockTmdbService.getDetails.mockRejectedValueOnce(new Error('TMDB API Error'));
+
+      mockContentRepo.update.mockResolvedValue({ affected: 1 });
+
+      const result = await service.blockPersonContents(11111);
+
+      expect(result.blocked).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(result.total).toBe(2);
     });
   });
 });

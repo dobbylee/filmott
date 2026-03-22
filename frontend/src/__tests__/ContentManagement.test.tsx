@@ -5,6 +5,7 @@ import ContentManagement from '@/components/admin/ContentManagement';
 
 const mockPatch = vi.fn();
 const mockGet = vi.fn();
+const mockPost = vi.fn();
 
 vi.mock('@/app/contents/[type]/[tmdbId]/actions', () => ({
   revalidateContentDetail: vi.fn(),
@@ -13,7 +14,7 @@ vi.mock('@/app/contents/[type]/[tmdbId]/actions', () => ({
 vi.mock('@/lib/api', () => ({
   default: {
     get: (...args: unknown[]) => mockGet(...args),
-    post: vi.fn(),
+    post: (...args: unknown[]) => mockPost(...args),
     patch: (...args: unknown[]) => mockPatch(...args),
     delete: vi.fn(),
   },
@@ -24,6 +25,7 @@ describe('ContentManagement', () => {
     vi.clearAllMocks();
     // 기본: 빈 차단 목록 반환
     mockGet.mockResolvedValue({ data: { data: [], total: 0, page: 1, totalPages: 0 } });
+    mockPost.mockResolvedValue({ data: { blocked: 0, failed: 0, total: 0 } });
   });
 
   it('타입 셀렉트와 TMDB ID 입력 필드를 렌더링해야 한다', () => {
@@ -309,6 +311,64 @@ describe('ContentManagement', () => {
         tmdbId: 123,
         contentType: 'movie',
         adult: false,
+      });
+    });
+  });
+
+  // 인물 일괄 차단 테스트
+  describe('인물 일괄 차단', () => {
+    it('Person ID 없이 클릭 시 에러 메시지를 표시해야 한다', async () => {
+      const user = userEvent.setup();
+      render(<ContentManagement />);
+
+      await user.click(screen.getByText('전체 작품 차단'));
+
+      expect(screen.getByText('Person ID를 입력해주세요.')).toBeInTheDocument();
+    });
+
+    it('Person ID 입력 후 클릭 시 확인 모달을 표시해야 한다', async () => {
+      const user = userEvent.setup();
+      render(<ContentManagement />);
+
+      const personIdInput = screen.getByLabelText(/인물 일괄 차단/);
+      await user.type(personIdInput, '12345');
+      await user.click(screen.getByText('전체 작품 차단'));
+
+      expect(screen.getByText('인물 전체 작품 차단')).toBeInTheDocument();
+      expect(screen.getByText(/인물 #12345의 전체 작품을 차단하시겠습니까\?/)).toBeInTheDocument();
+    });
+
+    it('모달 확인 시 POST API 호출 후 성공 메시지를 표시해야 한다', async () => {
+      mockPost.mockResolvedValue({ data: { blocked: 5, failed: 0, total: 5 } });
+      const user = userEvent.setup();
+      render(<ContentManagement />);
+
+      const personIdInput = screen.getByLabelText(/인물 일괄 차단/);
+      await user.type(personIdInput, '67890');
+      await user.click(screen.getByText('전체 작품 차단'));
+      await user.click(screen.getByText('확인'));
+
+      await waitFor(() => {
+        expect(mockPost).toHaveBeenCalledWith('/contents/adult/block-person/67890');
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/인물 #67890의 작품 5개 차단 완료/)).toBeInTheDocument();
+      });
+    });
+
+    it('모달 확인 후 Person ID 입력 필드가 초기화되어야 한다', async () => {
+      mockPost.mockResolvedValue({ data: { blocked: 3, failed: 0, total: 3 } });
+      const user = userEvent.setup();
+      render(<ContentManagement />);
+
+      const personIdInput = screen.getByLabelText(/인물 일괄 차단/);
+      await user.type(personIdInput, '11111');
+      await user.click(screen.getByText('전체 작품 차단'));
+      await user.click(screen.getByText('확인'));
+
+      await waitFor(() => {
+        expect(personIdInput).toHaveValue(null);
       });
     });
   });

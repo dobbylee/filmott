@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Content } from './content.entity';
 import {
   TmdbService,
@@ -306,7 +306,11 @@ export class ContentsService {
   /**
    * 인물의 전체 작품 일괄 차단 (관리자용)
    */
-  async blockPersonContents(personId: number): Promise<{ blocked: number }> {
+  async blockPersonContents(personId: number): Promise<{
+    blocked: number;
+    failed: number;
+    total: number;
+  }> {
     const credits = await this.tmdbService.getPersonCredits(personId);
     const allCredits = [...credits.cast, ...credits.crew].filter(
       (item) => item.media_type === 'movie' || item.media_type === 'tv',
@@ -318,27 +322,69 @@ export class ContentsService {
       unique.set(`${item.media_type}:${item.id}`, item);
     }
 
-    let blocked = 0;
+    // 일괄 조회: DB에 이미 존재하는 콘텐츠
+    const uniqueEntries = [...unique.values()];
+    const existingContents = uniqueEntries.length > 0
+      ? await this.contentRepo
+          .createQueryBuilder('c')
+          .where(
+            uniqueEntries.map((_, i) =>
+              `(c.tmdb_id = :tmdbId${i} AND c.content_type = :type${i})`
+            ).join(' OR '),
+            Object.fromEntries(
+              uniqueEntries.flatMap((item, i) => [
+                [`tmdbId${i}`, item.id],
+                [`type${i}`, item.media_type],
+              ]),
+            ),
+          )
+          .getMany()
+      : [];
+
+    const existingMap = new Map<string, Content>();
+    for (const c of existingContents) {
+      existingMap.set(`${c.contentType}:${c.tmdbId}`, c);
+    }
+
+    // 이미 adult=true인 항목 제외, 차단 대상 분류
+    const toBlockIds: number[] = [];
+    const toFetch: TmdbPersonCredit[] = [];
+
     for (const item of unique.values()) {
-      const type = item.media_type as 'movie' | 'tv';
-      let content = await this.contentRepo.findOne({
-        where: { tmdbId: item.id, contentType: type },
-      });
-      if (!content) {
-        try {
-          content = await this.findOrFetchByTmdbId(item.id, type);
-        } catch {
-          continue;
+      const key = `${item.media_type}:${item.id}`;
+      const existing = existingMap.get(key);
+      if (existing) {
+        if (!existing.adult) {
+          toBlockIds.push(existing.id);
         }
-      }
-      if (!content.adult) {
-        content.adult = true;
-        await this.contentRepo.save(content);
-        blocked++;
+      } else {
+        toFetch.push(item);
       }
     }
 
-    return { blocked };
+    // DB에 없는 항목은 개별 fetch (TMDB API 호출 불가피)
+    let failed = 0;
+    for (const item of toFetch) {
+      const type = item.media_type as 'movie' | 'tv';
+      try {
+        const content = await this.findOrFetchByTmdbId(item.id, type);
+        if (!content.adult) {
+          toBlockIds.push(content.id);
+        }
+      } catch {
+        failed++;
+      }
+    }
+
+    // 일괄 update
+    if (toBlockIds.length > 0) {
+      await this.contentRepo.update(
+        { id: In(toBlockIds) },
+        { adult: true },
+      );
+    }
+
+    return { blocked: toBlockIds.length, failed, total: unique.size };
   }
 
   /**

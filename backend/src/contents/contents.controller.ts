@@ -66,8 +66,8 @@ export class ContentsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const p = page ? parseInt(page, 10) : 1;
-    const l = limit ? Math.min(parseInt(limit, 10), 100) : 20;
+    const p = Math.max(1, parseInt(page ?? '1', 10) || 1);
+    const l = Math.max(1, Math.min(parseInt(limit ?? '20', 10) || 20, 100));
     return this.contentsService.getAdultContents(p, l);
   }
 

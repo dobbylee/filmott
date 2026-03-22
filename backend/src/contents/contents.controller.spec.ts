@@ -17,6 +17,7 @@ describe('ContentsController', () => {
     getSitemapContents: jest.fn(),
     toggleAdult: jest.fn(),
     getAdultContents: jest.fn(),
+    blockPersonContents: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -125,6 +126,18 @@ describe('ContentsController', () => {
       const guards = Reflect.getMetadata(
         '__guards__',
         ContentsController.prototype.getAdultContents,
+      );
+      expect(guards).toBeDefined();
+      expect(guards).toContainEqual(JwtAuthGuard);
+      expect(guards).toContainEqual(RolesGuard);
+    });
+  });
+
+  describe('blockPersonContents', () => {
+    it('JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        ContentsController.prototype.blockPersonContents,
       );
       expect(guards).toBeDefined();
       expect(guards).toContainEqual(JwtAuthGuard);
