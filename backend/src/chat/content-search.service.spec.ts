@@ -81,6 +81,18 @@ describe('ContentSearchService', () => {
       expect(query).toContain('LEFT JOIN content_metadata cm ON cm.content_id = c.id');
     });
 
+    it('adult 콘텐츠를 검색 결과에서 제외해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '영화 추천', 20, [],
+        { contentType: 'movie' },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('c.adult IS NOT TRUE');
+    });
+
     it('한국 시청 가능 필터가 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 

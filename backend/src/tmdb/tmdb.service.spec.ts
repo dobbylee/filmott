@@ -80,7 +80,7 @@ describe('TmdbService', () => {
 
       expect(result.results[0].media_type).toBe('movie');
       expect(mockHttpService.get).toHaveBeenCalledWith('/search/movie', {
-        params: { query: 'test', page: 1, language: 'ko-KR', region: 'KR' },
+        params: { query: 'test', page: 1, language: 'ko-KR', region: 'KR', include_adult: false },
       });
     });
   });
@@ -115,7 +115,7 @@ describe('TmdbService', () => {
       await service.getPopular('tv', 2);
 
       expect(mockHttpService.get).toHaveBeenCalledWith('/tv/popular', {
-        params: { page: 2, language: 'ko-KR', region: 'KR' },
+        params: { page: 2, language: 'ko-KR', region: 'KR', include_adult: false },
       });
     });
   });
@@ -128,7 +128,7 @@ describe('TmdbService', () => {
       await service.getNowPlaying();
 
       expect(mockHttpService.get).toHaveBeenCalledWith('/movie/now_playing', {
-        params: { page: 1, language: 'ko-KR', region: 'KR' },
+        params: { page: 1, language: 'ko-KR', region: 'KR', include_adult: false },
       });
     });
   });
@@ -141,7 +141,7 @@ describe('TmdbService', () => {
       await service.getTrending('all', 'week');
 
       expect(mockHttpService.get).toHaveBeenCalledWith('/trending/all/week', {
-        params: { language: 'ko-KR' },
+        params: { language: 'ko-KR', include_adult: false },
       });
     });
   });
@@ -235,6 +235,7 @@ describe('TmdbService', () => {
           with_watch_providers: '8',
           with_watch_monetization_types: 'flatrate|rent|buy|free|ads',
           primary_release_year: 2024,
+          include_adult: false,
         },
       });
     });
@@ -248,6 +249,7 @@ describe('TmdbService', () => {
       expect(mockHttpService.get).toHaveBeenCalledWith('/discover/tv', {
         params: expect.objectContaining({
           first_air_date_year: 2024,
+          include_adult: false,
         }),
       });
     });

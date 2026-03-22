@@ -242,6 +242,7 @@ WITH filtered AS (
   LEFT JOIN content_metadata cm ON cm.content_id = c.id
   LEFT JOIN rankings r ON r.content_id = c.id AND r.source = 'kobis'
   WHERE c.tmdb_id != ALL($1::int[])
+    AND (c.adult IS NOT TRUE)
     AND (
       c.origin_country LIKE '%KR%'
       OR c.watch_providers IS NOT NULL

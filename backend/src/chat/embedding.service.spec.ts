@@ -473,6 +473,15 @@ describe('EmbeddingService', () => {
       expect(mockDataSource.query).toHaveBeenCalledTimes(1);
     });
 
+    it('adult 콘텐츠를 검색 결과에서 제외해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchSimilar('스릴러 추천', 10, []);
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('c.adult IS NOT TRUE');
+    });
+
     it('fallback: 결과가 충분하면 추가 쿼리를 실행하지 않아야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 

@@ -130,7 +130,7 @@ export class TmdbService {
   ): Promise<TmdbSearchResult> {
     const { data } = await firstValueFrom(
       this.httpService.get<TmdbSearchResult>(`/search/${type}`, {
-        params: { query, page, language: 'ko-KR', region: 'KR' },
+        params: { query, page, language: 'ko-KR', region: 'KR', include_adult: false },
       }),
     );
     // media_type 주입 (search/{type}은 media_type을 반환하지 않음)
@@ -159,7 +159,7 @@ export class TmdbService {
   ): Promise<TmdbSearchResult> {
     const { data } = await firstValueFrom(
       this.httpService.get<TmdbSearchResult>(`/${type}/popular`, {
-        params: { page, language: 'ko-KR', region: 'KR' },
+        params: { page, language: 'ko-KR', region: 'KR', include_adult: false },
       }),
     );
     return data;
@@ -168,7 +168,7 @@ export class TmdbService {
   async getNowPlaying(page = 1): Promise<TmdbSearchResult> {
     const { data } = await firstValueFrom(
       this.httpService.get<TmdbSearchResult>('/movie/now_playing', {
-        params: { page, language: 'ko-KR', region: 'KR' },
+        params: { page, language: 'ko-KR', region: 'KR', include_adult: false },
       }),
     );
     return data;
@@ -182,7 +182,7 @@ export class TmdbService {
       this.httpService.get<TmdbSearchResult>(
         `/trending/${type}/${timeWindow}`,
         {
-          params: { language: 'ko-KR' },
+          params: { language: 'ko-KR', include_adult: false },
         },
       ),
     );
@@ -240,12 +240,13 @@ export class TmdbService {
       sortBy = 'first_air_date.desc';
     }
 
-    const params: Record<string, string | number> = {
+    const params: Record<string, string | number | boolean> = {
       language: 'ko-KR',
       watch_region: options.region ?? 'KR',
       with_watch_monetization_types: 'flatrate|rent|buy|free|ads',
       page: options.page ?? 1,
       sort_by: sortBy,
+      include_adult: false,
     };
 
     if (options.sort === 'vote_average.desc') {
