@@ -43,7 +43,7 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
   const canSend = text.trim().length > 0 && !disabled;
 
   return (
-    <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+    <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
       <textarea
         ref={textareaRef}
         value={text}
@@ -52,10 +52,10 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
           autoResize();
         }}
         onKeyDown={handleKeyDown}
-        placeholder="메시지를 입력하세요..."
+        placeholder="메시지를 입력하세요."
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none bg-transparent text-base text-white placeholder-white/40 outline-none disabled:opacity-50"
+        className="flex-1 resize-none bg-transparent text-base text-white placeholder-white/40 outline-none disabled:opacity-50 leading-6"
         style={{ minHeight: '24px' }}
       />
       <button

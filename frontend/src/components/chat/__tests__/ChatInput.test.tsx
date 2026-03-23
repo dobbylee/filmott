@@ -5,7 +5,7 @@ import ChatInput from '@/components/chat/ChatInput';
 describe('ChatInput', () => {
   it('메시지 입력 필드를 렌더링한다', () => {
     render(<ChatInput onSend={() => {}} />);
-    expect(screen.getByPlaceholderText('메시지를 입력하세요...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('메시지를 입력하세요.')).toBeInTheDocument();
   });
 
   it('전송 버튼을 렌더링한다', () => {
@@ -17,7 +17,7 @@ describe('ChatInput', () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '안녕하세요' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
@@ -28,7 +28,7 @@ describe('ChatInput', () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '안녕하세요' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
 
@@ -39,7 +39,7 @@ describe('ChatInput', () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '   ' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
@@ -50,7 +50,7 @@ describe('ChatInput', () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...') as HTMLTextAreaElement;
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: '테스트' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
@@ -60,7 +60,7 @@ describe('ChatInput', () => {
   it('disabled 상태에서는 입력이 비활성화된다', () => {
     render(<ChatInput onSend={() => {}} disabled />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     expect(textarea).toBeDisabled();
   });
 
@@ -68,7 +68,7 @@ describe('ChatInput', () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '테스트 메시지' } });
     fireEvent.click(screen.getByLabelText('전송'));
 

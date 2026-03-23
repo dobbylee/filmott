@@ -65,7 +65,7 @@ describe('ChatPage', () => {
 
   it('입력 영역을 렌더링한다', () => {
     render(<ChatPage />);
-    expect(screen.getByPlaceholderText('메시지를 입력하세요...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('메시지를 입력하세요.')).toBeInTheDocument();
   });
 
   it('AI 안내 문구가 표시된다', () => {
@@ -83,7 +83,7 @@ describe('ChatPage', () => {
 
     render(<ChatPage />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '영화 추천해줘' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
@@ -106,7 +106,7 @@ describe('ChatPage', () => {
 
     render(<ChatPage />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '테스트' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
@@ -118,7 +118,7 @@ describe('ChatPage', () => {
 
     render(<ChatPage />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '테스트 메시지' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
@@ -153,7 +153,7 @@ describe('ChatPage', () => {
 
     render(<ChatPage />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '저장 테스트' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
@@ -232,7 +232,7 @@ describe('ChatPage', () => {
 
     render(<ChatPage />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '에러 테스트' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
@@ -258,7 +258,7 @@ describe('ChatPage', () => {
 
     render(<ChatPage />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '추천해줘' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
@@ -288,7 +288,7 @@ describe('ChatPage', () => {
 
     render(<ChatPage />);
 
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요...');
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
     fireEvent.change(textarea, { target: { value: '첫 번째 질문' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
