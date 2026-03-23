@@ -196,8 +196,9 @@ export class ChatService {
 
     // 10. GPT 스트리밍 호출 (function calling 없이 텍스트만)
     const stream = await this.openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 2048,
+      model: 'gpt-5-nano',
+      reasoning_effort: 'low',
+      max_completion_tokens: 4096,
       stream: true,
       messages: [
         { role: 'system', content: systemPrompt },

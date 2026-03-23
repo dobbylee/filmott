@@ -150,14 +150,15 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
     });
 
-    it('gpt-4o-mini 모델을 response_format json_object로 호출해야 한다', async () => {
+    it('gpt-5-nano 모델을 response_format json_object로 호출해야 한다', async () => {
       mockIntent();
 
       await service.analyzeIntent('테스트');
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'gpt-4o-mini',
-        max_tokens: 150,
+        model: 'gpt-5-nano',
+        reasoning_effort: 'low',
+        max_completion_tokens: 1024,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: expect.stringContaining('JSON으로 추출') },

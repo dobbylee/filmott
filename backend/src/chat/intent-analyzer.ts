@@ -189,8 +189,9 @@ export class IntentAnalyzerService {
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        max_tokens: 150,
+        model: 'gpt-5-nano',
+        reasoning_effort: 'minimal',
+        max_completion_tokens: 1024,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: buildIntentSystemPrompt() },

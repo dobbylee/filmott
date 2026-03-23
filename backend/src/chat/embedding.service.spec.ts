@@ -141,8 +141,9 @@ describe('EmbeddingService', () => {
       expect(result).toBe('어두운 분위기의 범죄 스릴러입니다.');
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-4o-mini',
-          max_tokens: 500,
+          model: 'gpt-5-nano',
+          reasoning_effort: 'low',
+          max_completion_tokens: 2048,
         }),
       );
     });
