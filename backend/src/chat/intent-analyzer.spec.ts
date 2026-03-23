@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { IntentAnalyzerService, ParsedIntent, GENRE_ALIAS_MAP } from './intent-analyzer';
 import { GENRE_NAME_MAP } from '../common/constants';
+import { CHAT_MODEL } from './chat.constants';
 
 // OpenAI SDK mock
 const mockCreate = jest.fn();
@@ -150,14 +151,14 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
     });
 
-    it('gpt-5-nano 모델을 response_format json_object로 호출해야 한다', async () => {
+    it('CHAT_MODEL을 response_format json_object로 호출해야 한다', async () => {
       mockIntent();
 
       await service.analyzeIntent('테스트');
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'gpt-5-nano',
-        reasoning_effort: 'low',
+        model: CHAT_MODEL,
+        reasoning_effort: 'minimal',
         max_completion_tokens: 1024,
         response_format: { type: 'json_object' },
         messages: [

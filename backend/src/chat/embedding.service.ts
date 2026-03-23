@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { CHAT_MODEL } from './chat.constants';
 import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
 
@@ -120,7 +121,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 러닝타임: ${content.runtime ? content.runtime + '분' : '정보 없음'}`;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: CHAT_MODEL,
       reasoning_effort: 'low',
       max_completion_tokens: 2048,
       messages: [{ role: 'user', content: prompt }],

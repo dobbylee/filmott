@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { CHAT_MODEL } from './chat.constants';
 import { EmbeddingService, SimilarContent } from './embedding.service';
 import { ContentSearchService, ContentSearchFilters } from './content-search.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
@@ -196,7 +197,7 @@ export class ChatService {
 
     // 10. GPT 스트리밍 호출 (function calling 없이 텍스트만)
     const stream = await this.openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: CHAT_MODEL,
       reasoning_effort: 'low',
       max_completion_tokens: 4096,
       stream: true,

@@ -55,8 +55,8 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
         placeholder="메시지를 입력하세요."
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none bg-transparent text-base text-white placeholder-white/40 outline-none disabled:opacity-50 leading-6"
-        style={{ minHeight: '24px' }}
+        className="flex-1 resize-none bg-transparent text-base text-white placeholder-white/40 outline-none disabled:opacity-50 leading-8"
+        style={{ minHeight: '32px' }}
       />
       <button
         onClick={handleSubmit}

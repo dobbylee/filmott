@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { EmbeddingService } from './embedding.service';
+import { CHAT_MODEL } from './chat.constants';
 import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
 
@@ -141,7 +142,7 @@ describe('EmbeddingService', () => {
       expect(result).toBe('어두운 분위기의 범죄 스릴러입니다.');
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-5-nano',
+          model: CHAT_MODEL,
           reasoning_effort: 'low',
           max_completion_tokens: 2048,
         }),

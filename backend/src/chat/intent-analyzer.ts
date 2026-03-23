@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { CHAT_MODEL } from './chat.constants';
 
 export interface ParsedIntent {
   ottProviderNames: string[];
@@ -189,7 +190,7 @@ export class IntentAnalyzerService {
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-5-nano',
+        model: CHAT_MODEL,
         reasoning_effort: 'minimal',
         max_completion_tokens: 1024,
         response_format: { type: 'json_object' },
