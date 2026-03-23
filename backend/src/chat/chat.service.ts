@@ -177,16 +177,25 @@ export class ChatService {
       }
     }
 
-    // 8. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
+    // 8. 이전 대화에서 추천한 작품 제목 추출
+    const previouslyRecommended = (history || [])
+      .filter((msg) => msg.role === 'assistant')
+      .flatMap((msg) => {
+        const matches = msg.content.match(/\*\*(.+?)\*\*/g);
+        return matches ? matches.map((m) => m.replace(/\*\*/g, '')) : [];
+      });
+
+    // 9. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
     const systemPrompt = buildSystemPrompt(
       userContext,
       subscribedOtts,
       OTT_PROVIDERS,
       similarContents,
       intent,
+      previouslyRecommended,
     );
 
-    // 9. 대화 이력 구성
+    // 10. 대화 이력 구성
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       ...(history || []).map((msg) => ({
         role: msg.role as 'user' | 'assistant',
@@ -195,7 +204,7 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 10. GPT 스트리밍 호출 (function calling 없이 텍스트만)
+    // 11. GPT 스트리밍 호출 (function calling 없이 텍스트만)
     const stream = await this.openai.chat.completions.create({
       model: CHAT_MODEL,
       reasoning_effort: 'low',
@@ -209,7 +218,7 @@ export class ChatService {
 
     let fullText = '';
 
-    // 11. 스트리밍 이벤트 처리
+    // 12. 스트리밍 이벤트 처리
     try {
       for await (const chunk of stream) {
         if (signal?.aborted) {
@@ -228,7 +237,7 @@ export class ChatService {
       throw error;
     }
 
-    // 12. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
+    // 13. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
     const titles = this.extractTitlesFromText(fullText);
     if (titles.length > 0) {
       const { matched, unmatched } = this.matchTitlesToCandidates(titles, similarContents);

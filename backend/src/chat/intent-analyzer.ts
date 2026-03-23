@@ -191,7 +191,7 @@ export class IntentAnalyzerService {
     try {
       const response = await this.openai.chat.completions.create({
         model: CHAT_MODEL,
-        reasoning_effort: 'minimal',
+        reasoning_effort: 'none',
         max_completion_tokens: 1024,
         response_format: { type: 'json_object' },
         messages: [

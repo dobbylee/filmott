@@ -38,6 +38,7 @@ export function buildSystemPrompt(
   ottProviders: OttProvider[],
   candidates: SimilarContent[],
   intent?: ParsedIntent,
+  previouslyRecommended: string[] = [],
 ): string {
   const ottNames = subscribedOtts
     .map((id) => ottProviders.find((p) => p.id === id)?.name)
@@ -147,7 +148,7 @@ export function buildSystemPrompt(
 
   const today = new Date().toISOString().split('T')[0];
 
-  return `당신은 filmott의 AI 영화 큐레이터입니다. 한국어로 친근하게 대화합니다.
+  return `당신은 filmott의 AI 영화 큐레이터입니다. 한국어로 친근하되 반드시 존댓말(해요체)로 대화합니다. 대화가 이어져도 절대 반말로 전환하지 마세요.
 오늘 날짜: ${today}. "최신", "요즘", "올해" 등의 표현은 이 날짜를 기준으로 판단하세요.
 
 ## 사용자 취향
@@ -175,7 +176,7 @@ ${candidatesSection}
 - 구독 중인 OTT가 있으면 해당 플랫폼에서 볼 수 있는 작품을 우선 추천하세요. 후보 작품의 description에 플랫폼 정보가 포함되어 있습니다.
 - "보고싶어요" 목록에 있는 작품은 사용자가 관심 있는 작품이므로 적극 추천하세요.
 - 이미 시청한 작품과 성인물은 추천 금지.
-- 이전 대화에서 추천한 작품을 다시 추천하지 마세요.
+- 이전 대화에서 추천한 작품을 다시 추천하지 마세요.${previouslyRecommended.length > 0 ? `\n  이미 추천한 작품: ${previouslyRecommended.join(', ')}` : ''}
 - 추천과 무관한 질문은 영화/시리즈 대화로 유도.
 
 ## 응답 형식 (반드시 준수)
