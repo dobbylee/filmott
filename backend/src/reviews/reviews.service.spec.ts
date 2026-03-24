@@ -485,6 +485,7 @@ describe('ReviewsService', () => {
         leftJoin: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
         loadRelationCountAndMap: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
@@ -495,6 +496,7 @@ describe('ReviewsService', () => {
       const result = await service.getRecentReviews(5);
 
       expect(result).toHaveLength(1);
+      expect(mockQb.where).toHaveBeenCalledWith('content.adult IS NOT TRUE');
       expect(mockQb.take).toHaveBeenCalledWith(5);
     });
 
@@ -503,6 +505,7 @@ describe('ReviewsService', () => {
         leftJoin: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
         loadRelationCountAndMap: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
@@ -520,6 +523,7 @@ describe('ReviewsService', () => {
         leftJoin: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
         loadRelationCountAndMap: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),

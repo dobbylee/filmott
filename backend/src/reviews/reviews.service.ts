@@ -181,6 +181,7 @@ export class ReviewsService {
       .leftJoin('review.user', 'user')
       .addSelect(['user.id', 'user.nickname', 'user.profileImage', 'user.status'])
       .leftJoinAndSelect('review.content', 'content')
+      .where('content.adult IS NOT TRUE')
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .orderBy('review.createdAt', 'DESC')
       .take(safeLimit)
