@@ -14,8 +14,12 @@ export default function Footer() {
             >
               film<span className="text-gradient">ott</span>
             </Link>
-            <p className="text-sm text-white/40">AI가 취향에 맞는 영화/시리즈를 추천해드립니다</p>
-            <nav className="flex gap-2 text-sm text-muted-foreground">
+            <p className="text-sm text-white/40">AI가 취향에 맞는 영화/시리즈를 추천해 드립니다</p>
+          </div>
+
+          {/* 오른쪽: 정책 링크 + 연락처 */}
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:items-end">
+            <nav className="flex gap-2">
               <Link href="/privacy" className="hover:text-primary transition-colors">
                 개인정보처리방침
               </Link>
@@ -24,10 +28,6 @@ export default function Footer() {
                 이용약관
               </Link>
             </nav>
-          </div>
-
-          {/* 오른쪽: 연락처 + 추후 링크 추가 영역 */}
-          <div className="flex flex-col gap-1 text-base text-muted-foreground sm:items-end">
             <span>filmottkr@gmail.com</span>
           </div>
         </div>
