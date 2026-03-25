@@ -240,7 +240,7 @@ export default function ChatSection() {
 
       {/* 대화 없음 - 환영 메시지 + 예시 질문 */}
       {!hasConversation && (
-        <div className="px-4 pb-4 flex items-center justify-center" style={{ minHeight: '60vh' }}>
+        <div className="px-4 pb-4 flex items-center justify-center" style={{ height: '60vh' }}>
           <div className="flex flex-col items-center text-center">
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-fuchsia-700/20 to-indigo-600/20 border border-fuchsia-500/20 mb-4">
               <Sparkles className="w-7 h-7 text-fuchsia-400" />

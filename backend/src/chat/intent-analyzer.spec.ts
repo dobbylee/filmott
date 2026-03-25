@@ -275,6 +275,25 @@ describe('IntentAnalyzerService', () => {
       expect(result.genres).toEqual(['뮤지컬']);
     });
 
+    it('"재밌는 드라마 추천해줘" → contentType=tv + genres에서 드라마 제거되어 빈 배열', async () => {
+      mockIntent({ genres: ['드라마'], contentType: null });
+
+      const result = await service.analyzeIntent('재밌는 드라마 추천해줘');
+
+      expect(result.contentType).toBe('tv');
+      expect(result.genres).toEqual([]);
+    });
+
+    it('"로맨스 드라마 추천해줘" → contentType=tv + genres에서 드라마 제거되어 로맨스만 남음', async () => {
+      mockIntent({ genres: ['로맨스', '드라마'], contentType: null });
+
+      const result = await service.analyzeIntent('로맨스 드라마 추천해줘');
+
+      expect(result.contentType).toBe('tv');
+      expect(result.genres).toContain('로맨스');
+      expect(result.genres).not.toContain('드라마');
+    });
+
     it('movie 타입에서는 TV 전용 장르를 확장하지 않아야 한다', async () => {
       mockIntent({ contentType: 'movie', genres: ['액션'] });
 

@@ -302,9 +302,10 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
               (1 - (cm.embedding <=> $1::vector)) * 0.7 + LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, 0.3) AS weighted_score
        FROM content_metadata cm
        JOIN contents c ON c.id = cm.content_id
+       LEFT JOIN rankings r ON r.content_id = c.id AND r.source = 'kobis'
        WHERE c.tmdb_id != ALL($2::int[])
        AND (c.adult IS NOT TRUE)
-       AND (c.watch_providers IS NOT NULL OR c.origin_country LIKE '%KR%')
+       AND (c.watch_providers IS NOT NULL OR c.origin_country LIKE '%KR%' OR r.id IS NOT NULL)
        ${conditions.join('\n       ')}
        ORDER BY weighted_score DESC
        LIMIT ${limitParam}`,

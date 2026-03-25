@@ -14,6 +14,7 @@ export default function Footer() {
             >
               film<span className="text-gradient">ott</span>
             </Link>
+            <p className="text-sm text-white/40">AI가 취향에 맞는 영화/시리즈를 추천해드립니다</p>
             <nav className="flex gap-2 text-sm text-muted-foreground">
               <Link href="/privacy" className="hover:text-primary transition-colors">
                 개인정보처리방침

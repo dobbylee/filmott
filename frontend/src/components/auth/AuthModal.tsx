@@ -44,7 +44,9 @@ export default function AuthModal() {
           <X className="h-5 w-5" />
         </button>
 
-        <div className="mb-6" />
+        <div className="mb-6">
+          <p className="text-sm text-center text-white/50">로그인하면 취향에 맞는 추천을 받을 수 있어요</p>
+        </div>
 
         <div className="space-y-3">
           <SocialLoginButton provider="google" />

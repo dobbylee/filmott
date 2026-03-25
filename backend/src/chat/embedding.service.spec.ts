@@ -322,13 +322,15 @@ describe('EmbeddingService', () => {
       );
     });
 
-    it('필터 없으면 기본 조건(OTT 또는 한국 작품)만 포함해야 한다', async () => {
+    it('필터 없으면 기본 조건(OTT 또는 한국 작품 또는 KOBIS)만 포함해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       await service.searchSimilar('테스트', 10, []);
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('LEFT JOIN rankings r ON r.content_id = c.id AND r.source = \'kobis\'');
       expect(query).toContain('c.watch_providers IS NOT NULL OR c.origin_country LIKE');
+      expect(query).toContain('r.id IS NOT NULL');
       expect(query).not.toContain('content_type =');
       expect(query).not.toContain('release_date >=');
     });
