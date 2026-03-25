@@ -222,6 +222,13 @@ export class IntentAnalyzerService {
         if (hasTvKeyword && !hasMovieKeyword) intent.contentType = 'tv';
       }
 
+      // "드라마"가 contentType=tv로 잡혔으면 genres에서 제거 (장르 Drama 필터 방지)
+      if (intent.contentType === 'tv' && hasTvKeyword) {
+        intent.genres = intent.genres.filter(
+          (g) => !/^드라마$/i.test(g),
+        );
+      }
+
       // genres 후처리: GENRE_ALIAS_MAP으로 DB 장르명 변환 + TV 확장
       if (intent.genres.length > 0) {
         const mappedGenres = new Set<string>();

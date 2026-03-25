@@ -304,6 +304,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
        JOIN contents c ON c.id = cm.content_id
        WHERE c.tmdb_id != ALL($2::int[])
        AND (c.adult IS NOT TRUE)
+       AND (c.watch_providers IS NOT NULL OR c.origin_country LIKE '%KR%')
        ${conditions.join('\n       ')}
        ORDER BY weighted_score DESC
        LIMIT ${limitParam}`,

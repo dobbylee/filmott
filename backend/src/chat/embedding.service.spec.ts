@@ -322,14 +322,13 @@ describe('EmbeddingService', () => {
       );
     });
 
-    it('필터 없으면 기존과 동일하게 동작해야 한다', async () => {
+    it('필터 없으면 기본 조건(OTT 또는 한국 작품)만 포함해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       await service.searchSimilar('테스트', 10, []);
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      expect(query).not.toContain('watch_providers');
-      expect(query).not.toContain('origin_country LIKE');
+      expect(query).toContain('c.watch_providers IS NOT NULL OR c.origin_country LIKE');
       expect(query).not.toContain('content_type =');
       expect(query).not.toContain('release_date >=');
     });
@@ -454,12 +453,12 @@ describe('EmbeddingService', () => {
       expect(secondQuery).toContain('origin_country LIKE');
       expect(secondQuery).not.toContain('director LIKE');
 
-      // 3차 쿼리: 국가 필터 제거
+      // 3차 쿼리: 국가 동적 필터 제거 (기본 조건 '%KR%'는 유지)
       const thirdQuery = mockDataSource.query.mock.calls[2][0] as string;
       expect(thirdQuery).toContain('provider_name');
-      expect(thirdQuery).not.toContain('origin_country LIKE');
+      expect(thirdQuery).not.toContain('origin_country =');
 
-      // 4차 쿼리: OTT 필터 제거
+      // 4차 쿼리: OTT 동적 필터 제거 (기본 조건은 유지)
       const fourthQuery = mockDataSource.query.mock.calls[3][0] as string;
       expect(fourthQuery).not.toContain('provider_name');
     });

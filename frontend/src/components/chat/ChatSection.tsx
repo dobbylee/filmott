@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Sparkles, MessageSquare, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, MessageSquare, Plus } from 'lucide-react';
 import { sendChatMessage } from '@/lib/chat-stream';
 import type { ChatHistoryMessage } from '@/lib/chat-stream';
 import ChatMessageBubble from './ChatMessageBubble';
@@ -15,9 +15,9 @@ const MAX_STORED_MESSAGES = 50;
 const MAX_HISTORY_MESSAGES = 20;
 
 const EXAMPLE_QUESTIONS = [
-  '비 오는 날에 볼 만한 잔잔한 영화 알려줘',
+  '넷플릭스에서 볼 수 있는 최신 드라마 추천해줘',
   '친구들이랑 볼 코미디 영화 추천해줘',
-  '넷플릭스에서 볼 수 있는 한국 드라마 알려줘',
+  '통쾌한 액션 영화 추천해줘',
   '밤에 혼자 볼 스릴러 영화 추천해줘',
 ];
 
@@ -27,7 +27,6 @@ export default function ChatSection() {
   const [streamingText, setStreamingText] = useState('');
   const [streamingRecs, setStreamingRecs] = useState<ChatRecommendationWithPoster[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -53,10 +52,10 @@ export default function ChatSection() {
   }, []);
 
   useEffect(() => {
-    if (isExpanded) {
+    if (messages.length > 0 || isStreaming) {
       scrollToBottom();
     }
-  }, [messages, streamingText, isExpanded, scrollToBottom]);
+  }, [messages, streamingText, isStreaming, scrollToBottom]);
 
   // localStorage에서 메시지 복원
   useEffect(() => {
@@ -110,7 +109,6 @@ export default function ChatSection() {
     setStreamingRecs(null);
     setError(null);
     setIsStreaming(false);
-    setIsExpanded(false);
     localStorage.removeItem(STORAGE_KEY);
   };
 
@@ -133,7 +131,6 @@ export default function ChatSection() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setIsStreaming(true);
-    setIsExpanded(true);
     setStreamingText('');
     setStreamingRecs(null);
     streamingTextRef.current = '';
@@ -222,9 +219,6 @@ export default function ChatSection() {
 
   const hasConversation = messages.length > 0 || isStreaming;
 
-  // 마지막 AI 응답 찾기 (컴팩트 모드 미리보기용)
-  const lastAssistantMessage = [...messages].reverse().find((m) => m.role === 'assistant');
-
   return (
     <section id="chat-section" className="mx-auto w-full max-w-3xl">
       {/* 상단 헤더 */}
@@ -233,37 +227,21 @@ export default function ChatSection() {
           <Sparkles className="w-5 h-5 text-fuchsia-400" />
           <span className="text-sm font-semibold text-white">추천받기</span>
         </div>
-        <div className="flex items-center gap-2">
-          {hasConversation && (
-            <>
-              <button
-                onClick={handleNewChat}
-                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                새 대화
-              </button>
-              <button
-                onClick={() => setIsExpanded((prev) => !prev)}
-                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-                aria-label={isExpanded ? '접기' : '펼치기'}
-              >
-                {isExpanded ? (
-                  <ChevronUp className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                )}
-                {isExpanded ? '접기' : '펼치기'}
-              </button>
-            </>
-          )}
-        </div>
+        {hasConversation && (
+          <button
+            onClick={handleNewChat}
+            className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            새 대화
+          </button>
+        )}
       </div>
 
-      {/* 컴팩트 모드: 대화 없음 - 환영 메시지 + 예시 질문 */}
+      {/* 대화 없음 - 환영 메시지 + 예시 질문 */}
       {!hasConversation && (
-        <div className="px-4 pb-4">
-          <div className="flex flex-col items-center text-center py-6">
+        <div className="px-4 pb-4 flex items-center justify-center" style={{ minHeight: '60vh' }}>
+          <div className="flex flex-col items-center text-center">
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-fuchsia-700/20 to-indigo-600/20 border border-fuchsia-500/20 mb-4">
               <Sparkles className="w-7 h-7 text-fuchsia-400" />
             </div>
@@ -279,7 +257,7 @@ export default function ChatSection() {
                 <button
                   key={question}
                   onClick={() => handleExampleClick(question)}
-                  className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white/70 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all"
+                  className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white/70 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all break-keep"
                 >
                   <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 text-fuchsia-400/60" />
                   {question}
@@ -294,31 +272,12 @@ export default function ChatSection() {
         </div>
       )}
 
-      {/* 컴팩트 모드: 대화 있음 + 접힌 상태 - 미리보기 */}
-      {hasConversation && !isExpanded && (
-        <div className="px-4 pb-2">
-          {lastAssistantMessage && (
-            <button
-              onClick={() => setIsExpanded(true)}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10 transition-colors"
-            >
-              <p className="text-sm text-white/70 line-clamp-2">
-                {lastAssistantMessage.content}
-              </p>
-              <span className="text-xs text-fuchsia-400 mt-1 inline-block">
-                대화 계속하기
-              </span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* 확장 모드: 전체 대화 표시 */}
-      {hasConversation && isExpanded && (
+      {/* 대화 있음 - 메시지 영역 (고정 높이 + 내부 스크롤) */}
+      {hasConversation && (
         <div
           ref={messagesContainerRef}
           className="overflow-y-auto px-4 pb-2"
-          style={{ maxHeight: '60vh' }}
+          style={{ height: '60vh' }}
         >
           <div className="max-w-2xl mx-auto space-y-4">
             {messages.map((msg) => (

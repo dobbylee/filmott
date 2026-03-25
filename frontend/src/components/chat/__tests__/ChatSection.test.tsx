@@ -39,9 +39,9 @@ describe('ChatSection', () => {
 
   it('예시 질문 버튼들을 렌더링한다', () => {
     render(<ChatSection />);
-    expect(screen.getByText('비 오는 날에 볼 만한 잔잔한 영화 알려줘')).toBeInTheDocument();
+    expect(screen.getByText('넷플릭스에서 볼 수 있는 최신 드라마 추천해줘')).toBeInTheDocument();
     expect(screen.getByText('친구들이랑 볼 코미디 영화 추천해줘')).toBeInTheDocument();
-    expect(screen.getByText('넷플릭스에서 볼 수 있는 한국 드라마 알려줘')).toBeInTheDocument();
+    expect(screen.getByText('통쾌한 액션 영화 추천해줘')).toBeInTheDocument();
     expect(screen.getByText('밤에 혼자 볼 스릴러 영화 추천해줘')).toBeInTheDocument();
   });
 
@@ -83,8 +83,8 @@ describe('ChatSection', () => {
     });
   });
 
-  it('사용자 메시지가 낙관적으로 화면에 표시되고 확장 모드로 전환된다', async () => {
-    mockSendChatMessage.mockImplementationOnce(() => new Promise(() => {})); // pending
+  it('사용자 메시지가 낙관적으로 화면에 표시된다', async () => {
+    mockSendChatMessage.mockImplementationOnce(() => new Promise(() => {}));
 
     render(<ChatSection />);
 
@@ -135,30 +135,16 @@ describe('ChatSection', () => {
     });
   });
 
-  it('localStorage에서 메시지를 복원하고 미리보기를 표시한다', () => {
+  it('localStorage에서 메시지를 복원하여 표시한다', () => {
     const savedMessages = [
-      {
-        id: 1,
-        role: 'user',
-        content: '복원된 질문',
-        recommendations: null,
-        createdAt: '2026-03-25T00:00:00Z',
-      },
-      {
-        id: 2,
-        role: 'assistant',
-        content: '복원된 AI 응답 텍스트',
-        recommendations: null,
-        createdAt: '2026-03-25T00:00:01Z',
-      },
+      { id: 1, role: 'user', content: '복원된 질문', recommendations: null, createdAt: '2026-03-25T00:00:00Z' },
+      { id: 2, role: 'assistant', content: '복원된 AI 응답 텍스트', recommendations: null, createdAt: '2026-03-25T00:00:01Z' },
     ];
-    localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(savedMessages));
+    localStorageMock.getItem.mockReturnValue(JSON.stringify(savedMessages));
 
     render(<ChatSection />);
 
-    // 컴팩트 모드: 미리보기로 마지막 AI 응답이 표시됨
     expect(screen.getByText('복원된 AI 응답 텍스트')).toBeInTheDocument();
-    expect(screen.getByText('대화 계속하기')).toBeInTheDocument();
   });
 
   it('50개 초과 메시지는 최근 50개만 유지한다', () => {
@@ -169,49 +155,31 @@ describe('ChatSection', () => {
       recommendations: null,
       createdAt: new Date().toISOString(),
     }));
-    localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(manyMessages));
+    localStorageMock.getItem.mockReturnValue(JSON.stringify(manyMessages));
 
     render(<ChatSection />);
 
-    // localStorage에 50개로 트리밍하여 저장됨
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(
-      'filmott_chat_messages',
-      expect.any(String),
+    const setItemCalls = localStorageMock.setItem.mock.calls.filter(
+      (call: string[]) => call[0] === 'filmott_chat_messages',
     );
-    const savedData = JSON.parse(localStorageMock.setItem.mock.calls[0][1]);
+    expect(setItemCalls.length).toBeGreaterThan(0);
+    const savedData = JSON.parse(setItemCalls[0][1]);
     expect(savedData).toHaveLength(50);
-    // 마지막 50개만 유지 (인덱스 10~59)
     expect(savedData[0].content).toBe('메시지 10');
     expect(savedData[49].content).toBe('메시지 59');
   });
 
   it('"새 대화" 버튼 클릭 시 메시지와 localStorage를 초기화한다', async () => {
     const savedMessages = [
-      {
-        id: 1,
-        role: 'user',
-        content: '기존 메시지',
-        recommendations: null,
-        createdAt: '2026-03-25T00:00:00Z',
-      },
-      {
-        id: 2,
-        role: 'assistant',
-        content: 'AI 응답',
-        recommendations: null,
-        createdAt: '2026-03-25T00:00:01Z',
-      },
+      { id: 1, role: 'user', content: '기존 메시지', recommendations: null, createdAt: '2026-03-25T00:00:00Z' },
+      { id: 2, role: 'assistant', content: 'AI 응답', recommendations: null, createdAt: '2026-03-25T00:00:01Z' },
     ];
-    localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(savedMessages));
+    localStorageMock.getItem.mockReturnValue(JSON.stringify(savedMessages));
 
     render(<ChatSection />);
 
-    const newChatButton = screen.getByText('새 대화');
-    expect(newChatButton).toBeInTheDocument();
+    fireEvent.click(screen.getByText('새 대화'));
 
-    fireEvent.click(newChatButton);
-
-    // 환영 메시지가 다시 표시됨
     await waitFor(() => {
       expect(screen.getByText('오늘 뭐 볼까?')).toBeInTheDocument();
     });
@@ -220,79 +188,9 @@ describe('ChatSection', () => {
   });
 
   it('대화가 없을 때는 "새 대화" 버튼이 표시되지 않는다', () => {
+    localStorageMock.getItem.mockReturnValue(null);
     render(<ChatSection />);
     expect(screen.queryByText('새 대화')).not.toBeInTheDocument();
-  });
-
-  it('확장/축소 토글이 동작한다', async () => {
-    const savedMessages = [
-      {
-        id: 1,
-        role: 'user',
-        content: '질문입니다',
-        recommendations: null,
-        createdAt: '2026-03-25T00:00:00Z',
-      },
-      {
-        id: 2,
-        role: 'assistant',
-        content: '응답입니다',
-        recommendations: null,
-        createdAt: '2026-03-25T00:00:01Z',
-      },
-    ];
-    localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(savedMessages));
-
-    render(<ChatSection />);
-
-    // 초기 상태: 컴팩트 (접힌 상태), 미리보기 표시
-    expect(screen.getByText('대화 계속하기')).toBeInTheDocument();
-
-    // 펼치기 버튼 클릭
-    fireEvent.click(screen.getByText('펼치기'));
-
-    // 확장 모드: 전체 대화 표시
-    await waitFor(() => {
-      expect(screen.getByText('질문입니다')).toBeInTheDocument();
-      expect(screen.getByText('접기')).toBeInTheDocument();
-    });
-
-    // 접기 버튼 클릭
-    fireEvent.click(screen.getByText('접기'));
-
-    // 다시 컴팩트 모드
-    await waitFor(() => {
-      expect(screen.getByText('대화 계속하기')).toBeInTheDocument();
-    });
-  });
-
-  it('"대화 계속하기" 버튼 클릭 시 확장 모드로 전환된다', async () => {
-    const savedMessages = [
-      {
-        id: 1,
-        role: 'user',
-        content: '질문',
-        recommendations: null,
-        createdAt: '2026-03-25T00:00:00Z',
-      },
-      {
-        id: 2,
-        role: 'assistant',
-        content: '응답 내용',
-        recommendations: null,
-        createdAt: '2026-03-25T00:00:01Z',
-      },
-    ];
-    localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(savedMessages));
-
-    render(<ChatSection />);
-
-    fireEvent.click(screen.getByText('대화 계속하기'));
-
-    await waitFor(() => {
-      expect(screen.getByText('질문')).toBeInTheDocument();
-      expect(screen.getByText('접기')).toBeInTheDocument();
-    });
   });
 
   it('onError 콜백 시 에러 메시지가 화면에 표시된다', async () => {
@@ -334,15 +232,12 @@ describe('ChatSection', () => {
     fireEvent.change(textarea, { target: { value: '추천해줘' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
-    // 스트리밍 중에는 입력 비활성화
     await waitFor(() => {
       expect(textarea).toBeDisabled();
     });
 
-    // 스트리밍 완료
     resolveStream!();
 
-    // onDone 후에는 입력 활성화
     await waitFor(() => {
       expect(textarea).not.toBeDisabled();
     });
