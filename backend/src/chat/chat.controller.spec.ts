@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
+import { ChatThrottlerGuard } from './chat-throttler.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 describe('ChatController', () => {
@@ -215,9 +216,9 @@ describe('ChatController', () => {
       expect(guards).toContainEqual(OptionalJwtAuthGuard);
     });
 
-    it('컨트롤러 레벨에 ThrottlerGuard가 적용되어 있어야 한다', () => {
+    it('컨트롤러 레벨에 ChatThrottlerGuard가 적용되어 있어야 한다', () => {
       const guards = Reflect.getMetadata('__guards__', ChatController);
-      expect(guards).toContainEqual(ThrottlerGuard);
+      expect(guards).toContainEqual(ChatThrottlerGuard);
     });
 
     it('sendMessage 메서드에 Throttle 데코레이터가 있어야 한다', () => {
@@ -288,6 +289,106 @@ describe('ChatController', () => {
       const writeCalls = mockRes.write.mock.calls;
       expect(writeCalls).toHaveLength(1);
       expect(writeCalls[0][0]).toContain('test');
+    });
+  });
+});
+
+describe('ChatThrottlerGuard', () => {
+  let guard: ChatThrottlerGuard;
+
+  beforeEach(() => {
+    // DI 없이 직접 생성 — getTracker/getErrorMessage 등 순수 메서드만 테스트
+    guard = Object.create(ChatThrottlerGuard.prototype);
+  });
+
+  describe('getTracker', () => {
+    it('로그인 유저는 user-{id} 키를 반환해야 한다', async () => {
+      const req = { user: { id: 42 }, ip: '192.168.1.1' };
+      const tracker = await (guard as any).getTracker(req);
+      expect(tracker).toBe('user-42');
+    });
+
+    it('비로그인(user=null)은 ip-{ip} 키를 반환해야 한다', async () => {
+      const req = { user: null, ip: '10.0.0.1' };
+      const tracker = await (guard as any).getTracker(req);
+      expect(tracker).toBe('ip-10.0.0.1');
+    });
+
+    it('user 객체가 없으면 ip-{ip} 키를 반환해야 한다', async () => {
+      const req = { ip: '172.16.0.1' };
+      const tracker = await (guard as any).getTracker(req);
+      expect(tracker).toBe('ip-172.16.0.1');
+    });
+
+    it('user.id가 없으면 ip-{ip} 키를 반환해야 한다', async () => {
+      const req = { user: {}, ip: '192.168.0.1' };
+      const tracker = await (guard as any).getTracker(req);
+      expect(tracker).toBe('ip-192.168.0.1');
+    });
+  });
+
+  describe('handleRequest', () => {
+    it('비로그인 시 limit을 5로 조정하여 상위 호출해야 한다', async () => {
+      const mockContext = {
+        switchToHttp: () => ({
+          getRequest: () => ({ user: null, ip: '10.0.0.1' }),
+        }),
+      };
+
+      const superHandleRequest = jest.fn().mockResolvedValue(true);
+      jest.spyOn(Object.getPrototypeOf(ChatThrottlerGuard.prototype), 'handleRequest')
+        .mockImplementation(superHandleRequest);
+
+      const requestProps = {
+        context: mockContext,
+        limit: 10,
+        ttl: 60000,
+        throttler: { name: 'default' },
+        blockDuration: 60000,
+        getTracker: jest.fn(),
+        generateKey: jest.fn(),
+      };
+
+      await (guard as any).handleRequest(requestProps);
+
+      expect(superHandleRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 5 }),
+      );
+    });
+
+    it('로그인 유저는 원래 limit(10)을 유지해야 한다', async () => {
+      const mockContext = {
+        switchToHttp: () => ({
+          getRequest: () => ({ user: { id: 1 }, ip: '10.0.0.1' }),
+        }),
+      };
+
+      const superHandleRequest = jest.fn().mockResolvedValue(true);
+      jest.spyOn(Object.getPrototypeOf(ChatThrottlerGuard.prototype), 'handleRequest')
+        .mockImplementation(superHandleRequest);
+
+      const requestProps = {
+        context: mockContext,
+        limit: 10,
+        ttl: 60000,
+        throttler: { name: 'default' },
+        blockDuration: 60000,
+        getTracker: jest.fn(),
+        generateKey: jest.fn(),
+      };
+
+      await (guard as any).handleRequest(requestProps);
+
+      expect(superHandleRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 10 }),
+      );
+    });
+  });
+
+  describe('getErrorMessage', () => {
+    it('한국어 에러 메시지를 반환해야 한다', async () => {
+      const message = await (guard as any).getErrorMessage();
+      expect(message).toBe('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
     });
   });
 });

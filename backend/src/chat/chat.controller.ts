@@ -6,15 +6,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { ChatThrottlerGuard } from './chat-throttler.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/decorators/current-user.decorator';
 
 @Controller('chat')
-@UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
+@UseGuards(OptionalJwtAuthGuard, ChatThrottlerGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
