@@ -9,19 +9,19 @@ import type { Response } from 'express';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/decorators/current-user.decorator';
 
 @Controller('chat')
-@UseGuards(JwtAuthGuard, ThrottlerGuard)
+@UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post('messages')
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   async sendMessage(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: JwtPayload | null,
     @Body() dto: SendMessageDto,
     @Res() res: Response,
   ) {
@@ -39,7 +39,7 @@ export class ChatController {
 
     try {
       await this.chatService.sendMessageStream(
-        user.id,
+        user?.id ?? null,
         dto.content,
         dto.history ?? [],
         (event: string, data: unknown) => {

@@ -85,7 +85,7 @@ export class ChatService {
   }
 
   async sendMessageStream(
-    userId: number,
+    userId: number | null,
     content: string,
     history: ChatHistoryMessageDto[],
     emit: SseEmitter,
@@ -96,12 +96,28 @@ export class ChatService {
     }
 
     // 1. 사용자 컨텍스트 수집 + OTT 구독 정보
-    const [userContext, user] = await Promise.all([
-      this.buildUserContext(userId),
-      this.userRepo.findOne({ where: { id: userId }, select: ['id', 'subscribedOtts'] }),
-    ]);
+    let userContext: UserContext;
+    let subscribedOtts: string[];
 
-    const subscribedOtts = user?.subscribedOtts ?? [];
+    if (userId !== null) {
+      const [ctx, user] = await Promise.all([
+        this.buildUserContext(userId),
+        this.userRepo.findOne({ where: { id: userId }, select: ['id', 'subscribedOtts'] }),
+      ]);
+      userContext = ctx;
+      subscribedOtts = user?.subscribedOtts ?? [];
+    } else {
+      // 비로그인: 빈 컨텍스트 (개인화 없이 범용 추천)
+      userContext = {
+        favorites: [],
+        disliked: [],
+        genreStats: [],
+        watchedTmdbIds: [],
+        wantToWatch: [],
+        watchedGenres: [],
+      };
+      subscribedOtts = [];
+    }
 
     // 2. 대화 맥락을 합쳐서 벡터 검색 (전체 user 메시지 + 현재 메시지)
     const hasMetadata = await this.embeddingService.hasAnyMetadata();

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 describe('ChatController', () => {
   let controller: ChatController;
@@ -159,12 +159,60 @@ describe('ChatController', () => {
         expect.stringContaining('추천 중 오류가 발생했습니다'),
       );
     });
+
+    it('비로그인(user=null) 시 userId를 null로 전달해야 한다', async () => {
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+      };
+
+      mockChatService.sendMessageStream.mockResolvedValue(undefined);
+
+      await controller.sendMessage(
+        null,
+        { content: '영화 추천해줘' },
+        mockRes as unknown as import('express').Response,
+      );
+
+      expect(mockChatService.sendMessageStream).toHaveBeenCalledWith(
+        null,
+        '영화 추천해줘',
+        [],
+        expect.any(Function),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('비로그인 시에도 SSE 헤더를 설정하고 정상 응답해야 한다', async () => {
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+      };
+
+      mockChatService.sendMessageStream.mockResolvedValue(undefined);
+
+      await controller.sendMessage(
+        null,
+        { content: '재밌는 드라마 알려줘' },
+        mockRes as unknown as import('express').Response,
+      );
+
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
+      expect(mockRes.flushHeaders).toHaveBeenCalled();
+      expect(mockRes.end).toHaveBeenCalled();
+    });
   });
 
   describe('가드 적용 확인', () => {
-    it('컨트롤러 레벨에 JwtAuthGuard가 적용되어 있어야 한다', () => {
+    it('컨트롤러 레벨에 OptionalJwtAuthGuard가 적용되어 있어야 한다', () => {
       const guards = Reflect.getMetadata('__guards__', ChatController);
-      expect(guards).toContainEqual(JwtAuthGuard);
+      expect(guards).toContainEqual(OptionalJwtAuthGuard);
     });
 
     it('컨트롤러 레벨에 ThrottlerGuard가 적용되어 있어야 한다', () => {
