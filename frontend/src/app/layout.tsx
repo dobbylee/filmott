@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     default: 'filmott - 영화/시리즈 추천 & 리뷰',
     template: '%s | filmott',
   },
-  description: 'AI가 취향에 맞는 영화와 시리즈를 추천해드립니다. 리뷰와 별점으로 나만의 감상을 기록하세요.',
+  description: '뭐 볼지 고민될 때, AI에게 물어보세요. 취향에 맞는 영화와 시리즈를 추천받고, 리뷰와 별점으로 감상을 기록하세요.',
   icons: {
     icon: [
       { url: '/icons/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: 'filmott',
     title: 'filmott - 영화/시리즈 추천 & 리뷰',
-    description: 'AI가 취향에 맞는 영화와 시리즈를 추천해드립니다. 리뷰와 별점으로 나만의 감상을 기록하세요.',
+    description: '뭐 볼지 고민될 때, AI에게 물어보세요. 취향에 맞는 영화와 시리즈를 추천받고, 리뷰와 별점으로 감상을 기록하세요.',
     images: [
       {
         url: '/icons/og/og-image.png',
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'filmott - 영화/시리즈 추천 & 리뷰',
-    description: 'AI가 취향에 맞는 영화와 시리즈를 추천해드립니다. 리뷰와 별점으로 나만의 감상을 기록하세요.',
+    description: '뭐 볼지 고민될 때, AI에게 물어보세요. 취향에 맞는 영화와 시리즈를 추천받고, 리뷰와 별점으로 감상을 기록하세요.',
     images: ['/icons/og/twitter-card.png'],
   },
   verification: {
