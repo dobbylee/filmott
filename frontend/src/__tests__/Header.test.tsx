@@ -68,23 +68,12 @@ describe('Header', () => {
     expect(screen.queryByText('로그아웃')).not.toBeInTheDocument();
   });
 
-  it('로그인 상태에서 추천받기 링크를 표시해야 한다', () => {
+  it('헤더에 추천받기 링크가 없어야 한다', () => {
     mockUser = { nickname: 'testuser' };
 
     render(<Header />);
 
-    // 데스크톱 네비게이션에 추천받기 링크
-    const aiLinks = screen.getAllByText('추천받기');
-    expect(aiLinks.length).toBeGreaterThan(0);
-
-    const desktopLink = aiLinks.find((el) => el.closest('a')?.getAttribute('href') === '/chat');
-    expect(desktopLink).toBeDefined();
-  });
-
-  it('비로그인 상태에서도 추천받기 버튼을 표시해야 한다', () => {
-    render(<Header />);
-
-    expect(screen.getAllByText('추천받기').length).toBeGreaterThan(0);
+    expect(screen.queryByText('추천받기')).not.toBeInTheDocument();
   });
 
   it('검색 폼 제출을 처리해야 한다', async () => {
