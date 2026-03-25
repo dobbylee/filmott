@@ -9,6 +9,7 @@ import ChatInput from './ChatInput';
 import StreamingText from './StreamingText';
 import RecommendationCards from './RecommendationCards';
 import type { ChatMessageData, ChatRecommendationWithPoster } from '@/types/chat';
+import { trackEvent } from '@/lib/ga';
 
 const STORAGE_KEY = 'filmott_chat_messages';
 const MAX_STORED_MESSAGES = 50;
@@ -113,6 +114,7 @@ export default function ChatSection() {
   };
 
   const handleSend = async (content: string) => {
+    trackEvent('chat_message_sent', { message_count: messages.length + 1 });
     setError(null);
 
     // 대화 이력 구성 (최근 20개만 전송, role + content만 추출)
@@ -214,6 +216,7 @@ export default function ChatSection() {
   };
 
   const handleExampleClick = (question: string) => {
+    trackEvent('chat_example_clicked', { question });
     handleSend(question);
   };
 
