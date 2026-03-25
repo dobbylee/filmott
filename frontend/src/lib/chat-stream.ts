@@ -37,27 +37,31 @@ async function fetchWithAuth(
   url: string,
   body: string,
 ): Promise<Response> {
-  let token = localStorage.getItem('access_token');
+  const token = localStorage.getItem('access_token');
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   let response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
+    headers,
     body,
   });
 
-  // 401이면 토큰 갱신 후 재시도
-  if (response.status === 401) {
-    token = await refreshAccessToken();
-    if (!token) return response;
+  // 401이면 토큰 갱신 후 재시도 (비로그인이면 갱신 시도 없이 그대로 반환)
+  if (response.status === 401 && token) {
+    const newToken = await refreshAccessToken();
+    if (!newToken) return response;
 
     response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${newToken}`,
       },
       body,
     });
