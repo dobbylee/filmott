@@ -407,6 +407,8 @@ export class RankingsService {
 
   private async revalidateMainPage(): Promise<void> {
     if (!this.revalidateSecret) return;
+    // 배치 DB 작업 완료 후 30초 대기 — SSR 재생성이 배치와 겹치지 않도록
+    await sleep(30_000);
     try {
       const url = 'http://frontend:3000/internal/revalidate';
       const response = await fetch(url, {
