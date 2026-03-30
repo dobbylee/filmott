@@ -38,29 +38,37 @@ export class ChatController {
       abortController.abort();
     });
 
+    const safeSend = (event: string, data: unknown) => {
+      try {
+        if (!abortController.signal.aborted && !res.destroyed) {
+          res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        }
+      } catch {
+        // 연결 이미 끊김 — 무시
+      }
+    };
+
     try {
       await this.chatService.sendMessageStream(
         user?.id ?? null,
         dto.content,
         dto.history ?? [],
-        (event: string, data: unknown) => {
-          if (!abortController.signal.aborted) {
-            res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-          }
-        },
+        safeSend,
         abortController.signal,
       );
     } catch (error) {
-      if (!abortController.signal.aborted) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : '추천 중 오류가 발생했습니다.';
-        res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : '추천 중 오류가 발생했습니다.';
+      safeSend('error', { message });
     } finally {
-      if (!abortController.signal.aborted) {
-        res.end();
+      try {
+        if (!res.destroyed) {
+          res.end();
+        }
+      } catch {
+        // 연결 이미 끊김 — 무시
       }
     }
   }
