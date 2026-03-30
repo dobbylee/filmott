@@ -253,6 +253,7 @@ export class ContentsService {
     const rows = await this.contentRepo
       .createQueryBuilder('c')
       .select(['c.tmdbId', 'c.contentType', 'c.updatedAt'])
+      .where('c.adult IS NOT TRUE')
       .orderBy('c.updatedAt', 'DESC')
       .limit(50000)
       .getMany();

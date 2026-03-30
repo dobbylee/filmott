@@ -37,7 +37,7 @@ export async function generateMetadata({
   try {
     const content = await fetchContentDetail(type, tmdbId);
     const description = content.overview?.slice(0, 160) ?? `${content.title} 상세 정보`;
-    return {
+    const metadata: Metadata = {
       title: content.title,
       description,
       openGraph: {
@@ -56,6 +56,12 @@ export async function generateMetadata({
         images: content.backdropUrl ? [content.backdropUrl] : [],
       },
     };
+
+    if (content.adult) {
+      metadata.robots = { index: false, follow: false };
+    }
+
+    return metadata;
   } catch {
     return { title: '작품 상세' };
   }

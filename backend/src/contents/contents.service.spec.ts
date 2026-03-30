@@ -11,6 +11,7 @@ describe('ContentsService', () => {
 
   const mockQueryBuilder = {
     select: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     getMany: jest.fn(),
@@ -1090,7 +1091,7 @@ describe('ContentsService', () => {
   });
 
   describe('getSitemapContents', () => {
-    it('DB에서 모든 콘텐츠의 tmdbId, contentType, updatedAt을 반환해야 한다', async () => {
+    it('adult=true 콘텐츠를 제외하고 tmdbId, contentType, updatedAt을 반환해야 한다', async () => {
       const mockRows = [
         { tmdbId: 123, contentType: 'movie', updatedAt: new Date('2026-03-15') },
         { tmdbId: 456, contentType: 'tv', updatedAt: new Date('2026-03-14') },
@@ -1101,6 +1102,7 @@ describe('ContentsService', () => {
 
       expect(mockContentRepo.createQueryBuilder).toHaveBeenCalledWith('c');
       expect(mockQueryBuilder.select).toHaveBeenCalledWith(['c.tmdbId', 'c.contentType', 'c.updatedAt']);
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith('c.adult IS NOT TRUE');
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('c.updatedAt', 'DESC');
       expect(result).toEqual([
         { tmdbId: 123, contentType: 'movie', updatedAt: new Date('2026-03-15') },
