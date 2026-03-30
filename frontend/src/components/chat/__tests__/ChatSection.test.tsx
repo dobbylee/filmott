@@ -39,7 +39,7 @@ describe('ChatSection', () => {
 
   it('예시 질문 버튼들을 렌더링한다', () => {
     render(<ChatSection />);
-    expect(screen.getByText('넷플릭스에서 볼 수 있는 최신 드라마 추천해줘')).toBeInTheDocument();
+    expect(screen.getByText('최신 넷플릭스 시리즈 추천해줘')).toBeInTheDocument();
     expect(screen.getByText('친구들이랑 볼 코미디 영화 추천해줘')).toBeInTheDocument();
     expect(screen.getByText('통쾌한 액션 영화 추천해줘')).toBeInTheDocument();
     expect(screen.getByText('밤에 혼자 볼 스릴러 영화 추천해줘')).toBeInTheDocument();
@@ -48,11 +48,6 @@ describe('ChatSection', () => {
   it('입력 영역을 렌더링한다', () => {
     render(<ChatSection />);
     expect(screen.getByPlaceholderText('메시지를 입력하세요.')).toBeInTheDocument();
-  });
-
-  it('AI 안내 문구가 표시된다', () => {
-    render(<ChatSection />);
-    expect(screen.getByText('AI가 추천한 정보는 정확하지 않을 수 있습니다.')).toBeInTheDocument();
   });
 
   it('비로그인 상태에서도 메시지가 바로 전송된다', async () => {

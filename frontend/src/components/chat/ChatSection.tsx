@@ -16,7 +16,7 @@ const MAX_STORED_MESSAGES = 50;
 const MAX_HISTORY_MESSAGES = 20;
 
 const EXAMPLE_QUESTIONS = [
-  '넷플릭스에서 볼 수 있는 최신 드라마 추천해줘',
+  '최신 넷플릭스 시리즈 추천해줘',
   '친구들이랑 볼 코미디 영화 추천해줘',
   '통쾌한 액션 영화 추천해줘',
   '밤에 혼자 볼 스릴러 영화 추천해줘',
@@ -332,9 +332,6 @@ export default function ChatSection() {
       <div className="px-4 pb-4 pt-2">
         <div className="max-w-2xl mx-auto">
           <ChatInput onSend={handleSend} disabled={isStreaming} />
-          <p className="mt-2 text-center text-[11px] text-white/30">
-            AI가 추천한 정보는 정확하지 않을 수 있습니다.
-          </p>
         </div>
       </div>
     </section>
