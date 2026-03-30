@@ -42,6 +42,7 @@ describe('ChatController', () => {
         write: jest.fn(),
         end: jest.fn(),
         on: jest.fn(),
+        destroyed: false,
       };
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
@@ -67,6 +68,7 @@ describe('ChatController', () => {
         write: jest.fn(),
         end: jest.fn(),
         on: jest.fn(),
+        destroyed: false,
       };
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
@@ -97,6 +99,7 @@ describe('ChatController', () => {
         write: jest.fn(),
         end: jest.fn(),
         on: jest.fn(),
+        destroyed: false,
       };
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
@@ -123,6 +126,7 @@ describe('ChatController', () => {
         write: jest.fn(),
         end: jest.fn(),
         on: jest.fn(),
+        destroyed: false,
       };
 
       mockChatService.sendMessageStream.mockRejectedValue(new Error('API 오류'));
@@ -146,6 +150,7 @@ describe('ChatController', () => {
         write: jest.fn(),
         end: jest.fn(),
         on: jest.fn(),
+        destroyed: false,
       };
 
       mockChatService.sendMessageStream.mockRejectedValue('문자열 에러');
@@ -168,6 +173,7 @@ describe('ChatController', () => {
         write: jest.fn(),
         end: jest.fn(),
         on: jest.fn(),
+        destroyed: false,
       };
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
@@ -194,6 +200,7 @@ describe('ChatController', () => {
         write: jest.fn(),
         end: jest.fn(),
         on: jest.fn(),
+        destroyed: false,
       };
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
@@ -207,6 +214,81 @@ describe('ChatController', () => {
       expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
       expect(mockRes.flushHeaders).toHaveBeenCalled();
       expect(mockRes.end).toHaveBeenCalled();
+    });
+  });
+
+  describe('safeSend — res.destroyed 방어 로직', () => {
+    it('res.destroyed가 true이면 write를 호출하지 않아야 한다', async () => {
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+        destroyed: true,
+      };
+
+      mockChatService.sendMessageStream.mockImplementation(
+        async (_userId: number, _content: string, _history: unknown[], emit: (event: string, data: unknown) => void) => {
+          emit('text', { content: '응답' });
+        },
+      );
+
+      await controller.sendMessage(
+        user,
+        { content: '추천해줘' },
+        mockRes as unknown as import('express').Response,
+      );
+
+      expect(mockRes.write).not.toHaveBeenCalled();
+    });
+
+    it('res.destroyed가 true이면 end를 호출하지 않아야 한다', async () => {
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+        destroyed: true,
+      };
+
+      mockChatService.sendMessageStream.mockResolvedValue(undefined);
+
+      await controller.sendMessage(
+        user,
+        { content: '추천해줘' },
+        mockRes as unknown as import('express').Response,
+      );
+
+      expect(mockRes.end).not.toHaveBeenCalled();
+    });
+
+    it('res.write가 throw해도 에러가 전파되지 않아야 한다', async () => {
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn().mockImplementation(() => {
+          throw new Error('write EPIPE');
+        }),
+        end: jest.fn(),
+        on: jest.fn(),
+        destroyed: false,
+      };
+
+      mockChatService.sendMessageStream.mockImplementation(
+        async (_userId: number, _content: string, _history: unknown[], emit: (event: string, data: unknown) => void) => {
+          emit('text', { content: '응답' });
+        },
+      );
+
+      await expect(
+        controller.sendMessage(
+          user,
+          { content: '추천해줘' },
+          mockRes as unknown as import('express').Response,
+        ),
+      ).resolves.not.toThrow();
     });
   });
 
@@ -238,6 +320,7 @@ describe('ChatController', () => {
         on: jest.fn((event: string, handler: () => void) => {
           if (event === 'close') closeHandler.mockImplementation(handler);
         }),
+        destroyed: false,
       };
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
@@ -268,6 +351,7 @@ describe('ChatController', () => {
         on: jest.fn((event: string, handler: () => void) => {
           if (event === 'close') closeCallback = handler;
         }),
+        destroyed: false,
       };
 
       mockChatService.sendMessageStream.mockImplementation(
