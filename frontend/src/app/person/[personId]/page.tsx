@@ -89,7 +89,7 @@ export async function generateMetadata({
   try {
     const person = await fetchApi<PersonDetail>(
       `/contents/person/${personId}`,
-      { next: { revalidate: 3600 } },
+      { next: { revalidate: 21600 } },
     );
     const description = person.biography?.slice(0, 160) ?? `${person.name}의 출연작 목록`;
     return {
@@ -126,7 +126,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
     [person, credits] = await Promise.all([
       fetchApi<PersonDetail>(
         `/contents/person/${personId}`,
-        { next: { revalidate: 3600 } },
+        { next: { revalidate: 21600 } },
       ),
       fetchApi<PersonCreditsResult>(
         `/contents/person/${personId}/credits`,

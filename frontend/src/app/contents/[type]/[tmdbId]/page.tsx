@@ -26,7 +26,7 @@ async function fetchContentDetail(
 ): Promise<ContentDetail> {
   return fetchApi<ContentDetail>(
     `/contents/${type}/${tmdbId}`,
-    { next: { revalidate: 600 } },
+    { next: { revalidate: 3600 } },
   );
 }
 
