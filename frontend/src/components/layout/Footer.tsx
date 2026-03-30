@@ -5,7 +5,7 @@ export default function Footer() {
     <footer className="mt-12 border-t border-border bg-card">
       <div className="mx-auto max-w-7xl px-4 py-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
-          {/* 왼쪽: 로고 + 정책 링크 */}
+          {/* 왼쪽: 로고 + 태그라인 */}
           <div className="space-y-2">
             <Link
               href="/"
@@ -30,7 +30,7 @@ export default function Footer() {
               </svg>
               오픈채팅
             </a>
-            <span>filmottkr@gmail.com</span>
+            <a href="mailto:filmottkr@gmail.com" className="hover:text-primary transition-colors">filmottkr@gmail.com</a>
             <nav className="flex gap-2">
               <Link href="/privacy" className="hover:text-primary transition-colors">
                 개인정보처리방침
