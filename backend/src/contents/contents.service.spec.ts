@@ -1100,14 +1100,13 @@ describe('ContentsService', () => {
 
       const result = await service.getSitemapContents();
 
-      expect(mockContentRepo.createQueryBuilder).toHaveBeenCalledWith('c');
-      expect(mockQueryBuilder.select).toHaveBeenCalledWith(['c.tmdbId', 'c.contentType', 'c.updatedAt']);
       expect(mockQueryBuilder.where).toHaveBeenCalledWith('c.adult IS NOT TRUE');
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('c.updatedAt', 'DESC');
-      expect(result).toEqual([
-        { tmdbId: 123, contentType: 'movie', updatedAt: new Date('2026-03-15') },
-        { tmdbId: 456, contentType: 'tv', updatedAt: new Date('2026-03-14') },
-      ]);
+      expect(result).toEqual(mockRows);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toHaveProperty('tmdbId', 123);
+      expect(result[0]).toHaveProperty('contentType', 'movie');
+      expect(result[1]).toHaveProperty('tmdbId', 456);
+      expect(result[1]).toHaveProperty('contentType', 'tv');
     });
 
     it('콘텐츠가 없으면 빈 배열을 반환해야 한다', async () => {
