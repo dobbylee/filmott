@@ -158,7 +158,7 @@ describe('IntentAnalyzerService', () => {
 
       expect(mockCreate).toHaveBeenCalledWith({
         model: CHAT_MODEL,
-        reasoning_effort: 'none',
+        reasoning_effort: 'low',
         max_completion_tokens: 1024,
         response_format: { type: 'json_object' },
         messages: [
