@@ -237,6 +237,8 @@ describe('ChatService', () => {
       preferredCountries: [],
       ottProviderNames: [],
       hasData: false,
+      excludeGenres: [],
+      excludePersonNames: [],
     };
 
     const setupEmptyUserContext = () => {
@@ -645,7 +647,8 @@ describe('ChatService', () => {
 
     it('confidence=low + 유저 데이터 있음: 유저 선호만으로 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({
+      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
+        ...defaultEmptyPreference,
         preferredGenres: ['드라마', '스릴러'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
@@ -680,7 +683,7 @@ describe('ChatService', () => {
 
     it('confidence=low + 신규 유저: EmbeddingService.searchSimilar가 호출되어야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({
+      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
         preferredGenres: [],
         preferredCountries: [],
         ottProviderNames: [],
@@ -710,7 +713,7 @@ describe('ChatService', () => {
 
     it('필터 있음: 명시적 필터가 유저 선호보다 우선해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({
+      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
         preferredGenres: ['드라마'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
@@ -744,7 +747,7 @@ describe('ChatService', () => {
 
     it('명시적 OTT 필터 있음: 유저 장르/국가 선호는 WHERE 필터에 합쳐져야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({
+      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
         preferredGenres: ['드라마', '로맨스'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
@@ -776,7 +779,7 @@ describe('ChatService', () => {
 
     it('confidence=low + 유저 OTT 구독만 있고 장르/국가 선호 없는 경우 OTT 필터만 적용해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({
+      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
         preferredGenres: [],
         preferredCountries: [],
         ottProviderNames: ['wavve'],
@@ -804,7 +807,7 @@ describe('ChatService', () => {
 
     it('confidence=high이면 의도 필터 우선으로 ContentSearchService를 호출해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({
+      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
         preferredGenres: ['로맨스'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
@@ -838,7 +841,7 @@ describe('ChatService', () => {
 
     it('confidence=low이면 의도 필터를 스킵하고 유저 선호만으로 검색해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({
+      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
         preferredGenres: ['드라마'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
@@ -871,7 +874,7 @@ describe('ChatService', () => {
 
     it('confidence=low + 신규 유저이면 EmbeddingService.searchSimilar를 호출해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({
+      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
         preferredGenres: [],
         preferredCountries: [],
         ottProviderNames: [],
@@ -921,6 +924,7 @@ describe('ChatService', () => {
           watchedTmdbIds: expect.any(Array),
         }),
         ['netflix'],
+        expect.any(Array),
       );
     });
   });
@@ -1096,6 +1100,7 @@ describe('ChatService', () => {
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
       mockExtractUserPreference.mockReturnValue({
         preferredGenres: [], preferredCountries: [], ottProviderNames: [], hasData: false,
+        excludeGenres: [], excludePersonNames: [],
       });
       mockStreamCreate.mockResolvedValue({
         [Symbol.asyncIterator]: async function* () {

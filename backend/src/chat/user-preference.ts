@@ -5,6 +5,8 @@ export interface UserPreference {
   preferredCountries: string[];    // 선호 국가 ISO 코드 (상위 2개)
   ottProviderNames: string[];      // 구독 OTT TMDB provider_name
   hasData: boolean;                // 유저 데이터 존재 여부
+  excludeGenres: string[];         // 비선호 장르 (disliked 2회 이상)
+  excludePersonNames: string[];    // 비선호 감독 (disliked 2회 이상)
 }
 
 // [동기화 주의] intent-analyzer.ts INTENT_SYSTEM_PROMPT의 OTT provider_name과 동일 유지
@@ -20,6 +22,7 @@ const OTT_ID_TO_TMDB_NAME: Record<string, string> = {
 const MAX_GENRES = 5;
 const MIN_GENRE_COUNT = 2;
 const MAX_COUNTRIES = 2;
+const MIN_DISLIKE_COUNT = 2;
 
 // 가중 점수 = avgRating * log2(count + 1)
 // 평점이 높고 많이 본 장르일수록 높은 점수
@@ -96,6 +99,39 @@ function extractCountries(
   return sorted.slice(0, MAX_COUNTRIES).map(([country]) => country);
 }
 
+// disliked 작품에서 2회 이상 등장한 장르를 제외 대상으로 추출
+// preferredGenres와 겹치는 장르는 제외하지 않음 (선호 > 비선호)
+function extractExcludeGenres(
+  disliked: FavoriteContent[],
+  preferredGenres: string[],
+): string[] {
+  const genreCount = new Map<string, number>();
+  for (const item of disliked) {
+    const genres = item.genres.split(',').map((g) => g.trim()).filter(Boolean);
+    for (const genre of genres) {
+      genreCount.set(genre, (genreCount.get(genre) ?? 0) + 1);
+    }
+  }
+  return [...genreCount.entries()]
+    .filter(([genre, count]) => count >= MIN_DISLIKE_COUNT && !preferredGenres.includes(genre))
+    .map(([genre]) => genre);
+}
+
+// disliked 작품에서 2회 이상 등장한 감독을 제외 대상으로 추출
+function extractExcludePersonNames(
+  disliked: FavoriteContent[],
+): string[] {
+  const directorCount = new Map<string, number>();
+  for (const item of disliked) {
+    if (item.director) {
+      directorCount.set(item.director, (directorCount.get(item.director) ?? 0) + 1);
+    }
+  }
+  return [...directorCount.entries()]
+    .filter(([, count]) => count >= MIN_DISLIKE_COUNT)
+    .map(([name]) => name);
+}
+
 // OTT_ID_TO_TMDB_NAME에 없으면 null (한국어명은 TMDB provider_name과 매칭 불가)
 function mapOttNames(
   subscribedOtts: string[],
@@ -162,6 +198,7 @@ export function enrichQueryWithPreference(
 export function extractUserPreference(
   context: UserContext,
   subscribedOtts: string[],
+  intentPersonNames: string[] = [],
 ): UserPreference {
   // 장르 추출 우선순위:
   // 1순위: genreStats (리뷰 평점 기반, 가중 점수)
@@ -189,10 +226,16 @@ export function extractUserPreference(
     || context.wantToWatch.length > 0
     || subscribedOtts.length > 0;
 
+  const excludeGenres = extractExcludeGenres(context.disliked, preferredGenres);
+  const excludePersonNames = extractExcludePersonNames(context.disliked)
+    .filter((name) => !intentPersonNames.includes(name));
+
   return {
     preferredGenres,
     preferredCountries,
     ottProviderNames,
     hasData,
+    excludeGenres,
+    excludePersonNames,
   };
 }

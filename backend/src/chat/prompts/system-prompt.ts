@@ -8,6 +8,7 @@ export interface FavoriteContent {
   genres: string;
   rating: number;
   originCountry: string | null;
+  director?: string | null;
 }
 
 export interface GenreStat {

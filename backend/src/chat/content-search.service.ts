@@ -10,6 +10,8 @@ export interface ContentSearchFilters {
   dateRange?: { from: string | null; to: string | null };
   contentType?: 'movie' | 'tv';
   genres?: string[];
+  excludeGenres?: string[];
+  excludePersonNames?: string[];
 }
 
 interface FilteredRow {
@@ -218,6 +220,27 @@ export class ContentSearchService {
       );
       params.push(filters.genres);
       paramIndex++;
+    }
+
+    // 비선호 장르 제외
+    if (filters.excludeGenres?.length) {
+      conditions.push(
+        `AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(c.genres) AS g WHERE g->>'name' = ANY($${paramIndex}::text[]))`,
+      );
+      params.push(filters.excludeGenres);
+      paramIndex++;
+    }
+
+    // 비선호 감독 제외
+    if (filters.excludePersonNames?.length) {
+      const excludePersonConditions = filters.excludePersonNames
+        .map(() => {
+          const idx = paramIndex;
+          paramIndex++;
+          return `c.director LIKE $${idx}`;
+        });
+      conditions.push(`AND NOT (${excludePersonConditions.join(' OR ')})`);
+      filters.excludePersonNames.forEach((name) => params.push(`%${name}%`));
     }
 
     params.push(limit);

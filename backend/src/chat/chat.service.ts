@@ -36,6 +36,7 @@ interface RawFavoriteRow {
   genres: string;
   rating: number;
   originCountry: string | null;
+  director?: string | null;
 }
 
 interface RawGenreStatRow {
@@ -159,7 +160,7 @@ export class ChatService {
         : userContext.watchedTmdbIds;
 
       // 7. 유저 선호 추출 + 2분기 검색
-      const userPref = extractUserPreference(userContext, subscribedOtts);
+      const userPref = extractUserPreference(userContext, subscribedOtts, intent.personNames);
 
       if (intent.confidence === 'high') {
         // 구체적 요청: SQL 필터 우선, 유저 선호는 명시적 필터가 없는 필드에만 합산
@@ -173,6 +174,24 @@ export class ChatService {
         }
         if (!mergedFilters.countries?.length && userPref.preferredCountries.length > 0) {
           mergedFilters.countries = userPref.preferredCountries;
+        }
+
+        // 비선호 장르/감독 제외 (명시적 요청과 겹치지 않는 것만)
+        if (userPref.excludeGenres.length > 0) {
+          const effectiveExcludeGenres = userPref.excludeGenres.filter(
+            (g) => !mergedFilters.genres?.includes(g),
+          );
+          if (effectiveExcludeGenres.length > 0) {
+            mergedFilters.excludeGenres = effectiveExcludeGenres;
+          }
+        }
+        if (userPref.excludePersonNames.length > 0) {
+          const effectiveExcludePersons = userPref.excludePersonNames.filter(
+            (p) => !mergedFilters.personNames?.includes(p),
+          );
+          if (effectiveExcludePersons.length > 0) {
+            mergedFilters.excludePersonNames = effectiveExcludePersons;
+          }
         }
 
         const enrichedQuery = enrichQueryWithPreference(semanticQuery, userPref, intent);
@@ -189,6 +208,8 @@ export class ChatService {
           if (userPref.ottProviderNames.length > 0) prefOnlyFilters.ottProviderNames = userPref.ottProviderNames;
           if (userPref.preferredGenres.length > 0) prefOnlyFilters.genres = userPref.preferredGenres;
           if (userPref.preferredCountries.length > 0) prefOnlyFilters.countries = userPref.preferredCountries;
+          if (userPref.excludeGenres.length > 0) prefOnlyFilters.excludeGenres = userPref.excludeGenres;
+          if (userPref.excludePersonNames.length > 0) prefOnlyFilters.excludePersonNames = userPref.excludePersonNames;
 
           const enrichedQuery = enrichQueryWithPreference(semanticQuery, userPref, intent);
 
@@ -434,6 +455,7 @@ export class ChatService {
         "array_to_string(ARRAY(SELECT jsonb_array_elements(c.genres) ->> 'name'), ', ') AS \"genres\"",
         'r.rating AS "rating"',
         'c.origin_country AS "originCountry"',
+        'c.director AS "director"',
       ])
       .where('r.userId = :userId', { userId })
       .andWhere('r.rating <= 4')
@@ -450,6 +472,7 @@ export class ChatService {
       genres: row.genres || '',
       rating: row.rating,
       originCountry: row.originCountry ?? null,
+      director: row.director ?? null,
     }));
   }
 
