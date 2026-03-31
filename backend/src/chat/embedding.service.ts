@@ -125,7 +125,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 
     const response = await openai.chat.completions.create({
       model: CHAT_MODEL,
-      reasoning_effort: 'low',
+      reasoning_effort: 'none',
       max_completion_tokens: 2048,
       messages: [{ role: 'user', content: prompt }],
     });

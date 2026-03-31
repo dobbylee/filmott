@@ -143,7 +143,7 @@ describe('EmbeddingService', () => {
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           model: CHAT_MODEL,
-          reasoning_effort: 'low',
+          reasoning_effort: 'none',
           max_completion_tokens: 2048,
         }),
       );
