@@ -4,8 +4,6 @@ import { NotFoundException } from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { Content } from './content.entity';
 import { TmdbService } from '../tmdb/tmdb.service';
-import { EmbeddingService } from '../chat/embedding.service';
-
 describe('ContentsService', () => {
   let service: ContentsService;
   let tmdbService: TmdbService;
@@ -37,9 +35,6 @@ describe('ContentsService', () => {
     getPersonCredits: jest.fn(),
   };
 
-  const mockEmbeddingService = {
-    cacheContentMetadata: jest.fn().mockResolvedValue(null),
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -47,7 +42,6 @@ describe('ContentsService', () => {
         ContentsService,
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },
         { provide: TmdbService, useValue: mockTmdbService },
-        { provide: EmbeddingService, useValue: mockEmbeddingService },
       ],
     }).compile();
 
@@ -1238,77 +1232,4 @@ describe('ContentsService', () => {
     });
   });
 
-  describe('fetchAndSave - metadata 자동 캐싱', () => {
-    it('adult=true인 콘텐츠는 cacheContentMetadata를 호출하지 않아야 한다', async () => {
-      mockContentRepo.findOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
-
-      const tmdbData = {
-        id: 950,
-        title: 'Adult Movie',
-        original_title: 'Adult Movie',
-        poster_path: null,
-        backdrop_path: null,
-        overview: null,
-        release_date: null,
-        vote_average: null,
-        adult: true,
-        genres: [],
-        runtime: null,
-        credits: { cast: [] },
-        'watch/providers': { results: {} },
-      };
-      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
-
-      mockContentRepo.create.mockImplementation((data: Partial<Content>) => ({
-        ...data,
-        id: 30,
-      }));
-      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c as Content));
-
-      await service.getContentDetail(950, 'movie');
-
-      expect(mockEmbeddingService.cacheContentMetadata).not.toHaveBeenCalled();
-    });
-
-    it('adult=false인 콘텐츠는 cacheContentMetadata를 비동기로 호출해야 한다', async () => {
-      mockContentRepo.findOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
-
-      const tmdbData = {
-        id: 951,
-        title: 'Normal Movie',
-        original_title: 'Normal Movie',
-        poster_path: null,
-        backdrop_path: null,
-        overview: null,
-        release_date: '2026-01-01',
-        vote_average: 7.0,
-        vote_count: 100,
-        adult: false,
-        genres: [],
-        runtime: null,
-        credits: { cast: [] },
-        'watch/providers': { results: { KR: { flatrate: [{ provider_name: 'Netflix' }] } } },
-      };
-      mockTmdbService.getDetails.mockResolvedValue(tmdbData);
-
-      mockContentRepo.create.mockImplementation((data: Partial<Content>) => ({
-        ...data,
-        id: 31,
-        voteCount: 100,
-        releaseDate: '2026-01-01',
-      }));
-      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c as Content));
-
-      await service.getContentDetail(951, 'movie');
-
-      // 비동기 호출 대기
-      await new Promise((r) => setTimeout(r, 10));
-
-      expect(mockEmbeddingService.cacheContentMetadata).toHaveBeenCalledWith(31);
-    });
-  });
 });
