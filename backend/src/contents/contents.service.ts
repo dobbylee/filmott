@@ -8,6 +8,7 @@ import {
   TmdbPersonDetail,
   TmdbPersonCredit,
 } from '../tmdb/tmdb.service';
+import { EmbeddingService } from '../chat/embedding.service';
 import { TMDB_IMAGE_BASE, GENRE_NAME_MAP, CONTENT_DETAIL_TTL_MS } from '../common/constants';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class ContentsService {
     @InjectRepository(Content)
     private readonly contentRepo: Repository<Content>,
     private readonly tmdbService: TmdbService,
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   /**
@@ -162,6 +164,10 @@ export class ContentsService {
     content.watchProviders = watchProviders;
     content.credits = credits;
     await this.contentRepo.save(content);
+
+    if (!content.adult) {
+      this.embeddingService.cacheContentMetadata(content.id).catch(() => {});
+    }
 
     return {
       ...content,

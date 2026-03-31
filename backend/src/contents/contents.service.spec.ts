@@ -4,6 +4,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { Content } from './content.entity';
 import { TmdbService } from '../tmdb/tmdb.service';
+import { EmbeddingService } from '../chat/embedding.service';
 
 describe('ContentsService', () => {
   let service: ContentsService;
@@ -36,12 +37,17 @@ describe('ContentsService', () => {
     getPersonCredits: jest.fn(),
   };
 
+  const mockEmbeddingService = {
+    cacheContentMetadata: jest.fn().mockResolvedValue(null),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ContentsService,
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },
         { provide: TmdbService, useValue: mockTmdbService },
+        { provide: EmbeddingService, useValue: mockEmbeddingService },
       ],
     }).compile();
 
