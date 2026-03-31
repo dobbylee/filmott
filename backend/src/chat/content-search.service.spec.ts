@@ -626,6 +626,36 @@ describe('ContentSearchService', () => {
       expect(query).toContain('NOT EXISTS (SELECT 1 FROM content_metadata cm2 WHERE cm2.content_id = c.id)');
     });
 
+    it('excludeGenres 필터가 SQL에 NOT EXISTS 조건으로 생성되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '영화 추천', 20, [],
+        { excludeGenres: ['공포', '스릴러'] },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('NOT EXISTS');
+      expect(query).toContain("g->>'name'");
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContainEqual(['공포', '스릴러']);
+    });
+
+    it('excludePersonNames 필터가 SQL에 NOT (director LIKE) 조건으로 생성되어야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '영화 추천', 20, [],
+        { excludePersonNames: ['감독A'] },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('AND NOT (');
+      expect(query).toContain('director LIKE');
+      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
+      expect(params).toContain('%감독A%');
+    });
+
     it('임베딩 실패 시 1순위에서 인기도 기반으로 정렬해야 한다', async () => {
       mockEmbeddingService.generateEmbedding.mockRejectedValue(
         new Error('OpenAI API 오류'),

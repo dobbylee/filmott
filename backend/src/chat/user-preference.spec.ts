@@ -342,4 +342,111 @@ describe('extractUserPreference', () => {
       expect(result.preferredCountries).toEqual(['KR', 'US']);
     });
   });
+
+  describe('excludeGenres', () => {
+    it('disliked에서 2회 이상 등장한 장르만 excludeGenres에 포함되어야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        disliked: [
+          makeFavorite('영화A', '공포, 스릴러', 2),
+          makeFavorite('영화B', '공포, 액션', 3),
+          makeFavorite('영화C', '스릴러, 로맨스', 1),
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      // 공포: 2회, 스릴러: 2회 → excludeGenres
+      expect(result.excludeGenres).toContain('공포');
+      expect(result.excludeGenres).toContain('스릴러');
+    });
+
+    it('1회만 등장한 장르는 excludeGenres에서 제외되어야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        disliked: [
+          makeFavorite('영화A', '공포, 액션', 2),
+          makeFavorite('영화B', '공포, 로맨스', 3),
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      // 공포: 2회 → 포함, 액션: 1회 → 제외, 로맨스: 1회 → 제외
+      expect(result.excludeGenres).toContain('공포');
+      expect(result.excludeGenres).not.toContain('액션');
+      expect(result.excludeGenres).not.toContain('로맨스');
+    });
+
+    it('선호 장르(preferredGenres)와 겹치는 비선호 장르는 제외하지 않아야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        genreStats: [
+          makeGenreStat('스릴러', 8.0, 5),
+        ],
+        disliked: [
+          makeFavorite('영화A', '스릴러, 공포', 2),
+          makeFavorite('영화B', '스릴러, 공포', 1),
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      // 스릴러: 2회이지만 preferredGenres에 포함 → excludeGenres에서 제외
+      expect(result.preferredGenres).toContain('스릴러');
+      expect(result.excludeGenres).not.toContain('스릴러');
+      // 공포: 2회, preferredGenres에 미포함 → excludeGenres에 포함
+      expect(result.excludeGenres).toContain('공포');
+    });
+  });
+
+  describe('excludePersonNames', () => {
+    it('disliked에서 2회 이상 등장한 감독만 excludePersonNames에 포함되어야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        disliked: [
+          { ...makeFavorite('영화A', '액션', 2), director: '감독A' },
+          { ...makeFavorite('영화B', '액션', 1), director: '감독A' },
+          { ...makeFavorite('영화C', '드라마', 3), director: '감독B' },
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      // 감독A: 2회 → 포함, 감독B: 1회 → 제외
+      expect(result.excludePersonNames).toContain('감독A');
+      expect(result.excludePersonNames).not.toContain('감독B');
+    });
+
+    it('intentPersonNames로 명시된 감독은 excludePersonNames에서 제외되어야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        disliked: [
+          { ...makeFavorite('영화A', '액션', 2), director: '감독A' },
+          { ...makeFavorite('영화B', '액션', 1), director: '감독A' },
+        ],
+      };
+
+      const result = extractUserPreference(context, [], ['감독A']);
+
+      // 감독A: 2회이지만 intentPersonNames에 포함 → excludePersonNames에서 제외
+      expect(result.excludePersonNames).not.toContain('감독A');
+    });
+
+    it('director가 null인 항목은 무시되어야 한다', () => {
+      const context: UserContext = {
+        ...makeEmptyContext(),
+        disliked: [
+          { ...makeFavorite('영화A', '액션', 2), director: null },
+          { ...makeFavorite('영화B', '액션', 1), director: null },
+          { ...makeFavorite('영화C', '드라마', 3), director: '감독A' },
+        ],
+      };
+
+      const result = extractUserPreference(context, []);
+
+      // director null 항목은 무시, 감독A: 1회 → 제외
+      expect(result.excludePersonNames).toEqual([]);
+    });
+  });
 });

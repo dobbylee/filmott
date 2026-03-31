@@ -927,6 +927,69 @@ describe('ChatService', () => {
         expect.any(Array),
       );
     });
+
+    it('excludeGenres가 searchWithFilters 호출 시 필터에 포함되어야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        ...defaultEmptyPreference,
+        preferredGenres: ['드라마'],
+        preferredCountries: ['KR'],
+        ottProviderNames: ['Netflix'],
+        hasData: true,
+        excludeGenres: ['공포', '스릴러'],
+        excludePersonNames: [],
+      });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        confidence: 'high',
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('영화 추천');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '영화 추천해줘', [], jest.fn());
+
+      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      expect(calledFilters.excludeGenres).toEqual(['공포', '스릴러']);
+    });
+
+    it('명시적 요청 장르와 겹치는 excludeGenres는 필터에서 제외되어야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        ...defaultEmptyPreference,
+        preferredGenres: ['드라마'],
+        preferredCountries: [],
+        ottProviderNames: [],
+        hasData: true,
+        excludeGenres: ['공포', '스릴러'],
+        excludePersonNames: [],
+      });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        genres: ['공포'],
+        confidence: 'high',
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('공포 영화');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '공포 영화 추천해줘', [], jest.fn());
+
+      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      // '공포'는 명시적 요청 장르이므로 excludeGenres에서 제거
+      expect(calledFilters.genres).toEqual(['공포']);
+      expect(calledFilters.excludeGenres).toEqual(['스릴러']);
+    });
   });
 
   describe('extractTitlesFromText', () => {
