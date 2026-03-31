@@ -173,6 +173,8 @@ export class RankingsService {
         this.logger.error(`Failed to fetch trending-${type}-${timeWindow}`, error);
       }
     }
+
+    await this.revalidateMainPage();
   }
 
   async fetchTrending(
@@ -240,7 +242,6 @@ export class RankingsService {
       ]);
 
       this.logger.log(`Saved ${rankingsToUpsert.length} trending rankings for ${category}`);
-      await this.revalidateMainPage();
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error(`Failed to fetch trending: ${category}`, error);
@@ -407,8 +408,8 @@ export class RankingsService {
 
   private async revalidateMainPage(): Promise<void> {
     if (!this.revalidateSecret) return;
-    // 배치 DB 작업 완료 후 30초 대기 — SSR 재생성이 배치와 겹치지 않도록
-    await sleep(30_000);
+    // 배치 DB 작업 완료 후 잠시 대기 (WAL flush 보장)
+    await sleep(5_000);
     try {
       const url = 'http://frontend:3000/internal/revalidate';
       const response = await fetch(url, {

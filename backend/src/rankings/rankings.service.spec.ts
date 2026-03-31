@@ -450,4 +450,51 @@ describe('RankingsService', () => {
       expect(result).toEqual([]);
     });
   });
+
+  describe('fetchAllTrending - revalidation 중복 제거', () => {
+    let revalidateSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      // revalidateMainPage를 spy로 교체 (private 메서드)
+      revalidateSpy = jest
+        .spyOn(service as never, 'revalidateMainPage')
+        .mockResolvedValue(undefined);
+    });
+
+    it('fetchAllTrending은 모든 trending 처리 후 revalidateMainPage를 1회만 호출해야 한다', async () => {
+      const trendingData = {
+        results: [
+          { id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' },
+        ],
+      };
+
+      mockTmdbService.getTrending.mockResolvedValue(trendingData);
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchAllTrending();
+
+      // fetchAllTrending은 fetchTrending을 2회 호출하지만, revalidate는 1회만
+      expect(mockTmdbService.getTrending).toHaveBeenCalledTimes(2);
+      expect(revalidateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('fetchTrending 단독 호출 시 revalidateMainPage를 호출하지 않아야 한다', async () => {
+      const trendingData = {
+        results: [
+          { id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' },
+        ],
+      };
+
+      mockTmdbService.getTrending.mockResolvedValue(trendingData);
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchTrending('all', 'day');
+
+      expect(revalidateSpy).not.toHaveBeenCalled();
+    });
+  });
 });
