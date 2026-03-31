@@ -165,7 +165,9 @@ export class ContentsService {
     content.credits = credits;
     await this.contentRepo.save(content);
 
-    if (!content.adult) {
+    const isRecentRelease = content.releaseDate
+      && new Date(content.releaseDate) >= new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    if (!content.adult && ((content.voteCount ?? 0) >= 5 || isRecentRelease)) {
       this.embeddingService.cacheContentMetadata(content.id).catch((error) => {
         this.logger.warn(`metadata 캐싱 실패 (contentId=${content.id}): ${error instanceof Error ? error.message : String(error)}`);
       });

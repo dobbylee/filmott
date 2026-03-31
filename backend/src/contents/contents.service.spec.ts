@@ -1284,8 +1284,9 @@ describe('ContentsService', () => {
         poster_path: null,
         backdrop_path: null,
         overview: null,
-        release_date: null,
-        vote_average: null,
+        release_date: '2026-01-01',
+        vote_average: 7.0,
+        vote_count: 100,
         adult: false,
         genres: [],
         runtime: null,
@@ -1297,6 +1298,8 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockImplementation((data: Partial<Content>) => ({
         ...data,
         id: 31,
+        voteCount: 100,
+        releaseDate: '2026-01-01',
       }));
       mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c as Content));
 
