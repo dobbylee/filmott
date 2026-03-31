@@ -408,8 +408,6 @@ export class RankingsService {
 
   private async revalidateMainPage(): Promise<void> {
     if (!this.revalidateSecret) return;
-    // 배치 DB 작업 완료 후 잠시 대기 (WAL flush 보장)
-    await sleep(5_000);
     try {
       const url = 'http://frontend:3000/internal/revalidate';
       const response = await fetch(url, {
