@@ -91,6 +91,9 @@ export class EmbeddingService {
   async generateDescription(content: Content): Promise<string> {
     const openai = this.ensureOpenAI();
 
+    const sanitize = (text: string | null | undefined): string =>
+      (text || '').replace(/[\x00-\x1F\x7F]/g, '').trim() || '정보 없음';
+
     const genreNames = (content.genres || []).map((g) => g.name).join(', ');
     const cast = (content.credits || [])
       .slice(0, 5)
@@ -108,14 +111,14 @@ export class EmbeddingService {
 
     const prompt = `아래 작품 정보를 바탕으로 분위기, 감성, 테마, 시청 상황을 포함한 한국어 설명을 3~5문장으로 작성하세요.
 첫 문장에 연도, 국가, 타입, 플랫폼 정보를 자연스럽게 포함하세요.
-제목: ${content.title}
+제목: ${sanitize(content.title)}
 타입: ${contentType}
-장르: ${genreNames}
-줄거리: ${content.overview || '정보 없음'}
-감독: ${content.director || '정보 없음'}
+장르: ${genreNames || '정보 없음'}
+줄거리: ${sanitize(content.overview)}
+감독: ${sanitize(content.director)}
 출연진: ${cast || '정보 없음'}
 연도: ${year}
-제작 국가: ${content.originCountry || '정보 없음'}
+제작 국가: ${sanitize(content.originCountry)}
 OTT 플랫폼: ${ottNames || '정보 없음'}
 평점: ${content.voteAverage ?? '정보 없음'}
 러닝타임: ${content.runtime ? content.runtime + '분' : '정보 없음'}`;
