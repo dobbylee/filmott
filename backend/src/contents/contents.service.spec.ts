@@ -1291,7 +1291,7 @@ describe('ContentsService', () => {
         genres: [],
         runtime: null,
         credits: { cast: [] },
-        'watch/providers': { results: {} },
+        'watch/providers': { results: { KR: { flatrate: [{ provider_name: 'Netflix' }] } } },
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
