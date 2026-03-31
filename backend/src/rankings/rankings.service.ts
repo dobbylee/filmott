@@ -177,6 +177,7 @@ export class RankingsService {
     await this.revalidateMainPage();
   }
 
+  /** revalidation은 호출자 책임 — fetchAllTrending()에서 일괄 처리 */
   async fetchTrending(
     type: 'movie' | 'tv' | 'all' = 'all',
     timeWindow: 'day' | 'week' = 'day',

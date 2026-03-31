@@ -496,5 +496,207 @@ describe('RankingsService', () => {
 
       expect(revalidateSpy).not.toHaveBeenCalled();
     });
+
+    it('일부 카테고리 fetchTrending이 실패해도 revalidateMainPage를 1회 호출해야 한다', async () => {
+      mockTmdbService.getTrending
+        .mockResolvedValueOnce({
+          results: [{ id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' }],
+        })
+        .mockRejectedValueOnce(new Error('TMDB 일시 장애'));
+
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchAllTrending();
+
+      expect(revalidateSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('fetchDailyBoxOffice - revalidation 호출', () => {
+    it('일별 박스오피스 저장 후 revalidateMainPage를 1회 호출해야 한다', async () => {
+      const revalidateSpy = jest
+        .spyOn(service as never, 'revalidateMainPage')
+        .mockResolvedValue(undefined);
+
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: 'Test Movie',
+          movieCd: '12345',
+          openDt: '2026-03-01',
+          audiCnt: '100000',
+          audiAcc: '500000',
+          salesAmt: '1000000',
+          salesAcc: '5000000',
+        },
+      ];
+
+      mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
+      mockTmdbService.searchByType.mockResolvedValue({ results: [] });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchDailyBoxOffice();
+
+      expect(revalidateSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('fetchWeeklyBoxOffice - revalidation 호출', () => {
+    it('주간 박스오피스 저장 후 revalidateMainPage를 1회 호출해야 한다', async () => {
+      const revalidateSpy = jest
+        .spyOn(service as never, 'revalidateMainPage')
+        .mockResolvedValue(undefined);
+
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: 'Weekly Movie',
+          movieCd: '67890',
+          openDt: '2026-03-01',
+          audiCnt: '200000',
+          audiAcc: '1000000',
+          salesAmt: '2000000',
+          salesAcc: '10000000',
+        },
+      ];
+
+      mockKobisService.getWeeklyBoxOffice.mockResolvedValue(kobisItems);
+      mockTmdbService.searchByType.mockResolvedValue({ results: [] });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchWeeklyBoxOffice();
+
+      expect(revalidateSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('revalidateMainPage - 직접 동작 검증', () => {
+    it('REVALIDATE_SECRET 미설정 시 fetch를 호출하지 않고 즉시 반환해야 한다', async () => {
+      // 기본 mockConfigService는 secret을 빈 문자열로 반환 → early-return 경로
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      } as Response);
+
+      // private 메서드 직접 호출
+      await (service as unknown as { revalidateMainPage(): Promise<void> }).revalidateMainPage();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
+    it('REVALIDATE_SECRET 설정 시 sleep 없이 즉시 fetch를 호출해야 한다', async () => {
+      // secret이 있는 service 인스턴스를 별도 생성
+      const secretConfigService = {
+        get: jest.fn().mockImplementation((key: string) => {
+          if (key === 'REVALIDATE_SECRET') return 'test-secret';
+          return undefined;
+        }),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          RankingsService,
+          { provide: getRepositoryToken(Ranking), useValue: mockRankingRepo },
+          { provide: KobisService, useValue: mockKobisService },
+          { provide: TmdbService, useValue: mockTmdbService },
+          { provide: ContentsService, useValue: mockContentsService },
+          { provide: ConfigService, useValue: secretConfigService },
+        ],
+      }).compile();
+
+      const serviceWithSecret = module.get<RankingsService>(RankingsService);
+
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      } as Response);
+
+      const start = Date.now();
+      await (serviceWithSecret as unknown as { revalidateMainPage(): Promise<void> }).revalidateMainPage();
+      const elapsed = Date.now() - start;
+
+      // sleep이 완전히 제거되었으므로 1초 미만에 완료되어야 한다
+      expect(elapsed).toBeLessThan(1000);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'http://frontend:3000/internal/revalidate',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-secret',
+          }),
+        }),
+      );
+      fetchSpy.mockRestore();
+    });
+
+    it('fetch 응답이 non-ok일 때 예외 없이 warn 로그만 출력해야 한다', async () => {
+      const secretConfigService = {
+        get: jest.fn().mockImplementation((key: string) => {
+          if (key === 'REVALIDATE_SECRET') return 'test-secret';
+          return undefined;
+        }),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          RankingsService,
+          { provide: getRepositoryToken(Ranking), useValue: mockRankingRepo },
+          { provide: KobisService, useValue: mockKobisService },
+          { provide: TmdbService, useValue: mockTmdbService },
+          { provide: ContentsService, useValue: mockContentsService },
+          { provide: ConfigService, useValue: secretConfigService },
+        ],
+      }).compile();
+
+      const serviceWithSecret = module.get<RankingsService>(RankingsService);
+
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      } as Response);
+
+      // 예외가 발생하지 않아야 한다
+      await expect(
+        (serviceWithSecret as unknown as { revalidateMainPage(): Promise<void> }).revalidateMainPage(),
+      ).resolves.not.toThrow();
+
+      fetchSpy.mockRestore();
+    });
+
+    it('fetch 자체가 네트워크 오류로 실패해도 예외 없이 처리해야 한다', async () => {
+      const secretConfigService = {
+        get: jest.fn().mockImplementation((key: string) => {
+          if (key === 'REVALIDATE_SECRET') return 'test-secret';
+          return undefined;
+        }),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          RankingsService,
+          { provide: getRepositoryToken(Ranking), useValue: mockRankingRepo },
+          { provide: KobisService, useValue: mockKobisService },
+          { provide: TmdbService, useValue: mockTmdbService },
+          { provide: ContentsService, useValue: mockContentsService },
+          { provide: ConfigService, useValue: secretConfigService },
+        ],
+      }).compile();
+
+      const serviceWithSecret = module.get<RankingsService>(RankingsService);
+
+      const fetchSpy = jest.spyOn(global, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(
+        (serviceWithSecret as unknown as { revalidateMainPage(): Promise<void> }).revalidateMainPage(),
+      ).resolves.not.toThrow();
+
+      fetchSpy.mockRestore();
+    });
   });
 });
