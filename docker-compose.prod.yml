@@ -52,8 +52,40 @@ services:
     build:
       context: ./postgres
       dockerfile: Dockerfile
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
-    shm_size: '8g'
+    command:
+      - postgres
+      - -c
+      - shared_buffers=6GB
+      - -c
+      - effective_cache_size=18GB
+      - -c
+      - work_mem=32MB
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - max_connections=150
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - min_wal_size=1GB
+      - -c
+      - max_wal_size=4GB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - max_worker_processes=4
+      - -c
+      - max_parallel_workers_per_gather=2
+      - -c
+      - max_parallel_workers=4
+      - -c
+      - max_parallel_maintenance_workers=2
+      - -c
+      - log_min_duration_statement=1000
     ports:
       - '127.0.0.1:5432:5432'
     environment:
