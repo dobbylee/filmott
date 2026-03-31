@@ -274,7 +274,8 @@ export class IntentAnalyzerService {
         intent.personNames.length > 0 ||
         intent.dateRange !== null ||
         intent.genres.length > 0 ||
-        intent.referenceTitles.length > 0;
+        intent.referenceTitles.length > 0 ||
+        intent.contentType !== null;
 
       if (hasFilters && intent.confidence === 'low') {
         intent.confidence = 'high';

@@ -320,7 +320,7 @@ describe('IntentAnalyzerService', () => {
     it('confidence가 low로 추출되어야 한다 (모호한 요청)', async () => {
       mockIntent({ confidence: 'low' });
 
-      const result = await service.analyzeIntent('재밌는 영화 추천해줘');
+      const result = await service.analyzeIntent('뭐 볼까');
 
       expect(result.confidence).toBe('low');
     });

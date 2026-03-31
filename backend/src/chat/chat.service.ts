@@ -147,7 +147,6 @@ export class ChatService {
 
       // 4. ParsedIntent → ContentSearchFilters 변환
       const filters = this.buildFiltersFromIntent(intent);
-      const hasFilters = Object.keys(filters).length > 0;
 
       // 5. 쿼리 정제: 메타데이터 키워드 제거 후 의미적 쿼리만 사용
       const semanticQuery = this.intentAnalyzer.buildSemanticQuery(searchQuery, intent);

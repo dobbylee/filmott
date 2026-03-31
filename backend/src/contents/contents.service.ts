@@ -166,7 +166,9 @@ export class ContentsService {
     await this.contentRepo.save(content);
 
     if (!content.adult) {
-      this.embeddingService.cacheContentMetadata(content.id).catch(() => {});
+      this.embeddingService.cacheContentMetadata(content.id).catch((error) => {
+        this.logger.warn(`metadata 캐싱 실패 (contentId=${content.id}): ${error instanceof Error ? error.message : String(error)}`);
+      });
     }
 
     return {
