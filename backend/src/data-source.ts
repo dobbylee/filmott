@@ -15,5 +15,6 @@ export const AppDataSource = new DataSource({
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   extra: {
     options: '-c timezone=Asia/Seoul',
+    max: 5, // CLI용이므로 작게
   },
 });
