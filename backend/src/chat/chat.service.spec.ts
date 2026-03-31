@@ -229,6 +229,7 @@ describe('ChatService', () => {
       dateRange: null,
       contentType: null,
       genres: [],
+      confidence: 'low',
     };
 
     const defaultEmptyPreference: UserPreference = {
@@ -424,6 +425,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
         ottProviderNames: ['Netflix'],
+        confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('볼만한 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
@@ -448,9 +450,9 @@ describe('ChatService', () => {
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
-    it('필터 없는 메시지는 EmbeddingService.searchSimilar를 호출해야 한다', async () => {
+    it('confidence=low + 신규 유저 메시지는 EmbeddingService.searchSimilar를 호출해야 한다', async () => {
       setupEmptyUserContext();
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent, confidence: 'low' });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('재미있는 영화');
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
 
@@ -481,6 +483,7 @@ describe('ChatService', () => {
         personNames: ['봉준호'],
         dateRange: { from: '2020-01-01', to: null },
         contentType: 'movie',
+        confidence: 'high',
       };
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue(intentResult);
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('감독 영화');
@@ -520,6 +523,7 @@ describe('ChatService', () => {
         ottProviderNames: ['Netflix'],
         countries: ['KR'],
         personNames: ['봉준호'],
+        confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('사회 풍자 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
@@ -582,6 +586,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
         dateRange: { from: null, to: '1999-12-31' },
+        confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('90년대 이전 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
@@ -612,6 +617,7 @@ describe('ChatService', () => {
         ...emptyIntent,
         genres: ['공포', '스릴러'],
         contentType: 'movie',
+        confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('무서운 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
@@ -637,7 +643,7 @@ describe('ChatService', () => {
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
-    it('필터 없음 + 유저 데이터 있음: ContentSearchService.searchWithFilters가 유저 선호를 WHERE 필터로 호출해야 한다', async () => {
+    it('confidence=low + 유저 데이터 있음: 유저 선호만으로 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockExtractUserPreference.mockReturnValue({
         preferredGenres: ['드라마', '스릴러'],
@@ -645,7 +651,7 @@ describe('ChatService', () => {
         ottProviderNames: ['Netflix'],
         hasData: true,
       });
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent, confidence: 'low' });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('잔잔한 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
@@ -657,9 +663,9 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '비 오는 날에 볼 만한 잔잔한 영화', [], jest.fn());
 
-      // 유저 선호가 WHERE 필터 필드에 합쳐져서 전달되어야 한다
+      // confidence=low이므로 intent 필터를 스킵하고 유저 선호만 전달
       expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
-        '잔잔한 영화',
+        expect.any(String),
         20,
         expect.any(Array),
         expect.objectContaining({
@@ -672,7 +678,7 @@ describe('ChatService', () => {
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
-    it('필터 없음 + 신규 유저: EmbeddingService.searchSimilar가 호출되어야 한다', async () => {
+    it('confidence=low + 신규 유저: EmbeddingService.searchSimilar가 호출되어야 한다', async () => {
       setupEmptyUserContext();
       mockExtractUserPreference.mockReturnValue({
         preferredGenres: [],
@@ -680,7 +686,7 @@ describe('ChatService', () => {
         ottProviderNames: [],
         hasData: false,
       });
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent, confidence: 'low' });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('재미있는 영화');
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
 
@@ -714,6 +720,7 @@ describe('ChatService', () => {
         ...emptyIntent,
         ottProviderNames: ['Disney Plus'],
         countries: ['US'],
+        confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('히어로 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
@@ -746,6 +753,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
         ottProviderNames: ['Tving'],
+        confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('로맨스 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
@@ -766,7 +774,7 @@ describe('ChatService', () => {
       expect(calledFilters.countries).toEqual(['KR']);
     });
 
-    it('유저 OTT 구독만 있고 장르/국가 선호 없는 경우 OTT 필터만 적용해야 한다', async () => {
+    it('confidence=low + 유저 OTT 구독만 있고 장르/국가 선호 없는 경우 OTT 필터만 적용해야 한다', async () => {
       setupEmptyUserContext();
       mockExtractUserPreference.mockReturnValue({
         preferredGenres: [],
@@ -774,7 +782,7 @@ describe('ChatService', () => {
         ottProviderNames: ['wavve'],
         hasData: true,
       });
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent, confidence: 'low' });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('추천 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
@@ -787,12 +795,111 @@ describe('ChatService', () => {
       await service.sendMessageStream(1, '오늘 볼 영화 추천해줘', [], jest.fn());
 
       const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
-      // 유저 구독 OTT가 WHERE 필터로 적용되어야 한다
+      // confidence=low이므로 유저 선호만 적용
       expect(calledFilters.ottProviderNames).toEqual(['wavve']);
-      // 선호 없는 장르/국가는 필터에 포함되지 않아야 한다
       expect(calledFilters.genres).toBeUndefined();
       expect(calledFilters.countries).toBeUndefined();
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+    });
+
+    it('confidence=high이면 의도 필터 우선으로 ContentSearchService를 호출해야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        preferredGenres: ['로맨스'],
+        preferredCountries: ['KR'],
+        ottProviderNames: ['Netflix'],
+        hasData: true,
+      });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        genres: ['액션', 'SF'],
+        countries: ['US'],
+        confidence: 'high',
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('미국 액션 SF');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '미국 액션 SF 영화 추천해줘', [], jest.fn());
+
+      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      // confidence=high: 의도 필터가 우선, 유저 선호는 빈 필드에만 합산
+      expect(calledFilters.genres).toEqual(['액션', 'SF']);
+      expect(calledFilters.countries).toEqual(['US']);
+      // OTT는 의도에 없으므로 유저 선호 합산
+      expect(calledFilters.ottProviderNames).toEqual(['Netflix']);
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+    });
+
+    it('confidence=low이면 의도 필터를 스킵하고 유저 선호만으로 검색해야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        preferredGenres: ['드라마'],
+        preferredCountries: ['KR'],
+        ottProviderNames: ['Netflix'],
+        hasData: true,
+      });
+      // LLM이 장르를 추출했지만 confidence=low인 경우
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        genres: ['액션'],
+        confidence: 'low',
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('뭐 볼까');
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '뭐 볼까', [], jest.fn());
+
+      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      // confidence=low: 의도 필터(genres: ['액션'])를 스킵, 유저 선호만 사용
+      expect(calledFilters.genres).toEqual(['드라마']);
+      expect(calledFilters.countries).toEqual(['KR']);
+      expect(calledFilters.ottProviderNames).toEqual(['Netflix']);
+      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+    });
+
+    it('confidence=low + 신규 유저이면 EmbeddingService.searchSimilar를 호출해야 한다', async () => {
+      setupEmptyUserContext();
+      mockExtractUserPreference.mockReturnValue({
+        preferredGenres: [],
+        preferredCountries: [],
+        ottProviderNames: [],
+        hasData: false,
+      });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        confidence: 'low',
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('추천해줘');
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천합니다.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '추천해줘', [], jest.fn());
+
+      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
+        '추천해줘',
+        20,
+        expect.any(Array),
+        undefined,
+        undefined,
+      );
+      expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();
     });
 
     it('extractUserPreference가 올바른 인자로 호출되어야 한다', async () => {
@@ -1005,6 +1112,7 @@ describe('ChatService', () => {
         ottProviderNames: [], countries: [], excludeCountries: [],
         personNames: [], referenceTitles: ['기생충'],
         dateRange: null, contentType: 'movie', genres: [],
+        confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
 
@@ -1039,6 +1147,7 @@ describe('ChatService', () => {
         ottProviderNames: [], countries: [], excludeCountries: [],
         personNames: [], referenceTitles: ['영야성하'],
         dateRange: null, contentType: 'tv', genres: [],
+        confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
 
@@ -1082,6 +1191,7 @@ describe('ChatService', () => {
         ottProviderNames: [], countries: [], excludeCountries: [],
         personNames: [], referenceTitles: ['기생충'],
         dateRange: null, contentType: null, genres: [],
+        confidence: 'low',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
 

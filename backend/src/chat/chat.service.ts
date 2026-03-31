@@ -131,6 +131,7 @@ export class ChatService {
       dateRange: null,
       contentType: null,
       genres: [],
+      confidence: 'low',
     };
 
     if (hasMetadata) {
@@ -160,12 +161,10 @@ export class ChatService {
       // 7. 유저 선호 추출 + 2분기 검색
       const userPref = extractUserPreference(userContext, subscribedOtts);
 
-      if (hasFilters || userPref.hasData) {
-        // A+B 통합: 명시적 필터 + 유저 선호를 합쳐서 SQL 전체 검색
+      if (intent.confidence === 'high') {
+        // 구체적 요청: SQL 필터 우선, 유저 선호는 명시적 필터가 없는 필드에만 합산
         const mergedFilters: ContentSearchFilters = { ...filters };
 
-        // 명시적 필터가 있는 필드에는 유저 선호를 합치지 않는다
-        // (예: "티빙에서 볼만한" 요청 시 유저 구독 넷플릭스를 추가하지 않음)
         if (!mergedFilters.ottProviderNames?.length && userPref.ottProviderNames.length > 0) {
           mergedFilters.ottProviderNames = userPref.ottProviderNames;
         }
@@ -176,7 +175,6 @@ export class ChatService {
           mergedFilters.countries = userPref.preferredCountries;
         }
 
-        // 임베딩 쿼리에 유저 선호 주입 (벡터 유사도 개인화)
         const enrichedQuery = enrichQueryWithPreference(semanticQuery, userPref, intent);
 
         similarContents = await this.contentSearchService.searchWithFilters(
@@ -184,12 +182,28 @@ export class ChatService {
           referenceEmbedding ?? undefined,
         );
       } else {
-        // C. 필터 없음 + 신규 유저: 기존 벡터 검색 fallback
-        similarContents = await this.embeddingService.searchSimilar(
-          semanticQuery, 20, referenceExcludeTmdbIds,
-          undefined,
-          referenceEmbedding ?? undefined,
-        );
+        // 모호한 요청 (confidence='low')
+        if (userPref.hasData) {
+          // 유저 선호 있음: intent 필터 스킵, 유저 선호만으로 검색
+          const prefOnlyFilters: ContentSearchFilters = {};
+          if (userPref.ottProviderNames.length > 0) prefOnlyFilters.ottProviderNames = userPref.ottProviderNames;
+          if (userPref.preferredGenres.length > 0) prefOnlyFilters.genres = userPref.preferredGenres;
+          if (userPref.preferredCountries.length > 0) prefOnlyFilters.countries = userPref.preferredCountries;
+
+          const enrichedQuery = enrichQueryWithPreference(semanticQuery, userPref, intent);
+
+          similarContents = await this.contentSearchService.searchWithFilters(
+            enrichedQuery, 20, referenceExcludeTmdbIds, prefOnlyFilters,
+            referenceEmbedding ?? undefined,
+          );
+        } else {
+          // 신규 유저: 벡터 유사도만
+          similarContents = await this.embeddingService.searchSimilar(
+            semanticQuery, 20, referenceExcludeTmdbIds,
+            undefined,
+            referenceEmbedding ?? undefined,
+          );
+        }
       }
     }
 

@@ -94,15 +94,18 @@ export function buildSystemPrompt(
     ? `### 구독 중인 OTT\n${ottNames}\n\n해당 OTT에서 볼 수 있는 작품을 우선적으로 추천하세요. 다른 플랫폼의 작품도 추천할 수 있지만, 구독 중인 OTT에서 볼 수 있는 작품을 먼저 제안하세요.`
     : '';
 
+  const sortedCandidates = [...candidates].sort((a, b) => b.similarity - a.similarity);
+
   const candidatesSection =
-    candidates.length > 0
-      ? candidates
+    sortedCandidates.length > 0
+      ? sortedCandidates
           .map((c, i) => {
             const genreStr = (c.genres || []).map((g) => g.name).join(', ');
             const directorStr = c.director ? ` | 감독: ${c.director}` : '';
             const countryStr = c.originCountry ? ` | 국가: ${c.originCountry}` : '';
+            const similarityStr = c.similarity > 0 ? ` | 유사도: ${(c.similarity * 100).toFixed(0)}%` : '';
             const descriptionText = c.description || c.overview || '';
-            return `${i + 1}. [ID:${c.tmdbId}|${c.contentType}] ${c.title} (${c.voteAverage}점) - 장르: ${genreStr}${directorStr}${countryStr}\n   ${descriptionText}`;
+            return `${i + 1}. [ID:${c.tmdbId}|${c.contentType}] ${c.title} (${c.voteAverage}점${similarityStr}) - 장르: ${genreStr}${directorStr}${countryStr}\n   ${descriptionText}`;
           })
           .join('\n')
       : '(추천 후보가 없습니다)';
@@ -177,6 +180,7 @@ ${candidatesSection}
 - "보고싶어요" 목록에 있는 작품은 사용자가 관심 있는 작품이므로 적극 추천하세요.
 - 이미 시청한 작품과 성인물은 추천 금지.
 - 이전 대화에서 추천한 작품을 다시 추천하지 마세요.${previouslyRecommended.length > 0 ? `\n  이미 추천한 작품: ${previouslyRecommended.join(', ')}` : ''}
+- 유사도가 높은 작품을 우선 추천하되, 사용자 취향과 요청 맥락을 종합 판단하세요. 유사도가 낮더라도(30% 미만) 사용자 요청에 완벽히 부합하면 추천할 수 있습니다.
 - 추천과 무관한 질문은 영화/시리즈 대화로 유도.
 
 ## 응답 형식 (반드시 준수)
