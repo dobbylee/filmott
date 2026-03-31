@@ -6,3 +6,5 @@ RUN apk add --no-cache --virtual .build-deps git build-base clang19 llvm19-dev \
     && make clean && make OPTFLAGS="" && make install \
     && rm -rf /tmp/pgvector \
     && apk del .build-deps
+
+COPY postgresql.conf /etc/postgresql/postgresql.conf
