@@ -165,12 +165,8 @@ export class ContentsService {
     content.credits = credits;
     await this.contentRepo.save(content);
 
-    const isRecentRelease = content.releaseDate
-      && new Date(content.releaseDate) >= new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-    const isAvailableInKorea = content.originCountry?.includes('KR')
-      || watchProviders !== null;
-    const hasReadableTitle = /^[\sA-Za-z0-9가-힣\p{P}]+$/u.test(content.title || '');
-    if (!content.adult && isAvailableInKorea && hasReadableTitle && ((content.voteCount ?? 0) >= 5 || isRecentRelease)) {
+    const isKorean = content.originCountry?.includes('KR');
+    if (!content.adult && isKorean) {
       this.embeddingService.cacheContentMetadata(content.id).catch((error) => {
         this.logger.warn(`metadata 캐싱 실패 (contentId=${content.id}): ${error instanceof Error ? error.message : String(error)}`);
       });

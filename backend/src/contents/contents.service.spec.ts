@@ -1279,8 +1279,8 @@ describe('ContentsService', () => {
 
       const tmdbData = {
         id: 951,
-        title: 'Normal Movie',
-        original_title: 'Normal Movie',
+        title: '한국 영화',
+        original_title: 'Korean Movie',
         poster_path: null,
         backdrop_path: null,
         overview: null,
@@ -1290,6 +1290,7 @@ describe('ContentsService', () => {
         adult: false,
         genres: [],
         runtime: null,
+        origin_country: ['KR'],
         credits: { cast: [] },
         'watch/providers': { results: { KR: { flatrate: [{ provider_name: 'Netflix' }] } } },
       };
@@ -1298,8 +1299,7 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockImplementation((data: Partial<Content>) => ({
         ...data,
         id: 31,
-        voteCount: 100,
-        releaseDate: '2026-01-01',
+        originCountry: 'KR',
       }));
       mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c as Content));
 
