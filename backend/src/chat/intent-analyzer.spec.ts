@@ -364,6 +364,101 @@ describe('IntentAnalyzerService', () => {
     });
   });
 
+  describe('멀티턴', () => {
+    it('이전 대화의 장르 조건이 후속 메시지에 유지되어야 한다', async () => {
+      mockIntent({
+        genres: ['스릴러', '호러'],
+        countries: ['KR'],
+        confidence: 'high',
+      });
+
+      const history = [
+        { role: 'user' as const, content: '한국 스릴러 추천해줘' },
+        { role: 'assistant' as const, content: '한국 스릴러 추천 결과입니다.' },
+      ];
+
+      const result = await service.analyzeIntent('더 무서운 거 없어?', history);
+
+      expect(result.genres).toContain('스릴러');
+      expect(result.genres).toContain('공포');
+      expect(result.countries).toContain('KR');
+    });
+
+    it('히스토리가 없으면 기존과 동일하게 동작해야 한다', async () => {
+      mockIntent();
+
+      await service.analyzeIntent('테스트', undefined);
+
+      expect(mockCreate).toHaveBeenCalledWith({
+        model: CHAT_MODEL,
+        reasoning_effort: 'low',
+        max_completion_tokens: 1024,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: expect.stringContaining('JSON으로 추출') },
+          { role: 'user', content: '테스트' },
+        ],
+      });
+    });
+
+    it('최근 2턴만 프롬프트에 포함되어야 한다', async () => {
+      mockIntent();
+
+      const history = [
+        { role: 'user' as const, content: '1턴 질문' },
+        { role: 'assistant' as const, content: '1턴 응답' },
+        { role: 'user' as const, content: '2턴 질문' },
+        { role: 'assistant' as const, content: '2턴 응답' },
+        { role: 'user' as const, content: '3턴 질문' },
+        { role: 'assistant' as const, content: '3턴 응답' },
+      ];
+
+      await service.analyzeIntent('현재 질문', history);
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      // system(1) + 히스토리 2턴(4) + user(1) = 6개
+      expect(callArgs.messages).toHaveLength(6);
+      // 1턴 메시지는 잘려야 한다
+      expect(callArgs.messages[1].content).toBe('2턴 질문');
+      expect(callArgs.messages[2].content).toBe('2턴 응답');
+      expect(callArgs.messages[3].content).toBe('3턴 질문');
+      expect(callArgs.messages[4].content).toBe('3턴 응답');
+      expect(callArgs.messages[5].content).toBe('현재 질문');
+    });
+
+    it('LLM 호출 시 히스토리가 messages에 포함되어야 한다', async () => {
+      mockIntent();
+
+      const history = [
+        { role: 'user' as const, content: '한국 스릴러 추천해줘' },
+        { role: 'assistant' as const, content: '추천 결과입니다.' },
+      ];
+
+      await service.analyzeIntent('더 추천해줘', history);
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.messages).toHaveLength(4); // system + 2 history + user
+      expect(callArgs.messages[0].role).toBe('system');
+      expect(callArgs.messages[1]).toEqual({ role: 'user', content: '한국 스릴러 추천해줘' });
+      expect(callArgs.messages[2]).toEqual({ role: 'assistant', content: '추천 결과입니다.' });
+      expect(callArgs.messages[3]).toEqual({ role: 'user', content: '더 추천해줘' });
+    });
+
+    it('이전 메시지에 "드라마" 키워드가 있으면 contentType 후처리에서 tv를 유지해야 한다', async () => {
+      mockIntent({ contentType: 'tv', confidence: 'high', genres: ['공포'] });
+
+      const history = [
+        { role: 'user' as const, content: '드라마 추천해줘' },
+        { role: 'assistant' as const, content: '추천 결과입니다.' },
+      ];
+
+      const result = await service.analyzeIntent('더 무서운 거 없어?', history);
+
+      // 현재 메시지에 "드라마" 키워드가 없지만, 히스토리에 있으므로 tv 유지
+      expect(result.contentType).toBe('tv');
+    });
+  });
+
   describe('fallback 처리', () => {
     it('JSON 파싱 실패 시 빈 ParsedIntent를 반환해야 한다', async () => {
       mockLlmResponse('이것은 유효하지 않은 JSON입니다');

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { CHAT_MODEL } from './chat.constants';
+import { ChatHistoryMessageDto } from './dto/send-message.dto';
 
 export interface ParsedIntent {
   ottProviderNames: string[];
@@ -48,7 +49,25 @@ function buildIntentSystemPrompt(): string {
   - high: 구체적 필터(장르, OTT, 국가, 인물, 연대, 참조 작품 등)가 1개 이상 명시된 경우
   - low: "재밌는", "좋은", "추천해줘", "뭐 볼까" 등 모호한 요청. 필터 조건이 없는 경우
 
+이전 대화가 주어진 경우:
+- 이전 대화에서 언급된 조건(장르, 국가, OTT, 인물, 연대 등)이 현재 메시지에서 명시적으로 변경되지 않았다면 계속 유효한 것으로 간주하세요.
+- 현재 메시지가 "더", "다른", "비슷한" 등으로 시작하면 이전 조건을 유지하세요.
+- 사용자가 완전히 새로운 주제를 요청하면("아, 그건 됐고 코미디 추천해줘") 이전 조건을 무시하세요.
+- 현재 메시지의 의도를 중심으로 분석하되, 이전 대화에서 유지되는 조건만 보충하세요.
+
 JSON만 출력하세요.`;
+}
+
+function sliceRecentHistory(
+  history: ChatHistoryMessageDto[] | undefined,
+  maxTurns: number,
+): OpenAI.Chat.ChatCompletionMessageParam[] {
+  if (!history || history.length === 0) return [];
+  const sliced = history.slice(-(maxTurns * 2));
+  return sliced.map((msg) => ({
+    role: msg.role as 'user' | 'assistant',
+    content: msg.content,
+  }));
 }
 
 interface RawIntentResponse {
@@ -191,12 +210,17 @@ export class IntentAnalyzerService {
       : null;
   }
 
-  async analyzeIntent(userMessage: string): Promise<ParsedIntent> {
+  async analyzeIntent(
+    userMessage: string,
+    recentHistory?: ChatHistoryMessageDto[],
+  ): Promise<ParsedIntent> {
     if (!this.openai) {
       return { ...EMPTY_INTENT };
     }
 
     try {
+      const historyMessages = sliceRecentHistory(recentHistory, 2);
+
       const response = await this.openai.chat.completions.create({
         model: CHAT_MODEL,
         reasoning_effort: 'low',
@@ -204,6 +228,7 @@ export class IntentAnalyzerService {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: buildIntentSystemPrompt() },
+          ...historyMessages,
           { role: 'user', content: userMessage },
         ],
       });
@@ -217,8 +242,12 @@ export class IntentAnalyzerService {
       const intent = parseIntentResponse(parsed);
 
       // contentType 후처리: 메시지 키워드와 LLM 결과 교차 검증
-      const hasMovieKeyword = /영화|무비/i.test(userMessage);
-      const hasTvKeyword = /드라마|시리즈|TV|예능/i.test(userMessage);
+      // 멀티턴: 히스토리의 마지막 user 메시지도 키워드 검사 대상에 포함
+      const textToCheck = recentHistory?.length
+        ? `${recentHistory.filter((m) => m.role === 'user').slice(-1)[0]?.content ?? ''} ${userMessage}`
+        : userMessage;
+      const hasMovieKeyword = /영화|무비/i.test(textToCheck);
+      const hasTvKeyword = /드라마|시리즈|TV|예능/i.test(textToCheck);
       if (intent.contentType) {
         // LLM이 타입을 추출했지만 메시지에 키워드가 없으면 null로 강제
         if (!hasMovieKeyword && !hasTvKeyword) {

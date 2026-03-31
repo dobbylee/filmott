@@ -141,8 +141,8 @@ export class ChatService {
       userMessages.push(content);
       const searchQuery = userMessages.join(' ');
 
-      // 3. LLM 의도 분석 → 현재 메시지만 사용 (히스토리 포함 시 이전 맥락과 혼동)
-      intent = await this.intentAnalyzer.analyzeIntent(content);
+      // 3. LLM 의도 분석 → 최근 대화 맥락 포함 (멀티턴)
+      intent = await this.intentAnalyzer.analyzeIntent(content, history);
 
       // 4. ParsedIntent → ContentSearchFilters 변환
       const filters = this.buildFiltersFromIntent(intent);
