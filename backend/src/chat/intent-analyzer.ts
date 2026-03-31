@@ -12,6 +12,7 @@ export interface ParsedIntent {
   dateRange: { from: string | null; to: string | null } | null;
   contentType: 'movie' | 'tv' | null;
   genres: string[];
+  confidence: 'high' | 'low';
 }
 
 const EMPTY_INTENT: ParsedIntent = {
@@ -23,6 +24,7 @@ const EMPTY_INTENT: ParsedIntent = {
   dateRange: null,
   contentType: null,
   genres: [],
+  confidence: 'low',
 };
 
 function buildIntentSystemPrompt(): string {
@@ -42,6 +44,9 @@ function buildIntentSystemPrompt(): string {
 - contentType: "영화"/"무비" → "movie", "드라마"/"시리즈"/"TV"/"예능" → "tv". 이 단어가 메시지에 직접 포함된 경우에만 설정. 장르명(스릴러, 코미디, 로맨스, 액션, 호러, 공포, SF, 판타지, 애니메이션 등)으로는 절대 contentType을 추론하지 마세요. 확실하지 않으면 null.
 - genres: 사용자가 언급한 장르명을 배열로 추출. 사용자 표현 그대로 반환 (예: "호러" → ["호러"], "느와르" → ["느와르"], "SF 스릴러" → ["SF", "스릴러"]). 장르 언급이 없으면 빈 배열.
 - referenceTitles: "X 같은", "X 비슷한", "X 느낌의" 등에서 참조 작품명 X를 배열로 추출. 단순 언급("X 봤어")은 포함하지 않고, "~같은/비슷한/느낌의" 맥락에서만 추출. 없으면 빈 배열.
+- confidence: "high" 또는 "low"
+  - high: 구체적 필터(장르, OTT, 국가, 인물, 연대, 참조 작품 등)가 1개 이상 명시된 경우
+  - low: "재밌는", "좋은", "추천해줘", "뭐 볼까" 등 모호한 요청. 필터 조건이 없는 경우
 
 JSON만 출력하세요.`;
 }
@@ -55,6 +60,7 @@ interface RawIntentResponse {
   dateRange?: unknown;
   contentType?: unknown;
   genres?: unknown;
+  confidence?: unknown;
 }
 
 interface RawDateRange {
@@ -106,7 +112,9 @@ function parseIntentResponse(raw: RawIntentResponse): ParsedIntent {
 
   const genres = isStringArray(raw.genres) ? raw.genres : [];
 
-  return { ottProviderNames, countries, excludeCountries, personNames, referenceTitles, dateRange, contentType, genres };
+  const confidence: ParsedIntent['confidence'] = raw.confidence === 'high' ? 'high' : 'low';
+
+  return { ottProviderNames, countries, excludeCountries, personNames, referenceTitles, dateRange, contentType, genres, confidence };
 }
 
 // OTT명 정규식: 한/영 변형 포함
@@ -227,6 +235,22 @@ export class IntentAnalyzerService {
         intent.genres = intent.genres.filter(
           (g) => !/^드라마$/i.test(g),
         );
+      }
+
+      // confidence 후처리: 코드에서 교차 검증
+      const hasFilters =
+        intent.ottProviderNames.length > 0 ||
+        intent.countries.length > 0 ||
+        intent.excludeCountries.length > 0 ||
+        intent.personNames.length > 0 ||
+        intent.dateRange !== null ||
+        intent.genres.length > 0 ||
+        intent.referenceTitles.length > 0;
+
+      if (hasFilters && intent.confidence === 'low') {
+        intent.confidence = 'high';
+      } else if (!hasFilters && intent.confidence === 'high') {
+        intent.confidence = 'low';
       }
 
       // genres 후처리: GENRE_ALIAS_MAP으로 DB 장르명 변환 + TV 확장

@@ -63,7 +63,7 @@ describe('ContentSearchService', () => {
       title: `영화${i + 1}`,
     }));
 
-    it('SQL 필터가 전체 contents에서 검색해야 한다', async () => {
+    it('1순위가 content_metadata 기준으로 검색해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       const result = await service.searchWithFilters(
@@ -76,9 +76,9 @@ describe('ContentSearchService', () => {
       expect(mockDataSource.query).toHaveBeenCalledTimes(1);
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      // contents 테이블에서 검색 (content_metadata JOIN이 아닌 LEFT JOIN)
-      expect(query).toContain('FROM contents c');
-      expect(query).toContain('LEFT JOIN content_metadata cm ON cm.content_id = c.id');
+      // 1순위: content_metadata 기준 JOIN
+      expect(query).toContain('FROM content_metadata cm');
+      expect(query).toContain('JOIN contents c ON c.id = cm.content_id');
     });
 
     it('adult 콘텐츠를 검색 결과에서 제외해야 한다', async () => {
@@ -93,7 +93,7 @@ describe('ContentSearchService', () => {
       expect(query).toContain('c.adult IS NOT TRUE');
     });
 
-    it('한국 시청 가능 필터가 적용되어야 한다', async () => {
+    it('한국 시청 가능 필터가 1순위 블록에 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       await service.searchWithFilters(
@@ -102,18 +102,17 @@ describe('ContentSearchService', () => {
       );
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      // KR origin OR watch_providers OR KOBIS
+      // 1순위 블록: KR origin OR watch_providers OR KOBIS EXISTS
       expect(query).toContain("c.origin_country LIKE '%KR%'");
       expect(query).toContain('c.watch_providers IS NOT NULL');
       expect(query).toContain("r.source = 'kobis'");
     });
 
-    it('3단계 우선순위로 정렬되어야 한다', async () => {
+    it('2단계 우선순위로 정렬되어야 한다', async () => {
       const mixedRows = [
         { ...baseRow, content_id: 1, priority: 1, score: 0.9, description: '설명1' },
         { ...baseRow, content_id: 2, priority: 1, score: 0.85, description: '설명2' },
         { ...baseRow, content_id: 3, priority: 2, score: 0, description: null, overview: '줄거리3' },
-        { ...baseRow, content_id: 4, priority: 3, score: 0, description: null, overview: '줄거리4' },
       ];
       mockDataSource.query.mockResolvedValue(mixedRows);
 
@@ -123,15 +122,16 @@ describe('ContentSearchService', () => {
       );
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      // UNION ALL로 3단계 분리
-      expect(query).toContain('UNION ALL');
+      // UNION ALL로 2단계 분리 (1순위 content_metadata + 2순위 KOBIS)
+      const unionCount = (query.match(/UNION ALL/g) || []).length;
+      expect(unionCount).toBe(1);
       // 우선순위 정렬
       expect(query).toContain('ORDER BY priority, score DESC');
-      // 임베딩 있는 결과: description 사용
+      // 1순위: description 사용
       expect(result[0].description).toBe('설명1');
-      // 임베딩 없는 결과: overview fallback
+      // 2순위: overview fallback
       expect(result[2].description).toBe('줄거리3');
-      expect(result).toHaveLength(4);
+      expect(result).toHaveLength(3);
     });
 
     it('OTT 필터가 적용되어야 한다', async () => {
@@ -377,9 +377,9 @@ describe('ContentSearchService', () => {
       );
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      // 가중 스코어 수식 (CTE에서 가져온 embedding 컬럼 직접 사용)
-      expect(query).toContain('(1 - (embedding <=> $2::vector)) * 0.7');
-      expect(query).toContain('LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, 0.3)');
+      // 가중 스코어 수식 (content_metadata의 embedding 컬럼 직접 사용)
+      expect(query).toContain('(1 - (cm.embedding <=> $2::vector)) * 0.7');
+      expect(query).toContain('LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, 0.3)');
     });
 
     it('반환 데이터가 SimilarContent 형식으로 매핑되어야 한다', async () => {
@@ -512,7 +512,7 @@ describe('ContentSearchService', () => {
       expect(mockDataSource.query).toHaveBeenCalledTimes(1);
     });
 
-    it('generateEmbedding 실패 시 벡터 유사도 없이 2/3순위 결과만 반환해야 한다', async () => {
+    it('generateEmbedding 실패 시 벡터 유사도 없이 인기도 기반 결과를 반환해야 한다', async () => {
       mockEmbeddingService.generateEmbedding.mockRejectedValue(
         new Error('OpenAI API 오류'),
       );
@@ -555,7 +555,7 @@ describe('ContentSearchService', () => {
       expect(params).toContain('2024-01-01');
     });
 
-    it('CTE에서 rankings LEFT JOIN으로 한 번만 조회해야 한다', async () => {
+    it('2순위에서 rankings를 직접 JOIN으로 조회해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       await service.searchWithFilters(
@@ -564,11 +564,9 @@ describe('ContentSearchService', () => {
       );
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      // LEFT JOIN rankings가 CTE 내에 있어야 한다
-      expect(query).toContain('LEFT JOIN rankings r ON r.content_id = c.id');
-      // rankings에 대한 EXISTS 서브쿼리가 없어야 한다
-      expect(query).not.toContain('EXISTS (');
-      expect(query).not.toMatch(/EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+rankings/);
+      // 2순위: FROM rankings r JOIN contents c
+      expect(query).toContain('FROM rankings r');
+      expect(query).toContain('JOIN contents c ON c.id = r.content_id');
     });
 
     it('precomputedEmbedding이 있으면 generateEmbedding을 호출하지 않아야 한다', async () => {
@@ -598,7 +596,7 @@ describe('ContentSearchService', () => {
       expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledWith('스릴러 추천');
     });
 
-    it('CTE에서 embedding 컬럼을 SELECT하여 재조인 없이 사용해야 한다', async () => {
+    it('1순위 블록에서 content_metadata를 직접 조인하여 재조인이 불필요해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       await service.searchWithFilters(
@@ -607,10 +605,46 @@ describe('ContentSearchService', () => {
       );
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      // CTE에 embedding이 포함되어야 한다
+      // 1순위: FROM content_metadata cm 직접 시작
+      expect(query).toContain('FROM content_metadata cm');
+      // cm.embedding 직접 참조
       expect(query).toContain('cm.embedding');
-      // 1순위 블록에서 content_metadata 재조인이 없어야 한다
+      // 별도 재조인 없음
       expect(query).not.toContain('JOIN content_metadata cm_emb');
+    });
+
+    it('2순위 KOBIS 결과에서 content_metadata에 이미 있는 작품을 제외해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '영화 추천', 20, [],
+        { contentType: 'movie' },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      // 2순위 블록에 NOT EXISTS로 content_metadata 중복 제거
+      expect(query).toContain('NOT EXISTS (SELECT 1 FROM content_metadata cm2 WHERE cm2.content_id = c.id)');
+    });
+
+    it('임베딩 실패 시 1순위에서 인기도 기반으로 정렬해야 한다', async () => {
+      mockEmbeddingService.generateEmbedding.mockRejectedValue(
+        new Error('OpenAI API 오류'),
+      );
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters(
+        '영화 추천', 20, [],
+        { contentType: 'movie' },
+      );
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      // 벡터 유사도 없이 인기도만 사용
+      expect(query).not.toContain('<=>');
+      expect(query).not.toContain('::vector');
+      // 1순위 블록이 여전히 content_metadata 기준
+      expect(query).toContain('FROM content_metadata cm');
+      // 인기도 점수가 score로 사용
+      expect(query).toContain('LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, 0.3)');
     });
 
   });

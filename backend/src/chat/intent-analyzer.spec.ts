@@ -29,6 +29,7 @@ const EMPTY_INTENT: ParsedIntent = {
   dateRange: null,
   contentType: null,
   genres: [],
+  confidence: 'low',
 };
 
 describe('IntentAnalyzerService', () => {
@@ -302,6 +303,65 @@ describe('IntentAnalyzerService', () => {
       expect(result.genres).toEqual(['액션']);
       expect(result.genres).not.toContain('액션 & 어드벤처');
     });
+
+    it('confidence가 high로 추출되어야 한다 (구체적 필터 있음)', async () => {
+      mockIntent({
+        ottProviderNames: ['Netflix'],
+        countries: ['KR'],
+        genres: ['스릴러'],
+        confidence: 'high',
+      });
+
+      const result = await service.analyzeIntent('넷플릭스 한국 스릴러 영화 추천해줘');
+
+      expect(result.confidence).toBe('high');
+    });
+
+    it('confidence가 low로 추출되어야 한다 (모호한 요청)', async () => {
+      mockIntent({ confidence: 'low' });
+
+      const result = await service.analyzeIntent('재밌는 영화 추천해줘');
+
+      expect(result.confidence).toBe('low');
+    });
+
+    it('LLM이 confidence를 잘못 판단해도 코드에서 보정해야 한다 (필터 있는데 low)', async () => {
+      mockIntent({
+        ottProviderNames: ['Netflix'],
+        genres: ['액션'],
+        confidence: 'low',
+      });
+
+      const result = await service.analyzeIntent('넷플릭스 액션 영화');
+
+      expect(result.confidence).toBe('high');
+    });
+
+    it('LLM이 confidence를 잘못 판단해도 코드에서 보정해야 한다 (필터 없는데 high)', async () => {
+      mockIntent({ confidence: 'high' });
+
+      const result = await service.analyzeIntent('재밌는 거 추천해줘');
+
+      expect(result.confidence).toBe('low');
+    });
+
+    it('confidence가 잘못된 타입이면 low로 처리해야 한다', async () => {
+      mockLlmResponse(JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        excludeCountries: [],
+        personNames: [],
+        referenceTitles: [],
+        dateRange: null,
+        contentType: null,
+        genres: [],
+        confidence: 123,
+      }));
+
+      const result = await service.analyzeIntent('테스트');
+
+      expect(result.confidence).toBe('low');
+    });
   });
 
   describe('fallback 처리', () => {
@@ -376,6 +436,7 @@ describe('IntentAnalyzerService', () => {
       dateRange: null,
       contentType: null,
       genres: [],
+      confidence: 'low',
     };
 
     it('OTT명을 쿼리에서 제거해야 한다', () => {

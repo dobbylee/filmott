@@ -226,68 +226,48 @@ export class ContentSearchService {
     const dynamicConditions = conditions.join('\n       ');
 
     const buildEmbeddingScore = (embIdx: number): string => {
-      return `(1 - (embedding <=> $${embIdx}::vector)) * ${SCORE_WEIGHTS.VECTOR_DEFAULT} + LEAST(LN(GREATEST(vote_count, 1) + 1) / 10.0, ${SCORE_WEIGHTS.POPULARITY_DEFAULT})`;
+      return `(1 - (cm.embedding <=> $${embIdx}::vector)) * ${SCORE_WEIGHTS.VECTOR_DEFAULT} + LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, ${SCORE_WEIGHTS.POPULARITY_DEFAULT})`;
     };
 
-    // P0-2: CTE에서 embedding도 SELECT하여 1순위 블록에서 content_metadata 재조인 제거
-    // P1-4: rankings를 LEFT JOIN으로 한 번만 조회 (WHERE + SELECT 이중 서브쿼리 제거)
+    const popularityOnlyScore = `LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, ${SCORE_WEIGHTS.POPULARITY_DEFAULT})`;
+
+    // Phase 2: CTE 제거 — content_metadata 기준 1순위 + KOBIS 2순위 UNION ALL
     const query = `
-WITH filtered AS (
-  SELECT c.id, c.tmdb_id, c.content_type, c.title, c.poster_url,
-         c.genres, c.vote_average, c.vote_count, c.overview,
-         c.director, c.origin_country,
-         c.watch_providers,
-         cm.description,
-         cm.embedding,
-         (r.id IS NOT NULL) AS is_kobis,
-         (cm.content_id IS NOT NULL) AS has_embedding
-  FROM contents c
-  LEFT JOIN content_metadata cm ON cm.content_id = c.id
-  LEFT JOIN rankings r ON r.content_id = c.id AND r.source = 'kobis'
-  WHERE c.tmdb_id != ALL($1::int[])
-    AND (c.adult IS NOT TRUE)
-    AND (
-      c.origin_country LIKE '%KR%'
-      OR c.watch_providers IS NOT NULL
-      OR r.id IS NOT NULL
-    )
-    ${dynamicConditions}
-)
 SELECT * FROM (
-  ${embeddingParamIndex !== null
-    ? `-- 1순위: 임베딩 있는 결과 (벡터 유사도 + 인기도 가중 스코어)
-  -- 각 우선순위별로 최대 limit개씩 뽑은 뒤 최종 limit개로 자른다
-  (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
-          genres, vote_average, vote_count, overview, director, origin_country,
-          description, 1 AS priority,
-          ${buildEmbeddingScore(embeddingParamIndex)} AS score
-   FROM filtered
-   WHERE has_embedding = true
+  -- 1순위: content_metadata 기준 (임베딩 있는 9,633건)
+  (SELECT cm.content_id, c.tmdb_id, c.content_type, c.title, c.poster_url,
+          c.genres, c.vote_average, c.vote_count, c.overview,
+          c.director, c.origin_country,
+          cm.description, 1 AS priority,
+          ${embeddingParamIndex !== null
+    ? buildEmbeddingScore(embeddingParamIndex)
+    : popularityOnlyScore
+  } AS score
+   FROM content_metadata cm
+   JOIN contents c ON c.id = cm.content_id
+   WHERE c.tmdb_id != ALL($1::int[])
+     AND (c.adult IS NOT TRUE)
+     AND (c.origin_country LIKE '%KR%' OR c.watch_providers IS NOT NULL
+          OR EXISTS (SELECT 1 FROM rankings r WHERE r.content_id = c.id AND r.source = 'kobis'))
+     ${dynamicConditions}
    ORDER BY score DESC
    LIMIT ${limitParam})
 
   UNION ALL
 
-  `
-    : ''
-  }-- ${embeddingParamIndex !== null ? '2' : '1'}순위: KOBIS 랭킹 작품 (임베딩 없음, 인기도순)
-  (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
-          genres, vote_average, vote_count, overview, director, origin_country,
-          description, 2 AS priority, 0 AS score
-   FROM filtered
-   WHERE has_embedding = false AND is_kobis = true
-   ORDER BY score DESC, vote_count DESC
-   LIMIT ${limitParam})
-
-  UNION ALL
-
-  -- ${embeddingParamIndex !== null ? '3' : '2'}순위: 나머지 (임베딩 없음 + KOBIS 아님, 인기도순)
-  (SELECT id AS content_id, tmdb_id, content_type, title, poster_url,
-          genres, vote_average, vote_count, overview, director, origin_country,
-          description, 3 AS priority, 0 AS score
-   FROM filtered
-   WHERE has_embedding = false AND is_kobis = false
-   ORDER BY score DESC, vote_count DESC
+  -- 2순위: KOBIS 랭킹 (content_metadata에 없는 것만)
+  (SELECT c.id AS content_id, c.tmdb_id, c.content_type, c.title, c.poster_url,
+          c.genres, c.vote_average, c.vote_count, c.overview,
+          c.director, c.origin_country,
+          NULL::text AS description, 2 AS priority, 0 AS score
+   FROM rankings r
+   JOIN contents c ON c.id = r.content_id
+   WHERE r.source = 'kobis'
+     AND c.tmdb_id != ALL($1::int[])
+     AND (c.adult IS NOT TRUE)
+     AND NOT EXISTS (SELECT 1 FROM content_metadata cm2 WHERE cm2.content_id = c.id)
+     ${dynamicConditions}
+   ORDER BY c.vote_count DESC
    LIMIT ${limitParam})
 ) combined
 ORDER BY priority, score DESC
