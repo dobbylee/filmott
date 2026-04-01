@@ -7,6 +7,7 @@ import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
+import { EmbeddingService } from '../chat/embedding.service';
 import { Content } from '../contents/content.entity';
 import { EmbeddingService } from '../chat/embedding.service';
 import { TMDB_IMAGE_BASE } from '../common/constants';
@@ -431,6 +432,65 @@ export class RankingsService {
    */
   private formatDateWithDashes(dateStr: string): string {
     return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+  }
+
+  /**
+   * 한국 TV Discover 수집 + metadata 캐싱
+   * 매일 07:00 KST 실행 (트렌딩 06:00 이후)
+   * rankings 테이블에는 저장하지 않음 (순수 수집 목적)
+   */
+  @Cron('0 7 * * *', { name: 'korean-tv-discover', timeZone: 'Asia/Seoul' })
+  async fetchKoreanTvDiscover(): Promise<void> {
+    this.logger.log('Fetching Korean TV Discover');
+
+    try {
+      const today = new Date();
+      const sixMonthsAgo = new Date(today);
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+      const airDateLte = today.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+      const airDateGte = sixMonthsAgo.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+
+      // 1-2 페이지 순차 수집
+      const allResults: { id: number }[] = [];
+      for (const page of [1, 2]) {
+        const discoverData = await this.tmdbService.discoverByFilters('tv', {
+          originCountry: 'KR',
+          sort: 'first_air_date.desc',
+          airDateLte,
+          airDateGte,
+          page,
+        });
+        allResults.push(...discoverData.results.map((item) => ({ id: item.id })));
+        await sleep(TMDB_CALL_DELAY_MS);
+      }
+
+      this.logger.log(`Korean TV Discover: ${allResults.length}건 수집`);
+
+      // contents 캐싱 (250ms 간격)
+      const contentIds: number[] = [];
+      let failCount = 0;
+      for (const item of allResults) {
+        try {
+          const content = await this.contentsService.findOrFetchByTmdbId(item.id, 'tv');
+          contentIds.push(content.id);
+        } catch {
+          failCount++;
+        }
+        await sleep(TMDB_CALL_DELAY_MS);
+      }
+
+      this.logger.log(
+        `Korean TV Discover: 수집 ${allResults.length}건, 캐싱 성공 ${contentIds.length}건, 실패 ${failCount}건`,
+      );
+
+      // metadata 비동기 캐싱
+      if (contentIds.length > 0) {
+        this.cacheMetadataInBackground(contentIds);
+      }
+    } catch (error) {
+      this.logger.error('Failed to fetch Korean TV Discover', error);
+    }
   }
 
   private cacheMetadataInBackground(contentIds: number[]): void {

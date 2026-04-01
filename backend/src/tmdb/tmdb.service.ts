@@ -233,6 +233,9 @@ export class TmdbService {
       sort?: string;
       region?: string;
       page?: number;
+      originCountry?: string;
+      airDateGte?: string;
+      airDateLte?: string;
     } = {},
   ): Promise<TmdbSearchResult> {
     let sortBy = options.sort ?? 'popularity.desc';
@@ -264,6 +267,23 @@ export class TmdbService {
         params.primary_release_year = options.year;
       } else {
         params.first_air_date_year = options.year;
+      }
+    }
+    if (options.originCountry) {
+      params.with_origin_country = options.originCountry;
+    }
+    if (options.airDateGte) {
+      if (type === 'tv') {
+        params['first_air_date.gte'] = options.airDateGte;
+      } else {
+        params['release_date.gte'] = options.airDateGte;
+      }
+    }
+    if (options.airDateLte) {
+      if (type === 'tv') {
+        params['first_air_date.lte'] = options.airDateLte;
+      } else {
+        params['release_date.lte'] = options.airDateLte;
       }
     }
 

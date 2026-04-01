@@ -253,5 +253,52 @@ describe('TmdbService', () => {
         }),
       });
     });
+
+    it('originCountry가 with_origin_country 파라미터로 전달되어야 한다', async () => {
+      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
+
+      await service.discoverByFilters('tv', { originCountry: 'KR' });
+
+      expect(mockHttpService.get).toHaveBeenCalledWith('/discover/tv', {
+        params: expect.objectContaining({
+          with_origin_country: 'KR',
+        }),
+      });
+    });
+
+    it('TV 타입에서 airDateGte/Lte가 first_air_date 파라미터로 전달되어야 한다', async () => {
+      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
+
+      await service.discoverByFilters('tv', {
+        airDateGte: '2025-10-01',
+        airDateLte: '2026-04-01',
+      });
+
+      expect(mockHttpService.get).toHaveBeenCalledWith('/discover/tv', {
+        params: expect.objectContaining({
+          'first_air_date.gte': '2025-10-01',
+          'first_air_date.lte': '2026-04-01',
+        }),
+      });
+    });
+
+    it('영화 타입에서 airDateGte/Lte가 release_date 파라미터로 전달되어야 한다', async () => {
+      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
+
+      await service.discoverByFilters('movie', {
+        airDateGte: '2025-01-01',
+        airDateLte: '2025-12-31',
+      });
+
+      expect(mockHttpService.get).toHaveBeenCalledWith('/discover/movie', {
+        params: expect.objectContaining({
+          'release_date.gte': '2025-01-01',
+          'release_date.lte': '2025-12-31',
+        }),
+      });
+    });
   });
 });
