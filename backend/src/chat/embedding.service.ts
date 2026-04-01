@@ -331,6 +331,37 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     }));
   }
 
+  async batchCacheByContentIds(contentIds: number[]): Promise<BatchResult> {
+    const result: BatchResult = { cached: 0, skipped: 0, failed: 0 };
+    if (contentIds.length === 0) return result;
+
+    // 이미 캐싱된 content_id 조회
+    const existingRows: { content_id: number }[] = await this.dataSource.query(
+      `SELECT content_id FROM content_metadata WHERE content_id = ANY($1::int[])`,
+      [contentIds],
+    );
+    const existingIds = new Set(existingRows.map((r) => r.content_id));
+
+    const uncachedIds = contentIds.filter((id) => !existingIds.has(id));
+    result.skipped = contentIds.length - uncachedIds.length;
+
+    for (const contentId of uncachedIds) {
+      try {
+        await this.cacheContentMetadata(contentId, false);
+        result.cached++;
+        // Rate limit 방어: 100ms 딜레이
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        result.failed++;
+        this.logger.warn(
+          `배치 캐싱 실패 (contentId: ${contentId}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return result;
+  }
+
   async batchCacheMetadata(criteria: CacheCriteria): Promise<BatchResult> {
     const result: BatchResult = { cached: 0, skipped: 0, failed: 0 };
 
