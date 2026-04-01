@@ -9,7 +9,6 @@ import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
 import { EmbeddingService } from '../chat/embedding.service';
 import { Content } from '../contents/content.entity';
-import { EmbeddingService } from '../chat/embedding.service';
 import { TMDB_IMAGE_BASE } from '../common/constants';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
