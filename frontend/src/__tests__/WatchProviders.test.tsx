@@ -42,4 +42,16 @@ describe('WatchProviders', () => {
     const { container } = render(<WatchProviders data={data} />);
     expect(container.innerHTML).toBe('');
   });
+
+  it('로고 이미지에 w92 사이즈를 사용한다', () => {
+    const data: WatchProviderData = {
+      flatrate: [
+        { provider_id: 8, provider_name: '넷플릭스', logo_path: '/netflix.jpg' },
+      ],
+    };
+    render(<WatchProviders data={data} />);
+    const img = screen.getByAltText('넷플릭스');
+    expect(img).toHaveAttribute('src', expect.stringContaining('/w92/'));
+    expect(img).not.toHaveAttribute('src', expect.stringContaining('/original/'));
+  });
 });

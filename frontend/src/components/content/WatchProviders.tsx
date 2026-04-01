@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
 import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { WatchProviderData } from '@/types/content';
 
@@ -41,8 +41,8 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
       <div className="flex flex-wrap items-center gap-2">
         {unique.map((p) => (
           <div key={p.provider_id} className="group relative">
-            <Image
-              src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
+            <TmdbImage
+              src={`${TMDB_IMAGE_BASE}/w92${p.logo_path}`}
               alt={p.provider_name}
               width={32}
               height={32}
@@ -67,8 +67,8 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
           <div className="flex flex-wrap gap-2">
             {deduplicateProviders(data.flatrate).map((p) => (
               <div key={p.provider_id} className="group relative">
-                <Image
-                  src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
+                <TmdbImage
+                  src={`${TMDB_IMAGE_BASE}/w92${p.logo_path}`}
                   alt={p.provider_name}
                   width={40}
                   height={40}
@@ -91,8 +91,8 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
           <div className="flex flex-wrap gap-2">
             {deduplicateProviders(data.rent).map((p) => (
               <div key={p.provider_id} className="group relative">
-                <Image
-                  src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
+                <TmdbImage
+                  src={`${TMDB_IMAGE_BASE}/w92${p.logo_path}`}
                   alt={p.provider_name}
                   width={40}
                   height={40}
@@ -115,8 +115,8 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
           <div className="flex flex-wrap gap-2">
             {deduplicateProviders(data.buy).map((p) => (
               <div key={p.provider_id} className="group relative">
-                <Image
-                  src={`${TMDB_IMAGE_BASE}/original${p.logo_path}`}
+                <TmdbImage
+                  src={`${TMDB_IMAGE_BASE}/w92${p.logo_path}`}
                   alt={p.provider_name}
                   width={40}
                   height={40}
