@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import { Star, Clock, Calendar } from 'lucide-react';
+import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
 import { fetchApi } from '@/lib/fetcher';
 import CastCarousel from '@/components/content/CastCarousel';
 import ReviewListClient from '@/components/review/ReviewListClient';
@@ -143,8 +143,8 @@ export default async function ContentDetailPage({
         {/* 백드롭 */}
         {content.backdropUrl ? (
           <div className="relative h-[40vh] md:h-[55vh] w-full">
-            <Image
-              src={content.backdropUrl}
+            <TmdbImage
+              src={replaceTmdbSize(content.backdropUrl, 'w1280')}
               alt={content.title}
               fill
               priority
@@ -168,8 +168,8 @@ export default async function ContentDetailPage({
             <div className="hidden flex-shrink-0 md:block -mt-8">
               <div className="relative h-[270px] w-[180px] overflow-hidden rounded-lg shadow-xl md:h-[330px] md:w-[220px]">
                 {content.posterUrl ? (
-                  <Image
-                    src={content.posterUrl}
+                  <TmdbImage
+                    src={replaceTmdbSize(content.posterUrl, 'w342')}
                     alt={content.title}
                     fill
                     sizes="220px"
@@ -190,8 +190,8 @@ export default async function ContentDetailPage({
               <div className="mb-4 md:hidden">
                 <div className="relative h-[200px] w-[133px] overflow-hidden rounded-lg shadow-xl">
                   {content.posterUrl ? (
-                    <Image
-                      src={content.posterUrl}
+                    <TmdbImage
+                      src={replaceTmdbSize(content.posterUrl, 'w342')}
                       alt={content.title}
                       fill
                       sizes="133px"
