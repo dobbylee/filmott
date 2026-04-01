@@ -7,6 +7,7 @@ import { RankingsController } from './rankings.controller';
 import { KobisModule } from '../kobis/kobis.module';
 import { TmdbModule } from '../tmdb/tmdb.module';
 import { ContentsModule } from '../contents/contents.module';
+import { EmbeddingModule } from '../chat/embedding.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ContentsModule } from '../contents/contents.module';
     KobisModule,
     TmdbModule,
     ContentsModule,
+    EmbeddingModule,
   ],
   controllers: [RankingsController],
   providers: [RankingsService],

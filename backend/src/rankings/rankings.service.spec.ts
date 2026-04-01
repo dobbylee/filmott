@@ -7,6 +7,7 @@ import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
+import { EmbeddingService } from '../chat/embedding.service';
 
 describe('RankingsService', () => {
   let service: RankingsService;
@@ -34,6 +35,10 @@ describe('RankingsService', () => {
     findOrFetchByTmdbId: jest.fn(),
   };
 
+  const mockEmbeddingService = {
+    batchCacheByContentIds: jest.fn().mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
+  };
+
   const mockConfigService = {
     get: jest.fn().mockImplementation((key: string, defaultVal?: string) => defaultVal ?? ''),
   };
@@ -46,6 +51,7 @@ describe('RankingsService', () => {
         { provide: KobisService, useValue: mockKobisService },
         { provide: TmdbService, useValue: mockTmdbService },
         { provide: ContentsService, useValue: mockContentsService },
+        { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
@@ -605,6 +611,7 @@ describe('RankingsService', () => {
           { provide: KobisService, useValue: mockKobisService },
           { provide: TmdbService, useValue: mockTmdbService },
           { provide: ContentsService, useValue: mockContentsService },
+          { provide: EmbeddingService, useValue: mockEmbeddingService },
           { provide: ConfigService, useValue: secretConfigService },
         ],
       }).compile();
@@ -649,6 +656,7 @@ describe('RankingsService', () => {
           { provide: KobisService, useValue: mockKobisService },
           { provide: TmdbService, useValue: mockTmdbService },
           { provide: ContentsService, useValue: mockContentsService },
+          { provide: EmbeddingService, useValue: mockEmbeddingService },
           { provide: ConfigService, useValue: secretConfigService },
         ],
       }).compile();
@@ -684,6 +692,7 @@ describe('RankingsService', () => {
           { provide: KobisService, useValue: mockKobisService },
           { provide: TmdbService, useValue: mockTmdbService },
           { provide: ContentsService, useValue: mockContentsService },
+          { provide: EmbeddingService, useValue: mockEmbeddingService },
           { provide: ConfigService, useValue: secretConfigService },
         ],
       }).compile();
@@ -697,6 +706,106 @@ describe('RankingsService', () => {
       ).resolves.not.toThrow();
 
       fetchSpy.mockRestore();
+    });
+  });
+
+  describe('metadata 배치 캐싱 연결', () => {
+    it('fetchDailyBoxOffice 완료 후 contentId가 있는 항목의 metadata 캐싱을 호출해야 한다', async () => {
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: 'Test Movie',
+          movieCd: '12345',
+          openDt: '2026-03-01',
+          audiCnt: '100000',
+          audiAcc: '500000',
+          salesAmt: '1000000',
+          salesAcc: '5000000',
+        },
+      ];
+
+      mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
+      mockTmdbService.searchByType.mockResolvedValue({
+        results: [{ id: 999, title: 'Test Movie', release_date: '2026-03-01' }],
+      });
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 42, posterUrl: '/poster.jpg' });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchDailyBoxOffice();
+
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([42]);
+    });
+
+    it('fetchDailyBoxOffice에서 contentId가 없으면 metadata 캐싱을 호출하지 않아야 한다', async () => {
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: 'Unknown',
+          movieCd: '99999',
+          openDt: '2026-03-01',
+          audiCnt: '10000',
+          audiAcc: '50000',
+          salesAmt: '100000',
+          salesAcc: '500000',
+        },
+      ];
+
+      mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
+      mockTmdbService.searchByType.mockResolvedValue({ results: [] });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchDailyBoxOffice();
+
+      expect(mockEmbeddingService.batchCacheByContentIds).not.toHaveBeenCalled();
+    });
+
+    it('fetchTrending 완료 후 contentId가 있는 항목의 metadata 캐싱을 호출해야 한다', async () => {
+      const trendingData = {
+        results: [
+          { id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' },
+          { id: 200, media_type: 'tv', name: 'Show', poster_path: '/s.jpg' },
+        ],
+      };
+
+      mockTmdbService.getTrending.mockResolvedValue(trendingData);
+      mockContentsService.findOrFetchByTmdbId
+        .mockResolvedValueOnce({ id: 10 })
+        .mockResolvedValueOnce({ id: 20 });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchTrending('all', 'day');
+
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([10, 20]);
+    });
+
+    it('fetchWeeklyBoxOffice 완료 후 contentId가 있는 항목의 metadata 캐싱을 호출해야 한다', async () => {
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: 'Weekly Movie',
+          movieCd: '67890',
+          openDt: '2026-03-01',
+          audiCnt: '200000',
+          audiAcc: '1000000',
+          salesAmt: '2000000',
+          salesAcc: '10000000',
+        },
+      ];
+
+      mockKobisService.getWeeklyBoxOffice.mockResolvedValue(kobisItems);
+      mockTmdbService.searchByType.mockResolvedValue({
+        results: [{ id: 888, title: 'Weekly Movie', release_date: '2026-03-01' }],
+      });
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 55, posterUrl: '/poster.jpg' });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchWeeklyBoxOffice();
+
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([55]);
     });
   });
 });

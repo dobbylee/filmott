@@ -8,6 +8,7 @@ import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
 import { Content } from '../contents/content.entity';
+import { EmbeddingService } from '../chat/embedding.service';
 import { TMDB_IMAGE_BASE } from '../common/constants';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,6 +26,7 @@ export class RankingsService {
     private readonly kobisService: KobisService,
     private readonly tmdbService: TmdbService,
     private readonly contentsService: ContentsService,
+    private readonly embeddingService: EmbeddingService,
     private readonly configService: ConfigService,
   ) {
     this.revalidateSecret = this.configService.get<string>('REVALIDATE_SECRET', '');
@@ -85,6 +87,14 @@ export class RankingsService {
       ]);
 
       this.logger.log(`Saved ${rankingsToUpsert.length} daily box office rankings`);
+
+      const contentIds = rankingsToUpsert
+        .map((r) => r.contentId)
+        .filter((id): id is number => id !== undefined);
+      if (contentIds.length > 0) {
+        this.cacheMetadataInBackground(contentIds);
+      }
+
       await this.revalidateMainPage();
       return rankingsToUpsert;
     } catch (error) {
@@ -147,6 +157,14 @@ export class RankingsService {
       ]);
 
       this.logger.log(`Saved ${rankingsToUpsert.length} weekly box office rankings`);
+
+      const contentIds = rankingsToUpsert
+        .map((r) => r.contentId)
+        .filter((id): id is number => id !== undefined);
+      if (contentIds.length > 0) {
+        this.cacheMetadataInBackground(contentIds);
+      }
+
       await this.revalidateMainPage();
       return rankingsToUpsert;
     } catch (error) {
@@ -243,6 +261,14 @@ export class RankingsService {
       ]);
 
       this.logger.log(`Saved ${rankingsToUpsert.length} trending rankings for ${category}`);
+
+      const contentIds = rankingsToUpsert
+        .map((r) => r.contentId)
+        .filter((id): id is number => id !== undefined);
+      if (contentIds.length > 0) {
+        this.cacheMetadataInBackground(contentIds);
+      }
+
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error(`Failed to fetch trending: ${category}`, error);
@@ -405,6 +431,20 @@ export class RankingsService {
    */
   private formatDateWithDashes(dateStr: string): string {
     return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+  }
+
+  private cacheMetadataInBackground(contentIds: number[]): void {
+    this.embeddingService.batchCacheByContentIds(contentIds)
+      .then((result) => {
+        this.logger.log(
+          `Metadata 배치 캐싱 완료: cached=${result.cached}, skipped=${result.skipped}, failed=${result.failed}`,
+        );
+      })
+      .catch((error) => {
+        this.logger.warn(
+          `Metadata 배치 캐싱 실패: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
   }
 
   private async revalidateMainPage(): Promise<void> {
