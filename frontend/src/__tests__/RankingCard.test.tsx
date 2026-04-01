@@ -94,4 +94,45 @@ describe('RankingCard', () => {
     const img = screen.getByAltText('양쪽 포스터');
     expect(img).toHaveAttribute('src', expect.stringContaining('content-poster.jpg'));
   });
+
+  it('full URL posterUrl에 replaceTmdbSize로 w342가 적용된다', () => {
+    const withW500: RankingItem = {
+      id: 6,
+      rank: 1,
+      content: {
+        id: 300,
+        tmdbId: 11111,
+        contentType: 'movie',
+        title: 'w500 포스터 영화',
+        posterUrl: 'https://image.tmdb.org/t/p/w500/poster.jpg',
+      },
+    };
+    render(<RankingCard item={withW500} />);
+    const img = screen.getByAltText('w500 포스터 영화');
+    expect(img).toHaveAttribute('src', expect.stringContaining('/w342/'));
+    expect(img).not.toHaveAttribute('src', expect.stringContaining('/w500/'));
+  });
+
+  it('path posterUrl에 w342 prefix가 적용된다', () => {
+    const withPath: RankingItem = {
+      id: 7,
+      rank: 2,
+      content: {
+        id: 400,
+        tmdbId: 22222,
+        contentType: 'tv',
+        title: 'path 포스터',
+        posterUrl: '/poster-path.jpg',
+      },
+    };
+    render(<RankingCard item={withPath} />);
+    const img = screen.getByAltText('path 포스터');
+    expect(img).toHaveAttribute('src', expect.stringContaining('/w342/poster-path.jpg'));
+  });
+
+  it('포스터 이미지가 렌더링된다', () => {
+    render(<RankingCard item={item} />);
+    const img = screen.getByAltText('테스트 영화');
+    expect(img).toBeInTheDocument();
+  });
 });

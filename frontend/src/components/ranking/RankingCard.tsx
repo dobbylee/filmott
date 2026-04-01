@@ -1,7 +1,7 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { TMDB_IMAGE_BASE } from '@/types/content';
 import { Star } from 'lucide-react';
+import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
 
 export interface RankingItem {
   id: number;
@@ -40,11 +40,11 @@ export default function RankingCard({ item }: RankingCardProps) {
   const inner = (
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-white/5 border border-white/5 shadow-lg">
         {posterUrl ? (
-          <Image
-            src={posterUrl.startsWith('http') ? posterUrl : `${TMDB_IMAGE_BASE}/w342${posterUrl}`}
+          <TmdbImage
+            src={posterUrl.startsWith('http') ? replaceTmdbSize(posterUrl, 'w342') : `${TMDB_IMAGE_BASE}/w342${posterUrl}`}
             alt={title}
             fill
-            sizes="(max-width: 640px) 130px, 150px"
+            sizes="(max-width: 640px) 160px, 220px"
             className="object-cover transition-transform duration-700 group-hover:scale-110"
           />
         ) : (
