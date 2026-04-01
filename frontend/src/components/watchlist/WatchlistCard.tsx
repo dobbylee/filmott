@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
+import { replaceTmdbSize } from '@/components/common/TmdbImage';
 import { Star, Plus, Pencil } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from '@/components/review/LikeButton';
@@ -31,7 +32,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
   const reviewWithUser = review && user ? { ...review, user: review.user ?? user } : review;
   const href = `/contents/${content.contentType}/${content.tmdbId}`;
   const posterSrc = content.posterUrl
-    ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`)
+    ? (content.posterUrl.startsWith('http') ? replaceTmdbSize(content.posterUrl, 'w154') : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`)
     : null;
   const [showComments, setShowComments] = useState(false);
   const [commentsCount, setCommentsCount] = useState(review?.commentsCount ?? 0);
@@ -62,7 +63,7 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
         <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
           <Link href={href} className="relative h-[100px] w-[66px] overflow-hidden rounded-lg shadow-lg">
             {posterSrc ? (
-              <Image
+              <TmdbImage
                 src={posterSrc}
                 alt={content.title}
                 fill

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Check, Pencil, X } from 'lucide-react';
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
 import { useAuth } from '@/contexts/AuthContext';
 import { OTT_PROVIDERS } from '@/lib/ott-providers';
 import { getErrorMessage } from '@/utils/error';
@@ -101,7 +101,7 @@ export default function OttSubscriptions() {
                   }`}
                 >
                   <div className="relative h-8 w-8 overflow-hidden rounded-lg">
-                    <Image
+                    <TmdbImage
                       src={ott.logoUrl}
                       alt={ott.name}
                       fill
@@ -137,7 +137,7 @@ export default function OttSubscriptions() {
                   className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5"
                 >
                   <div className="relative h-5 w-5 overflow-hidden rounded">
-                    <Image
+                    <TmdbImage
                       src={ott.logoUrl}
                       alt={ott.name}
                       fill

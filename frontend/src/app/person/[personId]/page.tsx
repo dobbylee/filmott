@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
 import { Calendar, User } from 'lucide-react';
 import { fetchApi } from '@/lib/fetcher';
 import FilmographyGrid from '@/components/content/FilmographyGrid';
@@ -152,8 +152,8 @@ export default async function PersonPage({ params }: PersonPageProps) {
         <div className="flex-shrink-0">
           <div className="relative h-[300px] w-[200px] overflow-hidden rounded-2xl bg-white/5 border border-white/10 shadow-xl">
             {person.profile_path ? (
-              <Image
-                src={`${TMDB_IMAGE_BASE}/w500${person.profile_path}`}
+              <TmdbImage
+                src={`${TMDB_IMAGE_BASE}/w342${person.profile_path}`}
                 alt={person.name}
                 fill
                 sizes="200px"

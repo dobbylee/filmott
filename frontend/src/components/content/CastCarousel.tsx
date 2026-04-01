@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
 import Link from 'next/link';
 import { useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -61,7 +61,7 @@ export default function CastCarousel({ cast }: CastCarouselProps) {
           >
             <div className="relative h-[100px] w-[100px] overflow-hidden rounded-full bg-muted transition-transform duration-200 group-hover:scale-105">
               {member.profile_path ? (
-                <Image
+                <TmdbImage
                   src={`${TMDB_IMAGE_BASE}/w185${member.profile_path}`}
                   alt={member.name}
                   fill
