@@ -518,6 +518,101 @@ describe('EmbeddingService', () => {
     });
   });
 
+  describe('batchCacheByContentIds', () => {
+    it('미캐싱 콘텐츠만 캐싱해야 한다', async () => {
+      // content_id 1은 이미 캐싱됨, 2는 미캐싱
+      mockDataSource.query.mockResolvedValueOnce([{ content_id: 1 }]);
+
+      // cacheContentMetadata 내부: metadataRepo.findOne(null) -> contentRepo.findOne -> description -> embedding -> upsert
+      mockMetadataRepo.findOne
+        .mockResolvedValueOnce(null) // 캐시 미스
+        .mockResolvedValueOnce({ id: 1, contentId: 2, description: '설명' }); // upsert 후 조회
+      mockContentRepo.findOne.mockResolvedValue({
+        id: 2,
+        title: '테스트',
+        genres: [],
+        overview: '설명',
+        credits: [],
+        releaseDate: new Date(),
+      });
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: '설명' } }],
+      });
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: [0.1] }],
+      });
+      mockDataSource.query.mockResolvedValue([]); // upsert 쿼리
+
+      const result = await service.batchCacheByContentIds([1, 2]);
+
+      expect(result.cached).toBe(1);
+      expect(result.skipped).toBe(1);
+      expect(result.failed).toBe(0);
+    });
+
+    it('이미 캐싱된 콘텐츠만 있으면 모두 스킵해야 한다', async () => {
+      mockDataSource.query.mockResolvedValueOnce([
+        { content_id: 1 },
+        { content_id: 2 },
+      ]);
+
+      const result = await service.batchCacheByContentIds([1, 2]);
+
+      expect(result.cached).toBe(0);
+      expect(result.skipped).toBe(2);
+      expect(result.failed).toBe(0);
+    });
+
+    it('캐싱 실패 시 계속 진행해야 한다', async () => {
+      mockDataSource.query.mockResolvedValueOnce([]); // 아무것도 캐싱 안됨
+
+      // id=1 캐싱 실패, id=2 캐싱 성공
+      mockMetadataRepo.findOne
+        .mockResolvedValueOnce(null) // id=1 캐시 미스
+        .mockResolvedValueOnce(null) // id=2 캐시 미스
+        .mockResolvedValueOnce({ id: 1, contentId: 2, description: '설명' }); // id=2 upsert 후 조회
+
+      mockContentRepo.findOne
+        .mockResolvedValueOnce({
+          id: 1,
+          title: '실패작',
+          genres: [],
+          overview: '설명',
+          credits: [],
+          releaseDate: new Date(),
+        })
+        .mockResolvedValueOnce({
+          id: 2,
+          title: '성공작',
+          genres: [],
+          overview: '설명',
+          credits: [],
+          releaseDate: new Date(),
+        });
+
+      mockCreate
+        .mockRejectedValueOnce(new Error('API 오류')) // id=1 실패
+        .mockResolvedValueOnce({ choices: [{ message: { content: '설명' } }] }); // id=2 성공
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: [0.1] }],
+      });
+      mockDataSource.query.mockResolvedValue([]); // upsert 쿼리
+
+      const result = await service.batchCacheByContentIds([1, 2]);
+
+      expect(result.cached).toBe(1);
+      expect(result.skipped).toBe(0);
+      expect(result.failed).toBe(1);
+    });
+
+    it('빈 배열을 전달하면 즉시 반환해야 한다', async () => {
+      const result = await service.batchCacheByContentIds([]);
+
+      expect(result).toEqual({ cached: 0, skipped: 0, failed: 0 });
+      expect(mockDataSource.query).not.toHaveBeenCalled();
+    });
+  });
+
   describe('batchCacheMetadata', () => {
     it('조건에 맞는 콘텐츠를 배치 캐싱해야 한다', async () => {
       const mockQb = {
