@@ -7,6 +7,7 @@ import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
+import { EmbeddingService } from '../chat/embedding.service';
 
 describe('RankingsService', () => {
   let service: RankingsService;
@@ -28,10 +29,15 @@ describe('RankingsService', () => {
   const mockTmdbService = {
     searchByType: jest.fn(),
     getTrending: jest.fn(),
+    discoverByFilters: jest.fn(),
   };
 
   const mockContentsService = {
     findOrFetchByTmdbId: jest.fn(),
+  };
+
+  const mockEmbeddingService = {
+    batchCacheByContentIds: jest.fn().mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
   };
 
   const mockConfigService = {
@@ -46,6 +52,7 @@ describe('RankingsService', () => {
         { provide: KobisService, useValue: mockKobisService },
         { provide: TmdbService, useValue: mockTmdbService },
         { provide: ContentsService, useValue: mockContentsService },
+        { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
@@ -605,6 +612,7 @@ describe('RankingsService', () => {
           { provide: KobisService, useValue: mockKobisService },
           { provide: TmdbService, useValue: mockTmdbService },
           { provide: ContentsService, useValue: mockContentsService },
+          { provide: EmbeddingService, useValue: mockEmbeddingService },
           { provide: ConfigService, useValue: secretConfigService },
         ],
       }).compile();
@@ -649,6 +657,7 @@ describe('RankingsService', () => {
           { provide: KobisService, useValue: mockKobisService },
           { provide: TmdbService, useValue: mockTmdbService },
           { provide: ContentsService, useValue: mockContentsService },
+          { provide: EmbeddingService, useValue: mockEmbeddingService },
           { provide: ConfigService, useValue: secretConfigService },
         ],
       }).compile();
@@ -684,6 +693,7 @@ describe('RankingsService', () => {
           { provide: KobisService, useValue: mockKobisService },
           { provide: TmdbService, useValue: mockTmdbService },
           { provide: ContentsService, useValue: mockContentsService },
+          { provide: EmbeddingService, useValue: mockEmbeddingService },
           { provide: ConfigService, useValue: secretConfigService },
         ],
       }).compile();
@@ -697,6 +707,100 @@ describe('RankingsService', () => {
       ).resolves.not.toThrow();
 
       fetchSpy.mockRestore();
+    });
+  });
+
+  describe('fetchKoreanTvDiscover', () => {
+    it('Discover API를 2페이지 호출하고 contents를 캐싱해야 한다', async () => {
+      const page1 = {
+        results: [
+          { id: 1001, name: 'Korean Drama 1' },
+          { id: 1002, name: 'Korean Drama 2' },
+        ],
+      };
+      const page2 = {
+        results: [
+          { id: 1003, name: 'Korean Drama 3' },
+        ],
+      };
+
+      mockTmdbService.discoverByFilters
+        .mockResolvedValueOnce(page1)
+        .mockResolvedValueOnce(page2);
+
+      mockContentsService.findOrFetchByTmdbId
+        .mockResolvedValueOnce({ id: 101 })
+        .mockResolvedValueOnce({ id: 102 })
+        .mockResolvedValueOnce({ id: 103 });
+
+      await service.fetchKoreanTvDiscover();
+
+      // Discover API가 2번 호출되어야 한다
+      expect(mockTmdbService.discoverByFilters).toHaveBeenCalledTimes(2);
+      expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith('tv', expect.objectContaining({
+        originCountry: 'KR',
+        sort: 'first_air_date.desc',
+        page: 1,
+      }));
+      expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith('tv', expect.objectContaining({
+        page: 2,
+      }));
+
+      // contents 캐싱이 3번 호출되어야 한다
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledTimes(3);
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(1001, 'tv');
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(1002, 'tv');
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(1003, 'tv');
+    });
+
+    it('캐싱 성공한 contentId로 metadata 캐싱을 호출해야 한다', async () => {
+      mockTmdbService.discoverByFilters
+        .mockResolvedValueOnce({ results: [{ id: 2001 }] })
+        .mockResolvedValueOnce({ results: [] });
+
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 201 });
+
+      await service.fetchKoreanTvDiscover();
+
+      // batchCacheByContentIds가 비동기로 호출되어야 한다
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([201]);
+    });
+
+    it('contents 캐싱 실패 시에도 에러를 throw하지 않아야 한다', async () => {
+      mockTmdbService.discoverByFilters
+        .mockResolvedValueOnce({
+          results: [{ id: 3001 }, { id: 3002 }],
+        })
+        .mockResolvedValueOnce({ results: [] });
+
+      mockContentsService.findOrFetchByTmdbId
+        .mockRejectedValueOnce(new Error('TMDB error'))
+        .mockResolvedValueOnce({ id: 301 });
+
+      await expect(service.fetchKoreanTvDiscover()).resolves.not.toThrow();
+
+      // 성공한 1건만 metadata 캐싱에 전달
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([301]);
+    });
+
+    it('Discover API 실패 시 에러 로깅만 하고 throw하지 않아야 한다', async () => {
+      mockTmdbService.discoverByFilters.mockRejectedValue(new Error('TMDB Discover error'));
+
+      await expect(service.fetchKoreanTvDiscover()).resolves.not.toThrow();
+
+      // metadata 캐싱은 호출되지 않아야 한다
+      expect(mockEmbeddingService.batchCacheByContentIds).not.toHaveBeenCalled();
+    });
+
+    it('수집 결과가 0건이면 metadata 캐싱을 호출하지 않아야 한다', async () => {
+      mockTmdbService.discoverByFilters
+        .mockResolvedValueOnce({ results: [] })
+        .mockResolvedValueOnce({ results: [] });
+
+      await service.fetchKoreanTvDiscover();
+
+      expect(mockContentsService.findOrFetchByTmdbId).not.toHaveBeenCalled();
+      expect(mockEmbeddingService.batchCacheByContentIds).not.toHaveBeenCalled();
     });
   });
 });
