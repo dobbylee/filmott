@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
 import Link from 'next/link';
 import { TMDB_IMAGE_BASE, GENRE_MAP } from '@/types/content';
 import type { TmdbSearchItem } from '@/types/content';
@@ -26,8 +26,8 @@ export default function ContentCard({ item }: ContentCardProps) {
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-white/5 border border-white/5 shadow-lg">
         {item.poster_path ? (
-          <Image
-            src={`${TMDB_IMAGE_BASE}/w500${item.poster_path}`}
+          <TmdbImage
+            src={`${TMDB_IMAGE_BASE}/w342${item.poster_path}`}
             alt={title}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"

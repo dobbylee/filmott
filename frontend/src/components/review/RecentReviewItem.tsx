@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
+import { replaceTmdbSize } from '@/components/common/TmdbImage';
 import { Star } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import TimeAgo from '@/components/common/TimeAgo';
@@ -18,8 +19,8 @@ export default function RecentReviewItem({ review }: { review: Review }) {
       {content?.posterUrl && (
         <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
           <Link href={href} className="relative h-[100px] w-[66px] overflow-hidden rounded-lg shadow-lg">
-            <Image
-              src={content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`}
+            <TmdbImage
+              src={content.posterUrl.startsWith('http') ? replaceTmdbSize(content.posterUrl, 'w154') : `${TMDB_IMAGE_BASE}/w154${content.posterUrl}`}
               alt={content.title}
               fill
               sizes="66px"

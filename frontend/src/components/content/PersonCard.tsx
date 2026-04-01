@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
 import Link from 'next/link';
 import { User } from 'lucide-react';
 import { TMDB_IMAGE_BASE } from '@/types/content';
@@ -39,7 +39,7 @@ export default function PersonCard({ person }: PersonCardProps) {
         {/* Profile Image */}
         <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-full bg-white/5 border border-white/10">
           {person.profile_path ? (
-            <Image
+            <TmdbImage
               src={`${TMDB_IMAGE_BASE}/w185${person.profile_path}`}
               alt={person.name ?? ''}
               fill

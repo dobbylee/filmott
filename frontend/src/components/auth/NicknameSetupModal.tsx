@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Check, AlertCircle, ArrowLeft } from 'lucide-react';
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { validateNickname } from '@/utils/nickname';
@@ -208,7 +208,7 @@ export default function NicknameSetupModal({ tempToken }: NicknameSetupModalProp
                     }`}
                   >
                     <div className="relative h-10 w-10 overflow-hidden rounded-lg">
-                      <Image
+                      <TmdbImage
                         src={ott.logoUrl}
                         alt={ott.name}
                         fill

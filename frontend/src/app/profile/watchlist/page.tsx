@@ -3,7 +3,8 @@
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import TmdbImage from '@/components/common/TmdbImage';
+import { replaceTmdbSize } from '@/components/common/TmdbImage';
 import { Eye, Bookmark, ChevronLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
@@ -323,7 +324,7 @@ function WatchlistListContent() {
                   const { content } = item;
                   const href = `/contents/${content.contentType}/${content.tmdbId}`;
                   const posterSrc = content.posterUrl
-                    ? (content.posterUrl.startsWith('http') ? content.posterUrl : `${TMDB_IMAGE_BASE}/w342${content.posterUrl}`)
+                    ? (content.posterUrl.startsWith('http') ? replaceTmdbSize(content.posterUrl, 'w342') : `${TMDB_IMAGE_BASE}/w342${content.posterUrl}`)
                     : null;
 
                   return (
@@ -334,7 +335,7 @@ function WatchlistListContent() {
                     >
                       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-white/5 border border-white/5">
                         {posterSrc ? (
-                          <Image
+                          <TmdbImage
                             src={posterSrc}
                             alt={content.title}
                             fill
