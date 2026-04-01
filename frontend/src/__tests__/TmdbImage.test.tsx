@@ -4,8 +4,8 @@ import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
 
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
-    const { fill, priority, ...rest } = props;
-    return <img data-fill={fill ? 'true' : undefined} data-priority={priority ? 'true' : undefined} {...rest} />;
+    const { fill, priority, unoptimized, ...rest } = props;
+    return <img data-fill={fill ? 'true' : undefined} data-priority={priority ? 'true' : undefined} data-unoptimized={unoptimized ? 'true' : undefined} {...rest} />;
   },
 }));
 
@@ -48,7 +48,7 @@ describe('TmdbImage', () => {
       />,
     );
     const img = screen.getByAltText('테스트 포스터');
-    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('data-unoptimized', 'true');
   });
 
   it('전달된 props가 그대로 forwarding된다', () => {

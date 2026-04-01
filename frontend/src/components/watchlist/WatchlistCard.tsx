@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import TmdbImage from '@/components/common/TmdbImage';
-import { replaceTmdbSize } from '@/components/common/TmdbImage';
+import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
 import { Star, Plus, Pencil } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from '@/components/review/LikeButton';

@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import TmdbImage from '@/components/common/TmdbImage';
-import { replaceTmdbSize } from '@/components/common/TmdbImage';
+import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
 import { Star } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import TimeAgo from '@/components/common/TimeAgo';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import TmdbImage from '@/components/common/TmdbImage';
+import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
 import Link from 'next/link';
 import { Bookmark, Check } from 'lucide-react';
 import { TMDB_IMAGE_BASE } from '@/types/content';
@@ -56,7 +56,7 @@ export default function RecommendationCard({ recommendation }: RecommendationCar
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-white/5 border border-white/10">
         {posterUrl ? (
           <TmdbImage
-            src={posterUrl.startsWith('http') ? posterUrl : `${TMDB_IMAGE_BASE}/w342${posterUrl}`}
+            src={posterUrl.startsWith('http') ? replaceTmdbSize(posterUrl, 'w342') : `${TMDB_IMAGE_BASE}/w342${posterUrl}`}
             alt={title}
             fill
             sizes="(max-width: 640px) 140px, 160px"

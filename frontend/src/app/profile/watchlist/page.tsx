@@ -3,8 +3,7 @@
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import TmdbImage from '@/components/common/TmdbImage';
-import { replaceTmdbSize } from '@/components/common/TmdbImage';
+import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
 import { Eye, Bookmark, ChevronLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
