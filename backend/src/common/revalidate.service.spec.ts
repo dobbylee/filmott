@@ -48,7 +48,11 @@ describe('RevalidateService', () => {
           {
             provide: ConfigService,
             useValue: {
-              get: jest.fn().mockReturnValue('test-secret'),
+              get: jest.fn().mockImplementation((key: string, defaultValue?: string) => {
+                if (key === 'REVALIDATE_SECRET') return 'test-secret';
+                if (key === 'FRONTEND_URL') return 'http://frontend:3000';
+                return defaultValue ?? '';
+              }),
             },
           },
         ],

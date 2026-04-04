@@ -6,14 +6,17 @@ export class RevalidateService {
   private readonly logger = new Logger(RevalidateService.name);
   private readonly revalidateSecret: string;
 
+  private readonly frontendUrl: string;
+
   constructor(private readonly configService: ConfigService) {
     this.revalidateSecret = this.configService.get<string>('REVALIDATE_SECRET', '');
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
 
   async revalidatePath(path: string = '/'): Promise<void> {
     if (!this.revalidateSecret) return;
     try {
-      const url = 'http://frontend:3000/internal/revalidate';
+      const url = `${this.frontendUrl}/internal/revalidate`;
       const response = await fetch(url, {
         method: 'POST',
         headers: {

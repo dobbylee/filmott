@@ -42,6 +42,7 @@ services:
     environment:
       - NODE_ENV=production
       - DB_HOST=postgres
+      - FRONTEND_URL=http://frontend:3000
       - TZ=Asia/Seoul
     depends_on:
       postgres:
