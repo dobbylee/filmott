@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConfigService } from '@nestjs/config';
 import { NotFoundException } from '@nestjs/common';
 import { RankingsService } from './rankings.service';
 import { Ranking } from './ranking.entity';
@@ -8,6 +7,7 @@ import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
 import { EmbeddingService } from '../chat/embedding.service';
+import { RevalidateService } from '../common/revalidate.service';
 
 describe('RankingsService', () => {
   let service: RankingsService;
@@ -40,8 +40,8 @@ describe('RankingsService', () => {
     batchCacheByContentIds: jest.fn().mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
   };
 
-  const mockConfigService = {
-    get: jest.fn().mockImplementation((key: string, defaultVal?: string) => defaultVal ?? ''),
+  const mockRevalidateService = {
+    revalidatePath: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -53,7 +53,7 @@ describe('RankingsService', () => {
         { provide: TmdbService, useValue: mockTmdbService },
         { provide: ContentsService, useValue: mockContentsService },
         { provide: EmbeddingService, useValue: mockEmbeddingService },
-        { provide: ConfigService, useValue: mockConfigService },
+        { provide: RevalidateService, useValue: mockRevalidateService },
       ],
     }).compile();
 
@@ -459,16 +459,7 @@ describe('RankingsService', () => {
   });
 
   describe('fetchAllTrending - revalidation 중복 제거', () => {
-    let revalidateSpy: jest.SpyInstance;
-
-    beforeEach(() => {
-      // revalidateMainPage를 spy로 교체 (private 메서드)
-      revalidateSpy = jest
-        .spyOn(service as never, 'revalidateMainPage')
-        .mockResolvedValue(undefined);
-    });
-
-    it('fetchAllTrending은 모든 trending 처리 후 revalidateMainPage를 1회만 호출해야 한다', async () => {
+    it('fetchAllTrending은 모든 trending 처리 후 revalidatePath를 1회만 호출해야 한다', async () => {
       const trendingData = {
         results: [
           { id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' },
@@ -484,10 +475,11 @@ describe('RankingsService', () => {
 
       // fetchAllTrending은 fetchTrending을 2회 호출하지만, revalidate는 1회만
       expect(mockTmdbService.getTrending).toHaveBeenCalledTimes(2);
-      expect(revalidateSpy).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
 
-    it('fetchTrending 단독 호출 시 revalidateMainPage를 호출하지 않아야 한다', async () => {
+    it('fetchTrending 단독 호출 시 revalidatePath를 호출하지 않아야 한다', async () => {
       const trendingData = {
         results: [
           { id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' },
@@ -501,10 +493,10 @@ describe('RankingsService', () => {
 
       await service.fetchTrending('all', 'day');
 
-      expect(revalidateSpy).not.toHaveBeenCalled();
+      expect(mockRevalidateService.revalidatePath).not.toHaveBeenCalled();
     });
 
-    it('일부 카테고리 fetchTrending이 실패해도 revalidateMainPage를 1회 호출해야 한다', async () => {
+    it('일부 카테고리 fetchTrending이 실패해도 revalidatePath를 1회 호출해야 한다', async () => {
       mockTmdbService.getTrending
         .mockResolvedValueOnce({
           results: [{ id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' }],
@@ -517,16 +509,13 @@ describe('RankingsService', () => {
 
       await service.fetchAllTrending();
 
-      expect(revalidateSpy).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
   });
 
   describe('fetchDailyBoxOffice - revalidation 호출', () => {
-    it('일별 박스오피스 저장 후 revalidateMainPage를 1회 호출해야 한다', async () => {
-      const revalidateSpy = jest
-        .spyOn(service as never, 'revalidateMainPage')
-        .mockResolvedValue(undefined);
-
+    it('일별 박스오피스 저장 후 revalidatePath를 1회 호출해야 한다', async () => {
       const kobisItems = [
         {
           rank: '1',
@@ -547,16 +536,13 @@ describe('RankingsService', () => {
 
       await service.fetchDailyBoxOffice();
 
-      expect(revalidateSpy).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
   });
 
   describe('fetchWeeklyBoxOffice - revalidation 호출', () => {
-    it('주간 박스오피스 저장 후 revalidateMainPage를 1회 호출해야 한다', async () => {
-      const revalidateSpy = jest
-        .spyOn(service as never, 'revalidateMainPage')
-        .mockResolvedValue(undefined);
-
+    it('주간 박스오피스 저장 후 revalidatePath를 1회 호출해야 한다', async () => {
       const kobisItems = [
         {
           rank: '1',
@@ -577,136 +563,8 @@ describe('RankingsService', () => {
 
       await service.fetchWeeklyBoxOffice();
 
-      expect(revalidateSpy).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('revalidateMainPage - 직접 동작 검증', () => {
-    it('REVALIDATE_SECRET 미설정 시 fetch를 호출하지 않고 즉시 반환해야 한다', async () => {
-      // 기본 mockConfigService는 secret을 빈 문자열로 반환 → early-return 경로
-      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
-        ok: true,
-        json: async () => ({}),
-      } as Response);
-
-      // private 메서드 직접 호출
-      await (service as unknown as { revalidateMainPage(): Promise<void> }).revalidateMainPage();
-
-      expect(fetchSpy).not.toHaveBeenCalled();
-      fetchSpy.mockRestore();
-    });
-
-    it('REVALIDATE_SECRET 설정 시 sleep 없이 즉시 fetch를 호출해야 한다', async () => {
-      // secret이 있는 service 인스턴스를 별도 생성
-      const secretConfigService = {
-        get: jest.fn().mockImplementation((key: string) => {
-          if (key === 'REVALIDATE_SECRET') return 'test-secret';
-          return undefined;
-        }),
-      };
-
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          RankingsService,
-          { provide: getRepositoryToken(Ranking), useValue: mockRankingRepo },
-          { provide: KobisService, useValue: mockKobisService },
-          { provide: TmdbService, useValue: mockTmdbService },
-          { provide: ContentsService, useValue: mockContentsService },
-          { provide: EmbeddingService, useValue: mockEmbeddingService },
-          { provide: ConfigService, useValue: secretConfigService },
-        ],
-      }).compile();
-
-      const serviceWithSecret = module.get<RankingsService>(RankingsService);
-
-      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
-        ok: true,
-        json: async () => ({}),
-      } as Response);
-
-      const start = Date.now();
-      await (serviceWithSecret as unknown as { revalidateMainPage(): Promise<void> }).revalidateMainPage();
-      const elapsed = Date.now() - start;
-
-      // sleep이 완전히 제거되었으므로 1초 미만에 완료되어야 한다
-      expect(elapsed).toBeLessThan(1000);
-      expect(fetchSpy).toHaveBeenCalledWith(
-        'http://frontend:3000/internal/revalidate',
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-secret',
-          }),
-        }),
-      );
-      fetchSpy.mockRestore();
-    });
-
-    it('fetch 응답이 non-ok일 때 예외 없이 warn 로그만 출력해야 한다', async () => {
-      const secretConfigService = {
-        get: jest.fn().mockImplementation((key: string) => {
-          if (key === 'REVALIDATE_SECRET') return 'test-secret';
-          return undefined;
-        }),
-      };
-
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          RankingsService,
-          { provide: getRepositoryToken(Ranking), useValue: mockRankingRepo },
-          { provide: KobisService, useValue: mockKobisService },
-          { provide: TmdbService, useValue: mockTmdbService },
-          { provide: ContentsService, useValue: mockContentsService },
-          { provide: EmbeddingService, useValue: mockEmbeddingService },
-          { provide: ConfigService, useValue: secretConfigService },
-        ],
-      }).compile();
-
-      const serviceWithSecret = module.get<RankingsService>(RankingsService);
-
-      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
-        ok: false,
-        status: 500,
-        json: async () => ({}),
-      } as Response);
-
-      // 예외가 발생하지 않아야 한다
-      await expect(
-        (serviceWithSecret as unknown as { revalidateMainPage(): Promise<void> }).revalidateMainPage(),
-      ).resolves.not.toThrow();
-
-      fetchSpy.mockRestore();
-    });
-
-    it('fetch 자체가 네트워크 오류로 실패해도 예외 없이 처리해야 한다', async () => {
-      const secretConfigService = {
-        get: jest.fn().mockImplementation((key: string) => {
-          if (key === 'REVALIDATE_SECRET') return 'test-secret';
-          return undefined;
-        }),
-      };
-
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          RankingsService,
-          { provide: getRepositoryToken(Ranking), useValue: mockRankingRepo },
-          { provide: KobisService, useValue: mockKobisService },
-          { provide: TmdbService, useValue: mockTmdbService },
-          { provide: ContentsService, useValue: mockContentsService },
-          { provide: EmbeddingService, useValue: mockEmbeddingService },
-          { provide: ConfigService, useValue: secretConfigService },
-        ],
-      }).compile();
-
-      const serviceWithSecret = module.get<RankingsService>(RankingsService);
-
-      const fetchSpy = jest.spyOn(global, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
-
-      await expect(
-        (serviceWithSecret as unknown as { revalidateMainPage(): Promise<void> }).revalidateMainPage(),
-      ).resolves.not.toThrow();
-
-      fetchSpy.mockRestore();
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
   });
 

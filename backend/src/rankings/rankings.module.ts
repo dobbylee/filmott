@@ -8,6 +8,7 @@ import { KobisModule } from '../kobis/kobis.module';
 import { TmdbModule } from '../tmdb/tmdb.module';
 import { ContentsModule } from '../contents/contents.module';
 import { EmbeddingModule } from '../chat/embedding.module';
+import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { EmbeddingModule } from '../chat/embedding.module';
     TmdbModule,
     ContentsModule,
     EmbeddingModule,
+    CommonModule,
   ],
   controllers: [RankingsController],
   providers: [RankingsService],

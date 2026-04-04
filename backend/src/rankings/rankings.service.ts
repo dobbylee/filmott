@@ -2,12 +2,12 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
-import { ConfigService } from '@nestjs/config';
 import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
 import { EmbeddingService } from '../chat/embedding.service';
+import { RevalidateService } from '../common/revalidate.service';
 import { Content } from '../contents/content.entity';
 import { TMDB_IMAGE_BASE } from '../common/constants';
 
@@ -18,8 +18,6 @@ const TMDB_CALL_DELAY_MS = 250;
 export class RankingsService {
   private readonly logger = new Logger(RankingsService.name);
 
-  private readonly revalidateSecret: string;
-
   constructor(
     @InjectRepository(Ranking)
     private readonly rankingRepo: Repository<Ranking>,
@@ -27,10 +25,8 @@ export class RankingsService {
     private readonly tmdbService: TmdbService,
     private readonly contentsService: ContentsService,
     private readonly embeddingService: EmbeddingService,
-    private readonly configService: ConfigService,
-  ) {
-    this.revalidateSecret = this.configService.get<string>('REVALIDATE_SECRET', '');
-  }
+    private readonly revalidateService: RevalidateService,
+  ) {}
 
   /**
    * KOBIS 일별 박스오피스를 가져와 rankings에 저장
@@ -95,7 +91,7 @@ export class RankingsService {
         this.cacheMetadataInBackground(contentIds);
       }
 
-      await this.revalidateMainPage();
+      await this.revalidateService.revalidatePath('/');
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error('Failed to fetch daily box office', error);
@@ -165,7 +161,7 @@ export class RankingsService {
         this.cacheMetadataInBackground(contentIds);
       }
 
-      await this.revalidateMainPage();
+      await this.revalidateService.revalidatePath('/');
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error('Failed to fetch weekly box office', error);
@@ -192,7 +188,7 @@ export class RankingsService {
       }
     }
 
-    await this.revalidateMainPage();
+    await this.revalidateService.revalidatePath('/');
   }
 
   /** revalidation은 호출자 책임 — fetchAllTrending()에서 일괄 처리 */
@@ -317,7 +313,7 @@ export class RankingsService {
     }
     ranking.posterUrl = posterUrl;
     const saved = await this.rankingRepo.save(ranking);
-    await this.revalidateMainPage();
+    await this.revalidateService.revalidatePath('/');
     return saved;
   }
 
@@ -506,25 +502,4 @@ export class RankingsService {
       });
   }
 
-  private async revalidateMainPage(): Promise<void> {
-    if (!this.revalidateSecret) return;
-    try {
-      const url = 'http://frontend:3000/internal/revalidate';
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.revalidateSecret}`,
-        },
-        body: JSON.stringify({ path: '/' }),
-      });
-      if (!response.ok) {
-        this.logger.warn(`메인 페이지 캐시 갱신 실패: HTTP ${response.status}`);
-        return;
-      }
-      this.logger.log('메인 페이지 캐시 갱신 완료');
-    } catch {
-      this.logger.warn('메인 페이지 캐시 갱신 실패 (무시)');
-    }
-  }
 }
