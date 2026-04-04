@@ -13,6 +13,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { UserRole } from '../users/enums/user-role.enum';
 import { WatchlistService } from '../watchlist/watchlist.service';
+import { RevalidateService } from '../common/revalidate.service';
 
 @Injectable()
 export class ReviewsService {
@@ -23,6 +24,7 @@ export class ReviewsService {
     private readonly reviewLikeRepo: Repository<ReviewLike>,
     private readonly dataSource: DataSource,
     private readonly watchlistService: WatchlistService,
+    private readonly revalidateService: RevalidateService,
   ) {}
 
   async create(userId: number, dto: CreateReviewDto): Promise<Review> {
@@ -48,6 +50,7 @@ export class ReviewsService {
       await this.watchlistService.addToWatchlistByContentId(userId, dto.contentId, 'watched', dto.watchedAt);
     }
 
+    void this.revalidateService.revalidatePath('/');
     return saved;
   }
 
@@ -81,14 +84,18 @@ export class ReviewsService {
 
     // rating 또는 comment가 변경된 경우 likes_count 리셋 + 좋아요 데이터 삭제 (트랜잭션)
     if (ratingChanged || commentChanged) {
-      return this.dataSource.transaction(async (manager) => {
+      const result = await this.dataSource.transaction(async (manager) => {
         review.likesCount = 0;
         await manager.delete(ReviewLike, { reviewId: review.id });
         return manager.save(review);
       });
+      void this.revalidateService.revalidatePath('/');
+      return result;
     }
 
-    return this.reviewRepo.save(review);
+    const result = await this.reviewRepo.save(review);
+    void this.revalidateService.revalidatePath('/');
+    return result;
   }
 
   async delete(userId: number, reviewId: number, userRole?: string): Promise<void> {
@@ -104,6 +111,7 @@ export class ReviewsService {
     }
 
     await this.reviewRepo.remove(review);
+    void this.revalidateService.revalidatePath('/');
   }
 
   async findMyReview(userId: number, contentId: number): Promise<(Review & { commentsCount: number }) | null> {
