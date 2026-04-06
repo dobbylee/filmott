@@ -15,7 +15,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (isNaN(id)) return { title: 'filmott' };
 
   try {
-    const profile = await fetchApi<PublicProfile>(`/users/${id}/profile`);
+    const profile = await fetchApi<PublicProfile>(
+      `/users/${id}/profile`,
+      { next: { revalidate: 300 } },
+    );
     return {
       title: `${profile.nickname}의 프로필 - filmott`,
       description: `${profile.nickname}의 활동 내역을 확인하세요.`,
@@ -32,7 +35,10 @@ export default async function PublicProfilePage({ params }: PageProps) {
 
   let profile: PublicProfile;
   try {
-    profile = await fetchApi<PublicProfile>(`/users/${id}/profile`);
+    profile = await fetchApi<PublicProfile>(
+      `/users/${id}/profile`,
+      { next: { revalidate: 300 } },
+    );
   } catch {
     notFound();
   }
