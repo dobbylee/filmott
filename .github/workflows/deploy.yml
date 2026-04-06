@@ -39,14 +39,15 @@ jobs:
               fi
             done
             # ISR 캐시 revalidation (에러 페이지 캐시 방지)
-            REVAL_SECRET=$(grep REVALIDATE_SECRET ~/filmott/.env | cut -d= -f2)
+            REVAL_SECRET=$(grep REVALIDATE_SECRET ~/filmott/.env | cut -d= -f2-)
             if [ -n "$REVAL_SECRET" ]; then
               sleep 3
-              docker exec filmott-nginx-1 curl -s -X POST http://frontend:3000/internal/revalidate \
-                -H "Authorization: Bearer $REVAL_SECRET" \
-                -H "Content-Type: application/json" \
-                -d '{"path":"/"}'
-              echo ""
+              docker compose -f docker-compose.prod.yml exec -T frontend \
+                node -e "fetch('http://localhost:3000/internal/revalidate', {
+                  method: 'POST',
+                  headers: { 'Authorization': 'Bearer $REVAL_SECRET', 'Content-Type': 'application/json' },
+                  body: JSON.stringify({path:'/'})
+                }).then(r => r.text()).then(console.log).catch(console.error)"
               echo "ISR cache revalidated"
             fi
             docker image prune -f
