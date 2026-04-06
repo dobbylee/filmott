@@ -10,10 +10,21 @@ import {
 } from '../tmdb/tmdb.service';
 import { TMDB_IMAGE_BASE, GENRE_NAME_MAP, CONTENT_DETAIL_TTL_MS } from '../common/constants';
 
+const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000; // 5분
+const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72시간
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
 @Injectable()
 export class ContentsService {
   private readonly logger = new Logger(ContentsService.name);
   private readonly refreshingIds = new Set<string>();
+  private blockedIdsCache: CacheEntry<Set<string>> | null = null;
+  private readonly personDetailCache = new Map<number, CacheEntry<TmdbPersonDetail>>();
+  private readonly personCreditsCache = new Map<number, CacheEntry<{ cast: TmdbPersonCredit[]; crew: TmdbPersonCredit[] }>>();
 
   constructor(
     @InjectRepository(Content)
@@ -203,23 +214,42 @@ export class ContentsService {
   }
 
   /**
-   * 인물 상세 정보
+   * 인물 상세 정보 (72시간 TTL 캐시)
    */
   async getPersonDetail(personId: number): Promise<TmdbPersonDetail> {
-    return this.tmdbService.getPersonDetail(personId);
+    const cached = this.personDetailCache.get(personId);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.data;
+    }
+
+    const data = await this.tmdbService.getPersonDetail(personId);
+    this.personDetailCache.set(personId, {
+      data,
+      expiresAt: Date.now() + PERSON_CACHE_TTL_MS,
+    });
+    return data;
   }
 
   /**
-   * 인물 필모그래피 (movie/tv만, 최신순 정렬)
+   * 인물 필모그래피 (movie/tv만, 최신순 정렬, 72시간 TTL 캐시)
    */
   async getPersonCredits(personId: number): Promise<{
     cast: TmdbPersonCredit[];
     crew: TmdbPersonCredit[];
   }> {
-    const [credits, blockedIds] = await Promise.all([
-      this.tmdbService.getPersonCredits(personId),
-      this.getBlockedTmdbIds(),
-    ]);
+    let raw: { cast: TmdbPersonCredit[]; crew: TmdbPersonCredit[] };
+    const cached = this.personCreditsCache.get(personId);
+    if (cached && Date.now() < cached.expiresAt) {
+      raw = cached.data;
+    } else {
+      raw = await this.tmdbService.getPersonCredits(personId);
+      this.personCreditsCache.set(personId, {
+        data: raw,
+        expiresAt: Date.now() + PERSON_CACHE_TTL_MS,
+      });
+    }
+
+    const blockedIds = await this.getBlockedTmdbIds();
 
     const filterAndSort = (items: TmdbPersonCredit[]) => {
       return items
@@ -239,8 +269,8 @@ export class ContentsService {
     };
 
     return {
-      cast: filterAndSort(credits.cast),
-      crew: filterAndSort(credits.crew),
+      cast: filterAndSort(raw.cast),
+      crew: filterAndSort(raw.crew),
     };
   }
 
@@ -301,7 +331,9 @@ export class ContentsService {
     }
 
     content.adult = adult;
-    return this.contentRepo.save(content);
+    const saved = await this.contentRepo.save(content);
+    this.invalidateBlockedIdsCache();
+    return saved;
   }
 
   /**
@@ -384,6 +416,7 @@ export class ContentsService {
         { id: In(toBlockIds) },
         { adult: true, updatedAt: new Date() },
       );
+      this.invalidateBlockedIdsCache();
     }
 
     // 차단된 콘텐츠 정보 반환 (프론트에서 캐시 무효화용)
@@ -443,11 +476,20 @@ export class ContentsService {
   }
 
   private async getBlockedTmdbIds(): Promise<Set<string>> {
+    if (this.blockedIdsCache && Date.now() < this.blockedIdsCache.expiresAt) {
+      return this.blockedIdsCache.data;
+    }
     const blocked = await this.contentRepo.find({
       where: { adult: true },
       select: ['tmdbId', 'contentType'],
     });
-    return new Set(blocked.map((c) => `${c.contentType}:${c.tmdbId}`));
+    const data = new Set(blocked.map((c) => `${c.contentType}:${c.tmdbId}`));
+    this.blockedIdsCache = { data, expiresAt: Date.now() + BLOCKED_IDS_TTL_MS };
+    return data;
+  }
+
+  private invalidateBlockedIdsCache(): void {
+    this.blockedIdsCache = null;
   }
 
   private mapTmdbToContent(
