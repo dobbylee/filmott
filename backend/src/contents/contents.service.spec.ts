@@ -1118,6 +1118,71 @@ describe('ContentsService', () => {
     });
   });
 
+  describe('cleanupExpiredPersonCache', () => {
+    it('만료된 인물 캐시 엔트리를 삭제해야 한다', async () => {
+      // 캐시에 만료 엔트리를 채우기 위해 getPersonDetail 호출
+      const personData = { id: 1, name: 'Actor 1' };
+      mockTmdbService.getPersonDetail.mockResolvedValue(personData);
+      await service.getPersonDetail(1);
+
+      // 캐시 엔트리의 expiresAt을 과거로 설정하기 위해 다시 호출
+      const personData2 = { id: 2, name: 'Actor 2' };
+      mockTmdbService.getPersonDetail.mockResolvedValue(personData2);
+      await service.getPersonDetail(2);
+
+      // 내부 캐시 접근: personDetailCache에 expiresAt을 강제로 과거로 변경
+      const detailCache = (service as unknown as { personDetailCache: Map<number, { data: unknown; expiresAt: number }> }).personDetailCache;
+      const entry1 = detailCache.get(1);
+      if (entry1) entry1.expiresAt = Date.now() - 1000; // 만료
+
+      expect(detailCache.size).toBe(2);
+
+      service.cleanupExpiredPersonCache();
+
+      // 만료된 엔트리(id=1)만 삭제, 미만료(id=2) 유지
+      expect(detailCache.size).toBe(1);
+      expect(detailCache.has(1)).toBe(false);
+      expect(detailCache.has(2)).toBe(true);
+    });
+
+    it('만료된 credits 캐시 엔트리를 삭제해야 한다', async () => {
+      const creditsData = { cast: [], crew: [] };
+
+      // blockedIds 캐시용
+      mockContentRepo.find.mockResolvedValue([]);
+
+      mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
+      await service.getPersonCredits(10);
+      await service.getPersonCredits(20);
+
+      const creditsCache = (service as unknown as { personCreditsCache: Map<number, { data: unknown; expiresAt: number }> }).personCreditsCache;
+      const entry10 = creditsCache.get(10);
+      if (entry10) entry10.expiresAt = Date.now() - 1000; // 만료
+
+      expect(creditsCache.size).toBe(2);
+
+      service.cleanupExpiredPersonCache();
+
+      expect(creditsCache.size).toBe(1);
+      expect(creditsCache.has(10)).toBe(false);
+      expect(creditsCache.has(20)).toBe(true);
+    });
+
+    it('만료된 엔트리가 없으면 아무것도 삭제하지 않아야 한다', async () => {
+      const personData = { id: 5, name: 'Actor 5' };
+      mockTmdbService.getPersonDetail.mockResolvedValue(personData);
+      await service.getPersonDetail(5);
+
+      const detailCache = (service as unknown as { personDetailCache: Map<number, { data: unknown; expiresAt: number }> }).personDetailCache;
+      expect(detailCache.size).toBe(1);
+
+      service.cleanupExpiredPersonCache();
+
+      expect(detailCache.size).toBe(1);
+      expect(detailCache.has(5)).toBe(true);
+    });
+  });
+
   describe('blockPersonContents', () => {
     const blockQueryBuilder = {
       where: jest.fn().mockReturnThis(),

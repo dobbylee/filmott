@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Cron } from '@nestjs/schedule';
 import { In, Repository } from 'typeorm';
 import { Content } from './content.entity';
 import {
@@ -490,6 +491,33 @@ export class ContentsService {
 
   private invalidateBlockedIdsCache(): void {
     this.blockedIdsCache = null;
+  }
+
+  @Cron('0 */6 * * *', { name: 'person-cache-cleanup', timeZone: 'Asia/Seoul' })
+  cleanupExpiredPersonCache(): void {
+    const now = Date.now();
+    let detailRemoved = 0;
+    let creditsRemoved = 0;
+
+    for (const [key, entry] of this.personDetailCache) {
+      if (now >= entry.expiresAt) {
+        this.personDetailCache.delete(key);
+        detailRemoved++;
+      }
+    }
+    for (const [key, entry] of this.personCreditsCache) {
+      if (now >= entry.expiresAt) {
+        this.personCreditsCache.delete(key);
+        creditsRemoved++;
+      }
+    }
+
+    if (detailRemoved > 0 || creditsRemoved > 0) {
+      this.logger.log(
+        `인물 캐시 정리: detail ${detailRemoved}건, credits ${creditsRemoved}건 제거 ` +
+        `(남은: detail ${this.personDetailCache.size}, credits ${this.personCreditsCache.size})`,
+      );
+    }
   }
 
   private mapTmdbToContent(
