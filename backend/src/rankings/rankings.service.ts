@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nestjs';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
@@ -95,6 +96,7 @@ export class RankingsService {
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error('Failed to fetch daily box office', error);
+      Sentry.captureException(error);
       throw error;
     }
   }
@@ -165,6 +167,7 @@ export class RankingsService {
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error('Failed to fetch weekly box office', error);
+      Sentry.captureException(error);
       throw error;
     }
   }
@@ -185,6 +188,7 @@ export class RankingsService {
         await this.fetchTrending(type, timeWindow);
       } catch (error) {
         this.logger.error(`Failed to fetch trending-${type}-${timeWindow}`, error);
+        Sentry.captureException(error);
       }
     }
 
@@ -485,6 +489,7 @@ export class RankingsService {
       }
     } catch (error) {
       this.logger.error('Failed to fetch Korean TV Discover', error);
+      Sentry.captureException(error);
     }
   }
 

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nestjs';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
@@ -8,6 +9,10 @@ import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
 import { EmbeddingService } from '../chat/embedding.service';
 import { RevalidateService } from '../common/revalidate.service';
+
+jest.mock('@sentry/nestjs', () => ({
+  captureException: jest.fn(),
+}));
 
 describe('RankingsService', () => {
   let service: RankingsService;
@@ -334,6 +339,15 @@ describe('RankingsService', () => {
 
       await expect(service.fetchDailyBoxOffice()).rejects.toThrow('KOBIS API error');
     });
+
+    it('KOBIS 서비스 실패 시 Sentry.captureException을 호출해야 한다', async () => {
+      const error = new Error('KOBIS API error');
+      mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
+
+      await expect(service.fetchDailyBoxOffice()).rejects.toThrow();
+
+      expect(Sentry.captureException).toHaveBeenCalledWith(error);
+    });
   });
 
   describe('fetchTrending - 에러 처리', () => {
@@ -342,6 +356,17 @@ describe('RankingsService', () => {
       mockTmdbService.getTrending.mockRejectedValue(error);
 
       await expect(service.fetchTrending('all', 'day')).rejects.toThrow('TMDB API error');
+    });
+  });
+
+  describe('fetchWeeklyBoxOffice - 에러 처리', () => {
+    it('KOBIS 서비스 실패 시 Sentry.captureException을 호출해야 한다', async () => {
+      const error = new Error('KOBIS Weekly API error');
+      mockKobisService.getWeeklyBoxOffice.mockRejectedValue(error);
+
+      await expect(service.fetchWeeklyBoxOffice()).rejects.toThrow();
+
+      expect(Sentry.captureException).toHaveBeenCalledWith(error);
     });
   });
 
@@ -511,6 +536,23 @@ describe('RankingsService', () => {
 
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+    });
+
+    it('일부 카테고리 fetchTrending이 실패하면 Sentry.captureException을 호출해야 한다', async () => {
+      const trendingError = new Error('TMDB 일시 장애');
+      mockTmdbService.getTrending
+        .mockResolvedValueOnce({
+          results: [{ id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' }],
+        })
+        .mockRejectedValueOnce(trendingError);
+
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await service.fetchAllTrending();
+
+      expect(Sentry.captureException).toHaveBeenCalledWith(trendingError);
     });
   });
 
@@ -743,6 +785,15 @@ describe('RankingsService', () => {
       await expect(service.fetchKoreanTvDiscover()).resolves.not.toThrow();
 
       expect(mockEmbeddingService.batchCacheByContentIds).not.toHaveBeenCalled();
+    });
+
+    it('Discover API 실패 시 Sentry.captureException을 호출해야 한다', async () => {
+      const error = new Error('TMDB Discover error');
+      mockTmdbService.discoverByFilters.mockRejectedValue(error);
+
+      await service.fetchKoreanTvDiscover();
+
+      expect(Sentry.captureException).toHaveBeenCalledWith(error);
     });
 
     it('수집 결과가 0건이면 metadata 캐싱을 호출하지 않아야 한다', async () => {
