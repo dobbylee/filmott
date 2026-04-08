@@ -9,6 +9,7 @@ import { validateNickname } from '@/utils/nickname';
 import { getErrorMessage } from '@/utils/error';
 import { OTT_PROVIDERS } from '@/lib/ott-providers';
 import api from '@/lib/api';
+import { trackEvent } from '@/lib/ga';
 import type { AuthResponse } from '@/types/auth';
 
 interface NicknameSetupModalProps {
@@ -96,6 +97,7 @@ export default function NicknameSetupModal({ tempToken }: NicknameSetupModalProp
         nickname,
         subscribedOtts: skipOtts ? [] : selectedOtts,
       });
+      trackEvent('signup_completed', { provider: response.data.user.provider ?? 'unknown' });
       handleAuthSuccess(response.data);
       router.replace('/');
     } catch (err) {

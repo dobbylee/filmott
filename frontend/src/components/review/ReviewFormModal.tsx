@@ -8,6 +8,7 @@ import StarRating from './StarRating';
 import type { Review } from '@/types/review';
 import type { WatchlistStatusResponse } from '@/types/watchlist';
 import { useFocusTrap } from '@/utils/useFocusTrap';
+import { trackEvent } from '@/lib/ga';
 
 interface ReviewFormModalProps {
   contentId: number;
@@ -71,6 +72,9 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
           comment: comment || undefined,
           ...(needsDate ? { watchedAt } : {}),
         });
+      }
+      if (!isEditing) {
+        trackEvent('review_created', { content_id: contentId });
       }
       onMutate?.();
       window.dispatchEvent(new Event('watchlist-updated'));

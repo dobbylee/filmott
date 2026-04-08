@@ -8,6 +8,7 @@ import ReviewListClient from '@/components/review/ReviewListClient';
 import ReviewFormWrapper from '@/components/review/ReviewFormWrapper';
 import WatchlistStatusButton from '@/components/watchlist/WatchlistStatusButton';
 import AdultBlockButton from '@/components/content/AdultBlockButton';
+import ContentDetailTracker from '@/components/content/ContentDetailTracker';
 import type { ContentDetail, WatchProviderData } from '@/types/content';
 import type { ReviewsResponse, ContentStats } from '@/types/review';
 import ErrorWithRetry from '@/components/common/ErrorWithRetry';
@@ -138,6 +139,7 @@ export default async function ContentDetailPage({
 
   return (
     <div className="-mt-20">
+      <ContentDetailTracker tmdbId={tmdbId} title={content.title} contentType={type} />
       {/* 상단: 백드롭 + 포스터 + 기본 정보 */}
       <div className="relative">
         {/* 백드롭 */}

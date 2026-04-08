@@ -6,6 +6,7 @@ import { Plus, Eye, Bookmark, ChevronDown, Trash2, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import WatchedDateModal from './WatchedDateModal';
+import { trackEvent } from '@/lib/ga';
 import type { WatchlistStatus, WatchlistStatusResponse } from '@/types/watchlist';
 
 const WATCHLIST_UPDATED_EVENT = 'watchlist-updated';
@@ -92,6 +93,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
         status: newStatus,
         ...(watchedAt ? { watchedAt } : {}),
       });
+      trackEvent('watchlist_added', { status: newStatus, content_type: contentType });
       setStatus(newStatus);
       setWatchlistId(res.data.id);
       router.refresh();

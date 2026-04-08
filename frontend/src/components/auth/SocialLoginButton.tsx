@@ -1,5 +1,7 @@
 'use client';
 
+import { trackEvent } from '@/lib/ga';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface SocialLoginButtonProps {
@@ -51,6 +53,7 @@ export default function SocialLoginButton({ provider }: SocialLoginButtonProps) 
   const config = providerConfig[provider];
 
   const handleClick = () => {
+    trackEvent('social_login_started', { provider });
     window.location.href = `${API_URL}/auth/${provider}`;
   };
 
