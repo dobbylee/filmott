@@ -73,6 +73,9 @@ export const metadata: Metadata = {
     google: 'WuGIDIhovyzkZISq5W4Vqj4vB8DNl1-uJLbxud_Arf8',
     other: { 'naver-site-verification': '5b129903bdb4858e122e23dde0ffdf216e4debd5' },
   },
+  alternates: {
+    canonical: '/',
+  },
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,

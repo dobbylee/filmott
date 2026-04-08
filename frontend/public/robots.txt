@@ -8,5 +8,6 @@ Disallow: /api
 Disallow: /api/*
 Disallow: /profile
 Disallow: /profile/*
+Disallow: /search
 
 Sitemap: https://filmott.kr/sitemap.xml

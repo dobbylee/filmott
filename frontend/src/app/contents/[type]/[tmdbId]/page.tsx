@@ -41,6 +41,9 @@ export async function generateMetadata({
     const metadata: Metadata = {
       title: content.title,
       description,
+      alternates: {
+        canonical: `/contents/${type}/${tmdbId}`,
+      },
       openGraph: {
         type: 'article',
         title: content.title,
@@ -137,8 +140,39 @@ export default async function ContentDetailPage({
     ? content.genres
     : [];
 
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': type === 'tv' ? 'TVSeries' : 'Movie',
+    name: content.title,
+    description: content.overview ?? undefined,
+    image: content.posterUrl
+      ? replaceTmdbSize(content.posterUrl, 'w342')
+      : undefined,
+    datePublished: content.releaseDate ?? undefined,
+    genre: genres.length > 0 ? genres.map((g) => g.name) : undefined,
+  };
+
+  if (content.director) {
+    jsonLd.director = {
+      '@type': 'Person',
+      name: content.director,
+    };
+  }
+
+  if (content.voteAverage != null && Number(content.voteAverage) > 0) {
+    jsonLd.aggregateRating = {
+      '@type': 'AggregateRating',
+      ratingValue: Number(content.voteAverage),
+      bestRating: 10,
+    };
+  }
+
   return (
     <div className="-mt-20">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <ContentDetailTracker tmdbId={tmdbId} title={content.title} contentType={type} />
       {/* 상단: 백드롭 + 포스터 + 기본 정보 */}
       <div className="relative">

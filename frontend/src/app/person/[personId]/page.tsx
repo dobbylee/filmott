@@ -95,6 +95,9 @@ export async function generateMetadata({
     return {
       title: `${person.name} 필모그래피`,
       description,
+      alternates: {
+        canonical: `/person/${personId}`,
+      },
       openGraph: {
         title: `${person.name} 필모그래피`,
         description,

@@ -22,6 +22,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return {
       title: `${profile.nickname}의 프로필 - filmott`,
       description: `${profile.nickname}의 활동 내역을 확인하세요.`,
+      alternates: {
+        canonical: `/profile/${id}`,
+      },
     };
   } catch {
     return { title: 'filmott' };
