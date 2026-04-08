@@ -116,10 +116,10 @@ describe('EmbeddingService', () => {
       const result = await service.generateEmbedding('테스트 텍스트');
 
       expect(result).toEqual(mockEmbedding);
-      expect(mockEmbeddingsCreate).toHaveBeenCalledWith({
-        model: 'text-embedding-3-small',
-        input: '테스트 텍스트',
-      });
+      expect(mockEmbeddingsCreate).toHaveBeenCalledWith(
+        { model: 'text-embedding-3-small', input: '테스트 텍스트' },
+        expect.objectContaining({ timeout: 10_000 }),
+      );
     });
   });
 
@@ -146,6 +146,7 @@ describe('EmbeddingService', () => {
           reasoning_effort: 'none',
           max_completion_tokens: 2048,
         }),
+        expect.objectContaining({ timeout: 10_000 }),
       );
     });
 

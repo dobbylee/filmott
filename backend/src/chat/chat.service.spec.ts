@@ -393,6 +393,24 @@ describe('ChatService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('OpenAI 스트리밍 호출에 30초 timeout 옵션이 전달되어야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      mockStreamCreate.mockResolvedValue({
+        [Symbol.asyncIterator]: async function* () {
+          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
+        },
+      });
+
+      await service.sendMessageStream(1, '추천해줘', [], jest.fn());
+
+      expect(mockStreamCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ stream: true }),
+        expect.objectContaining({ timeout: 30_000 }),
+      );
+    });
+
     it('대화 이력(history)을 포함하여 OpenAI에 전달해야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
@@ -419,6 +437,7 @@ describe('ChatService', () => {
             expect.objectContaining({ role: 'user', content: '새 질문' }),
           ]),
         }),
+        expect.objectContaining({ timeout: 30_000 }),
       );
     });
 

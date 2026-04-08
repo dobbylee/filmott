@@ -74,6 +74,17 @@ describe('IntentAnalyzerService', () => {
   };
 
   describe('analyzeIntent', () => {
+    it('OpenAI 호출에 10초 timeout 옵션이 전달되어야 한다', async () => {
+      mockIntent({ ottProviderNames: [] });
+
+      await service.analyzeIntent('영화 추천해줘');
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ model: CHAT_MODEL }),
+        expect.objectContaining({ timeout: 10_000 }),
+      );
+    });
+
     it('OTT 플랫폼을 올바르게 추출해야 한다', async () => {
       mockIntent({ ottProviderNames: ['Netflix'] });
 
@@ -157,16 +168,19 @@ describe('IntentAnalyzerService', () => {
 
       await service.analyzeIntent('테스트');
 
-      expect(mockCreate).toHaveBeenCalledWith({
-        model: CHAT_MODEL,
-        reasoning_effort: 'low',
-        max_completion_tokens: 1024,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: expect.stringContaining('JSON으로 추출') },
-          { role: 'user', content: '테스트' },
-        ],
-      });
+      expect(mockCreate).toHaveBeenCalledWith(
+        {
+          model: CHAT_MODEL,
+          reasoning_effort: 'low',
+          max_completion_tokens: 1024,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: expect.stringContaining('JSON으로 추출') },
+            { role: 'user', content: '테스트' },
+          ],
+        },
+        expect.objectContaining({ timeout: 10_000 }),
+      );
     });
 
     it('여러 OTT 플랫폼을 동시에 추출해야 한다', async () => {
@@ -389,16 +403,19 @@ describe('IntentAnalyzerService', () => {
 
       await service.analyzeIntent('테스트', undefined);
 
-      expect(mockCreate).toHaveBeenCalledWith({
-        model: CHAT_MODEL,
-        reasoning_effort: 'low',
-        max_completion_tokens: 1024,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: expect.stringContaining('JSON으로 추출') },
-          { role: 'user', content: '테스트' },
-        ],
-      });
+      expect(mockCreate).toHaveBeenCalledWith(
+        {
+          model: CHAT_MODEL,
+          reasoning_effort: 'low',
+          max_completion_tokens: 1024,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: expect.stringContaining('JSON으로 추출') },
+            { role: 'user', content: '테스트' },
+          ],
+        },
+        expect.objectContaining({ timeout: 10_000 }),
+      );
     });
 
     it('최근 2턴만 프롬프트에 포함되어야 한다', async () => {

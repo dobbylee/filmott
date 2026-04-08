@@ -7,6 +7,8 @@ import { CHAT_MODEL } from './chat.constants';
 import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
 
+const OPENAI_EMBEDDING_TIMEOUT_MS = 10_000;
+
 export interface SimilarContent {
   contentId: number;
   tmdbId: number;
@@ -81,10 +83,13 @@ export class EmbeddingService {
 
   async generateEmbedding(text: string): Promise<number[]> {
     const openai = this.ensureOpenAI();
-    const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: text,
-    });
+    const response = await openai.embeddings.create(
+      {
+        model: 'text-embedding-3-small',
+        input: text,
+      },
+      { timeout: OPENAI_EMBEDDING_TIMEOUT_MS },
+    );
     return response.data[0].embedding;
   }
 
@@ -123,12 +128,15 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 평점: ${content.voteAverage ?? '정보 없음'}
 러닝타임: ${content.runtime ? content.runtime + '분' : '정보 없음'}`;
 
-    const response = await openai.chat.completions.create({
-      model: CHAT_MODEL,
-      reasoning_effort: 'none',
-      max_completion_tokens: 2048,
-      messages: [{ role: 'user', content: prompt }],
-    });
+    const response = await openai.chat.completions.create(
+      {
+        model: CHAT_MODEL,
+        reasoning_effort: 'none',
+        max_completion_tokens: 2048,
+        messages: [{ role: 'user', content: prompt }],
+      },
+      { timeout: OPENAI_EMBEDDING_TIMEOUT_MS },
+    );
 
     return response.choices[0]?.message?.content?.trim() || '';
   }

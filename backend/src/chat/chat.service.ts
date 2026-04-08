@@ -23,6 +23,8 @@ import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 
+const OPENAI_STREAM_TIMEOUT_MS = 30_000;
+
 export interface ChatRecommendation {
   tmdbId: number;
   contentType: 'movie' | 'tv';
@@ -255,16 +257,19 @@ export class ChatService {
     ];
 
     // 11. GPT 스트리밍 호출 (function calling 없이 텍스트만)
-    const stream = await this.openai.chat.completions.create({
-      model: CHAT_MODEL,
-      reasoning_effort: 'low',
-      max_completion_tokens: 4096,
-      stream: true,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages,
-      ],
-    });
+    const stream = await this.openai.chat.completions.create(
+      {
+        model: CHAT_MODEL,
+        reasoning_effort: 'low',
+        max_completion_tokens: 4096,
+        stream: true,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages,
+        ],
+      },
+      { timeout: OPENAI_STREAM_TIMEOUT_MS },
+    );
 
     let fullText = '';
 

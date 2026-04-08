@@ -4,6 +4,8 @@ import OpenAI from 'openai';
 import { CHAT_MODEL } from './chat.constants';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 
+const OPENAI_INTENT_TIMEOUT_MS = 10_000;
+
 export interface ParsedIntent {
   ottProviderNames: string[];
   countries: string[];
@@ -221,17 +223,20 @@ export class IntentAnalyzerService {
     try {
       const historyMessages = sliceRecentHistory(recentHistory, 2);
 
-      const response = await this.openai.chat.completions.create({
-        model: CHAT_MODEL,
-        reasoning_effort: 'low',
-        max_completion_tokens: 1024,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: buildIntentSystemPrompt() },
-          ...historyMessages,
-          { role: 'user', content: userMessage },
-        ],
-      });
+      const response = await this.openai.chat.completions.create(
+        {
+          model: CHAT_MODEL,
+          reasoning_effort: 'low',
+          max_completion_tokens: 1024,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: buildIntentSystemPrompt() },
+            ...historyMessages,
+            { role: 'user', content: userMessage },
+          ],
+        },
+        { timeout: OPENAI_INTENT_TIMEOUT_MS },
+      );
 
       const text = response.choices[0]?.message?.content?.trim();
       if (!text) {
