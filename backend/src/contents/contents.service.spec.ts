@@ -47,14 +47,12 @@ describe('ContentsService', () => {
 
     service = module.get<ContentsService>(ContentsService);
     tmdbService = module.get<TmdbService>(TmdbService);
+
+    mockContentRepo.find.mockResolvedValue([]);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-  });
-
-  beforeEach(() => {
-    mockContentRepo.find.mockResolvedValue([]);
   });
 
   describe('findOrFetchByTmdbId', () => {

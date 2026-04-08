@@ -124,6 +124,8 @@ describe('RankingsService', () => {
         expect.any(Array),
         ['source', 'category', 'rank', 'targetDate'],
       );
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
 
     it('TMDB 매칭 실패 시에도 랭킹을 저장해야 한다', async () => {
@@ -556,60 +558,6 @@ describe('RankingsService', () => {
     });
   });
 
-  describe('fetchDailyBoxOffice - revalidation 호출', () => {
-    it('일별 박스오피스 저장 후 revalidatePath를 1회 호출해야 한다', async () => {
-      const kobisItems = [
-        {
-          rank: '1',
-          movieNm: 'Test Movie',
-          movieCd: '12345',
-          openDt: '2026-03-01',
-          audiCnt: '100000',
-          audiAcc: '500000',
-          salesAmt: '1000000',
-          salesAcc: '5000000',
-        },
-      ];
-
-      mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
-      mockTmdbService.searchByType.mockResolvedValue({ results: [] });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
-      mockRankingRepo.upsert.mockResolvedValue(undefined);
-
-      await service.fetchDailyBoxOffice();
-
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
-    });
-  });
-
-  describe('fetchWeeklyBoxOffice - revalidation 호출', () => {
-    it('주간 박스오피스 저장 후 revalidatePath를 1회 호출해야 한다', async () => {
-      const kobisItems = [
-        {
-          rank: '1',
-          movieNm: 'Weekly Movie',
-          movieCd: '67890',
-          openDt: '2026-03-01',
-          audiCnt: '200000',
-          audiAcc: '1000000',
-          salesAmt: '2000000',
-          salesAcc: '10000000',
-        },
-      ];
-
-      mockKobisService.getWeeklyBoxOffice.mockResolvedValue(kobisItems);
-      mockTmdbService.searchByType.mockResolvedValue({ results: [] });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
-      mockRankingRepo.upsert.mockResolvedValue(undefined);
-
-      await service.fetchWeeklyBoxOffice();
-
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
-    });
-  });
-
   describe('metadata 배치 캐싱 연결', () => {
     it('fetchDailyBoxOffice 완료 후 contentId가 있는 항목의 metadata 캐싱을 호출해야 한다', async () => {
       const kobisItems = [
@@ -707,6 +655,8 @@ describe('RankingsService', () => {
       await service.fetchWeeklyBoxOffice();
 
       expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([55]);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
   });
 

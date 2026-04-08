@@ -69,10 +69,6 @@ describe('EmbeddingService', () => {
     jest.clearAllMocks();
   });
 
-  it('정의되어 있어야 한다', () => {
-    expect(service).toBeDefined();
-  });
-
   describe('hasAnyMetadata', () => {
     it('메타데이터가 존재하면 true를 반환해야 한다', async () => {
       mockDataSource.query.mockResolvedValue([{ exists: true }]);

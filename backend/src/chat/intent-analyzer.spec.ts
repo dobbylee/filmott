@@ -85,72 +85,22 @@ describe('IntentAnalyzerService', () => {
       );
     });
 
-    it('OTT 플랫폼을 올바르게 추출해야 한다', async () => {
-      mockIntent({ ottProviderNames: ['Netflix'] });
-
-      const result = await service.analyzeIntent('넷플릭스에서 볼만한 영화');
-
-      expect(result.ottProviderNames).toEqual(['Netflix']);
-      expect(result.countries).toEqual([]);
-      expect(result.personNames).toEqual([]);
-      expect(result.dateRange).toBeNull();
-      expect(result.contentType).toBe('movie');
-    });
-
-    it('제작 국가를 올바르게 추출해야 한다', async () => {
-      mockIntent({ countries: ['KR'] });
-
-      const result = await service.analyzeIntent('한국 영화 추천해줘');
-
-      expect(result.countries).toEqual(['KR']);
-    });
-
-    it('인물 이름을 올바르게 추출해야 한다', async () => {
-      mockIntent({ personNames: ['봉준호'] });
-
-      const result = await service.analyzeIntent('기생충 감독의 다른 작품');
-
-      expect(result.personNames).toEqual(['봉준호']);
-    });
-
-    it('연도 범위를 올바르게 추출해야 한다', async () => {
-      mockIntent({ dateRange: { from: '1990-01-01', to: '1999-12-31' } });
-
-      const result = await service.analyzeIntent('90년대 느와르 영화');
-
-      expect(result.dateRange).toEqual({ from: '1990-01-01', to: '1999-12-31' });
-    });
-
-    it('최신 키워드의 연도 범위를 올바르게 추출해야 한다', async () => {
-      mockIntent({ dateRange: { from: '2024-01-01', to: null } });
-
-      const result = await service.analyzeIntent('최신 영화 추천해줘');
-
-      expect(result.dateRange).toEqual({ from: '2024-01-01', to: null });
-    });
-
-    it('콘텐츠 타입을 올바르게 추출해야 한다', async () => {
-      mockIntent({ contentType: 'tv' });
-
-      const result = await service.analyzeIntent('재밌는 드라마 추천해줘');
-
-      expect(result.contentType).toBe('tv');
-    });
-
-    it('복합 의도를 모두 추출해야 한다', async () => {
+    it('복합 의도의 모든 필드를 올바르게 추출해야 한다', async () => {
       mockIntent({
         ottProviderNames: ['Netflix'],
         countries: ['KR'],
+        personNames: ['봉준호'],
         dateRange: { from: '2024-01-01', to: null },
         contentType: 'tv',
       });
 
       const result = await service.analyzeIntent(
-        '넷플릭스에서 볼 수 있는 한국 최신 드라마',
+        '넷플릭스에서 볼 수 있는 봉준호 감독의 한국 최신 드라마',
       );
 
       expect(result.ottProviderNames).toEqual(['Netflix']);
       expect(result.countries).toEqual(['KR']);
+      expect(result.personNames).toEqual(['봉준호']);
       expect(result.dateRange).toEqual({ from: '2024-01-01', to: null });
       expect(result.contentType).toBe('tv');
     });

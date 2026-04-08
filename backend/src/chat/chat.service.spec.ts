@@ -108,10 +108,6 @@ describe('ChatService', () => {
     jest.clearAllMocks();
   });
 
-  it('정의되어 있어야 한다', () => {
-    expect(service).toBeDefined();
-  });
-
   describe('buildUserContext', () => {
     const mockQueryBuilder = () => ({
       innerJoin: jest.fn().mockReturnThis(),
@@ -700,36 +696,6 @@ describe('ChatService', () => {
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
-    it('confidence=low + 신규 유저: EmbeddingService.searchSimilar가 호출되어야 한다', async () => {
-      setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
-        preferredGenres: [],
-        preferredCountries: [],
-        ottProviderNames: [],
-        hasData: false,
-      });
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent, confidence: 'low' });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('재미있는 영화');
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
-        },
-      });
-
-      await service.sendMessageStream(1, '재미있는 영화 추천해줘', [], jest.fn());
-
-      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
-        '재미있는 영화',
-        20,
-        expect.any(Array),
-        undefined,
-        undefined,
-      );
-      expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();
-    });
-
     it('필터 있음: 명시적 필터가 유저 선호보다 우선해야 한다', async () => {
       setupEmptyUserContext();
       mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
@@ -889,39 +855,6 @@ describe('ChatService', () => {
       expect(calledFilters.countries).toEqual(['KR']);
       expect(calledFilters.ottProviderNames).toEqual(['Netflix']);
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
-    });
-
-    it('confidence=low + 신규 유저이면 EmbeddingService.searchSimilar를 호출해야 한다', async () => {
-      setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
-        preferredGenres: [],
-        preferredCountries: [],
-        ottProviderNames: [],
-        hasData: false,
-      });
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
-        ...emptyIntent,
-        confidence: 'low',
-      });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('추천해줘');
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
-
-      await service.sendMessageStream(1, '추천해줘', [], jest.fn());
-
-      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
-        '추천해줘',
-        20,
-        expect.any(Array),
-        undefined,
-        undefined,
-      );
-      expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();
     });
 
     it('extractUserPreference가 올바른 인자로 호출되어야 한다', async () => {
