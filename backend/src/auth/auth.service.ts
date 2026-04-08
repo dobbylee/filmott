@@ -168,7 +168,7 @@ export class AuthService {
     await this.refreshTokenRepo.delete({ userId });
   }
 
-  @Cron('0 3 * * *') // 매일 새벽 3시
+  @Cron('0 3 * * *', { name: 'clean-expired-tokens', timeZone: 'Asia/Seoul' })
   async cleanExpiredTokens(): Promise<void> {
     await this.refreshTokenRepo
       .createQueryBuilder('rt')
