@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LikeButton from '@/components/review/LikeButton';
+import { createMockAuth } from './helpers/mockAuthContext';
 
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -11,17 +12,7 @@ vi.mock('next/navigation', () => ({
 const mockOpenAuthModal = vi.fn();
 let mockUser: { id: number; nickname: string } | null = null;
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: mockUser,
-    logout: vi.fn(),
-    handleAuthSuccess: vi.fn(),
-    token: null,
-    isLoading: false,
-    updateUser: vi.fn(),
-    openAuthModal: mockOpenAuthModal,
-    closeAuthModal: vi.fn(),
-    authModal: { isOpen: false },
-  }),
+  useAuth: () => createMockAuth({ user: mockUser, openAuthModal: mockOpenAuthModal }),
 }));
 
 vi.mock('@/lib/api', () => ({

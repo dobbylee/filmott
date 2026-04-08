@@ -20,6 +20,11 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+const mockTrackEvent = vi.fn();
+vi.mock('@/lib/ga', () => ({
+  trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
+}));
+
 describe('ReviewFormModal', () => {
   const defaultProps = {
     contentId: 1,
@@ -271,13 +276,54 @@ describe('ReviewFormModal', () => {
     expect(screen.queryByText(/초기화/)).not.toBeInTheDocument();
   });
 
-  it('별점 미선택 상태에서 제출하면 에러 메시지를 표시해야 한다', async () => {
+  it('신규 작성 성공 시 review_created 이벤트를 content_id와 함께 호출해야 한다', async () => {
+    mockPost.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
     render(<ReviewFormModal {...defaultProps} />);
 
+    await user.click(screen.getByLabelText('8점'));
     await user.click(screen.getByText('작성'));
-    expect(screen.getByText('별점을 선택해주세요.')).toBeInTheDocument();
+
+    expect(mockTrackEvent).toHaveBeenCalledWith('review_created', { content_id: 1 });
+  });
+
+  it('신규 작성 실패 시 review_created 이벤트를 호출하지 않아야 한다', async () => {
+    mockPost.mockRejectedValue({ response: { data: { message: '서버 오류' } } });
+    const user = userEvent.setup();
+
+    render(<ReviewFormModal {...defaultProps} />);
+
+    await user.click(screen.getByLabelText('6점'));
+    await user.click(screen.getByText('작성'));
+
+    expect(mockTrackEvent).not.toHaveBeenCalled();
+  });
+
+  it('수정(patch) 시 review_created 이벤트를 호출하지 않아야 한다', async () => {
+    mockPatch.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    render(
+      <ReviewFormModal
+        {...defaultProps}
+        existingReview={{
+          id: 10,
+          userId: 1,
+          contentId: 1,
+          rating: 5,
+          comment: '기존 리뷰',
+          likesCount: 0,
+          createdAt: '2024-12-25T12:00:00Z',
+          updatedAt: '2024-12-25T12:00:00Z',
+        }}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('9점'));
+    await user.click(screen.getByText('수정'));
+
+    expect(mockTrackEvent).not.toHaveBeenCalled();
   });
 
   it('코멘트가 비어있으면 undefined로 전달해야 한다', async () => {

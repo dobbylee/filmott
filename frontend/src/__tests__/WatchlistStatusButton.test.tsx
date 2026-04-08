@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WatchlistStatusButton from '@/components/watchlist/WatchlistStatusButton';
+import { createMockAuth } from './helpers/mockAuthContext';
+
+const mockTrackEvent = vi.fn();
+vi.mock('@/lib/ga', () => ({
+  trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -11,17 +17,7 @@ const mockOpenAuthModal = vi.fn();
 let mockUser: { nickname: string } | null = null;
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: mockUser,
-    openAuthModal: mockOpenAuthModal,
-    logout: vi.fn(),
-    handleAuthSuccess: vi.fn(),
-    token: null,
-    isLoading: false,
-    updateUser: vi.fn(),
-    closeAuthModal: vi.fn(),
-    authModal: { isOpen: false },
-  }),
+  useAuth: () => createMockAuth({ user: mockUser, openAuthModal: mockOpenAuthModal }),
 }));
 
 const mockGet = vi.fn();
@@ -245,5 +241,76 @@ describe('WatchlistStatusButton', () => {
     render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
 
     expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it('"감상할 작품"으로 추가 성공 시 watchlist_added 이벤트를 호출해야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
+    mockPost.mockResolvedValue({ data: { id: 10 } });
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('기록하기'));
+    const options = screen.getAllByText('감상할 작품');
+    await user.click(options[options.length - 1]);
+
+    await waitFor(() => {
+      expect(mockTrackEvent).toHaveBeenCalledWith('watchlist_added', {
+        status: 'want_to_watch',
+        content_type: 'movie',
+      });
+    });
+  });
+
+  it('POST 실패 시 watchlist_added 이벤트를 호출하지 않아야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
+    mockPost.mockRejectedValue(new Error('서버 오류'));
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('기록하기'));
+    const options = screen.getAllByText('감상할 작품');
+    await user.click(options[options.length - 1]);
+
+    await waitFor(() => {
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
+    });
+
+    expect(mockTrackEvent).not.toHaveBeenCalled();
+  });
+
+  it('tv 콘텐츠 추가 시 content_type이 tv로 이벤트를 호출해야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
+    mockPost.mockResolvedValue({ data: { id: 20 } });
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton tmdbId={456} contentType="tv" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('기록하기'));
+    const options = screen.getAllByText('감상할 작품');
+    await user.click(options[options.length - 1]);
+
+    await waitFor(() => {
+      expect(mockTrackEvent).toHaveBeenCalledWith('watchlist_added', {
+        status: 'want_to_watch',
+        content_type: 'tv',
+      });
+    });
   });
 });

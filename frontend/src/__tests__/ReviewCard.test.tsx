@@ -2,23 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ReviewCard from '@/components/review/ReviewCard';
 import type { Review } from '@/types/review';
+import { createMockAuth } from './helpers/mockAuthContext';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: null,
-    logout: vi.fn(),
-    handleAuthSuccess: vi.fn(),
-    token: null,
-    isLoading: false,
-    updateUser: vi.fn(),
-    openAuthModal: vi.fn(),
-    closeAuthModal: vi.fn(),
-    authModal: { isOpen: false },
-  }),
+  useAuth: () => createMockAuth(),
 }));
 
 vi.mock('@/lib/api', () => ({
