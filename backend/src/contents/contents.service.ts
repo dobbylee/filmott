@@ -544,11 +544,14 @@ export class ContentsService {
       .join(', ') || null;
 
     // 제작 국가 추출
-    const originCountry = (
+    const originCountryRaw = (
       tmdbData.origin_country
       ?? tmdbData.production_countries?.map((c) => c.iso_3166_1)
       ?? []
     ).join(', ') || null;
+    const originCountry = originCountryRaw && originCountryRaw.length <= 100
+      ? originCountryRaw
+      : null;
 
     return {
       tmdbId: tmdbData.id,
