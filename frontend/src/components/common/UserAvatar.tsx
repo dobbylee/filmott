@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { isDeletedUser } from '@/utils/user';
 
 interface UserAvatarProps {
-  user?: { nickname: string; status?: string; profileImage?: string } | null;
+  user?: { nickname: string; status?: string; profileImage?: string | null } | null;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   linkToProfile?: boolean;
   userId?: number;

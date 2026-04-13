@@ -34,8 +34,6 @@ describe('useAuthCallback', () => {
     it('code 파라미터로 POST /auth/social/exchange를 호출한다', async () => {
       const mockResponse = {
         data: {
-          access_token: 'new-access-token',
-          refresh_token: 'new-refresh-token',
           user: { id: 1, nickname: 'testuser', role: 'USER' },
         },
       };

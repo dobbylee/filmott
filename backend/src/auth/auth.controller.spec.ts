@@ -13,9 +13,68 @@ import { AuthProvider } from '../users/enums/auth-provider.enum';
 import { UserRole } from '../users/enums/user-role.enum';
 import { SocialCallbackResult } from './auth.service';
 import { ROLES_KEY } from './decorators/roles.decorator';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import {
+  AUTH_ACCESS_TOKEN_COOKIE,
+  AUTH_REFRESH_TOKEN_COOKIE,
+} from './auth-cookie.util';
 
 describe('AuthController', () => {
   let controller: AuthController;
+
+  const createMockResponse = () => ({
+    cookie: jest.fn(),
+    redirect: jest.fn(),
+    clearCookie: jest.fn(),
+  });
+
+  const expectAuthCookies = (
+    mockRes: ReturnType<typeof createMockResponse>,
+    accessToken: string,
+    refreshToken: string,
+  ) => {
+    expect(mockRes.cookie).toHaveBeenCalledWith(
+      AUTH_ACCESS_TOKEN_COOKIE,
+      accessToken,
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: false,
+        path: '/',
+      }),
+    );
+    expect(mockRes.cookie).toHaveBeenCalledWith(
+      AUTH_REFRESH_TOKEN_COOKIE,
+      refreshToken,
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: false,
+        path: '/',
+      }),
+    );
+  };
+
+  const expectAuthCookiesCleared = (mockRes: ReturnType<typeof createMockResponse>) => {
+    expect(mockRes.clearCookie).toHaveBeenCalledWith(
+      AUTH_ACCESS_TOKEN_COOKIE,
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: false,
+        path: '/',
+      }),
+    );
+    expect(mockRes.clearCookie).toHaveBeenCalledWith(
+      AUTH_REFRESH_TOKEN_COOKIE,
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: false,
+        path: '/',
+      }),
+    );
+  };
 
   const mockAuthService = {
     login: jest.fn(),
@@ -102,8 +161,9 @@ describe('AuthController', () => {
   });
 
   describe('POST /auth/login (login)', () => {
-    it('authService.login을 호출하고 토큰과 사용자를 반환해야 한다', async () => {
+    it('authService.login을 호출하고 세션 쿠키를 설정한 뒤 사용자만 반환해야 한다', async () => {
       const dto = { email: 'test@test.com', password: 'password1' };
+      const mockRes = createMockResponse();
       const response = {
         access_token: 'token',
         refresh_token: 'refresh-token',
@@ -111,16 +171,18 @@ describe('AuthController', () => {
       };
       mockAuthService.login.mockResolvedValue(response);
 
-      const result = await controller.login(dto);
+      const result = await controller.login(dto, mockRes as never);
 
       expect(mockAuthService.login).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(response);
+      expectAuthCookies(mockRes, 'token', 'refresh-token');
+      expect(result).toEqual({ user: response.user });
     });
   });
 
   describe('POST /auth/refresh', () => {
-    it('정상적으로 토큰을 갱신하고 새 토큰 쌍을 반환해야 한다', async () => {
-      const dto = { refresh_token: 'valid-refresh-token' };
+    it('쿠키의 refresh token으로 세션을 갱신하고 쿠키를 교체해야 한다', async () => {
+      const mockReq = { cookies: { [AUTH_REFRESH_TOKEN_COOKIE]: 'valid-refresh-token' } };
+      const mockRes = createMockResponse();
       const response = {
         access_token: 'new-access-token',
         refresh_token: 'new-refresh-token',
@@ -128,31 +190,58 @@ describe('AuthController', () => {
       };
       mockAuthService.refreshTokens.mockResolvedValue(response);
 
-      const result = await controller.refresh(dto);
+      const result = await controller.refresh(mockReq as never, {} as RefreshTokenDto, mockRes as never);
 
       expect(mockAuthService.refreshTokens).toHaveBeenCalledWith('valid-refresh-token');
-      expect(result).toEqual(response);
+      expectAuthCookies(mockRes, 'new-access-token', 'new-refresh-token');
+      expect(result).toEqual({ user: response.user });
     });
 
-    it('유효하지 않은 토큰이면 UnauthorizedException을 던져야 한다', async () => {
-      const dto = { refresh_token: 'invalid-token' };
+    it('cookie가 없으면 body fallback으로 refresh token을 읽어야 한다', async () => {
+      const mockReq = { cookies: {} };
+      const mockRes = createMockResponse();
+      const response = {
+        access_token: 'new-access-token',
+        refresh_token: 'new-refresh-token',
+        user: { id: 1, nickname: 'test', role: 'USER' },
+      };
+      mockAuthService.refreshTokens.mockResolvedValue(response);
+
+      await controller.refresh(
+        mockReq as never,
+        { refresh_token: 'body-refresh-token' },
+        mockRes as never,
+      );
+
+      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith('body-refresh-token');
+      expectAuthCookies(mockRes, 'new-access-token', 'new-refresh-token');
+    });
+
+    it('유효하지 않은 토큰이면 쿠키를 정리하고 UnauthorizedException을 던져야 한다', async () => {
+      const mockReq = { cookies: { [AUTH_REFRESH_TOKEN_COOKIE]: 'invalid-token' } };
+      const mockRes = createMockResponse();
       mockAuthService.refreshTokens.mockRejectedValue(
         new UnauthorizedException('유효하지 않은 리프레시 토큰입니다.'),
       );
 
-      await expect(controller.refresh(dto)).rejects.toThrow(UnauthorizedException);
+      await expect(
+        controller.refresh(mockReq as never, {} as RefreshTokenDto, mockRes as never),
+      ).rejects.toThrow(UnauthorizedException);
       expect(mockAuthService.refreshTokens).toHaveBeenCalledWith('invalid-token');
+      expectAuthCookiesCleared(mockRes);
     });
   });
 
   describe('POST /auth/logout', () => {
-    it('정상적으로 토큰을 폐기해야 한다', async () => {
-      const dto = { refresh_token: 'valid-refresh-token' };
+    it('정상적으로 토큰을 폐기하고 세션 쿠키를 삭제해야 한다', async () => {
+      const mockReq = { cookies: { [AUTH_REFRESH_TOKEN_COOKIE]: 'valid-refresh-token' } };
+      const mockRes = createMockResponse();
       mockAuthService.revokeRefreshToken.mockResolvedValue(undefined);
 
-      const result = await controller.logout(dto);
+      const result = await controller.logout(mockReq as never, {} as RefreshTokenDto, mockRes as never);
 
       expect(mockAuthService.revokeRefreshToken).toHaveBeenCalledWith('valid-refresh-token');
+      expectAuthCookiesCleared(mockRes);
       expect(result).toBeUndefined();
     });
   });
@@ -425,7 +514,8 @@ describe('AuthController', () => {
   });
 
   describe('POST /auth/social/exchange (exchangeCode)', () => {
-    it('유효한 code로 토큰을 교환해야 한다', async () => {
+    it('유효한 code로 세션을 교환하고 쿠키를 설정해야 한다', async () => {
+      const mockRes = createMockResponse();
       const response = {
         access_token: 'at',
         refresh_token: 'rt',
@@ -433,10 +523,11 @@ describe('AuthController', () => {
       };
       mockAuthService.exchangeOneTimeCode.mockResolvedValue(response);
 
-      const result = await controller.exchangeCode('valid-code');
+      const result = await controller.exchangeCode('valid-code', mockRes as never);
 
       expect(mockAuthService.exchangeOneTimeCode).toHaveBeenCalledWith('valid-code');
-      expect(result).toEqual(response);
+      expectAuthCookies(mockRes, 'at', 'rt');
+      expect(result).toEqual({ user: response.user });
     });
 
     it('code가 없으면 BadRequestException을 던져야 한다', async () => {
@@ -453,8 +544,9 @@ describe('AuthController', () => {
   });
 
   describe('POST /auth/social/complete-signup (completeSocialSignup)', () => {
-    it('닉네임 설정 후 토큰과 사용자 정보를 반환해야 한다', async () => {
+    it('닉네임 설정 후 세션 쿠키를 설정하고 사용자 정보를 반환해야 한다', async () => {
       const dto = { tempToken: 'temp-token', nickname: 'newuser' };
+      const mockRes = createMockResponse();
       const response = {
         access_token: 'new-at',
         refresh_token: 'new-rt',
@@ -462,10 +554,11 @@ describe('AuthController', () => {
       };
       mockAuthService.completeSocialSignup.mockResolvedValue(response);
 
-      const result = await controller.completeSocialSignup(dto);
+      const result = await controller.completeSocialSignup(dto, mockRes as never);
 
       expect(mockAuthService.completeSocialSignup).toHaveBeenCalledWith('temp-token', 'newuser', undefined);
-      expect(result).toEqual(response);
+      expectAuthCookies(mockRes, 'new-at', 'new-rt');
+      expect(result).toEqual({ user: response.user });
     });
   });
 

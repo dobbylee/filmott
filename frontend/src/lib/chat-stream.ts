@@ -13,21 +13,14 @@ export interface ChatHistoryMessage {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = localStorage.getItem('refresh_token');
-  if (!refreshToken) return null;
-
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   try {
     const res = await fetch(`${apiUrl}/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      credentials: 'include',
     });
     if (!res.ok) return null;
-    const data = await res.json();
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    return data.access_token;
+    return 'refreshed';
   } catch {
     return null;
   }
@@ -37,33 +30,26 @@ async function fetchWithAuth(
   url: string,
   body: string,
 ): Promise<Response> {
-  const token = localStorage.getItem('access_token');
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
   let response = await fetch(url, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body,
+    credentials: 'include',
   });
 
-  // 401이면 토큰 갱신 후 재시도 (비로그인이면 갱신 시도 없이 그대로 반환)
-  if (response.status === 401 && token) {
-    const newToken = await refreshAccessToken();
-    if (!newToken) return response;
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) return response;
 
     response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${newToken}`,
       },
       body,
+      credentials: 'include',
     });
   }
 

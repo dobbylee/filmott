@@ -8,7 +8,9 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import api from '@/lib/api';
+import { isAxiosError } from 'axios';
+import { refreshApi } from '@/lib/api';
+import { clearLegacyAuthStorage } from '@/lib/auth-storage';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
 import type { User, AuthResponse } from '@/types/auth';
 
@@ -28,7 +30,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authModal, setAuthModal] = useState<{ isOpen: boolean }>({
     isOpen: false,
@@ -37,12 +38,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 401 응답 시 모달 열기
   useEffect(() => {
     const handleAuthRequired = () => {
-      // api.ts 인터셉터에서 이미 제거하지만, 방어적으로 여기서도 클리어
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
+      clearLegacyAuthStorage();
       setUser(null);
-      setToken(null);
       setAuthModal({ isOpen: true });
     };
     window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
@@ -50,45 +47,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('access_token');
-    const storedUser = localStorage.getItem('user');
+    clearLegacyAuthStorage();
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
+    let isMounted = true;
+
+    const restoreSession = async () => {
       try {
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem('user');
+        const { data } = await refreshApi.get<User>('/users/me');
+        if (isMounted) {
+          setUser(data);
+        }
+        return;
+      } catch (error) {
+        if (!isAxiosError(error) || error.response?.status !== 401) {
+          if (isMounted) {
+            setUser(null);
+          }
+          return;
+        }
+
+        try {
+          await refreshApi.post('/auth/refresh');
+          const { data } = await refreshApi.get<User>('/users/me');
+          if (isMounted) {
+            setUser(data);
+          }
+        } catch {
+          if (isMounted) {
+            setUser(null);
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    }
-    setIsLoading(false);
+    };
+
+    restoreSession().catch(() => {
+      if (isMounted) {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleAuthSuccess = useCallback((response: AuthResponse) => {
-    const { access_token, refresh_token, user: userData } = response;
-    setToken(access_token);
-    setUser(userData);
-    localStorage.setItem('access_token', access_token);
-    localStorage.setItem('refresh_token', refresh_token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(response.user);
+    setAuthModal({ isOpen: false });
   }, []);
 
   const logout = useCallback(() => {
-    const refreshToken = localStorage.getItem('refresh_token');
-    if (refreshToken) {
-      // fire-and-forget: 서버 요청 실패해도 클라이언트 로그아웃 진행
-      api.post('/auth/logout', { refresh_token: refreshToken }).catch(() => {});
-    }
-    setToken(null);
+    refreshApi.post('/auth/logout').catch(() => {});
     setUser(null);
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
+    clearLegacyAuthStorage();
+    setAuthModal({ isOpen: false });
   }, []);
 
   const updateUser = useCallback((updatedUser: User) => {
     setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
   }, []);
 
   const openAuthModal = useCallback(() => {
@@ -101,7 +122,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, isLoading, handleAuthSuccess, logout, updateUser, authModal, openAuthModal, closeAuthModal }}
+      value={{
+        user,
+        token: null,
+        isLoading,
+        handleAuthSuccess,
+        logout,
+        updateUser,
+        authModal,
+        openAuthModal,
+        closeAuthModal,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -2,7 +2,7 @@ export interface User {
   id: number;
   nickname: string;
   email?: string | null;
-  profileImage?: string;
+  profileImage?: string | null;
   status?: string;
   role?: string;
   provider?: string;
@@ -11,9 +11,9 @@ export interface User {
 }
 
 export interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
   user: User;
+  access_token?: string;
+  refresh_token?: string;
 }
 
 export interface UpdateProfileRequest {

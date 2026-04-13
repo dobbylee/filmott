@@ -28,6 +28,11 @@ import { CompleteSocialSignupDto } from './dto/complete-social-signup.dto';
 import { GoogleService } from './social/google.service';
 import { KakaoService } from './social/kakao.service';
 import { NaverService } from './social/naver.service';
+import {
+  AUTH_REFRESH_TOKEN_COOKIE,
+  clearAuthCookies,
+  setAuthCookies,
+} from './auth-cookie.util';
 
 const OAUTH_STATE_COOKIE = 'oauth_state';
 const STATE_COOKIE_MAX_AGE = 5 * 60 * 1000; // 5분
@@ -62,22 +67,55 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('login')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const session = await this.authService.login(loginDto);
+    this.setSessionCookies(res, session);
+    return { user: session.user };
   }
 
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   @Throttle({ default: { ttl: 60000, limit: 10 } })
-  async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshTokens(refreshTokenDto.refresh_token);
+  async refresh(
+    @Req() req: Request,
+    @Body() refreshTokenDto: RefreshTokenDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = this.getRefreshToken(req, refreshTokenDto?.refresh_token);
+    if (!refreshToken) {
+      this.clearSessionCookies(res);
+      throw new UnauthorizedException('리프레시 토큰이 필요합니다.');
+    }
+
+    try {
+      const session = await this.authService.refreshTokens(refreshToken);
+      this.setSessionCookies(res, session);
+      return { user: session.user };
+    } catch (error) {
+      this.clearSessionCookies(res);
+      throw error;
+    }
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post('logout')
   @Throttle({ default: { ttl: 60000, limit: 10 } })
-  async logout(@Body() refreshTokenDto: RefreshTokenDto) {
-    await this.authService.revokeRefreshToken(refreshTokenDto.refresh_token);
+  async logout(
+    @Req() req: Request,
+    @Body() refreshTokenDto: RefreshTokenDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = this.getRefreshToken(req, refreshTokenDto?.refresh_token);
+    try {
+      if (refreshToken) {
+        await this.authService.revokeRefreshToken(refreshToken);
+      }
+    } finally {
+      this.clearSessionCookies(res);
+    }
   }
 
   // --- 소셜 로그인 엔드포인트 ---
@@ -151,18 +189,32 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('social/exchange')
   @Throttle({ default: { ttl: 60000, limit: 10 } })
-  async exchangeCode(@Body('code') code: string) {
+  async exchangeCode(
+    @Body('code') code: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     if (!code) {
       throw new BadRequestException('코드가 필요합니다.');
     }
-    return this.authService.exchangeOneTimeCode(code);
+    const session = await this.authService.exchangeOneTimeCode(code);
+    this.setSessionCookies(res, session);
+    return { user: session.user };
   }
 
   @HttpCode(HttpStatus.OK)
   @Post('social/complete-signup')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
-  async completeSocialSignup(@Body() dto: CompleteSocialSignupDto) {
-    return this.authService.completeSocialSignup(dto.tempToken, dto.nickname, dto.subscribedOtts);
+  async completeSocialSignup(
+    @Body() dto: CompleteSocialSignupDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const session = await this.authService.completeSocialSignup(
+      dto.tempToken,
+      dto.nickname,
+      dto.subscribedOtts,
+    );
+    this.setSessionCookies(res, session);
+    return { user: session.user };
   }
 
   // --- Private helpers ---
@@ -187,6 +239,25 @@ export class AuthController {
       return false;
     }
     return true;
+  }
+
+  private getRefreshToken(req: Request, bodyRefreshToken?: string): string | undefined {
+    const cookieRefreshToken = req.cookies?.[AUTH_REFRESH_TOKEN_COOKIE];
+    if (typeof cookieRefreshToken === 'string' && cookieRefreshToken.length > 0) {
+      return cookieRefreshToken;
+    }
+    return bodyRefreshToken;
+  }
+
+  private setSessionCookies(
+    res: Response,
+    tokens: { access_token: string; refresh_token: string },
+  ): void {
+    setAuthCookies(res, tokens, this.isProduction);
+  }
+
+  private clearSessionCookies(res: Response): void {
+    clearAuthCookies(res, this.isProduction);
   }
 
   private async handleSocialCallback(

@@ -40,8 +40,6 @@ describe('AdminLoginPage', () => {
 
   it('로그인 성공 시 /admin으로 리다이렉트해야 한다', async () => {
     const authResponse = {
-      access_token: 'test-token',
-      refresh_token: 'test-refresh',
       user: { id: 1, nickname: 'admin', role: 'ADMIN' },
     };
     mockPost.mockResolvedValue({ data: authResponse });

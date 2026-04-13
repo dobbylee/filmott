@@ -5,6 +5,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { UsersService } from '../../users/users.service';
 import { UserStatus } from '../../users/enums/user-status.enum';
 import { UserRole } from '../../users/enums/user-role.enum';
+import { AUTH_ACCESS_TOKEN_COOKIE } from '../auth-cookie.util';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
@@ -35,6 +36,39 @@ describe('JwtStrategy', () => {
   });
 
   const payload = { sub: 1, nickname: 'testuser', role: 'USER' };
+
+  describe('jwt extractor', () => {
+    it('쿠키 토큰을 우선적으로 읽어야 한다', () => {
+      const extractor = (strategy as unknown as {
+        _jwtFromRequest: (req: {
+          cookies?: Record<string, string>;
+          headers?: Record<string, string>;
+        }) => string | null;
+      })._jwtFromRequest;
+
+      const token = extractor({
+        cookies: { [AUTH_ACCESS_TOKEN_COOKIE]: 'cookie-token' },
+        headers: { authorization: 'Bearer header-token' },
+      });
+
+      expect(token).toBe('cookie-token');
+    });
+
+    it('쿠키가 없으면 Authorization 헤더를 fallback으로 사용해야 한다', () => {
+      const extractor = (strategy as unknown as {
+        _jwtFromRequest: (req: {
+          cookies?: Record<string, string>;
+          headers?: Record<string, string>;
+        }) => string | null;
+      })._jwtFromRequest;
+
+      const token = extractor({
+        headers: { authorization: 'Bearer header-token' },
+      });
+
+      expect(token).toBe('header-token');
+    });
+  });
 
   describe('validate', () => {
     it('ACTIVE 유저는 정상적으로 id, nickname, role을 반환해야 한다', async () => {

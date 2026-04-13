@@ -1,8 +1,10 @@
 import axios, { type AxiosRequestConfig } from 'axios';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
+import { clearLegacyAuthStorage } from '@/lib/auth-storage';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,33 +13,26 @@ const api = axios.create({
 // refresh 요청 전용 인스턴스 — 인터셉터를 우회하여 무한 루프 방지
 const refreshApi = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
-});
-
-api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
+  withCredentials: true,
 });
 
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (token: string) => void; reject: (error: unknown) => void }> = [];
+let failedQueue: Array<{ resolve: () => void; reject: (error: unknown) => void }> = [];
 
-const processQueue = (error: unknown, token: string | null) => {
+const processQueue = (error: unknown) => {
   failedQueue.forEach((prom) => {
-    if (token) prom.resolve(token);
-    else prom.reject(error);
+    if (error) {
+      prom.reject(error);
+      return;
+    }
+
+    prom.resolve();
   });
   failedQueue = [];
 };
 
 const clearAuthAndNotify = () => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user');
+  clearLegacyAuthStorage();
   window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
 };
 
@@ -63,13 +58,9 @@ api.interceptors.response.use(
 
     // 이미 refresh 진행 중이면 큐에 추가
     if (isRefreshing) {
-      return new Promise<string>((resolve, reject) => {
+      return new Promise<void>((resolve, reject) => {
         failedQueue.push({ resolve, reject });
-      }).then((token) => {
-        originalRequest.headers = {
-          ...originalRequest.headers,
-          Authorization: `Bearer ${token}`,
-        };
+      }).then(() => {
         return api(originalRequest);
       });
     }
@@ -78,22 +69,11 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const refreshToken = localStorage.getItem('refresh_token');
-      if (!refreshToken) throw new Error('No refresh token');
-
-      const { data } = await refreshApi.post('/auth/refresh', { refresh_token: refreshToken });
-      localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('refresh_token', data.refresh_token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      processQueue(null, data.access_token);
-      originalRequest.headers = {
-        ...originalRequest.headers,
-        Authorization: `Bearer ${data.access_token}`,
-      };
+      await refreshApi.post('/auth/refresh');
+      processQueue(null);
       return api(originalRequest);
     } catch (refreshError) {
-      processQueue(refreshError, null);
+      processQueue(refreshError);
       clearAuthAndNotify();
       return Promise.reject(refreshError);
     } finally {
