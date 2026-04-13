@@ -17,5 +17,5 @@ export function replaceTmdbSize(url: string, targetSize: string): string {
  * TMDB CDN이 이미 WebP + 다양한 사이즈를 제공하므로 프록시가 불필요하다.
  */
 export default function TmdbImage(props: ImageProps) {
-  return <Image {...props} unoptimized />;
+  return <Image {...props} alt={props.alt} unoptimized />;
 }

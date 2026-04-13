@@ -18,9 +18,14 @@ vi.mock('@/contexts/AuthContext', () => ({
 }));
 
 vi.mock('next/image', () => ({
-  default: ({ alt, ...props }: Record<string, unknown>) => (
+  default: ({ alt, fill, unoptimized, ...props }: Record<string, unknown>) => (
     // eslint-disable-next-line @next/next/no-img-element
-    <img alt={alt as string} {...props} />
+    <img
+      alt={typeof alt === 'string' ? alt : ''}
+      data-fill={fill ? 'true' : undefined}
+      data-unoptimized={unoptimized ? 'true' : undefined}
+      {...props}
+    />
   ),
 }));
 

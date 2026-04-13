@@ -89,39 +89,43 @@ function formatRuntime(minutes?: number): string {
 }
 
 async function ReviewsSection({ contentId }: { contentId: number }) {
-  try {
-    const [reviewsData, stats] = await Promise.all([
-      fetchApi<ReviewsResponse>(
-        `/reviews?contentId=${contentId}&page=1&sort=latest`,
-        { cache: 'no-store' },
-      ),
-      fetchApi<ContentStats>(
-        `/reviews/${contentId}/stats`,
-        { cache: 'no-store' },
-      ),
-    ]);
+  const reviewsSectionData = await Promise.all([
+    fetchApi<ReviewsResponse>(
+      `/reviews?contentId=${contentId}&page=1&sort=latest`,
+      { cache: 'no-store' },
+    ),
+    fetchApi<ContentStats>(
+      `/reviews/${contentId}/stats`,
+      { cache: 'no-store' },
+    ),
+  ])
+    .then(([reviewsData, stats]) => ({ reviewsData, stats }))
+    .catch(() => null);
 
-    return (
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-4 flex items-center gap-4 pl-3">
-          <h2 id="reviews" className="text-lg font-bold">리뷰</h2>
-          <div className="flex items-center gap-1.5">
-            <Star className={`h-5 w-5 ${stats.averageRating != null ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-            <span className="text-lg font-semibold">{stats.averageRating ?? 0}</span>
-            <span className="text-sm text-muted-foreground">
-              ({stats.reviewCount}개)
-            </span>
-          </div>
-        </div>
-        <div className="mb-4">
-          <ReviewFormWrapper contentId={contentId} />
-        </div>
-        <ReviewListClient reviews={reviewsData.data} contentId={contentId} />
-      </div>
-    );
-  } catch {
+  if (!reviewsSectionData) {
     return <ErrorWithRetry title="리뷰" message="리뷰를 불러올 수 없습니다." />;
   }
+
+  const { reviewsData, stats } = reviewsSectionData;
+
+  return (
+    <div className="mx-auto w-full max-w-3xl">
+      <div className="mb-4 flex items-center gap-4 pl-3">
+        <h2 id="reviews" className="text-lg font-bold">리뷰</h2>
+        <div className="flex items-center gap-1.5">
+          <Star className={`h-5 w-5 ${stats.averageRating != null ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+          <span className="text-lg font-semibold">{stats.averageRating ?? 0}</span>
+          <span className="text-sm text-muted-foreground">
+            ({stats.reviewCount}개)
+          </span>
+        </div>
+      </div>
+      <div className="mb-4">
+        <ReviewFormWrapper contentId={contentId} />
+      </div>
+      <ReviewListClient reviews={reviewsData.data} contentId={contentId} />
+    </div>
+  );
 }
 
 export default async function ContentDetailPage({

@@ -24,66 +24,73 @@ async function fetchRecentReviews(): Promise<Review[]> {
 /* ---- Sections ---- */
 
 async function BoxOfficeSection() {
-  try {
-    const [daily, weekly] = await Promise.all([
-      fetchBoxOffice('daily-box-office'),
-      fetchBoxOffice('weekly-box-office'),
-    ]);
-    return (
-      <RankingCarousel
-        title="박스오피스"
-        tabs={[
-          { label: '일간', items: daily },
-          { label: '주간', items: weekly },
-        ]}
-      />
-    );
-  } catch {
+  const boxOffice = await Promise.all([
+    fetchBoxOffice('daily-box-office'),
+    fetchBoxOffice('weekly-box-office'),
+  ])
+    .then(([daily, weekly]) => ({ daily, weekly }))
+    .catch(() => null);
+
+  if (!boxOffice) {
     return <SectionError title="박스오피스" />;
   }
+
+  return (
+    <RankingCarousel
+      title="박스오피스"
+      tabs={[
+        { label: '일간', items: boxOffice.daily },
+        { label: '주간', items: boxOffice.weekly },
+      ]}
+    />
+  );
 }
 
 async function TrendingSection() {
-  try {
-    const [day, week] = await Promise.all([
-      fetchTrending('trending-all-day'),
-      fetchTrending('trending-all-week'),
-    ]);
-    return (
-      <RankingCarousel
-        title="지금 뜨는 작품"
-        tabs={[
-          { label: '일간', items: day },
-          { label: '주간', items: week },
-        ]}
-      />
-    );
-  } catch {
+  const trending = await Promise.all([
+    fetchTrending('trending-all-day'),
+    fetchTrending('trending-all-week'),
+  ])
+    .then(([day, week]) => ({ day, week }))
+    .catch(() => null);
+
+  if (!trending) {
     return <SectionError title="지금 뜨는 작품" />;
   }
+
+  return (
+    <RankingCarousel
+      title="지금 뜨는 작품"
+      tabs={[
+        { label: '일간', items: trending.day },
+        { label: '주간', items: trending.week },
+      ]}
+    />
+  );
 }
 
 
 async function RecentReviewsSection() {
-  try {
-    const reviews = await fetchRecentReviews();
-    if (reviews.length === 0) return null;
+  const reviews = await fetchRecentReviews().catch(() => null);
 
-    return (
-      <section>
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold tracking-tight text-white">최근 리뷰</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {reviews.slice(0, 6).map((review) => (
-            <RecentReviewItem key={review.id} review={review} />
-          ))}
-        </div>
-      </section>
-    );
-  } catch {
+  if (!reviews) {
     return <SectionError title="최근 리뷰" />;
   }
+
+  if (reviews.length === 0) return null;
+
+  return (
+    <section>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold tracking-tight text-white">최근 리뷰</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {reviews.slice(0, 6).map((review) => (
+          <RecentReviewItem key={review.id} review={review} />
+        ))}
+      </div>
+    </section>
+  );
 }
 
 /* ---- Skeletons ---- */

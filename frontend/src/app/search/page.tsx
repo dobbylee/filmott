@@ -87,7 +87,6 @@ async function LoadMoreResults({
       <SearchResultSections
         key={`${query}-${type ?? 'all'}`}
         query={query}
-        searchType={type}
         personResults={personResults}
         contentResults={contentResults}
         personTotal={personTotal}

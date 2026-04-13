@@ -23,6 +23,10 @@ const EXAMPLE_QUESTIONS = [
   '밤에 혼자 볼 스릴러 영화 추천해줘',
 ];
 
+function getHighestMessageId(messages: ChatMessageData[]): number {
+  return messages.reduce((maxId, message) => Math.max(maxId, message.id), 0);
+}
+
 export default function ChatSection() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
@@ -38,6 +42,13 @@ export default function ChatSection() {
   const streamingRecsRef = useRef<ChatRecommendationWithPoster[] | null>(null);
   // onDone 이중 호출 방지 플래그
   const isDoneCalledRef = useRef(false);
+  const nextMessageIdRef = useRef(1);
+
+  const getNextMessageId = () => {
+    const nextId = nextMessageIdRef.current;
+    nextMessageIdRef.current += 1;
+    return nextId;
+  };
 
   useEffect(() => {
     streamingTextRef.current = streamingText;
@@ -64,6 +75,8 @@ export default function ChatSection() {
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
+      let restoreTimer: ReturnType<typeof setTimeout> | undefined;
+
       try {
         const parsed: unknown = JSON.parse(saved);
         if (
@@ -83,9 +96,15 @@ export default function ChatSection() {
           if (validMessages.length > MAX_STORED_MESSAGES) {
             const trimmed = validMessages.slice(-MAX_STORED_MESSAGES);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-            setMessages(trimmed);
+            nextMessageIdRef.current = getHighestMessageId(trimmed) + 1;
+            restoreTimer = setTimeout(() => {
+              setMessages(trimmed);
+            }, 0);
           } else {
-            setMessages(validMessages);
+            nextMessageIdRef.current = getHighestMessageId(validMessages) + 1;
+            restoreTimer = setTimeout(() => {
+              setMessages(validMessages);
+            }, 0);
           }
         } else {
           localStorage.removeItem(STORAGE_KEY);
@@ -93,6 +112,12 @@ export default function ChatSection() {
       } catch {
         localStorage.removeItem(STORAGE_KEY);
       }
+
+      return () => {
+        if (restoreTimer) {
+          clearTimeout(restoreTimer);
+        }
+      };
     }
   }, []);
 
@@ -112,6 +137,7 @@ export default function ChatSection() {
     setStreamingRecs(null);
     setError(null);
     setIsStreaming(false);
+    nextMessageIdRef.current = 1;
     localStorage.removeItem(STORAGE_KEY);
   };
 
@@ -127,7 +153,7 @@ export default function ChatSection() {
 
     // 낙관적 UI: 사용자 메시지 추가
     const userMessage: ChatMessageData = {
-      id: Date.now(),
+      id: getNextMessageId(),
       role: 'user',
       content,
       recommendations: null,
@@ -157,7 +183,7 @@ export default function ChatSection() {
           setMessages((prev) => [
             ...prev,
             {
-              id: Date.now() + 1,
+              id: getNextMessageId(),
               role: 'assistant',
               content: cleanedText,
               recommendations: streamingRecsRef.current,
@@ -183,7 +209,7 @@ export default function ChatSection() {
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now(),
+            id: getNextMessageId(),
             role: 'assistant',
             content: cleanedText,
             recommendations: streamingRecsRef.current,
@@ -201,7 +227,7 @@ export default function ChatSection() {
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now(),
+            id: getNextMessageId(),
             role: 'assistant',
             content: cleanedText,
             recommendations: streamingRecsRef.current,

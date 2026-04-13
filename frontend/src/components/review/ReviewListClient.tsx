@@ -8,51 +8,82 @@ import ReviewSortSelector from './ReviewSortSelector';
 import type { Review, ReviewsResponse } from '@/types/review';
 
 type ReviewSort = 'latest' | 'likes';
+const EMPTY_LIKED_IDS = new Set<number>();
 
 interface ReviewListClientProps {
   reviews: Review[];
   contentId: number;
 }
 
+interface ReviewListState {
+  key: string | null;
+  reviews: Review[];
+  likedIds: Set<number>;
+}
+
 export default function ReviewListClient({ reviews: initialReviews, contentId }: ReviewListClientProps) {
   const { user } = useAuth();
-  const [reviews, setReviews] = useState(initialReviews);
-  const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
+  const [reviewState, setReviewState] = useState<ReviewListState>({
+    key: null,
+    reviews: initialReviews,
+    likedIds: EMPTY_LIKED_IDS,
+  });
   const [sort, setSort] = useState<ReviewSort>('latest');
-  const [sortLoading, setSortLoading] = useState(false);
+  const shouldFetch = Boolean(user) || sort !== 'latest';
+  const requestKey = shouldFetch ? `${user?.id ?? 'guest'}:${contentId}:${sort}` : null;
 
   useEffect(() => {
-    setSortLoading(true);
-    if (!user) {
-      // 비로그인 + 최신순이면 SSR 데이터 그대로 사용
-      if (sort === 'latest') {
-        setReviews(initialReviews);
-        setSortLoading(false);
-      } else {
-        api.get<ReviewsResponse>(`/reviews?contentId=${contentId}&page=1&sort=${sort}`)
-          .then((res) => setReviews(res.data.data))
-          .catch(() => setReviews(initialReviews))
-          .finally(() => setSortLoading(false));
-      }
-      setLikedIds(new Set());
+    if (!requestKey) {
       return;
     }
 
-    // 클라이언트에서 최신 리뷰 + liked 상태를 함께 가져옴
-    Promise.all([
-      api.get<ReviewsResponse>(`/reviews?contentId=${contentId}&page=1&sort=${sort}`),
-      api.get<number[]>(`/reviews/liked-ids?contentId=${contentId}`),
-    ])
-      .then(([reviewsRes, likedRes]) => {
-        setReviews(reviewsRes.data.data);
-        setLikedIds(new Set(likedRes.data));
-      })
-      .catch(() => {
-        setReviews(initialReviews);
-        setLikedIds(new Set());
-      })
-      .finally(() => setSortLoading(false));
-  }, [user, contentId, initialReviews, sort]);
+    let active = true;
+
+    const loadReviews = async () => {
+      try {
+        if (!user) {
+          const reviewsRes = await api.get<ReviewsResponse>(
+            `/reviews?contentId=${contentId}&page=1&sort=${sort}`,
+          );
+          if (active) {
+            setReviewState({
+              key: requestKey,
+              reviews: reviewsRes.data.data,
+              likedIds: EMPTY_LIKED_IDS,
+            });
+          }
+          return;
+        }
+
+        const [reviewsRes, likedRes] = await Promise.all([
+          api.get<ReviewsResponse>(`/reviews?contentId=${contentId}&page=1&sort=${sort}`),
+          api.get<number[]>(`/reviews/liked-ids?contentId=${contentId}`),
+        ]);
+
+        if (active) {
+          setReviewState({
+            key: requestKey,
+            reviews: reviewsRes.data.data,
+            likedIds: new Set(likedRes.data),
+          });
+        }
+      } catch {
+        if (active) {
+          setReviewState({
+            key: requestKey,
+            reviews: initialReviews,
+            likedIds: EMPTY_LIKED_IDS,
+          });
+        }
+      }
+    };
+
+    void loadReviews();
+
+    return () => {
+      active = false;
+    };
+  }, [contentId, initialReviews, requestKey, sort, user]);
 
   const handleSortChange = (newSort: ReviewSort) => {
     if (newSort !== sort) {
@@ -60,13 +91,23 @@ export default function ReviewListClient({ reviews: initialReviews, contentId }:
     }
   };
 
+  const reviews = requestKey && reviewState.key === requestKey
+    ? reviewState.reviews
+    : initialReviews;
+  const likedIds = requestKey && reviewState.key === requestKey
+    ? reviewState.likedIds
+    : EMPTY_LIKED_IDS;
+  const sortLoading = requestKey !== null && reviewState.key !== requestKey;
   const isAdmin = user?.role === 'ADMIN';
   const filtered = user
     ? reviews.filter((r) => r.userId !== user.id)
     : reviews;
 
   const handleDeleteReview = (reviewId: number) => {
-    setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+    setReviewState((prev) => ({
+      ...prev,
+      reviews: prev.reviews.filter((r) => r.id !== reviewId),
+    }));
   };
 
   if (filtered.length === 0) {

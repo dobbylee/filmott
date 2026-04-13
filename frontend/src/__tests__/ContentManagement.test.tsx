@@ -24,12 +24,15 @@ describe('ContentManagement', () => {
     mockPost.mockResolvedValue({ data: { blocked: 0, failed: 0, total: 0, blockedContents: [] } });
   });
 
-  it('타입 셀렉트와 TMDB ID 입력 필드를 렌더링해야 한다', () => {
+  it('타입 셀렉트와 TMDB ID 입력 필드를 렌더링해야 한다', async () => {
     render(<ContentManagement />);
 
-    expect(screen.getByLabelText('타입')).toBeInTheDocument();
-    expect(screen.getByLabelText('TMDB ID')).toBeInTheDocument();
-    expect(screen.getByText('차단')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalled();
+      expect(screen.getByLabelText('타입')).toBeInTheDocument();
+      expect(screen.getByLabelText('TMDB ID')).toBeInTheDocument();
+      expect(screen.getByText('차단')).toBeInTheDocument();
+    });
   });
 
   it('TMDB ID 없이 차단 버튼 클릭 시 에러 메시지를 표시해야 한다', async () => {

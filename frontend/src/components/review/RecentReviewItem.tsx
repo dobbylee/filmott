@@ -6,7 +6,7 @@ import TimeAgo from '@/components/common/TimeAgo';
 import type { Review } from '@/types/review';
 import type { ContentItem } from '@/types/content';
 import { TMDB_IMAGE_BASE } from '@/types/content';
-import { getDisplayNickname, isDeletedUser, isInactiveUser } from '@/utils/user';
+import { getDisplayNickname, isInactiveUser } from '@/utils/user';
 import UserAvatar from '@/components/common/UserAvatar';
 
 export default function RecentReviewItem({ review }: { review: Review }) {

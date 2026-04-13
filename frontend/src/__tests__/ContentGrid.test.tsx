@@ -5,8 +5,9 @@ import type { TmdbSearchItem } from '@/types/content';
 
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
-    const { fill, ...rest } = props;
-    return <img {...rest} data-fill={fill ? 'true' : undefined} />;
+    const { fill, unoptimized, ...rest } = props;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img {...rest} alt={typeof rest.alt === 'string' ? rest.alt : ''} data-fill={fill ? 'true' : undefined} data-unoptimized={unoptimized ? 'true' : undefined} />;
   },
 }));
 

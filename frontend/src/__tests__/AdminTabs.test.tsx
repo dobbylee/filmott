@@ -7,24 +7,20 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 
-vi.mock('@/lib/api', () => ({
-  default: {
-    get: vi.fn().mockImplementation((url: string) => {
-      if (url.includes('adult-list')) {
-        return Promise.resolve({ data: { data: [], total: 0, page: 1, totalPages: 0 } });
-      }
-      return Promise.resolve({
-        data: { users: [], total: 0, page: 1, totalPages: 0 },
-      });
-    }),
-    post: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
-  },
+vi.mock('@/components/admin/UserManagement', () => ({
+  default: () => <h2>유저 관리</h2>,
 }));
 
-vi.mock('@/app/admin/actions', () => ({
-  revalidateMainPageAction: vi.fn(),
+vi.mock('@/components/admin/RankingRefresh', () => ({
+  default: () => <section>랭킹 갱신</section>,
+}));
+
+vi.mock('@/components/admin/UnmatchedPosters', () => ({
+  default: () => <section>매칭 안 된 포스터</section>,
+}));
+
+vi.mock('@/components/admin/ContentManagement', () => ({
+  default: () => <h2>콘텐츠 관리</h2>,
 }));
 
 describe('AdminTabs', () => {

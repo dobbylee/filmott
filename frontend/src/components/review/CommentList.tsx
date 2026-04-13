@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Trash2 } from 'lucide-react';
 import UserAvatar from '@/components/common/UserAvatar';
-import { getDisplayNickname, isDeletedUser, isInactiveUser } from '@/utils/user';
+import { getDisplayNickname, isInactiveUser } from '@/utils/user';
 import { formatCommentDate } from '@/utils/date';
 import type { Comment } from '@/types/comment';
 

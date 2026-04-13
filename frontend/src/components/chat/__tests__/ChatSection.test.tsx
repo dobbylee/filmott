@@ -36,9 +36,17 @@ describe('ChatSection', () => {
     mockAuthUser = null;
     mockSendChatMessage.mockReset();
     localStorageMock.clear();
-    localStorageMock.getItem.mockClear();
-    localStorageMock.setItem.mockClear();
-    localStorageMock.removeItem.mockClear();
+    localStorageMock.getItem.mockReset();
+    localStorageMock.setItem.mockReset();
+    localStorageMock.removeItem.mockReset();
+    localStorageMock.clear.mockClear();
+    localStorageMock.getItem.mockImplementation((key: string) => localStorageMock._store[key] ?? null);
+    localStorageMock.setItem.mockImplementation((key: string, value: string) => {
+      localStorageMock._store[key] = value;
+    });
+    localStorageMock.removeItem.mockImplementation((key: string) => {
+      delete localStorageMock._store[key];
+    });
   });
 
   it('환영 메시지를 렌더링한다', () => {
@@ -161,7 +169,7 @@ describe('ChatSection', () => {
     });
   });
 
-  it('localStorage에서 메시지를 복원하여 표시한다', () => {
+  it('localStorage에서 메시지를 복원하여 표시한다', async () => {
     const savedMessages = [
       { id: 1, role: 'user', content: '복원된 질문', recommendations: null, createdAt: '2026-03-25T00:00:00Z' },
       { id: 2, role: 'assistant', content: '복원된 AI 응답 텍스트', recommendations: null, createdAt: '2026-03-25T00:00:01Z' },
@@ -170,10 +178,12 @@ describe('ChatSection', () => {
 
     render(<ChatSection />);
 
-    expect(screen.getByText('복원된 AI 응답 텍스트')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('복원된 AI 응답 텍스트')).toBeInTheDocument();
+    });
   });
 
-  it('50개 초과 메시지는 최근 50개만 유지한다', () => {
+  it('50개 초과 메시지는 최근 50개만 유지한다', async () => {
     const manyMessages = Array.from({ length: 60 }, (_, i) => ({
       id: i,
       role: i % 2 === 0 ? 'user' : 'assistant',
@@ -185,14 +195,16 @@ describe('ChatSection', () => {
 
     render(<ChatSection />);
 
-    const setItemCalls = localStorageMock.setItem.mock.calls.filter(
-      (call: string[]) => call[0] === 'filmott_chat_messages',
-    );
-    expect(setItemCalls.length).toBeGreaterThan(0);
-    const savedData = JSON.parse(setItemCalls[0][1]);
-    expect(savedData).toHaveLength(50);
-    expect(savedData[0].content).toBe('메시지 10');
-    expect(savedData[49].content).toBe('메시지 59');
+    await waitFor(() => {
+      const setItemCalls = localStorageMock.setItem.mock.calls.filter(
+        (call: string[]) => call[0] === 'filmott_chat_messages',
+      );
+      expect(setItemCalls.length).toBeGreaterThan(0);
+      const savedData = JSON.parse(setItemCalls[0][1]);
+      expect(savedData).toHaveLength(50);
+      expect(savedData[0].content).toBe('메시지 10');
+      expect(savedData[49].content).toBe('메시지 59');
+    });
   });
 
   it('"새 대화" 버튼 클릭 시 메시지와 localStorage를 초기화한다', async () => {
@@ -203,6 +215,10 @@ describe('ChatSection', () => {
     localStorageMock.getItem.mockReturnValue(JSON.stringify(savedMessages));
 
     render(<ChatSection />);
+
+    await waitFor(() => {
+      expect(screen.getByText('새 대화')).toBeInTheDocument();
+    });
 
     fireEvent.click(screen.getByText('새 대화'));
 

@@ -56,7 +56,7 @@ async function fetchWithAuth(
     credentials: 'include',
   };
 
-  let response = await fetch(url, requestInit);
+  const response = await fetch(url, requestInit);
 
   if (response.status === 401) {
     const refreshed = await refreshAccessToken();

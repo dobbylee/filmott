@@ -12,9 +12,15 @@ vi.mock('@/components/common/TimeAgo', () => ({
 
 // next/image stub
 vi.mock('next/image', () => ({
-  default: ({ fill: _fill, sizes: _sizes, ...props }: Record<string, unknown>) => (
+  default: ({ fill, sizes, unoptimized, ...props }: Record<string, unknown>) => (
     // eslint-disable-next-line @next/next/no-img-element
-    <img {...props} alt={props.alt as string} />
+    <img
+      {...props}
+      alt={typeof props.alt === 'string' ? props.alt : ''}
+      data-fill={fill ? 'true' : undefined}
+      data-sizes={typeof sizes === 'string' ? sizes : undefined}
+      data-unoptimized={unoptimized ? 'true' : undefined}
+    />
   ),
 }));
 

@@ -36,61 +36,81 @@ export function useAuthCallback({
   onAuthSuccess,
   onRedirect,
 }: UseAuthCallbackParams): CallbackState {
-  const [state, setState] = useState<CallbackState>({ type: 'loading' });
-  const processed = useRef(false);
+  const [asyncState, setAsyncState] = useState<CallbackState>({ type: 'loading' });
+  const onAuthSuccessRef = useRef(onAuthSuccess);
+  const onRedirectRef = useRef(onRedirect);
 
   useEffect(() => {
-    if (processed.current) return;
+    onAuthSuccessRef.current = onAuthSuccess;
+    onRedirectRef.current = onRedirect;
+  }, [onAuthSuccess, onRedirect]);
 
-    // 에러 처리
+  useEffect(() => {
     if (error) {
-      processed.current = true;
-      setState({ type: 'error', message: getErrorText(error) });
       const timer = setTimeout(() => {
-        onRedirect('/');
+        onRedirectRef.current('/');
       }, 3000);
       return () => clearTimeout(timer);
     }
 
     if (status === 'success') {
-      processed.current = true;
+      let active = true;
+      let redirectTimer: ReturnType<typeof setTimeout> | undefined;
+
       (async () => {
         try {
           const { data } = await refreshApi.get<User>('/users/me');
-          onAuthSuccess({ user: data });
+          if (!active) return;
+
+          onAuthSuccessRef.current({ user: data });
           if (typeof window !== 'undefined') {
             window.history.replaceState({}, '', '/auth/callback');
           }
-          setState({ type: 'success' });
-          onRedirect('/');
+          setAsyncState({ type: 'success' });
+          onRedirectRef.current('/');
         } catch {
-          setState({ type: 'error', message: getErrorText('social_auth_failed') });
-          const timer = setTimeout(() => onRedirect('/'), 3000);
-          return () => clearTimeout(timer);
+          if (!active) return;
+
+          setAsyncState({ type: 'error', message: getErrorText('social_auth_failed') });
+          redirectTimer = setTimeout(() => onRedirectRef.current('/'), 3000);
         }
       })();
-      return;
+
+      return () => {
+        active = false;
+        if (redirectTimer) {
+          clearTimeout(redirectTimer);
+        }
+      };
     }
 
     if (isNew === 'true') {
-      processed.current = true;
-      setState({ type: 'nickname' });
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, '', '/auth/callback');
       }
       return;
     }
 
-    // 파라미터 없음: 에러 (초기 로딩 시 searchParams가 아직 없을 수 있으므로 지연 처리)
+    let redirectTimer: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
-      if (!processed.current) {
-        processed.current = true;
-        setState({ type: 'error', message: '잘못된 접근입니다.' });
-        setTimeout(() => onRedirect('/'), 3000);
-      }
+      setAsyncState({ type: 'error', message: '잘못된 접근입니다.' });
+      redirectTimer = setTimeout(() => onRedirectRef.current('/'), 3000);
     }, 500);
-    return () => clearTimeout(timer);
-  }, [status, isNew, error, onAuthSuccess, onRedirect]);
+    return () => {
+      clearTimeout(timer);
+      if (redirectTimer) {
+        clearTimeout(redirectTimer);
+      }
+    };
+  }, [status, isNew, error]);
 
-  return state;
+  if (error) {
+    return { type: 'error', message: getErrorText(error) };
+  }
+
+  if (isNew === 'true') {
+    return { type: 'nickname' };
+  }
+
+  return asyncState;
 }

@@ -5,7 +5,8 @@ import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
     const { fill, priority, unoptimized, ...rest } = props;
-    return <img data-fill={fill ? 'true' : undefined} data-priority={priority ? 'true' : undefined} data-unoptimized={unoptimized ? 'true' : undefined} {...rest} />;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img data-fill={fill ? 'true' : undefined} data-priority={priority ? 'true' : undefined} data-unoptimized={unoptimized ? 'true' : undefined} {...rest} alt={typeof rest.alt === 'string' ? rest.alt : ''} />;
   },
 }));
 

@@ -23,15 +23,14 @@ interface TimeAgoProps {
 }
 
 export default function TimeAgo({ date, className }: TimeAgoProps) {
-  const [text, setText] = useState(() => formatTimeAgo(date));
+  const [, forceTick] = useState(0);
 
   useEffect(() => {
-    setText(formatTimeAgo(date));
     const interval = setInterval(() => {
-      setText(formatTimeAgo(date));
+      forceTick((value) => value + 1);
     }, 60_000);
     return () => clearInterval(interval);
-  }, [date]);
+  }, []);
 
-  return <span className={className} suppressHydrationWarning>{text}</span>;
+  return <span className={className} suppressHydrationWarning>{formatTimeAgo(date)}</span>;
 }

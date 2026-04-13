@@ -10,40 +10,73 @@ interface ReviewFormWrapperProps {
   contentId: number;
 }
 
+interface ReviewLoadState {
+  key: string | null;
+  review: Review | null;
+  liked: boolean;
+}
+
 export default function ReviewFormWrapper({ contentId }: ReviewFormWrapperProps) {
   const { user } = useAuth();
-  const [existingReview, setExistingReview] = useState<Review | null | undefined>(undefined);
-  const [myLiked, setMyLiked] = useState(false);
+  const [reviewState, setReviewState] = useState<ReviewLoadState>({
+    key: null,
+    review: null,
+    liked: false,
+  });
   const [refreshKey, setRefreshKey] = useState(0);
+  const requestKey = user ? `${user.id}:${contentId}:${refreshKey}` : null;
 
   useEffect(() => {
-    if (!user) {
-      setExistingReview(null);
-      setMyLiked(false);
+    if (!requestKey) {
       return;
     }
 
-    api
-      .get<Review | null>(`/reviews/my?contentId=${contentId}`)
-      .then((res) => {
+    let active = true;
+
+    const loadReview = async () => {
+      try {
+        const res = await api.get<Review | null>(`/reviews/my?contentId=${contentId}`);
         const review = res.data && typeof res.data === 'object' ? res.data : null;
-        setExistingReview(review);
-        // 내 리뷰가 있으면 liked 여부 확인
+        let liked = false;
+
         if (review) {
-          api
-            .get<number[]>(`/reviews/liked-ids?contentId=${contentId}`)
-            .then((likesRes) => setMyLiked(new Set(likesRes.data).has(review.id)))
-            .catch(() => setMyLiked(false));
+          try {
+            const likesRes = await api.get<number[]>(`/reviews/liked-ids?contentId=${contentId}`);
+            liked = new Set(likesRes.data).has(review.id);
+          } catch {
+            liked = false;
+          }
         }
-      })
-      .catch(() => {
-        setExistingReview(null);
-      });
-  }, [user, contentId, refreshKey]);
+
+        if (active) {
+          setReviewState({ key: requestKey, review, liked });
+        }
+      } catch {
+        if (active) {
+          setReviewState({ key: requestKey, review: null, liked: false });
+        }
+      }
+    };
+
+    void loadReview();
+
+    return () => {
+      active = false;
+    };
+  }, [contentId, requestKey]);
 
   const handleMutate = () => {
     setRefreshKey((k) => k + 1);
   };
+
+  const existingReview = !user
+    ? null
+    : reviewState.key === requestKey
+      ? reviewState.review
+      : undefined;
+  const myLiked = user && reviewState.key === requestKey
+    ? reviewState.liked
+    : false;
 
   if (existingReview === undefined) {
     return (

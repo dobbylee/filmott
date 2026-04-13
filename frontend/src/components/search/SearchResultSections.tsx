@@ -8,7 +8,6 @@ import type { TmdbSearchItem, TmdbSearchResult } from '@/types/content';
 
 interface SearchResultSectionsProps {
   query: string;
-  searchType?: string; // undefined = 전체, 'person' = 인물
   personResults: TmdbSearchItem[];
   contentResults: TmdbSearchItem[];
   personTotal: number;
@@ -20,7 +19,6 @@ const CONTENT_INITIAL = 20;
 
 export default function SearchResultSections({
   query,
-  searchType,
   personResults: initialPersons,
   contentResults: initialContents,
   personTotal,

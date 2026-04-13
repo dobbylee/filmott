@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Star, Trash2 } from 'lucide-react';
+import { Star } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
 import LikeButton from './LikeButton';
 import ReviewCommentsModal from './ReviewCommentsModal';
 import api from '@/lib/api';
 import type { Review } from '@/types/review';
-import { getDisplayNickname, isDeletedUser, isInactiveUser } from '@/utils/user';
+import { getDisplayNickname, isInactiveUser } from '@/utils/user';
 import UserAvatar from '@/components/common/UserAvatar';
 
 interface ReviewCardProps {
