@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { sendChatMessage } from '@/lib/chat-stream';
 import type { ChatStreamCallbacks } from '@/lib/chat-stream';
+import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
 
 function createMockResponse(chunks: string[], status = 200): Response {
   let chunkIndex = 0;
@@ -73,16 +74,45 @@ describe('sendChatMessage', () => {
     expect(callbacks.onError).toHaveBeenCalledWith('오류 발생');
   });
 
-  it('401 응답 후 refresh도 실패하면 onError를 호출한다', async () => {
+  it('guest 요청이 401 후 refresh 실패면 서버 세션을 정리한 뒤 다시 guest 요청을 시도한다', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    fetchSpy
+      .mockResolvedValueOnce(createMockResponse([], 401))
+      .mockResolvedValueOnce(createMockResponse([], 401))
+      .mockResolvedValueOnce(createMockResponse([], 204))
+      .mockResolvedValueOnce(createMockResponse(['event: done\ndata: {}\n\n']));
+
+    await sendChatMessage('테스트', [], callbacks);
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('/auth/logout'),
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+      }),
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
+    expect(callbacks.onDone).toHaveBeenCalledTimes(1);
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
+  it('로그인 사용자의 401 응답이 refresh 실패로 이어지면 세션 만료 에러를 호출한다', async () => {
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
     const fetchSpy = vi.spyOn(global, 'fetch');
     fetchSpy
       .mockResolvedValueOnce(createMockResponse([], 401))
       .mockResolvedValueOnce(createMockResponse([], 401));
 
-    await sendChatMessage('테스트', [], callbacks);
+    await sendChatMessage('테스트', [], callbacks, { isAuthenticated: true });
 
-    expect(callbacks.onError).toHaveBeenCalledWith('로그인이 필요합니다. 다시 로그인해주세요.');
+    expect(callbacks.onError).toHaveBeenCalledWith('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+    const authEvent = dispatchSpy.mock.calls.find(
+      (call) => (call[0] as CustomEvent).type === AUTH_REQUIRED_EVENT,
+    );
+    expect(authEvent).toBeDefined();
   });
 
   it('401 응답 후 refresh가 성공하면 원 요청을 재시도해야 한다', async () => {

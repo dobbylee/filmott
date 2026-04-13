@@ -3,6 +3,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ChatSection from '@/components/chat/ChatSection';
 import type { ChatHistoryMessage, ChatStreamCallbacks } from '@/lib/chat-stream';
 
+let mockAuthUser: { id: number; nickname: string } | null = null;
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: mockAuthUser,
+  }),
+}));
+
 // chat-stream mock
 const mockSendChatMessage = vi.fn();
 vi.mock('@/lib/chat-stream', () => ({
@@ -25,6 +33,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 describe('ChatSection', () => {
   beforeEach(() => {
+    mockAuthUser = null;
     mockSendChatMessage.mockReset();
     localStorageMock.clear();
     localStorageMock.getItem.mockClear();
@@ -74,6 +83,7 @@ describe('ChatSection', () => {
           onDone: expect.any(Function),
           onError: expect.any(Function),
         }),
+        { isAuthenticated: false },
       );
     });
   });
@@ -104,6 +114,27 @@ describe('ChatSection', () => {
         '밤에 혼자 볼 스릴러 영화 추천해줘',
         expect.any(Array),
         expect.any(Object),
+        { isAuthenticated: false },
+      );
+    });
+  });
+
+  it('로그인 상태면 sendChatMessage에 isAuthenticated=true를 전달한다', async () => {
+    mockAuthUser = { id: 1, nickname: 'tester' };
+    mockSendChatMessage.mockImplementationOnce(() => new Promise(() => {}));
+
+    render(<ChatSection />);
+
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '로그인 추천' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(mockSendChatMessage).toHaveBeenCalledWith(
+        '로그인 추천',
+        [],
+        expect.any(Object),
+        { isAuthenticated: true },
       );
     });
   });
@@ -205,6 +236,33 @@ describe('ChatSection', () => {
     await waitFor(() => {
       expect(screen.getByText('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.')).toBeInTheDocument();
     });
+  });
+
+  it('세션 만료 에러가 나도 기존 대화 localStorage는 지우지 않는다', async () => {
+    const savedMessages = [
+      { id: 1, role: 'user', content: '기존 메시지', recommendations: null, createdAt: '2026-03-25T00:00:00Z' },
+      { id: 2, role: 'assistant', content: '기존 응답', recommendations: null, createdAt: '2026-03-25T00:00:01Z' },
+    ];
+    localStorageMock.getItem.mockReturnValue(JSON.stringify(savedMessages));
+    mockAuthUser = { id: 1, nickname: 'tester' };
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        callbacks.onError('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
+        return Promise.resolve();
+      },
+    );
+
+    render(<ChatSection />);
+
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '새 메시지' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(screen.getByText('로그인 세션이 만료되었습니다. 다시 로그인해주세요.')).toBeInTheDocument();
+    });
+
+    expect(localStorageMock.removeItem).not.toHaveBeenCalledWith('filmott_chat_messages');
   });
 
   it('스트리밍 완료(onDone) 후 입력이 다시 활성화된다', async () => {

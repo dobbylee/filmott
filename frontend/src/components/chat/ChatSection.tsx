@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Sparkles, MessageSquare, Plus } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { sendChatMessage } from '@/lib/chat-stream';
 import type { ChatHistoryMessage } from '@/lib/chat-stream';
 import ChatMessageBubble from './ChatMessageBubble';
@@ -23,6 +24,7 @@ const EXAMPLE_QUESTIONS = [
 ];
 
 export default function ChatSection() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState('');
@@ -173,7 +175,7 @@ export default function ChatSection() {
           setStreamingText('');
           setStreamingRecs(null);
         },
-      });
+      }, { isAuthenticated: Boolean(user) });
 
       // onDone이 호출되지 않은 경우 (연결 끊김 등) 받은 텍스트 보존
       if (!isDoneCalledRef.current && streamingTextRef.current) {

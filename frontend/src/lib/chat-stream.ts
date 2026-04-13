@@ -1,3 +1,4 @@
+import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
 import type { ChatRecommendationWithPoster } from '@/types/chat';
 
 export interface ChatStreamCallbacks {
@@ -12,45 +13,61 @@ export interface ChatHistoryMessage {
   content: string;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+interface ChatRequestOptions {
+  isAuthenticated?: boolean;
+}
+
+async function refreshAccessToken(): Promise<boolean> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   try {
     const res = await fetch(`${apiUrl}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
     });
-    if (!res.ok) return null;
-    return 'refreshed';
+    return res.ok;
   } catch {
-    return null;
+    return false;
+  }
+}
+
+async function clearServerSession(): Promise<void> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+  try {
+    await fetch(`${apiUrl}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+  } catch {
+    // 쿠키 정리 실패는 무시하고 원래 에러 처리 흐름을 따른다.
   }
 }
 
 async function fetchWithAuth(
   url: string,
   body: string,
+  isAuthenticated: boolean,
 ): Promise<Response> {
-  let response = await fetch(url, {
+  const requestInit: RequestInit = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body,
     credentials: 'include',
-  });
+  };
+
+  let response = await fetch(url, requestInit);
 
   if (response.status === 401) {
     const refreshed = await refreshAccessToken();
-    if (!refreshed) return response;
+    if (refreshed) {
+      return fetch(url, requestInit);
+    }
 
-    response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body,
-      credentials: 'include',
-    });
+    if (!isAuthenticated) {
+      await clearServerSession();
+      return fetch(url, requestInit);
+    }
   }
 
   return response;
@@ -60,17 +77,27 @@ export async function sendChatMessage(
   content: string,
   history: ChatHistoryMessage[],
   callbacks: ChatStreamCallbacks,
+  options: ChatRequestOptions = {},
 ): Promise<void> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+  const isAuthenticated = options.isAuthenticated ?? false;
 
   const response = await fetchWithAuth(
     `${apiUrl}/chat/messages`,
     JSON.stringify({ content, history }),
+    isAuthenticated,
   );
 
   if (!response.ok) {
     if (response.status === 401) {
-      callbacks.onError('로그인이 필요합니다. 다시 로그인해주세요.');
+      if (isAuthenticated && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
+      }
+      callbacks.onError(
+        isAuthenticated
+          ? '로그인 세션이 만료되었습니다. 다시 로그인해주세요.'
+          : '로그인이 필요합니다. 다시 로그인해주세요.',
+      );
       return;
     }
     if (response.status === 429) {
