@@ -1,10 +1,6 @@
 import { IsNotEmpty, IsString, MinLength, MaxLength, Matches, IsArray, IsOptional, ArrayMaxSize } from 'class-validator';
 
 export class CompleteSocialSignupDto {
-  @IsNotEmpty({ message: '임시 토큰을 입력해주세요.' })
-  @IsString()
-  tempToken!: string;
-
   @IsNotEmpty({ message: '닉네임을 입력해주세요.' })
   @IsString({ message: '닉네임은 문자열이어야 합니다.' })
   @MinLength(2, { message: '닉네임은 2자 이상이어야 합니다.' })

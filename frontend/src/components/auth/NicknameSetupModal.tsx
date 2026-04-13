@@ -12,13 +12,9 @@ import api from '@/lib/api';
 import { trackEvent } from '@/lib/ga';
 import type { AuthResponse } from '@/types/auth';
 
-interface NicknameSetupModalProps {
-  tempToken: string;
-}
-
 type Step = 'nickname' | 'ott';
 
-export default function NicknameSetupModal({ tempToken }: NicknameSetupModalProps) {
+export default function NicknameSetupModal() {
   const { handleAuthSuccess } = useAuth();
   const router = useRouter();
 
@@ -93,7 +89,6 @@ export default function NicknameSetupModal({ tempToken }: NicknameSetupModalProp
     setIsSubmitting(true);
     try {
       const response = await api.post<AuthResponse>('/auth/social/complete-signup', {
-        tempToken,
         nickname,
         subscribedOtts: skipOtts ? [] : selectedOtts,
       });

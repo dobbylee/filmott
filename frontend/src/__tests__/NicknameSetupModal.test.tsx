@@ -49,7 +49,7 @@ describe('NicknameSetupModal', () => {
   });
 
   it('닉네임 입력 단계를 렌더링해야 한다', () => {
-    render(<NicknameSetupModal tempToken="test-token" />);
+    render(<NicknameSetupModal />);
 
     expect(screen.getByText('닉네임 설정')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('2자 이상 닉네임')).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe('NicknameSetupModal', () => {
     const user = userEvent.setup();
     mockApiGet.mockResolvedValue({ data: { available: true } });
 
-    render(<NicknameSetupModal tempToken="test-token" />);
+    render(<NicknameSetupModal />);
 
     const input = screen.getByPlaceholderText('2자 이상 닉네임');
     await user.type(input, 'testuser');
@@ -84,7 +84,7 @@ describe('NicknameSetupModal', () => {
     const user = userEvent.setup();
     mockApiGet.mockResolvedValue({ data: { available: true } });
 
-    render(<NicknameSetupModal tempToken="test-token" />);
+    render(<NicknameSetupModal />);
 
     const input = screen.getByPlaceholderText('2자 이상 닉네임');
     await user.type(input, 'testuser');
@@ -105,13 +105,11 @@ describe('NicknameSetupModal', () => {
     mockApiGet.mockResolvedValue({ data: { available: true } });
     mockApiPost.mockResolvedValue({
       data: {
-        access_token: 'token',
-        refresh_token: 'refresh',
         user: { id: 1, nickname: 'testuser', subscribedOtts: ['netflix', 'tving'] },
       },
     });
 
-    render(<NicknameSetupModal tempToken="test-token" />);
+    render(<NicknameSetupModal />);
 
     const input = screen.getByPlaceholderText('2자 이상 닉네임');
     await user.type(input, 'testuser');
@@ -129,7 +127,6 @@ describe('NicknameSetupModal', () => {
     await user.click(screen.getByRole('button', { name: '시작하기' }));
 
     expect(mockApiPost).toHaveBeenCalledWith('/auth/social/complete-signup', {
-      tempToken: 'test-token',
       nickname: 'testuser',
       subscribedOtts: ['netflix', 'tving'],
     });
@@ -140,13 +137,11 @@ describe('NicknameSetupModal', () => {
     mockApiGet.mockResolvedValue({ data: { available: true } });
     mockApiPost.mockResolvedValue({
       data: {
-        access_token: 'token',
-        refresh_token: 'refresh',
         user: { id: 1, nickname: 'testuser', subscribedOtts: [] },
       },
     });
 
-    render(<NicknameSetupModal tempToken="test-token" />);
+    render(<NicknameSetupModal />);
 
     const input = screen.getByPlaceholderText('2자 이상 닉네임');
     await user.type(input, 'testuser');
@@ -159,7 +154,6 @@ describe('NicknameSetupModal', () => {
     await user.click(screen.getByRole('button', { name: '건너뛰기' }));
 
     expect(mockApiPost).toHaveBeenCalledWith('/auth/social/complete-signup', {
-      tempToken: 'test-token',
       nickname: 'testuser',
       subscribedOtts: [],
     });
@@ -170,13 +164,11 @@ describe('NicknameSetupModal', () => {
     mockApiGet.mockResolvedValue({ data: { available: true } });
     mockApiPost.mockResolvedValue({
       data: {
-        access_token: 'token',
-        refresh_token: 'refresh',
         user: { id: 1, nickname: 'testuser', provider: 'google' },
       },
     });
 
-    render(<NicknameSetupModal tempToken="test-token" />);
+    render(<NicknameSetupModal />);
 
     const input = screen.getByPlaceholderText('2자 이상 닉네임');
     await user.type(input, 'testuser');
@@ -196,13 +188,11 @@ describe('NicknameSetupModal', () => {
     mockApiGet.mockResolvedValue({ data: { available: true } });
     mockApiPost.mockResolvedValue({
       data: {
-        access_token: 'token',
-        refresh_token: 'refresh',
         user: { id: 1, nickname: 'testuser' },
       },
     });
 
-    render(<NicknameSetupModal tempToken="test-token" />);
+    render(<NicknameSetupModal />);
 
     const input = screen.getByPlaceholderText('2자 이상 닉네임');
     await user.type(input, 'testuser');
@@ -222,7 +212,7 @@ describe('NicknameSetupModal', () => {
     mockApiGet.mockResolvedValue({ data: { available: true } });
     mockApiPost.mockRejectedValue(new Error('서버 오류'));
 
-    render(<NicknameSetupModal tempToken="test-token" />);
+    render(<NicknameSetupModal />);
 
     const input = screen.getByPlaceholderText('2자 이상 닉네임');
     await user.type(input, 'testuser');
@@ -241,7 +231,7 @@ describe('NicknameSetupModal', () => {
     const user = userEvent.setup();
     mockApiGet.mockResolvedValue({ data: { available: true } });
 
-    render(<NicknameSetupModal tempToken="test-token" />);
+    render(<NicknameSetupModal />);
 
     const input = screen.getByPlaceholderText('2자 이상 닉네임');
     await user.type(input, 'testuser');

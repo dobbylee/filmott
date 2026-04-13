@@ -349,101 +349,6 @@ describe('AuthService', () => {
     });
   });
 
-  describe('generateOneTimeCode / exchangeOneTimeCode', () => {
-    it('일회용 코드를 생성하고 교환하여 토큰을 반환해야 한다', async () => {
-      const userId = 1;
-      mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER, subscribedOtts: [],
-      });
-      mockJwtService.sign.mockReturnValue('access.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
-      mockRefreshTokenRepo.save.mockResolvedValue({});
-
-      const code = service.generateOneTimeCode(userId);
-      expect(typeof code).toBe('string');
-      expect(code.length).toBe(64);
-
-      const result = await service.exchangeOneTimeCode(code);
-      expect(result.access_token).toBe('access.token');
-      expect(result.refresh_token).toBeDefined();
-      expect(result.user).toEqual({
-        id: 1, nickname: 'testuser', role: UserRole.USER, profileImage: null, subscribedOtts: [],
-      });
-    });
-
-    it('동일 코드를 두 번 사용하면 두 번째에 UnauthorizedException을 던져야 한다', async () => {
-      mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER, profileImage: null,
-      });
-      mockJwtService.sign.mockReturnValue('access.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
-      mockRefreshTokenRepo.save.mockResolvedValue({});
-
-      const code = service.generateOneTimeCode(1);
-      await service.exchangeOneTimeCode(code);
-
-      await expect(service.exchangeOneTimeCode(code))
-        .rejects.toThrow(new UnauthorizedException('유효하지 않거나 만료된 코드입니다.'));
-    });
-
-    it('존재하지 않는 코드면 UnauthorizedException을 던져야 한다', async () => {
-      await expect(service.exchangeOneTimeCode('nonexistent-code'))
-        .rejects.toThrow(new UnauthorizedException('유효하지 않거나 만료된 코드입니다.'));
-    });
-
-    it('만료된 코드면 UnauthorizedException을 던져야 한다', async () => {
-      const code = service.generateOneTimeCode(1);
-
-      // 만료 시간을 과거로 설정
-      const nowSpy = jest.spyOn(Date, 'now');
-      nowSpy.mockReturnValue(Date.now() + 6 * 60 * 1000); // 6분 후
-
-      await expect(service.exchangeOneTimeCode(code))
-        .rejects.toThrow(new UnauthorizedException('유효하지 않거나 만료된 코드입니다.'));
-
-      nowSpy.mockRestore();
-    });
-
-    it('SUSPENDED 유저의 코드 교환 시 UnauthorizedException을 던져야 한다', async () => {
-      mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.SUSPENDED, role: UserRole.USER,
-      });
-
-      const code = service.generateOneTimeCode(1);
-      await expect(service.exchangeOneTimeCode(code))
-        .rejects.toThrow(new UnauthorizedException('정지된 계정입니다.'));
-    });
-
-    it('DELETED 유저의 코드 교환 시 UnauthorizedException을 던져야 한다', async () => {
-      mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.DELETED, role: UserRole.USER,
-      });
-
-      const code = service.generateOneTimeCode(1);
-      await expect(service.exchangeOneTimeCode(code))
-        .rejects.toThrow(new UnauthorizedException('탈퇴한 계정입니다.'));
-    });
-  });
-
-  describe('cleanExpiredCodes', () => {
-    it('만료된 코드를 정리해야 한다', () => {
-      const nowSpy = jest.spyOn(Date, 'now');
-      const baseTime = 1700000000000;
-      nowSpy.mockReturnValue(baseTime);
-
-      service.generateOneTimeCode(1);
-      service.generateOneTimeCode(2);
-
-      // 6분 후로 시간 이동
-      nowSpy.mockReturnValue(baseTime + 6 * 60 * 1000);
-      service.cleanExpiredCodes();
-
-      // 코드 교환 시도 시 실패해야 한다
-      // (코드 자체가 삭제되어 not found)
-      nowSpy.mockRestore();
-    });
-  });
-
   describe('login', () => {
     it('ADMIN은 이메일 로그인이 가능해야 한다', async () => {
       const mockUser = {
@@ -494,7 +399,7 @@ describe('AuthService', () => {
       profileImage: 'http://google.com/photo.jpg',
     };
 
-    it('기존 유저가 있으면 one-time code를 반환해야 한다', async () => {
+    it('기존 유저가 있으면 즉시 세션을 반환해야 한다', async () => {
       const existingUser = {
         id: 1,
         nickname: 'existinguser',
@@ -504,15 +409,28 @@ describe('AuthService', () => {
         providerId: 'google-123',
         status: UserStatus.ACTIVE,
         role: UserRole.USER,
+        profileImage: null,
+        subscribedOtts: [],
       };
       mockUsersService.findByProvider.mockResolvedValue(existingUser);
+      mockJwtService.sign.mockReturnValue('access.token');
+      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.save.mockResolvedValue({});
 
       const result = await service.handleSocialCallback(googleProfile);
 
       expect(result.type).toBe('existing');
       if (result.type === 'existing') {
-        expect(typeof result.code).toBe('string');
-        expect(result.code.length).toBe(64);
+        expect(result.session.access_token).toBe('access.token');
+        expect(result.session.refresh_token).toHaveLength(64);
+        expect(result.session.user).toEqual({
+          id: 1,
+          nickname: 'existinguser',
+          email: 'user@gmail.com',
+          role: UserRole.USER,
+          profileImage: null,
+          subscribedOtts: [],
+        });
       }
       expect(mockUsersService.findByProvider).toHaveBeenCalledWith(
         AuthProvider.GOOGLE,
@@ -520,7 +438,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('신규 유저면 tempToken을 반환해야 한다', async () => {
+    it('신규 유저면 signupToken을 반환해야 한다', async () => {
       mockUsersService.findByProvider.mockResolvedValue(null);
       mockJwtService.sign.mockReturnValue('temp.jwt.token');
 
@@ -528,7 +446,7 @@ describe('AuthService', () => {
 
       expect(result.type).toBe('new');
       if (result.type === 'new') {
-        expect(result.tempToken).toBe('temp.jwt.token');
+        expect(result.signupToken).toBe('temp.jwt.token');
       }
       expect(mockJwtService.sign).toHaveBeenCalledWith(
         {

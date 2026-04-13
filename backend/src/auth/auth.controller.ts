@@ -30,8 +30,11 @@ import { KakaoService } from './social/kakao.service';
 import { NaverService } from './social/naver.service';
 import {
   AUTH_REFRESH_TOKEN_COOKIE,
+  SOCIAL_SIGNUP_COOKIE,
   clearAuthCookies,
+  clearSocialSignupCookie,
   setAuthCookies,
+  setSocialSignupCookie,
 } from './auth-cookie.util';
 
 const OAUTH_STATE_COOKIE = 'oauth_state';
@@ -137,7 +140,7 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.handleSocialCallback(req, res, 'google', code, state, async () => {
+    return this.handleSocialCallback(req, res, code, state, async () => {
       return this.googleService.getProfile(code);
     });
   }
@@ -159,7 +162,7 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.handleSocialCallback(req, res, 'kakao', code, state, async () => {
+    return this.handleSocialCallback(req, res, code, state, async () => {
       return this.kakaoService.getProfile(code);
     });
   }
@@ -181,40 +184,38 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.handleSocialCallback(req, res, 'naver', code, state, async () => {
+    return this.handleSocialCallback(req, res, code, state, async () => {
       return this.naverService.getProfile(code, state);
     });
-  }
-
-  @HttpCode(HttpStatus.OK)
-  @Post('social/exchange')
-  @Throttle({ default: { ttl: 60000, limit: 10 } })
-  async exchangeCode(
-    @Body('code') code: string,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    if (!code) {
-      throw new BadRequestException('코드가 필요합니다.');
-    }
-    const session = await this.authService.exchangeOneTimeCode(code);
-    this.setSessionCookies(res, session);
-    return { user: session.user };
   }
 
   @HttpCode(HttpStatus.OK)
   @Post('social/complete-signup')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   async completeSocialSignup(
+    @Req() req: Request,
     @Body() dto: CompleteSocialSignupDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.authService.completeSocialSignup(
-      dto.tempToken,
-      dto.nickname,
-      dto.subscribedOtts,
-    );
-    this.setSessionCookies(res, session);
-    return { user: session.user };
+    const signupToken = this.getSocialSignupToken(req);
+    if (!signupToken) {
+      this.clearSignupCookie(res);
+      throw new BadRequestException('회원가입 세션이 만료되었습니다. 다시 시도해주세요.');
+    }
+
+    try {
+      const session = await this.authService.completeSocialSignup(
+        signupToken,
+        dto.nickname,
+        dto.subscribedOtts,
+      );
+      this.clearSignupCookie(res);
+      this.setSessionCookies(res, session);
+      return { user: session.user };
+    } catch (error) {
+      this.clearSignupCookie(res);
+      throw error;
+    }
   }
 
   // --- Private helpers ---
@@ -249,6 +250,11 @@ export class AuthController {
     return bodyRefreshToken;
   }
 
+  private getSocialSignupToken(req: Request): string | undefined {
+    const signupToken = req.cookies?.[SOCIAL_SIGNUP_COOKIE];
+    return typeof signupToken === 'string' && signupToken.length > 0 ? signupToken : undefined;
+  }
+
   private setSessionCookies(
     res: Response,
     tokens: { access_token: string; refresh_token: string },
@@ -260,10 +266,17 @@ export class AuthController {
     clearAuthCookies(res, this.isProduction);
   }
 
+  private setSignupCookie(res: Response, signupToken: string): void {
+    setSocialSignupCookie(res, signupToken, this.isProduction);
+  }
+
+  private clearSignupCookie(res: Response): void {
+    clearSocialSignupCookie(res, this.isProduction);
+  }
+
   private async handleSocialCallback(
     req: Request,
     res: Response,
-    provider: string,
     code: string,
     state: string,
     getProfile: () => ReturnType<typeof this.googleService.getProfile>,
@@ -285,13 +298,13 @@ export class AuthController {
       const result = await this.authService.handleSocialCallback(profile);
 
       if (result.type === 'existing') {
-        const params = new URLSearchParams({ code: result.code });
+        this.clearSignupCookie(res);
+        this.setSessionCookies(res, result.session);
+        const params = new URLSearchParams({ status: 'success' });
         res.redirect(`${callbackUrl}?${params.toString()}`);
       } else {
-        const params = new URLSearchParams({
-          new: 'true',
-          tempToken: result.tempToken,
-        });
+        this.setSignupCookie(res, result.signupToken);
+        const params = new URLSearchParams({ new: 'true' });
         res.redirect(`${callbackUrl}?${params.toString()}`);
       }
     } catch (error) {

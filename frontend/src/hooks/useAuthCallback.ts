@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import api from '@/lib/api';
-import type { AuthResponse } from '@/types/auth';
+import { refreshApi } from '@/lib/api';
+import type { AuthResponse, User } from '@/types/auth';
 
 export type CallbackState =
   | { type: 'loading' }
-  | { type: 'nickname'; tempToken: string }
+  | { type: 'nickname' }
   | { type: 'error'; message: string }
   | { type: 'success' };
 
@@ -22,18 +22,16 @@ function getErrorText(reason: string): string {
 }
 
 interface UseAuthCallbackParams {
-  code: string | null;
+  status: string | null;
   isNew: string | null;
-  tempToken: string | null;
   error: string | null;
   onAuthSuccess: (data: AuthResponse) => void;
   onRedirect: (path: string) => void;
 }
 
 export function useAuthCallback({
-  code,
+  status,
   isNew,
-  tempToken,
   error,
   onAuthSuccess,
   onRedirect,
@@ -54,13 +52,12 @@ export function useAuthCallback({
       return () => clearTimeout(timer);
     }
 
-    // 기존 유저: code로 토큰 교환
-    if (code) {
+    if (status === 'success') {
       processed.current = true;
       (async () => {
         try {
-          const { data } = await api.post<AuthResponse>('/auth/social/exchange', { code });
-          onAuthSuccess(data);
+          const { data } = await refreshApi.get<User>('/users/me');
+          onAuthSuccess({ user: data });
           if (typeof window !== 'undefined') {
             window.history.replaceState({}, '', '/auth/callback');
           }
@@ -75,10 +72,9 @@ export function useAuthCallback({
       return;
     }
 
-    // 신규 유저: 닉네임 설정 모달 표시
-    if (isNew === 'true' && tempToken) {
+    if (isNew === 'true') {
       processed.current = true;
-      setState({ type: 'nickname', tempToken });
+      setState({ type: 'nickname' });
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, '', '/auth/callback');
       }
@@ -94,7 +90,7 @@ export function useAuthCallback({
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [code, isNew, tempToken, error, onAuthSuccess, onRedirect]);
+  }, [status, isNew, error, onAuthSuccess, onRedirect]);
 
   return state;
 }

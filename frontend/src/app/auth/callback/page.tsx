@@ -16,16 +16,15 @@ function AuthCallbackContent() {
   }, [router]);
 
   const state = useAuthCallback({
-    code: searchParams.get('code'),
+    status: searchParams.get('status'),
     isNew: searchParams.get('new'),
-    tempToken: searchParams.get('tempToken'),
     error: searchParams.get('error'),
     onAuthSuccess: handleAuthSuccess,
     onRedirect,
   });
 
   if (state.type === 'nickname') {
-    return <NicknameSetupModal tempToken={state.tempToken} />;
+    return <NicknameSetupModal />;
   }
 
   if (state.type === 'error') {

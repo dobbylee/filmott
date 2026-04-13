@@ -17,6 +17,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import {
   AUTH_ACCESS_TOKEN_COOKIE,
   AUTH_REFRESH_TOKEN_COOKIE,
+  SOCIAL_SIGNUP_COOKIE,
 } from './auth-cookie.util';
 
 describe('AuthController', () => {
@@ -76,6 +77,34 @@ describe('AuthController', () => {
     );
   };
 
+  const expectSignupCookie = (
+    mockRes: ReturnType<typeof createMockResponse>,
+    signupToken: string,
+  ) => {
+    expect(mockRes.cookie).toHaveBeenCalledWith(
+      SOCIAL_SIGNUP_COOKIE,
+      signupToken,
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: false,
+        path: '/',
+      }),
+    );
+  };
+
+  const expectSignupCookieCleared = (mockRes: ReturnType<typeof createMockResponse>) => {
+    expect(mockRes.clearCookie).toHaveBeenCalledWith(
+      SOCIAL_SIGNUP_COOKIE,
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: false,
+        path: '/',
+      }),
+    );
+  };
+
   const mockAuthService = {
     login: jest.fn(),
     register: jest.fn(),
@@ -83,7 +112,6 @@ describe('AuthController', () => {
     revokeRefreshToken: jest.fn(),
     handleSocialCallback: jest.fn(),
     completeSocialSignup: jest.fn(),
-    exchangeOneTimeCode: jest.fn(),
   };
 
   const mockConfigService = {
@@ -319,15 +347,15 @@ describe('AuthController', () => {
   });
 
   describe('GET /auth/google/callback (googleCallback)', () => {
-    it('기존 유저면 one-time code와 함께 프론트엔드로 리다이렉트해야 한다', async () => {
-      const mockRes = {
-        cookie: jest.fn(),
-        redirect: jest.fn(),
-        clearCookie: jest.fn(),
-      };
+    it('기존 유저면 callback에서 바로 세션 쿠키를 설정하고 성공 플래그로 리다이렉트해야 한다', async () => {
+      const mockRes = createMockResponse();
       const existingResult: SocialCallbackResult = {
         type: 'existing',
-        code: 'one-time-code-abc',
+        session: {
+          access_token: 'access-token',
+          refresh_token: 'refresh-token',
+          user: { id: 1, nickname: 'existinguser', role: 'USER', profileImage: null, subscribedOtts: [] },
+        },
       };
       mockGoogleService.getProfile.mockResolvedValue({
         provider: AuthProvider.GOOGLE,
@@ -342,24 +370,17 @@ describe('AuthController', () => {
       await controller.googleCallback('code123', 'valid-state', mockReq as never, mockRes as never);
 
       expect(mockRes.clearCookie).toHaveBeenCalledWith('oauth_state', { path: '/' });
-      expect(mockRes.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('code=one-time-code-abc'),
-      );
-      // 토큰이 URL에 노출되지 않아야 한다
-      expect(mockRes.redirect).not.toHaveBeenCalledWith(
-        expect.stringContaining('token='),
-      );
+      expectAuthCookies(mockRes, 'access-token', 'refresh-token');
+      expectSignupCookieCleared(mockRes);
+      expect(mockRes.redirect).toHaveBeenCalledWith(expect.stringContaining('status=success'));
+      expect(mockRes.redirect).not.toHaveBeenCalledWith(expect.stringContaining('code='));
     });
 
-    it('신규 유저면 tempToken과 함께 프론트엔드로 리다이렉트해야 한다', async () => {
-      const mockRes = {
-        cookie: jest.fn(),
-        redirect: jest.fn(),
-        clearCookie: jest.fn(),
-      };
+    it('신규 유저면 signup cookie를 설정하고 new=true로 리다이렉트해야 한다', async () => {
+      const mockRes = createMockResponse();
       const newResult: SocialCallbackResult = {
         type: 'new',
-        tempToken: 'temp-jwt-token',
+        signupToken: 'signup-jwt-token',
       };
       mockGoogleService.getProfile.mockResolvedValue({
         provider: AuthProvider.GOOGLE,
@@ -373,9 +394,9 @@ describe('AuthController', () => {
       const mockReq = { cookies: { oauth_state: 'valid-state' } };
       await controller.googleCallback('code456', 'valid-state', mockReq as never, mockRes as never);
 
-      expect(mockRes.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('new=true&tempToken=temp-jwt-token'),
-      );
+      expectSignupCookie(mockRes, 'signup-jwt-token');
+      expect(mockRes.redirect).toHaveBeenCalledWith(expect.stringContaining('new=true'));
+      expect(mockRes.redirect).not.toHaveBeenCalledWith(expect.stringContaining('tempToken='));
     });
 
     it('state가 일치하지 않으면 에러와 함께 리다이렉트해야 한다', async () => {
@@ -513,39 +534,10 @@ describe('AuthController', () => {
     });
   });
 
-  describe('POST /auth/social/exchange (exchangeCode)', () => {
-    it('유효한 code로 세션을 교환하고 쿠키를 설정해야 한다', async () => {
-      const mockRes = createMockResponse();
-      const response = {
-        access_token: 'at',
-        refresh_token: 'rt',
-        user: { id: 1, nickname: 'user', role: 'USER' },
-      };
-      mockAuthService.exchangeOneTimeCode.mockResolvedValue(response);
-
-      const result = await controller.exchangeCode('valid-code', mockRes as never);
-
-      expect(mockAuthService.exchangeOneTimeCode).toHaveBeenCalledWith('valid-code');
-      expectAuthCookies(mockRes, 'at', 'rt');
-      expect(result).toEqual({ user: response.user });
-    });
-
-    it('code가 없으면 BadRequestException을 던져야 한다', async () => {
-      await expect(controller.exchangeCode('')).rejects.toThrow(BadRequestException);
-    });
-
-    it('유효하지 않은 code면 UnauthorizedException을 던져야 한다', async () => {
-      mockAuthService.exchangeOneTimeCode.mockRejectedValue(
-        new UnauthorizedException('유효하지 않거나 만료된 코드입니다.'),
-      );
-
-      await expect(controller.exchangeCode('invalid-code')).rejects.toThrow(UnauthorizedException);
-    });
-  });
-
   describe('POST /auth/social/complete-signup (completeSocialSignup)', () => {
-    it('닉네임 설정 후 세션 쿠키를 설정하고 사용자 정보를 반환해야 한다', async () => {
-      const dto = { tempToken: 'temp-token', nickname: 'newuser' };
+    it('signup cookie로 회원가입을 완료하고 세션 쿠키를 설정해야 한다', async () => {
+      const dto = { nickname: 'newuser' };
+      const mockReq = { cookies: { [SOCIAL_SIGNUP_COOKIE]: 'signup-token' } };
       const mockRes = createMockResponse();
       const response = {
         access_token: 'new-at',
@@ -554,11 +546,23 @@ describe('AuthController', () => {
       };
       mockAuthService.completeSocialSignup.mockResolvedValue(response);
 
-      const result = await controller.completeSocialSignup(dto, mockRes as never);
+      const result = await controller.completeSocialSignup(mockReq as never, dto, mockRes as never);
 
-      expect(mockAuthService.completeSocialSignup).toHaveBeenCalledWith('temp-token', 'newuser', undefined);
+      expect(mockAuthService.completeSocialSignup).toHaveBeenCalledWith('signup-token', 'newuser', undefined);
+      expectSignupCookieCleared(mockRes);
       expectAuthCookies(mockRes, 'new-at', 'new-rt');
       expect(result).toEqual({ user: response.user });
+    });
+
+    it('signup cookie가 없으면 BadRequestException을 던지고 쿠키를 정리해야 한다', async () => {
+      const mockReq = { cookies: {} };
+      const mockRes = createMockResponse();
+
+      await expect(
+        controller.completeSocialSignup(mockReq as never, { nickname: 'newuser' }, mockRes as never),
+      ).rejects.toThrow(BadRequestException);
+
+      expectSignupCookieCleared(mockRes);
     });
   });
 
@@ -607,11 +611,6 @@ describe('AuthController', () => {
       expect(googleKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
       expect(kakaoKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
       expect(naverKeys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
-    });
-
-    it('exchangeCode 메서드에 Throttle 데코레이터가 있어야 한다', () => {
-      const keys = Reflect.getMetadataKeys(AuthController.prototype.exchangeCode);
-      expect(keys.some(key => key.toString().includes('THROTTLER'))).toBe(true);
     });
 
     it('completeSocialSignup 메서드에 Throttle 데코레이터가 있어야 한다', () => {
