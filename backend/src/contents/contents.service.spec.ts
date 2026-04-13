@@ -4,6 +4,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { Content } from './content.entity';
 import { TmdbService } from '../tmdb/tmdb.service';
+import { RevalidateService } from '../common/revalidate.service';
 describe('ContentsService', () => {
   let service: ContentsService;
   let tmdbService: TmdbService;
@@ -35,6 +36,10 @@ describe('ContentsService', () => {
     getPersonCredits: jest.fn(),
   };
 
+  const mockRevalidateService = {
+    revalidatePath: jest.fn().mockResolvedValue(undefined),
+    revalidatePaths: jest.fn().mockResolvedValue(undefined),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -42,6 +47,7 @@ describe('ContentsService', () => {
         ContentsService,
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },
         { provide: TmdbService, useValue: mockTmdbService },
+        { provide: RevalidateService, useValue: mockRevalidateService },
       ],
     }).compile();
 
@@ -955,6 +961,10 @@ describe('ContentsService', () => {
       expect(mockContentRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ adult: true }),
       );
+      expect(mockRevalidateService.revalidatePaths).toHaveBeenCalledWith([
+        '/',
+        '/contents/movie/123',
+      ]);
     });
 
     it('DB에 콘텐츠가 없으면 TMDB에서 가져온 후 adult를 설정해야 한다', async () => {
@@ -994,6 +1004,10 @@ describe('ContentsService', () => {
 
       expect(mockTmdbService.getDetails).toHaveBeenCalledWith(456, 'movie');
       expect(result.adult).toBe(true);
+      expect(mockRevalidateService.revalidatePaths).toHaveBeenCalledWith([
+        '/',
+        '/contents/movie/456',
+      ]);
     });
 
     it('차단 해제 시 adult를 false로 설정해야 한다', async () => {
@@ -1010,6 +1024,10 @@ describe('ContentsService', () => {
       const result = await service.toggleAdult(789, 'tv', false);
 
       expect(result.adult).toBe(false);
+      expect(mockRevalidateService.revalidatePaths).toHaveBeenCalledWith([
+        '/',
+        '/contents/tv/789',
+      ]);
     });
   });
 
@@ -1220,6 +1238,11 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockReturnValue(fetchedContent);
       mockContentRepo.save.mockResolvedValue(fetchedContent);
       mockContentRepo.update.mockResolvedValue({ affected: 3 });
+      mockContentRepo.find.mockResolvedValue([
+        { tmdbId: 100, contentType: 'movie' },
+        { tmdbId: 200, contentType: 'tv' },
+        { tmdbId: 300, contentType: 'movie' },
+      ]);
 
       const result = await service.blockPersonContents(12345);
 
@@ -1228,6 +1251,12 @@ describe('ContentsService', () => {
       expect(result.blocked).toBe(3);
       expect(result.failed).toBe(0);
       expect(mockContentRepo.update).toHaveBeenCalled();
+      expect(mockRevalidateService.revalidatePaths).toHaveBeenCalledWith([
+        '/',
+        '/contents/movie/100',
+        '/contents/tv/200',
+        '/contents/movie/300',
+      ]);
     });
 
     it('이미 adult=true인 항목을 건너뛰어야 한다', async () => {
@@ -1247,12 +1276,19 @@ describe('ContentsService', () => {
       mockContentRepo.createQueryBuilder.mockReturnValue(blockQueryBuilder);
       blockQueryBuilder.getMany.mockResolvedValue(existingContents);
       mockContentRepo.update.mockResolvedValue({ affected: 1 });
+      mockContentRepo.find.mockResolvedValue([
+        { tmdbId: 200, contentType: 'movie' },
+      ]);
 
       const result = await service.blockPersonContents(99999);
 
       // id:100은 이미 adult=true → 건너뜀, id:200만 차단
       expect(result.blocked).toBe(1);
       expect(result.total).toBe(2);
+      expect(mockRevalidateService.revalidatePaths).toHaveBeenCalledWith([
+        '/',
+        '/contents/movie/200',
+      ]);
     });
 
     it('TMDB fetch 실패 시 failed 카운트를 증가시키고 계속 진행해야 한다', async () => {
@@ -1286,12 +1322,19 @@ describe('ContentsService', () => {
       mockTmdbService.getDetails.mockRejectedValueOnce(new Error('TMDB API Error'));
 
       mockContentRepo.update.mockResolvedValue({ affected: 1 });
+      mockContentRepo.find.mockResolvedValue([
+        { tmdbId: 100, contentType: 'movie' },
+      ]);
 
       const result = await service.blockPersonContents(11111);
 
       expect(result.blocked).toBe(1);
       expect(result.failed).toBe(1);
       expect(result.total).toBe(2);
+      expect(mockRevalidateService.revalidatePaths).toHaveBeenCalledWith([
+        '/',
+        '/contents/movie/100',
+      ]);
     });
   });
 

@@ -10,6 +10,7 @@ import {
   TmdbPersonCredit,
 } from '../tmdb/tmdb.service';
 import { TMDB_IMAGE_BASE, GENRE_NAME_MAP, CONTENT_DETAIL_TTL_MS } from '../common/constants';
+import { RevalidateService } from '../common/revalidate.service';
 
 const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000; // 5분
 const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72시간
@@ -31,6 +32,7 @@ export class ContentsService {
     @InjectRepository(Content)
     private readonly contentRepo: Repository<Content>,
     private readonly tmdbService: TmdbService,
+    private readonly revalidateService: RevalidateService,
   ) {}
 
   /**
@@ -334,6 +336,10 @@ export class ContentsService {
     content.adult = adult;
     const saved = await this.contentRepo.save(content);
     this.invalidateBlockedIdsCache();
+    await this.revalidateService.revalidatePaths([
+      '/',
+      `/contents/${contentType}/${tmdbId}`,
+    ]);
     return saved;
   }
 
@@ -427,6 +433,13 @@ export class ContentsService {
           select: ['tmdbId', 'contentType'],
         })
       : [];
+
+    if (blockedContents.length > 0) {
+      await this.revalidateService.revalidatePaths([
+        '/',
+        ...blockedContents.map((content) => `/contents/${content.contentType}/${content.tmdbId}`),
+      ]);
+    }
 
     return {
       blocked: toBlockIds.length,

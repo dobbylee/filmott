@@ -741,4 +741,76 @@ describe('WatchlistService', () => {
       expect(result.watchedAt).toBeNull();
     });
   });
+
+  describe('addToWatchlistByContentIdWithManager', () => {
+    it('트랜잭션 매니저 저장소로 새 워치리스트 항목을 생성해야 한다', async () => {
+      const transactionalRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation((data: any) => data),
+        save: jest.fn().mockImplementation((data: any) => Promise.resolve(data)),
+      };
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(transactionalRepo),
+      };
+
+      const result = await service.addToWatchlistByContentIdWithManager(
+        mockManager as any,
+        1,
+        7,
+        'watched',
+        '2026-04-01T00:00:00Z',
+      );
+
+      expect(mockManager.getRepository).toHaveBeenCalled();
+      expect(transactionalRepo.create).toHaveBeenCalledWith({
+        userId: 1,
+        contentId: 7,
+        status: 'watched',
+        watchedAt: new Date('2026-04-01T00:00:00Z'),
+      });
+      expect(result).toEqual({
+        userId: 1,
+        contentId: 7,
+        status: 'watched',
+        watchedAt: new Date('2026-04-01T00:00:00Z'),
+      });
+    });
+
+    it('트랜잭션 매니저 저장소에서 기존 항목을 업데이트해야 한다', async () => {
+      const existing = {
+        id: 9,
+        userId: 1,
+        contentId: 7,
+        status: 'want_to_watch',
+        watchedAt: null,
+      };
+      const transactionalRepo = {
+        findOne: jest.fn().mockResolvedValue(existing),
+        create: jest.fn(),
+        save: jest.fn().mockImplementation((data: any) => Promise.resolve(data)),
+      };
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(transactionalRepo),
+      };
+
+      const result = await service.addToWatchlistByContentIdWithManager(
+        mockManager as any,
+        1,
+        7,
+        'want_to_watch',
+      );
+
+      expect(transactionalRepo.create).not.toHaveBeenCalled();
+      expect(transactionalRepo.save).toHaveBeenCalledWith({
+        ...existing,
+        status: 'want_to_watch',
+        watchedAt: null,
+      });
+      expect(result).toEqual({
+        ...existing,
+        status: 'want_to_watch',
+        watchedAt: null,
+      });
+    });
+  });
 });

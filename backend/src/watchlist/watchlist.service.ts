@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Watchlist } from './watchlist.entity';
 import { ContentsService } from '../contents/contents.service';
 import { AddToWatchlistDto } from './dto/add-to-watchlist.dto';
@@ -64,28 +64,23 @@ export class WatchlistService {
     status: 'watched' | 'want_to_watch',
     watchedAt?: string,
   ): Promise<Watchlist> {
-    const existing = await this.watchlistRepo.findOne({
-      where: { userId, contentId },
-    });
+    return this.upsertByContentId(this.watchlistRepo, userId, contentId, status, watchedAt);
+  }
 
-    const resolvedDate = status === 'watched'
-      ? (watchedAt ? new Date(watchedAt) : new Date())
-      : null;
-
-    if (existing) {
-      existing.status = status;
-      existing.watchedAt = resolvedDate;
-      return this.watchlistRepo.save(existing);
-    }
-
-    const watchlist = this.watchlistRepo.create({
+  async addToWatchlistByContentIdWithManager(
+    manager: EntityManager,
+    userId: number,
+    contentId: number,
+    status: 'watched' | 'want_to_watch',
+    watchedAt?: string,
+  ): Promise<Watchlist> {
+    return this.upsertByContentId(
+      manager.getRepository(Watchlist),
       userId,
       contentId,
       status,
-      watchedAt: resolvedDate,
-    });
-
-    return this.watchlistRepo.save(watchlist);
+      watchedAt,
+    );
   }
 
   /**
@@ -334,5 +329,36 @@ export class WatchlistService {
       status: item?.status ?? null,
       watchlistId: item?.id ?? null,
     };
+  }
+
+  private async upsertByContentId(
+    repo: Repository<Watchlist>,
+    userId: number,
+    contentId: number,
+    status: 'watched' | 'want_to_watch',
+    watchedAt?: string,
+  ): Promise<Watchlist> {
+    const existing = await repo.findOne({
+      where: { userId, contentId },
+    });
+
+    const resolvedDate = status === 'watched'
+      ? (watchedAt ? new Date(watchedAt) : new Date())
+      : null;
+
+    if (existing) {
+      existing.status = status;
+      existing.watchedAt = resolvedDate;
+      return repo.save(existing);
+    }
+
+    const watchlist = repo.create({
+      userId,
+      contentId,
+      status,
+      watchedAt: resolvedDate,
+    });
+
+    return repo.save(watchlist);
   }
 }

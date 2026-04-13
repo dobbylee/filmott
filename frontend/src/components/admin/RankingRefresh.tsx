@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { RefreshCw, Check, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { getErrorMessage } from '@/utils/error';
-import { revalidateMainPageAction } from '@/app/admin/actions';
 
 interface CategoryConfig {
   key: string;
@@ -38,12 +37,6 @@ export default function RankingRefresh() {
 
     try {
       await api.post(`/rankings/refresh/${category}`);
-      // 메인 페이지 캐시 즉시 갱신 (Server Action으로 서버사이드 호출)
-      try {
-        await revalidateMainPageAction();
-      } catch {
-        // revalidation 실패해도 갱신 자체는 성공
-      }
       setStates((prev) => ({
         ...prev,
         [category]: { status: 'success', message: '갱신 완료' },

@@ -39,8 +39,7 @@ describe('ReviewsService', () => {
   };
 
   const mockWatchlistService = {
-    getWatchlistStatus: jest.fn(),
-    addToWatchlistByContentId: jest.fn(),
+    addToWatchlistByContentIdWithManager: jest.fn(),
   };
 
   const mockRevalidateService = {
@@ -67,37 +66,59 @@ describe('ReviewsService', () => {
   });
 
   describe('create', () => {
+    const createManager = ({
+      existingReview = null,
+      existingWatchlist = null,
+      createdReview,
+    }: {
+      existingReview?: Partial<Review> | null;
+      existingWatchlist?: { status: 'watched' | 'want_to_watch' } | null;
+      createdReview: Review;
+    }) => ({
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(existingReview)
+        .mockResolvedValueOnce(existingWatchlist),
+      create: jest.fn().mockReturnValue(createdReview),
+      save: jest.fn().mockResolvedValue(createdReview),
+    });
+
     it('별점과 코멘트로 리뷰를 생성해야 한다', async () => {
       const dto = { contentId: 1, rating: 8, comment: 'Great movie!' };
-      mockReviewRepo.findOne.mockResolvedValue(null);
       const created = { id: 1, userId: 1, ...dto, likesCount: 0 };
-      mockReviewRepo.create.mockReturnValue(created);
-      mockReviewRepo.save.mockResolvedValue(created);
-      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: null, watchlistId: null });
-      mockWatchlistService.addToWatchlistByContentId.mockResolvedValue({});
+      const mockManager = createManager({ createdReview: created as Review });
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
+        cb(mockManager as unknown as EntityManager),
+      );
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue({});
 
       const result = await service.create(1, dto);
 
-      expect(mockReviewRepo.create).toHaveBeenCalledWith({
+      expect(mockManager.create).toHaveBeenCalledWith(Review, {
         userId: 1,
         contentId: 1,
         rating: 8,
         comment: 'Great movie!',
-
       });
       expect(result).toEqual(created);
-      expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched', undefined);
+      expect(mockWatchlistService.addToWatchlistByContentIdWithManager).toHaveBeenCalledWith(
+        mockManager,
+        1,
+        1,
+        'watched',
+        undefined,
+      );
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
 
     it('별점만으로 리뷰를 생성해야 한다', async () => {
       const dto = { contentId: 1, rating: 7 };
-      mockReviewRepo.findOne.mockResolvedValue(null);
       const created = { id: 2, userId: 1, ...dto, likesCount: 0 };
-      mockReviewRepo.create.mockReturnValue(created);
-      mockReviewRepo.save.mockResolvedValue(created);
-      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: null, watchlistId: null });
-      mockWatchlistService.addToWatchlistByContentId.mockResolvedValue({});
+      const mockManager = createManager({ createdReview: created as Review });
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
+        cb(mockManager as unknown as EntityManager),
+      );
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue({});
 
       const result = await service.create(1, dto);
       expect(result.id).toBe(2);
@@ -105,14 +126,13 @@ describe('ReviewsService', () => {
     });
 
     it('DTO를 통해 코멘트만으로 리뷰를 생성해야 한다 - rating은 파이프 레벨에서 검증', async () => {
-      // rating은 DTO ValidationPipe에서 필수 검증됨. 서비스는 rating이 있다고 가정
       const dto = { contentId: 1, rating: 5, comment: '좋아요' };
-      mockReviewRepo.findOne.mockResolvedValue(null);
       const created = { id: 3, userId: 1, ...dto, likesCount: 0 };
-      mockReviewRepo.create.mockReturnValue(created);
-      mockReviewRepo.save.mockResolvedValue(created);
-      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: null, watchlistId: null });
-      mockWatchlistService.addToWatchlistByContentId.mockResolvedValue({});
+      const mockManager = createManager({ createdReview: created as Review });
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
+        cb(mockManager as unknown as EntityManager),
+      );
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue({});
 
       const result = await service.create(1, dto);
       expect(result.rating).toBe(5);
@@ -120,32 +140,64 @@ describe('ReviewsService', () => {
 
     it('이미 감상한 경우 워치리스트에 추가하지 않아야 한다', async () => {
       const dto = { contentId: 1, rating: 8 };
-      mockReviewRepo.findOne.mockResolvedValue(null);
       const created = { id: 4, userId: 1, ...dto, likesCount: 0 };
-      mockReviewRepo.create.mockReturnValue(created);
-      mockReviewRepo.save.mockResolvedValue(created);
-      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: 'watched', watchlistId: 1 });
+      const mockManager = createManager({
+        createdReview: created as Review,
+        existingWatchlist: { status: 'watched' },
+      });
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
+        cb(mockManager as unknown as EntityManager),
+      );
 
       await service.create(1, dto);
-      expect(mockWatchlistService.addToWatchlistByContentId).not.toHaveBeenCalled();
+      expect(mockWatchlistService.addToWatchlistByContentIdWithManager).not.toHaveBeenCalled();
     });
 
     it('리뷰 생성 시 want_to_watch를 watched로 전환해야 한다', async () => {
       const dto = { contentId: 1, rating: 9 };
-      mockReviewRepo.findOne.mockResolvedValue(null);
       const created = { id: 5, userId: 1, ...dto, likesCount: 0 };
-      mockReviewRepo.create.mockReturnValue(created);
-      mockReviewRepo.save.mockResolvedValue(created);
-      mockWatchlistService.getWatchlistStatus.mockResolvedValue({ status: 'want_to_watch', watchlistId: 2 });
-      mockWatchlistService.addToWatchlistByContentId.mockResolvedValue({});
+      const mockManager = createManager({
+        createdReview: created as Review,
+        existingWatchlist: { status: 'want_to_watch' },
+      });
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
+        cb(mockManager as unknown as EntityManager),
+      );
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue({});
 
       await service.create(1, dto);
-      expect(mockWatchlistService.addToWatchlistByContentId).toHaveBeenCalledWith(1, 1, 'watched', undefined);
+      expect(mockWatchlistService.addToWatchlistByContentIdWithManager).toHaveBeenCalledWith(
+        mockManager,
+        1,
+        1,
+        'watched',
+        undefined,
+      );
+    });
+
+    it('워치리스트 저장이 실패하면 리뷰 생성도 롤백해야 한다', async () => {
+      const dto = { contentId: 1, rating: 6 };
+      const created = { id: 6, userId: 1, ...dto, likesCount: 0 };
+      const mockManager = createManager({ createdReview: created as Review });
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
+        cb(mockManager as unknown as EntityManager),
+      );
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockRejectedValue(
+        new Error('watchlist failed'),
+      );
+
+      await expect(service.create(1, dto)).rejects.toThrow('watchlist failed');
+      expect(mockRevalidateService.revalidatePath).not.toHaveBeenCalled();
     });
 
     it('리뷰가 이미 존재하면 ConflictException을 던져야 한다', async () => {
       const dto = { contentId: 1, rating: 8 };
-      mockReviewRepo.findOne.mockResolvedValue({ id: 1, userId: 1, contentId: 1 });
+      const mockManager = {
+        findOne: jest.fn().mockResolvedValueOnce({ id: 1, userId: 1, contentId: 1 }),
+      };
+      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
+        cb(mockManager as unknown as EntityManager),
+      );
 
       await expect(service.create(1, dto)).rejects.toThrow(ConflictException);
     });

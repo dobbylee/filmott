@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import RankingRefresh from '@/components/admin/RankingRefresh';
 
 const mockPost = vi.fn();
-const mockRevalidateMainPageAction = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   default: {
@@ -13,10 +12,6 @@ vi.mock('@/lib/api', () => ({
     patch: vi.fn(),
     delete: vi.fn(),
   },
-}));
-
-vi.mock('@/app/admin/actions', () => ({
-  revalidateMainPageAction: (...args: unknown[]) => mockRevalidateMainPageAction(...args),
 }));
 
 describe('RankingRefresh', () => {
@@ -48,34 +43,6 @@ describe('RankingRefresh', () => {
 
     await waitFor(() => {
       expect(mockPost).toHaveBeenCalledWith('/rankings/refresh/daily-box-office');
-    });
-  });
-
-  it('성공 시 Server Action으로 캐시를 갱신해야 한다', async () => {
-    mockPost.mockResolvedValue({ data: {} });
-    mockRevalidateMainPageAction.mockResolvedValue(undefined);
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    render(<RankingRefresh />);
-
-    await user.click(screen.getByText('일별 박스오피스'));
-
-    await waitFor(() => {
-      expect(mockRevalidateMainPageAction).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it('Server Action 실패 시에도 갱신 성공으로 처리해야 한다', async () => {
-    mockPost.mockResolvedValue({ data: {} });
-    mockRevalidateMainPageAction.mockRejectedValue(new Error('revalidation failed'));
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    render(<RankingRefresh />);
-
-    await user.click(screen.getByText('일별 박스오피스'));
-
-    await waitFor(() => {
-      expect(screen.getByText('갱신 완료')).toBeInTheDocument();
     });
   });
 

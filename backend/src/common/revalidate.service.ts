@@ -34,4 +34,9 @@ export class RevalidateService {
       this.logger.warn(`캐시 갱신 실패 (${path}, 무시)`);
     }
   }
+
+  async revalidatePaths(paths: string[]): Promise<void> {
+    const uniquePaths = [...new Set(paths.filter((path): path is string => Boolean(path)))];
+    await Promise.allSettled(uniquePaths.map((path) => this.revalidatePath(path)));
+  }
 }

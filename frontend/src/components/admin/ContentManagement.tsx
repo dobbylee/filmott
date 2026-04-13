@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Shield, ShieldOff, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
 import { getErrorMessage } from '@/utils/error';
-import { revalidateContentDetail } from '@/app/contents/[type]/[tmdbId]/actions';
 
 type ContentType = 'movie' | 'tv';
 
@@ -97,12 +96,7 @@ export default function ContentManagement() {
           message: `인물 #${confirmModal.personId}의 작품 ${data.blocked}개 차단 완료`,
         });
         setPersonId('');
-        await Promise.all([
-          fetchAdultList(1),
-          ...data.blockedContents.map((c) =>
-            revalidateContentDetail(c.contentType, String(c.tmdbId)),
-          ),
-        ]);
+        await fetchAdultList(1);
         return;
       }
 
@@ -126,10 +120,7 @@ export default function ContentManagement() {
             : `${label} #${tmdbId} 차단 해제 완료`,
       });
       if (!isListUnblock) setTmdbId('');
-      await Promise.all([
-        fetchAdultList(page),
-        revalidateContentDetail(targetType, String(targetTmdbId)),
-      ]);
+      await fetchAdultList(page);
     } catch (err) {
       setResult({ type: 'error', message: getErrorMessage(err) });
     } finally {

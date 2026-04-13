@@ -13,6 +13,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { UserRole } from '../users/enums/user-role.enum';
 import { WatchlistService } from '../watchlist/watchlist.service';
+import { Watchlist } from '../watchlist/watchlist.entity';
 import { RevalidateService } from '../common/revalidate.service';
 
 @Injectable()
@@ -28,27 +29,38 @@ export class ReviewsService {
   ) {}
 
   async create(userId: number, dto: CreateReviewDto): Promise<Review> {
-    const existing = await this.reviewRepo.findOne({
-      where: { userId, contentId: dto.contentId },
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const existing = await manager.findOne(Review, {
+        where: { userId, contentId: dto.contentId },
+      });
+      if (existing) {
+        throw new ConflictException('이미 이 작품에 리뷰를 작성했습니다.');
+      }
+
+      const review = manager.create(Review, {
+        userId,
+        contentId: dto.contentId,
+        rating: dto.rating,
+        comment: dto.comment,
+      });
+
+      const createdReview = await manager.save(review);
+      const watchlistEntry = await manager.findOne(Watchlist, {
+        where: { userId, contentId: dto.contentId },
+      });
+
+      if (watchlistEntry?.status !== 'watched') {
+        await this.watchlistService.addToWatchlistByContentIdWithManager(
+          manager,
+          userId,
+          dto.contentId,
+          'watched',
+          dto.watchedAt,
+        );
+      }
+
+      return createdReview;
     });
-    if (existing) {
-      throw new ConflictException('이미 이 작품에 리뷰를 작성했습니다.');
-    }
-
-    const review = this.reviewRepo.create({
-      userId,
-      contentId: dto.contentId,
-      rating: dto.rating,
-      comment: dto.comment,
-    });
-
-    const saved = await this.reviewRepo.save(review);
-
-    // 리뷰 작성 시 감상한 작품에 없으면 자동 추가
-    const { status } = await this.watchlistService.getWatchlistStatus(userId, dto.contentId);
-    if (status !== 'watched') {
-      await this.watchlistService.addToWatchlistByContentId(userId, dto.contentId, 'watched', dto.watchedAt);
-    }
 
     void this.revalidateService.revalidatePath('/');
     return saved;

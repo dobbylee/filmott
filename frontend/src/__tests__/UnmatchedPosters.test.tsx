@@ -5,7 +5,6 @@ import UnmatchedPosters from '@/components/admin/UnmatchedPosters';
 
 const mockGet = vi.fn();
 const mockPatch = vi.fn();
-const mockRevalidateMainPageAction = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   default: {
@@ -14,10 +13,6 @@ vi.mock('@/lib/api', () => ({
     patch: (...args: unknown[]) => mockPatch(...args),
     delete: vi.fn(),
   },
-}));
-
-vi.mock('@/app/admin/actions', () => ({
-  revalidateMainPageAction: (...args: unknown[]) => mockRevalidateMainPageAction(...args),
 }));
 
 const unmatchedData = [
@@ -71,7 +66,6 @@ describe('UnmatchedPosters', () => {
   it('저장 버튼 클릭 시 PATCH API를 호출해야 한다', async () => {
     mockGet.mockResolvedValue({ data: [unmatchedData[0]] });
     mockPatch.mockResolvedValue({ data: {} });
-    mockRevalidateMainPageAction.mockResolvedValue(undefined);
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     render(<UnmatchedPosters />);
@@ -96,7 +90,6 @@ describe('UnmatchedPosters', () => {
   it('저장 성공 시 "저장 완료" 메시지를 표시해야 한다', async () => {
     mockGet.mockResolvedValue({ data: [unmatchedData[0]] });
     mockPatch.mockResolvedValue({ data: {} });
-    mockRevalidateMainPageAction.mockResolvedValue(undefined);
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     render(<UnmatchedPosters />);
@@ -147,24 +140,4 @@ describe('UnmatchedPosters', () => {
     expect(saveButton).toBeDisabled();
   });
 
-  it('성공 후 Server Action으로 캐시를 갱신해야 한다', async () => {
-    mockGet.mockResolvedValue({ data: [unmatchedData[0]] });
-    mockPatch.mockResolvedValue({ data: {} });
-    mockRevalidateMainPageAction.mockResolvedValue(undefined);
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    render(<UnmatchedPosters />);
-
-    await waitFor(() => {
-      expect(screen.getByText('매칭 안된 영화')).toBeInTheDocument();
-    });
-
-    const input = screen.getByPlaceholderText('포스터 URL을 입력하세요');
-    await user.type(input, 'https://example.com/poster.jpg');
-    await user.click(screen.getByText('저장'));
-
-    await waitFor(() => {
-      expect(mockRevalidateMainPageAction).toHaveBeenCalledTimes(1);
-    });
-  });
 });

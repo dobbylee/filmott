@@ -7,10 +7,6 @@ const mockPatch = vi.fn();
 const mockGet = vi.fn();
 const mockPost = vi.fn();
 
-vi.mock('@/app/contents/[type]/[tmdbId]/actions', () => ({
-  revalidateContentDetail: vi.fn(),
-}));
-
 vi.mock('@/lib/api', () => ({
   default: {
     get: (...args: unknown[]) => mockGet(...args),
@@ -25,7 +21,7 @@ describe('ContentManagement', () => {
     vi.clearAllMocks();
     // 기본: 빈 차단 목록 반환
     mockGet.mockResolvedValue({ data: { data: [], total: 0, page: 1, totalPages: 0 } });
-    mockPost.mockResolvedValue({ data: { blocked: 0, failed: 0, total: 0 } });
+    mockPost.mockResolvedValue({ data: { blocked: 0, failed: 0, total: 0, blockedContents: [] } });
   });
 
   it('타입 셀렉트와 TMDB ID 입력 필드를 렌더링해야 한다', () => {

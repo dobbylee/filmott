@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { ImageOff, Save, Check, AlertCircle, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { getErrorMessage } from '@/utils/error';
-import { revalidateMainPageAction } from '@/app/admin/actions';
 
 interface UnmatchedRanking {
   id: number;
@@ -73,11 +72,6 @@ export default function UnmatchedPosters() {
 
     try {
       await api.patch(`/rankings/${id}/poster`, { posterUrl: state.posterUrl.trim() });
-      try {
-        await revalidateMainPageAction();
-      } catch {
-        // revalidation 실패해도 저장 자체는 성공
-      }
       setStates((prev) => ({
         ...prev,
         [id]: { ...prev[id], status: 'success', message: '저장 완료' },
