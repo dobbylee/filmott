@@ -765,6 +765,52 @@ describe('AuthService', () => {
       expect(result.user.subscribedOtts).toEqual([]);
     });
 
+    it('email이 null인 소셜 가입도 정상 완료해야 한다', async () => {
+      const mockPayload = {
+        provider: AuthProvider.KAKAO,
+        providerId: 'kakao-123',
+        email: null,
+        nickname: 'Kakao User',
+        profileImage: null,
+        type: 'social_signup',
+      };
+      mockJwtService.verify.mockReturnValue(mockPayload);
+      mockUsersService.findByProvider.mockResolvedValue(null);
+
+      const createdUser = {
+        id: 12,
+        nickname: 'kakao-user',
+        email: null,
+        provider: AuthProvider.KAKAO,
+        providerId: 'kakao-123',
+        subscribedOtts: ['netflix'],
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+      };
+      mockUsersService.createSocialUser.mockResolvedValue(createdUser);
+      mockJwtService.sign.mockReturnValue('access.token');
+      mockRefreshTokenRepo.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data,
+      );
+      mockRefreshTokenRepo.save.mockResolvedValue({});
+
+      const result = await service.completeSocialSignup(
+        'valid-kakao-token',
+        'kakao-user',
+        ['netflix'],
+      );
+
+      expect(mockUsersService.createSocialUser).toHaveBeenCalledWith({
+        nickname: 'kakao-user',
+        provider: AuthProvider.KAKAO,
+        providerId: 'kakao-123',
+        email: null,
+        profileImage: null,
+        subscribedOtts: ['netflix'],
+      });
+      expect(result.user.email).toBeNull();
+    });
+
     it('P1-6: 이미 가입된 소셜 계정이면 ConflictException을 던져야 한다', async () => {
       const mockPayload = {
         provider: AuthProvider.GOOGLE,

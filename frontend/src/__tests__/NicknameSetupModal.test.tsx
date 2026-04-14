@@ -164,6 +164,36 @@ describe('NicknameSetupModal', () => {
     });
   });
 
+  it('저장된 signup token이 있으면 가입 완료 요청에 함께 포함해야 한다', async () => {
+    const user = userEvent.setup();
+    mockApiGet.mockResolvedValue({ data: { available: true } });
+    mockApiPost.mockResolvedValue({
+      data: {
+        user: { id: 1, nickname: 'testuser', subscribedOtts: [] },
+      },
+    });
+    window.sessionStorage.setItem('filmott_social_signup_token', 'signup-token');
+
+    render(<NicknameSetupModal />);
+
+    const input = screen.getByPlaceholderText('2자 이상 닉네임');
+    await user.type(input, 'testuser');
+
+    await waitFor(() => {
+      expect(screen.getByText('사용 가능한 닉네임입니다.')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await user.click(screen.getByRole('button', { name: '건너뛰기' }));
+
+    expect(mockApiPost).toHaveBeenCalledWith('/auth/social/complete-signup', {
+      nickname: 'testuser',
+      subscribedOtts: [],
+      signupToken: 'signup-token',
+    });
+    expect(window.sessionStorage.getItem('filmott_social_signup_token')).toBeNull();
+  });
+
   it('회원가입 완료 시 signup_completed 이벤트를 provider와 함께 호출해야 한다', async () => {
     const user = userEvent.setup();
     mockApiGet.mockResolvedValue({ data: { available: true } });

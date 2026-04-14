@@ -2,12 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAuthCallback } from '@/hooks/useAuthCallback';
 
-const mockReplaceState = vi.fn();
-Object.defineProperty(window, 'history', {
-  value: { replaceState: mockReplaceState },
-  writable: true,
-});
-
 const mockSessionGet = vi.fn();
 vi.mock('@/lib/api', () => ({
   default: {},
@@ -49,7 +43,6 @@ describe('useAuthCallback', () => {
 
       await waitFor(() => {
         expect(mockOnAuthSuccess).toHaveBeenCalledWith({ user: mockUser });
-        expect(mockReplaceState).toHaveBeenCalled();
         expect(mockOnRedirect).toHaveBeenCalledWith('/');
         expect(result.current.type).toBe('success');
       });
@@ -78,6 +71,25 @@ describe('useAuthCallback', () => {
   });
 
   describe('신규 유저 닉네임 설정', () => {
+    it('hash의 signup token을 sessionStorage에 저장하고 hash만 제거한다', () => {
+      window.history.replaceState({}, '', '/auth/callback?new=true#signup=temp-token');
+      const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+      const { result } = renderHook(() =>
+        useAuthCallback({
+          status: null,
+          isNew: 'true',
+          error: null,
+          onAuthSuccess: mockOnAuthSuccess,
+          onRedirect: mockOnRedirect,
+        }),
+      );
+
+      expect(result.current.type).toBe('nickname');
+      expect(window.sessionStorage.getItem('filmott_social_signup_token')).toBe('temp-token');
+      expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/auth/callback?new=true');
+    });
+
     it('new=true 파라미터로 nickname 상태를 반환한다', () => {
       const { result } = renderHook(() =>
         useAuthCallback({
@@ -90,7 +102,6 @@ describe('useAuthCallback', () => {
       );
 
       expect(result.current.type).toBe('nickname');
-      expect(mockReplaceState).toHaveBeenCalled();
     });
   });
 

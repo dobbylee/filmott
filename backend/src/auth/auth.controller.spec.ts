@@ -466,7 +466,7 @@ describe('AuthController', () => {
 
       expectSignupCookie(mockRes, 'signup-jwt-token');
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('new=true'),
+        expect.stringContaining('new=true#signup=signup-jwt-token'),
       );
       expect(mockRes.redirect).not.toHaveBeenCalledWith(
         expect.stringContaining('tempToken='),
@@ -680,6 +680,33 @@ describe('AuthController', () => {
       ).rejects.toThrow(BadRequestException);
 
       expectSignupCookieCleared(mockRes);
+    });
+
+    it('signup cookie가 없어도 body signupToken fallback으로 회원가입을 완료해야 한다', async () => {
+      const dto = { nickname: 'newuser', signupToken: 'body-signup-token' };
+      const mockReq = { cookies: {} };
+      const mockRes = createMockResponse();
+      const response = {
+        access_token: 'new-at',
+        refresh_token: 'new-rt',
+        user: { id: 1, nickname: 'newuser', email: 'e@e.com', role: 'USER' },
+      };
+      mockAuthService.completeSocialSignup.mockResolvedValue(response);
+
+      const result = await controller.completeSocialSignup(
+        mockReq as never,
+        dto,
+        mockRes as never,
+      );
+
+      expect(mockAuthService.completeSocialSignup).toHaveBeenCalledWith(
+        'body-signup-token',
+        'newuser',
+        undefined,
+      );
+      expectSignupCookieCleared(mockRes);
+      expectAuthCookies(mockRes, 'new-at', 'new-rt');
+      expect(result).toEqual({ user: response.user });
     });
   });
 

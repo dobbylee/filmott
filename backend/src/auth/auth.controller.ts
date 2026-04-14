@@ -204,7 +204,7 @@ export class AuthController {
     @Body() dto: CompleteSocialSignupDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const signupToken = this.getSocialSignupToken(req);
+    const signupToken = this.getSocialSignupToken(req) ?? dto.signupToken;
     if (!signupToken) {
       this.clearSignupCookie(res);
       throw new BadRequestException(
@@ -322,7 +322,9 @@ export class AuthController {
       } else {
         this.setSignupCookie(res, result.signupToken);
         const params = new URLSearchParams({ new: 'true' });
-        res.redirect(`${callbackUrl}?${params.toString()}`);
+        res.redirect(
+          `${callbackUrl}?${params.toString()}#signup=${encodeURIComponent(result.signupToken)}`,
+        );
       }
     } catch (error) {
       let errorCode = 'social_auth_failed';

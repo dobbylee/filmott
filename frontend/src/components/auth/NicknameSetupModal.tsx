@@ -10,6 +10,10 @@ import { getErrorMessage } from '@/utils/error';
 import { OTT_PROVIDERS } from '@/lib/ott-providers';
 import api from '@/lib/api';
 import { trackEvent } from '@/lib/ga';
+import {
+  clearStoredSocialSignupToken,
+  getStoredSocialSignupToken,
+} from '@/lib/social-signup-storage';
 import type { AuthResponse } from '@/types/auth';
 
 type Step = 'nickname' | 'ott';
@@ -88,10 +92,13 @@ export default function NicknameSetupModal() {
     setError('');
     setIsSubmitting(true);
     try {
+      const signupToken = getStoredSocialSignupToken();
       const response = await api.post<AuthResponse>('/auth/social/complete-signup', {
         nickname,
         subscribedOtts: skipOtts ? [] : selectedOtts,
+        ...(signupToken ? { signupToken } : {}),
       });
+      clearStoredSocialSignupToken();
       trackEvent('signup_completed', { provider: response.data.user.provider ?? 'unknown' });
       handleAuthSuccess(response.data);
       router.replace('/');

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { refreshApi } from '@/lib/api';
+import { persistSocialSignupTokenFromHash } from '@/lib/social-signup-storage';
 import type { AuthResponse, User } from '@/types/auth';
 
 export type CallbackState =
@@ -18,7 +19,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 function getErrorText(reason: string): string {
-  return ERROR_MESSAGES[reason] || '로그인 중 오류가 발생했습니다. 다시 시도해주세요.';
+  return (
+    ERROR_MESSAGES[reason] || '로그인 중 오류가 발생했습니다. 다시 시도해주세요.'
+  );
 }
 
 interface UseAuthCallbackParams {
@@ -36,7 +39,9 @@ export function useAuthCallback({
   onAuthSuccess,
   onRedirect,
 }: UseAuthCallbackParams): CallbackState {
-  const [asyncState, setAsyncState] = useState<CallbackState>({ type: 'loading' });
+  const [asyncState, setAsyncState] = useState<CallbackState>({
+    type: 'loading',
+  });
   const onAuthSuccessRef = useRef(onAuthSuccess);
   const onRedirectRef = useRef(onRedirect);
 
@@ -63,15 +68,15 @@ export function useAuthCallback({
           if (!active) return;
 
           onAuthSuccessRef.current({ user: data });
-          if (typeof window !== 'undefined') {
-            window.history.replaceState({}, '', '/auth/callback');
-          }
           setAsyncState({ type: 'success' });
           onRedirectRef.current('/');
         } catch {
           if (!active) return;
 
-          setAsyncState({ type: 'error', message: getErrorText('social_auth_failed') });
+          setAsyncState({
+            type: 'error',
+            message: getErrorText('social_auth_failed'),
+          });
           redirectTimer = setTimeout(() => onRedirectRef.current('/'), 3000);
         }
       })();
@@ -86,7 +91,10 @@ export function useAuthCallback({
 
     if (isNew === 'true') {
       if (typeof window !== 'undefined') {
-        window.history.replaceState({}, '', '/auth/callback');
+        const token = persistSocialSignupTokenFromHash(window.location.hash);
+        if (token) {
+          window.history.replaceState({}, '', '/auth/callback?new=true');
+        }
       }
       return;
     }

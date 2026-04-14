@@ -24,4 +24,8 @@ export class CompleteSocialSignupDto {
   @IsString({ each: true })
   @ArrayMaxSize(10)
   subscribedOtts?: string[];
+
+  @IsOptional()
+  @IsString()
+  signupToken?: string;
 }
