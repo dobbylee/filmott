@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "check:backend": "npm --prefix backend run check",
+    "check:frontend": "npm --prefix frontend run check",
+    "check": "npm run check:backend && npm run check:frontend"
   },
   "author": "",
   "license": "ISC",
