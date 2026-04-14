@@ -13,10 +13,9 @@ export class RevalidateService {
       'REVALIDATE_SECRET',
       '',
     );
-    this.frontendUrl = this.configService.get<string>(
-      'FRONTEND_URL',
-      'http://localhost:3000',
-    );
+    this.frontendUrl =
+      this.configService.get<string>('FRONTEND_INTERNAL_URL') ??
+      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
 
   async revalidatePath(path: string = '/'): Promise<void> {

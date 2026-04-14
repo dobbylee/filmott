@@ -52,7 +52,8 @@ describe('RevalidateService', () => {
                 .fn()
                 .mockImplementation((key: string, defaultValue?: string) => {
                   if (key === 'REVALIDATE_SECRET') return 'test-secret';
-                  if (key === 'FRONTEND_URL') return 'http://frontend:3000';
+                  if (key === 'FRONTEND_INTERNAL_URL')
+                    return 'http://frontend:3000';
                   return defaultValue ?? '';
                 }),
             },
