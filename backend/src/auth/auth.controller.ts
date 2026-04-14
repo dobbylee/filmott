@@ -39,6 +39,12 @@ import {
 
 const OAUTH_STATE_COOKIE = 'oauth_state';
 const STATE_COOKIE_MAX_AGE = 5 * 60 * 1000; // 5분
+const INTERNAL_FRONTEND_HOSTNAMES = new Set([
+  'frontend',
+  'localhost',
+  '127.0.0.1',
+  '0.0.0.0',
+]);
 
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
@@ -56,6 +62,7 @@ export class AuthController {
     this.frontendUrl = this.configService.getOrThrow<string>('FRONTEND_URL');
     this.isProduction =
       this.configService.get<string>('NODE_ENV') === 'production';
+    this.validateFrontendUrl();
   }
 
   // --- 기존 엔드포인트 ---
@@ -289,6 +296,25 @@ export class AuthController {
 
   private clearSignupCookie(res: Response): void {
     clearSocialSignupCookie(res, this.isProduction);
+  }
+
+  private validateFrontendUrl(): void {
+    if (!this.isProduction) {
+      return;
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(this.frontendUrl);
+    } catch {
+      throw new Error('FRONTEND_URL must be an absolute URL.');
+    }
+
+    if (INTERNAL_FRONTEND_HOSTNAMES.has(parsedUrl.hostname)) {
+      throw new Error(
+        'FRONTEND_URL must be a public browser-reachable origin in production.',
+      );
+    }
   }
 
   private async handleSocialCallback(

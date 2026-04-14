@@ -168,6 +168,29 @@ describe('AuthController', () => {
     expect(controller).toBeDefined();
   });
 
+  it('production에서 FRONTEND_URL이 Docker 내부 호스트면 초기화에 실패해야 한다', () => {
+    const invalidConfigService = {
+      getOrThrow: jest.fn().mockReturnValue('http://frontend:3000'),
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'NODE_ENV') return 'production';
+        return undefined;
+      }),
+    };
+
+    expect(
+      () =>
+        new AuthController(
+          mockAuthService as never,
+          invalidConfigService as never,
+          mockGoogleService as never,
+          mockKakaoService as never,
+          mockNaverService as never,
+        ),
+    ).toThrow(
+      'FRONTEND_URL must be a public browser-reachable origin in production.',
+    );
+  });
+
   describe('POST /auth/signup (register) -- ADMIN 전용', () => {
     it('authService.register를 호출하고 토큰과 사용자를 반환해야 한다', async () => {
       const dto = {
@@ -366,7 +389,7 @@ describe('AuthController', () => {
 
     it('production 환경에서 secure: true로 설정되어야 한다', async () => {
       const prodConfigService = {
-        getOrThrow: jest.fn().mockReturnValue('http://localhost:3000'),
+        getOrThrow: jest.fn().mockReturnValue('https://filmott.kr'),
         get: jest.fn().mockReturnValue('production'),
       };
 
