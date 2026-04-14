@@ -58,7 +58,13 @@ export class Content {
   @Column({ name: 'release_date', type: 'date', nullable: true })
   releaseDate?: Date;
 
-  @Column({ name: 'vote_average', type: 'numeric', precision: 3, scale: 1, nullable: true })
+  @Column({
+    name: 'vote_average',
+    type: 'numeric',
+    precision: 3,
+    scale: 1,
+    nullable: true,
+  })
   voteAverage?: number;
 
   @Column({ name: 'vote_count', type: 'integer', default: 0 })
@@ -73,7 +79,12 @@ export class Content {
   @Column({ type: 'varchar', length: 200, nullable: true })
   director!: string | null;
 
-  @Column({ name: 'origin_country', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'origin_country',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   originCountry!: string | null;
 
   @Column({ name: 'watch_providers', type: 'jsonb', nullable: true })

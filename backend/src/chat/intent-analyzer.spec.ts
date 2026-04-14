@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { IntentAnalyzerService, ParsedIntent, GENRE_ALIAS_MAP } from './intent-analyzer';
+import {
+  IntentAnalyzerService,
+  ParsedIntent,
+  GENRE_ALIAS_MAP,
+} from './intent-analyzer';
 import { GENRE_NAME_MAP } from '../common/constants';
 import { CHAT_MODEL } from './chat.constants';
 
@@ -61,16 +65,18 @@ describe('IntentAnalyzerService', () => {
   };
 
   const mockIntent = (overrides: Partial<ParsedIntent> = {}): void => {
-    mockLlmResponse(JSON.stringify({
-      ottProviderNames: [],
-      countries: [],
-      excludeCountries: [],
-      personNames: [],
-      dateRange: null,
-      contentType: null,
-      genres: [],
-      ...overrides,
-    }));
+    mockLlmResponse(
+      JSON.stringify({
+        ottProviderNames: [],
+        countries: [],
+        excludeCountries: [],
+        personNames: [],
+        dateRange: null,
+        contentType: null,
+        genres: [],
+        ...overrides,
+      }),
+    );
   };
 
   describe('analyzeIntent', () => {
@@ -125,7 +131,10 @@ describe('IntentAnalyzerService', () => {
           max_completion_tokens: 1024,
           response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: expect.stringContaining('JSON으로 추출') },
+            {
+              role: 'system',
+              content: expect.stringContaining('JSON으로 추출'),
+            },
             { role: 'user', content: '테스트' },
           ],
         },
@@ -136,7 +145,8 @@ describe('IntentAnalyzerService', () => {
     it('여러 OTT 플랫폼을 동시에 추출해야 한다', async () => {
       mockIntent({ ottProviderNames: ['Netflix', 'Tving'] });
 
-      const result = await service.analyzeIntent('넷플릭스나 티빙에서 볼만한 영화');
+      const result =
+        await service.analyzeIntent('넷플릭스나 티빙에서 볼만한 영화');
 
       expect(result.ottProviderNames).toEqual(['Netflix', 'Tving']);
     });
@@ -144,7 +154,8 @@ describe('IntentAnalyzerService', () => {
     it('여러 인물을 동시에 추출해야 한다', async () => {
       mockIntent({ personNames: ['송강호', '최민식'] });
 
-      const result = await service.analyzeIntent('송강호와 최민식이 나오는 영화');
+      const result =
+        await service.analyzeIntent('송강호와 최민식이 나오는 영화');
 
       expect(result.personNames).toEqual(['송강호', '최민식']);
     });
@@ -153,11 +164,16 @@ describe('IntentAnalyzerService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           IntentAnalyzerService,
-          { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('') } },
+          {
+            provide: ConfigService,
+            useValue: { get: jest.fn().mockReturnValue('') },
+          },
         ],
       }).compile();
 
-      const noKeyService = module.get<IntentAnalyzerService>(IntentAnalyzerService);
+      const noKeyService = module.get<IntentAnalyzerService>(
+        IntentAnalyzerService,
+      );
 
       const result = await noKeyService.analyzeIntent('넷플릭스 영화');
 
@@ -188,21 +204,25 @@ describe('IntentAnalyzerService', () => {
       { genre: '판타지', expanded: 'SF & 판타지', type: 'tv' as const },
       { genre: '액션', expanded: '액션 & 어드벤처', type: null },
       { genre: 'SF', expanded: 'SF & 판타지', type: null },
-    ])('$genre -> $expanded 확장 (contentType=$type)', async ({ genre, expanded, type }) => {
-      mockIntent({ contentType: type, genres: [genre] });
+    ])(
+      '$genre -> $expanded 확장 (contentType=$type)',
+      async ({ genre, expanded, type }) => {
+        mockIntent({ contentType: type, genres: [genre] });
 
-      const result = await service.analyzeIntent(
-        type === 'tv' ? `${genre} 드라마 추천해줘` : `${genre}물 추천해줘`,
-      );
+        const result = await service.analyzeIntent(
+          type === 'tv' ? `${genre} 드라마 추천해줘` : `${genre}물 추천해줘`,
+        );
 
-      expect(result.genres).toContain(genre);
-      expect(result.genres).toContain(expanded);
-    });
+        expect(result.genres).toContain(genre);
+        expect(result.genres).toContain(expanded);
+      },
+    );
 
     it('참조 작품명을 올바르게 추출해야 한다', async () => {
       mockIntent({ referenceTitles: ['영야성하'] });
 
-      const result = await service.analyzeIntent('영야성하 같은 드라마 추천해줘');
+      const result =
+        await service.analyzeIntent('영야성하 같은 드라마 추천해줘');
 
       expect(result.referenceTitles).toEqual(['영야성하']);
     });
@@ -216,16 +236,18 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('referenceTitles가 잘못된 타입이면 빈 배열로 처리해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        referenceTitles: '기생충',
-        dateRange: null,
-        contentType: null,
-        genres: [],
-      }));
+      mockLlmResponse(
+        JSON.stringify({
+          ottProviderNames: [],
+          countries: [],
+          excludeCountries: [],
+          personNames: [],
+          referenceTitles: '기생충',
+          dateRange: null,
+          contentType: null,
+          genres: [],
+        }),
+      );
 
       const result = await service.analyzeIntent('기생충 같은 영화');
 
@@ -276,7 +298,9 @@ describe('IntentAnalyzerService', () => {
         confidence: 'high',
       });
 
-      const result = await service.analyzeIntent('넷플릭스 한국 스릴러 영화 추천해줘');
+      const result = await service.analyzeIntent(
+        '넷플릭스 한국 스릴러 영화 추천해줘',
+      );
 
       expect(result.confidence).toBe('high');
     });
@@ -310,17 +334,19 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('confidence가 잘못된 타입이면 low로 처리해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: [],
-        countries: [],
-        excludeCountries: [],
-        personNames: [],
-        referenceTitles: [],
-        dateRange: null,
-        contentType: null,
-        genres: [],
-        confidence: 123,
-      }));
+      mockLlmResponse(
+        JSON.stringify({
+          ottProviderNames: [],
+          countries: [],
+          excludeCountries: [],
+          personNames: [],
+          referenceTitles: [],
+          dateRange: null,
+          contentType: null,
+          genres: [],
+          confidence: 123,
+        }),
+      );
 
       const result = await service.analyzeIntent('테스트');
 
@@ -360,7 +386,10 @@ describe('IntentAnalyzerService', () => {
           max_completion_tokens: 1024,
           response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: expect.stringContaining('JSON으로 추출') },
+            {
+              role: 'system',
+              content: expect.stringContaining('JSON으로 추출'),
+            },
             { role: 'user', content: '테스트' },
           ],
         },
@@ -406,9 +435,18 @@ describe('IntentAnalyzerService', () => {
       const callArgs = mockCreate.mock.calls[0][0];
       expect(callArgs.messages).toHaveLength(4); // system + 2 history + user
       expect(callArgs.messages[0].role).toBe('system');
-      expect(callArgs.messages[1]).toEqual({ role: 'user', content: '한국 스릴러 추천해줘' });
-      expect(callArgs.messages[2]).toEqual({ role: 'assistant', content: '추천 결과입니다.' });
-      expect(callArgs.messages[3]).toEqual({ role: 'user', content: '더 추천해줘' });
+      expect(callArgs.messages[1]).toEqual({
+        role: 'user',
+        content: '한국 스릴러 추천해줘',
+      });
+      expect(callArgs.messages[2]).toEqual({
+        role: 'assistant',
+        content: '추천 결과입니다.',
+      });
+      expect(callArgs.messages[3]).toEqual({
+        role: 'user',
+        content: '더 추천해줘',
+      });
     });
 
     it('이전 메시지에 "드라마" 키워드가 있으면 contentType 후처리에서 tv를 유지해야 한다', async () => {
@@ -462,13 +500,15 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('잘못된 타입의 필드가 있으면 기본값으로 처리해야 한다', async () => {
-      mockLlmResponse(JSON.stringify({
-        ottProviderNames: 'Netflix',
-        countries: 123,
-        personNames: null,
-        dateRange: 'invalid',
-        contentType: 'anime',
-      }));
+      mockLlmResponse(
+        JSON.stringify({
+          ottProviderNames: 'Netflix',
+          countries: 123,
+          personNames: null,
+          dateRange: 'invalid',
+          contentType: 'anime',
+        }),
+      );
 
       const result = await service.analyzeIntent('테스트');
 
@@ -502,8 +542,14 @@ describe('IntentAnalyzerService', () => {
     };
 
     it('OTT명을 쿼리에서 제거해야 한다', () => {
-      const intent: ParsedIntent = { ...emptyIntent, ottProviderNames: ['Netflix'] };
-      const result = service.buildSemanticQuery('넷플릭스에서 볼 수 있는 따뜻한 가족 영화', intent);
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        ottProviderNames: ['Netflix'],
+      };
+      const result = service.buildSemanticQuery(
+        '넷플릭스에서 볼 수 있는 따뜻한 가족 영화',
+        intent,
+      );
 
       expect(result).not.toMatch(/넷플릭스/);
       expect(result).toContain('따뜻한');
@@ -513,7 +559,10 @@ describe('IntentAnalyzerService', () => {
 
     it('인물명을 쿼리에서 제거해야 한다', () => {
       const intent: ParsedIntent = { ...emptyIntent, personNames: ['봉준호'] };
-      const result = service.buildSemanticQuery('봉준호 감독의 사회 풍자 영화', intent);
+      const result = service.buildSemanticQuery(
+        '봉준호 감독의 사회 풍자 영화',
+        intent,
+      );
 
       expect(result).not.toMatch(/봉준호/);
       expect(result).toContain('사회');
@@ -531,7 +580,10 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('intent.countries가 비어있으면 국가명을 제거하지 않아야 한다', () => {
-      const result = service.buildSemanticQuery('한국 로맨스 드라마', emptyIntent);
+      const result = service.buildSemanticQuery(
+        '한국 로맨스 드라마',
+        emptyIntent,
+      );
 
       expect(result).toContain('한국');
     });
@@ -549,7 +601,10 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('요청 표현을 제거해야 한다', () => {
-      const result = service.buildSemanticQuery('스릴러 영화 추천해줘', emptyIntent);
+      const result = service.buildSemanticQuery(
+        '스릴러 영화 추천해줘',
+        emptyIntent,
+      );
 
       expect(result).not.toMatch(/추천해줘/);
       expect(result).toContain('스릴러');
@@ -563,7 +618,10 @@ describe('IntentAnalyzerService', () => {
         dateRange: { from: '2024-01-01', to: null },
         contentType: 'tv',
       };
-      const result = service.buildSemanticQuery('최신 한국 로맨스 드라마 추천해줘', intent);
+      const result = service.buildSemanticQuery(
+        '최신 한국 로맨스 드라마 추천해줘',
+        intent,
+      );
 
       expect(result).not.toMatch(/최신/);
       expect(result).not.toMatch(/한국/);
@@ -581,7 +639,10 @@ describe('IntentAnalyzerService', () => {
         contentType: 'tv',
       };
       // "드라마"만 남으므로 (3자 이하) 원본 반환
-      const result = service.buildSemanticQuery('최신 한국 드라마 추천해줘', intent);
+      const result = service.buildSemanticQuery(
+        '최신 한국 드라마 추천해줘',
+        intent,
+      );
 
       expect(result).toBe('최신 한국 드라마 추천해줘');
     });
@@ -599,16 +660,26 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('intent가 빈 경우 원본 그대로 반환해야 한다 (요청 표현 제외)', () => {
-      const result = service.buildSemanticQuery('따뜻한 가족 영화', emptyIntent);
+      const result = service.buildSemanticQuery(
+        '따뜻한 가족 영화',
+        emptyIntent,
+      );
 
       expect(result).toBe('따뜻한 가족 영화');
     });
 
     it('다양한 OTT명 변형을 제거해야 한다', () => {
-      const intent: ParsedIntent = { ...emptyIntent, ottProviderNames: ['Netflix'] };
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        ottProviderNames: ['Netflix'],
+      };
 
-      expect(service.buildSemanticQuery('넷플 액션 영화', intent)).not.toMatch(/넷플/);
-      expect(service.buildSemanticQuery('Netflix 액션 영화', intent)).not.toMatch(/Netflix/i);
+      expect(service.buildSemanticQuery('넷플 액션 영화', intent)).not.toMatch(
+        /넷플/,
+      );
+      expect(
+        service.buildSemanticQuery('Netflix 액션 영화', intent),
+      ).not.toMatch(/Netflix/i);
     });
 
     it('90년대 같은 연대 표현도 제거해야 한다', () => {
@@ -627,7 +698,10 @@ describe('IntentAnalyzerService', () => {
         ...emptyIntent,
         dateRange: { from: '2024-01-01', to: '2024-12-31' },
       };
-      const result = service.buildSemanticQuery('2024년 개봉 액션 영화', intent);
+      const result = service.buildSemanticQuery(
+        '2024년 개봉 액션 영화',
+        intent,
+      );
 
       expect(result).not.toMatch(/2024년/);
       expect(result).toContain('개봉');
@@ -640,7 +714,10 @@ describe('IntentAnalyzerService', () => {
         ottProviderNames: ['Netflix'],
         personNames: ['봉준호'],
       };
-      const result = service.buildSemanticQuery('넷플릭스 봉준호 감독 스릴러 영화', intent);
+      const result = service.buildSemanticQuery(
+        '넷플릭스 봉준호 감독 스릴러 영화',
+        intent,
+      );
 
       expect(result).not.toMatch(/\s{2,}/);
     });
@@ -654,7 +731,10 @@ describe('IntentAnalyzerService', () => {
     it('인물 제거 후 고립된 "감독"을 제거해야 한다', () => {
       const intent: ParsedIntent = { ...emptyIntent, personNames: ['봉준호'] };
       // "봉준호 감독 사회 풍자 영화" → "사회 풍자 영화" (감독 제거, 충분한 길이)
-      const result = service.buildSemanticQuery('봉준호 감독 사회 풍자 영화', intent);
+      const result = service.buildSemanticQuery(
+        '봉준호 감독 사회 풍자 영화',
+        intent,
+      );
 
       expect(result).not.toMatch(/감독/);
       expect(result).not.toMatch(/봉준호/);
@@ -664,7 +744,10 @@ describe('IntentAnalyzerService', () => {
 
     it('인물 제거 후 고립된 "나오는"을 제거해야 한다', () => {
       const intent: ParsedIntent = { ...emptyIntent, personNames: ['송강호'] };
-      const result = service.buildSemanticQuery('송강호 나오는 영화 재밌는 거', intent);
+      const result = service.buildSemanticQuery(
+        '송강호 나오는 영화 재밌는 거',
+        intent,
+      );
 
       expect(result).not.toMatch(/나오는/);
       expect(result).toContain('영화');
@@ -672,24 +755,36 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('인물이 없으면 "감독"을 유지해야 한다', () => {
-      const result = service.buildSemanticQuery('유명한 감독의 영화', emptyIntent);
+      const result = service.buildSemanticQuery(
+        '유명한 감독의 영화',
+        emptyIntent,
+      );
 
       expect(result).toContain('감독');
     });
 
     it('"중에"를 제거하고 앞뒤 공백을 보존해야 한다', () => {
       const intent: ParsedIntent = { ...emptyIntent, countries: ['FR'] };
-      const result = service.buildSemanticQuery('프랑스 영화 중에 로맨틱한 거', intent);
+      const result = service.buildSemanticQuery(
+        '프랑스 영화 중에 로맨틱한 거',
+        intent,
+      );
 
       expect(result).toBe('영화 로맨틱한 거');
       expect(result).not.toMatch(/중에/);
     });
 
     it('분위기 쿼리에서 "거/것"을 보존해야 한다', () => {
-      const result1 = service.buildSemanticQuery('밤에 볼 만한 무서운 거', emptyIntent);
+      const result1 = service.buildSemanticQuery(
+        '밤에 볼 만한 무서운 거',
+        emptyIntent,
+      );
       expect(result1).toBe('밤에 볼 만한 무서운 거');
 
-      const result2 = service.buildSemanticQuery('잠 안 올 때 볼 만한 것', emptyIntent);
+      const result2 = service.buildSemanticQuery(
+        '잠 안 올 때 볼 만한 것',
+        emptyIntent,
+      );
       expect(result2).toBe('잠 안 올 때 볼 만한 것');
     });
 
@@ -746,7 +841,10 @@ describe('IntentAnalyzerService', () => {
         ...emptyIntent,
         genres: ['범죄', '액션'],
       };
-      const result = service.buildSemanticQuery('90년대 느와르 영화 스타일', intent);
+      const result = service.buildSemanticQuery(
+        '90년대 느와르 영화 스타일',
+        intent,
+      );
 
       expect(result).not.toMatch(/느와르/);
       expect(result).not.toMatch(/범죄/);
@@ -756,14 +854,23 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('genres가 비어있으면 장르 키워드를 제거하지 않아야 한다', () => {
-      const result = service.buildSemanticQuery('무서운 호러 영화', emptyIntent);
+      const result = service.buildSemanticQuery(
+        '무서운 호러 영화',
+        emptyIntent,
+      );
 
       expect(result).toContain('호러');
     });
 
     it('참조 작품명을 쿼리에서 제거해야 한다', () => {
-      const intent: ParsedIntent = { ...emptyIntent, referenceTitles: ['영야성하'] };
-      const result = service.buildSemanticQuery('영야성하 같은 분위기 드라마', intent);
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        referenceTitles: ['영야성하'],
+      };
+      const result = service.buildSemanticQuery(
+        '영야성하 같은 분위기 드라마',
+        intent,
+      );
 
       expect(result).not.toMatch(/영야성하/);
       expect(result).not.toMatch(/같은/);
@@ -772,8 +879,14 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('참조 작품 제거 후 "비슷한" 고립 수식어를 제거해야 한다', () => {
-      const intent: ParsedIntent = { ...emptyIntent, referenceTitles: ['기생충'] };
-      const result = service.buildSemanticQuery('기생충 비슷한 사회 풍자 영화', intent);
+      const intent: ParsedIntent = {
+        ...emptyIntent,
+        referenceTitles: ['기생충'],
+      };
+      const result = service.buildSemanticQuery(
+        '기생충 비슷한 사회 풍자 영화',
+        intent,
+      );
 
       expect(result).not.toMatch(/기생충/);
       expect(result).not.toMatch(/비슷한/);
@@ -783,7 +896,10 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('참조 작품이 없으면 "같은"을 유지해야 한다', () => {
-      const result = service.buildSemanticQuery('같은 분위기 영화', emptyIntent);
+      const result = service.buildSemanticQuery(
+        '같은 분위기 영화',
+        emptyIntent,
+      );
 
       expect(result).toContain('같은');
     });
@@ -817,7 +933,9 @@ describe('IntentAnalyzerService', () => {
           expect(validGenreNames.has(dbName)).toBe(true);
           if (!validGenreNames.has(dbName)) {
             // 실패 시 어떤 alias의 어떤 값이 문제인지 명확히 표시
-            fail(`GENRE_ALIAS_MAP["${alias}"]의 값 "${dbName}"이 GENRE_NAME_MAP에 존재하지 않음`);
+            fail(
+              `GENRE_ALIAS_MAP["${alias}"]의 값 "${dbName}"이 GENRE_NAME_MAP에 존재하지 않음`,
+            );
           }
         }
       }

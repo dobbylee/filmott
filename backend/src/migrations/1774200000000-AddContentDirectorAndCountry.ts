@@ -13,7 +13,11 @@ export class AddContentDirectorAndCountry1774200000000 implements MigrationInter
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "contents" DROP COLUMN IF EXISTS "origin_country"`);
-    await queryRunner.query(`ALTER TABLE "contents" DROP COLUMN IF EXISTS "director"`);
+    await queryRunner.query(
+      `ALTER TABLE "contents" DROP COLUMN IF EXISTS "origin_country"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "contents" DROP COLUMN IF EXISTS "director"`,
+    );
   }
 }

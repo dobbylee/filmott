@@ -18,9 +18,7 @@ describe('ChatController', () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [ChatController],
-      providers: [
-        { provide: ChatService, useValue: mockChatService },
-      ],
+      providers: [{ provide: ChatService, useValue: mockChatService }],
     }).compile();
 
     controller = module.get<ChatController>(ChatController);
@@ -53,9 +51,18 @@ describe('ChatController', () => {
         mockRes as unknown as import('express').Response,
       );
 
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-cache');
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Connection', 'keep-alive');
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'text/event-stream',
+      );
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Cache-Control',
+        'no-cache',
+      );
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Connection',
+        'keep-alive',
+      );
       expect(mockRes.setHeader).toHaveBeenCalledWith('X-Accel-Buffering', 'no');
       expect(mockRes.flushHeaders).toHaveBeenCalled();
       expect(mockRes.end).toHaveBeenCalled();
@@ -73,9 +80,7 @@ describe('ChatController', () => {
 
       mockChatService.sendMessageStream.mockResolvedValue(undefined);
 
-      const history = [
-        { role: 'user' as const, content: '이전 질문' },
-      ];
+      const history = [{ role: 'user' as const, content: '이전 질문' }];
 
       await controller.sendMessage(
         user,
@@ -129,7 +134,9 @@ describe('ChatController', () => {
         destroyed: false,
       };
 
-      mockChatService.sendMessageStream.mockRejectedValue(new Error('API 오류'));
+      mockChatService.sendMessageStream.mockRejectedValue(
+        new Error('API 오류'),
+      );
 
       await controller.sendMessage(
         user,
@@ -211,7 +218,10 @@ describe('ChatController', () => {
         mockRes as unknown as import('express').Response,
       );
 
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'text/event-stream',
+      );
       expect(mockRes.flushHeaders).toHaveBeenCalled();
       expect(mockRes.end).toHaveBeenCalled();
     });
@@ -229,7 +239,12 @@ describe('ChatController', () => {
       };
 
       mockChatService.sendMessageStream.mockImplementation(
-        async (_userId: number, _content: string, _history: unknown[], emit: (event: string, data: unknown) => void) => {
+        async (
+          _userId: number,
+          _content: string,
+          _history: unknown[],
+          emit: (event: string, data: unknown) => void,
+        ) => {
           emit('text', { content: '응답' });
         },
       );
@@ -277,7 +292,12 @@ describe('ChatController', () => {
       };
 
       mockChatService.sendMessageStream.mockImplementation(
-        async (_userId: number, _content: string, _history: unknown[], emit: (event: string, data: unknown) => void) => {
+        async (
+          _userId: number,
+          _content: string,
+          _history: unknown[],
+          emit: (event: string, data: unknown) => void,
+        ) => {
           emit('text', { content: '응답' });
         },
       );
@@ -304,8 +324,14 @@ describe('ChatController', () => {
     });
 
     it('sendMessage 메서드에 Throttle 데코레이터가 있어야 한다', () => {
-      const allMetadataKeys = Reflect.getMetadataKeys(ChatController.prototype.sendMessage);
-      expect(allMetadataKeys.some((key: string) => key.toString().includes('THROTTLER'))).toBe(true);
+      const allMetadataKeys = Reflect.getMetadataKeys(
+        ChatController.prototype.sendMessage,
+      );
+      expect(
+        allMetadataKeys.some((key: string) =>
+          key.toString().includes('THROTTLER'),
+        ),
+      ).toBe(true);
     });
   });
 
@@ -355,7 +381,12 @@ describe('ChatController', () => {
       };
 
       mockChatService.sendMessageStream.mockImplementation(
-        async (_userId: number, _content: string, _history: unknown[], emit: (event: string, data: unknown) => void) => {
+        async (
+          _userId: number,
+          _content: string,
+          _history: unknown[],
+          emit: (event: string, data: unknown) => void,
+        ) => {
           // 첫 emit 후 연결 끊김 시뮬레이션
           emit('text', { content: 'test' });
           if (closeCallback) closeCallback();
@@ -420,7 +451,11 @@ describe('ChatThrottlerGuard', () => {
       };
 
       const superHandleRequest = jest.fn().mockResolvedValue(true);
-      jest.spyOn(Object.getPrototypeOf(ChatThrottlerGuard.prototype), 'handleRequest')
+      jest
+        .spyOn(
+          Object.getPrototypeOf(ChatThrottlerGuard.prototype),
+          'handleRequest',
+        )
         .mockImplementation(superHandleRequest);
 
       const requestProps = {
@@ -448,7 +483,11 @@ describe('ChatThrottlerGuard', () => {
       };
 
       const superHandleRequest = jest.fn().mockResolvedValue(true);
-      jest.spyOn(Object.getPrototypeOf(ChatThrottlerGuard.prototype), 'handleRequest')
+      jest
+        .spyOn(
+          Object.getPrototypeOf(ChatThrottlerGuard.prototype),
+          'handleRequest',
+        )
         .mockImplementation(superHandleRequest);
 
       const requestProps = {

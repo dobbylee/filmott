@@ -42,7 +42,9 @@ describe('RankingsService', () => {
   };
 
   const mockEmbeddingService = {
-    batchCacheByContentIds: jest.fn().mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
+    batchCacheByContentIds: jest
+      .fn()
+      .mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
   };
 
   const mockRevalidateService = {
@@ -105,7 +107,9 @@ describe('RankingsService', () => {
       };
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(cachedContent);
 
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchDailyBoxOffice();
@@ -120,10 +124,12 @@ describe('RankingsService', () => {
       });
       expect(result[0].targetDate).toBeDefined();
       expect(mockKobisService.getDailyBoxOffice).toHaveBeenCalled();
-      expect(mockRankingRepo.upsert).toHaveBeenCalledWith(
-        expect.any(Array),
-        ['source', 'category', 'rank', 'targetDate'],
-      );
+      expect(mockRankingRepo.upsert).toHaveBeenCalledWith(expect.any(Array), [
+        'source',
+        'category',
+        'rank',
+        'targetDate',
+      ]);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
@@ -145,7 +151,9 @@ describe('RankingsService', () => {
       mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
       mockTmdbService.searchByType.mockResolvedValue({ results: [] });
 
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchDailyBoxOffice();
@@ -171,7 +179,9 @@ describe('RankingsService', () => {
 
       mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
       mockTmdbService.searchByType.mockResolvedValue({ results: [] });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchDailyBoxOffice();
@@ -208,7 +218,9 @@ describe('RankingsService', () => {
         .mockResolvedValueOnce(movieContent)
         .mockResolvedValueOnce(tvContent);
 
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchTrending('all', 'day');
@@ -218,10 +230,12 @@ describe('RankingsService', () => {
       expect(result[1].targetDate).toBeDefined();
       expect(mockTmdbService.getTrending).toHaveBeenCalledWith('all', 'day');
       expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledTimes(2);
-      expect(mockRankingRepo.upsert).toHaveBeenCalledWith(
-        expect.any(Array),
-        ['source', 'category', 'rank', 'targetDate'],
-      );
+      expect(mockRankingRepo.upsert).toHaveBeenCalledWith(expect.any(Array), [
+        'source',
+        'category',
+        'rank',
+        'targetDate',
+      ]);
     });
 
     it('targetDate를 YYYY-MM-DD 형식의 오늘 날짜로 설정해야 한다', async () => {
@@ -238,12 +252,16 @@ describe('RankingsService', () => {
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchTrending('movie', 'day');
 
-      const expectedDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+      const expectedDate = new Date().toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Seoul',
+      });
       expect(result[0].targetDate).toBe(expectedDate);
     });
 
@@ -264,7 +282,9 @@ describe('RankingsService', () => {
         new Error('TMDB error'),
       );
 
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       const result = await service.fetchTrending('movie', 'day');
@@ -311,9 +331,7 @@ describe('RankingsService', () => {
       mockTmdbService.searchByType.mockImplementation(async (name: string) => {
         callOrder.push(`search:${name}`);
         return {
-          results: [
-            { id: 100, title: name, release_date: '2026-03-01' },
-          ],
+          results: [{ id: 100, title: name, release_date: '2026-03-01' }],
         };
       });
       mockContentsService.findOrFetchByTmdbId.mockImplementation(async () => {
@@ -321,7 +339,9 @@ describe('RankingsService', () => {
         return { id: 1, posterUrl: '/poster.jpg' };
       });
 
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       await service.fetchDailyBoxOffice();
@@ -339,7 +359,9 @@ describe('RankingsService', () => {
       const error = new Error('KOBIS API error');
       mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
 
-      await expect(service.fetchDailyBoxOffice()).rejects.toThrow('KOBIS API error');
+      await expect(service.fetchDailyBoxOffice()).rejects.toThrow(
+        'KOBIS API error',
+      );
     });
 
     it('KOBIS 서비스 실패 시 Sentry.captureException을 호출해야 한다', async () => {
@@ -357,7 +379,9 @@ describe('RankingsService', () => {
       const error = new Error('TMDB API error');
       mockTmdbService.getTrending.mockRejectedValue(error);
 
-      await expect(service.fetchTrending('all', 'day')).rejects.toThrow('TMDB API error');
+      await expect(service.fetchTrending('all', 'day')).rejects.toThrow(
+        'TMDB API error',
+      );
     });
   });
 
@@ -401,11 +425,7 @@ describe('RankingsService', () => {
       ];
       mockRankingRepo.find.mockResolvedValue(rankings);
 
-      const result = await service.getRankings(
-        'kobis',
-        'daily-box-office',
-        10,
-      );
+      const result = await service.getRankings('kobis', 'daily-box-office', 10);
 
       expect(result).toHaveLength(2);
       expect(mockRankingRepo.findOne).toHaveBeenCalledWith({
@@ -438,9 +458,15 @@ describe('RankingsService', () => {
     it('존재하는 랭킹의 posterUrl을 업데이트해야 한다', async () => {
       const ranking = { id: 1, title: 'Test Movie', posterUrl: undefined };
       mockRankingRepo.findOneBy.mockResolvedValue(ranking);
-      mockRankingRepo.save.mockResolvedValue({ ...ranking, posterUrl: 'https://example.com/poster.jpg' });
+      mockRankingRepo.save.mockResolvedValue({
+        ...ranking,
+        posterUrl: 'https://example.com/poster.jpg',
+      });
 
-      const result = await service.updatePosterUrl(1, 'https://example.com/poster.jpg');
+      const result = await service.updatePosterUrl(
+        1,
+        'https://example.com/poster.jpg',
+      );
 
       expect(mockRankingRepo.findOneBy).toHaveBeenCalledWith({ id: 1 });
       expect(mockRankingRepo.save).toHaveBeenCalledWith({
@@ -453,8 +479,9 @@ describe('RankingsService', () => {
     it('존재하지 않는 랭킹에 대해 NotFoundException을 던져야 한다', async () => {
       mockRankingRepo.findOneBy.mockResolvedValue(null);
 
-      await expect(service.updatePosterUrl(999, 'https://example.com/poster.jpg'))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.updatePosterUrl(999, 'https://example.com/poster.jpg'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -464,7 +491,13 @@ describe('RankingsService', () => {
       mockRankingRepo.findOne.mockResolvedValue(latestRecord);
 
       const unmatchedRankings = [
-        { id: 1, rank: 3, title: 'Unmatched Movie', targetDate: '2026-03-16', contentId: null },
+        {
+          id: 1,
+          rank: 3,
+          title: 'Unmatched Movie',
+          targetDate: '2026-03-16',
+          contentId: null,
+        },
       ];
       mockRankingRepo.find.mockResolvedValue(unmatchedRankings);
 
@@ -489,13 +522,20 @@ describe('RankingsService', () => {
     it('fetchAllTrending은 모든 trending 처리 후 revalidatePath를 1회만 호출해야 한다', async () => {
       const trendingData = {
         results: [
-          { id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' },
+          {
+            id: 100,
+            media_type: 'movie',
+            title: 'Movie',
+            poster_path: '/m.jpg',
+          },
         ],
       };
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       await service.fetchAllTrending();
@@ -509,13 +549,20 @@ describe('RankingsService', () => {
     it('fetchTrending 단독 호출 시 revalidatePath를 호출하지 않아야 한다', async () => {
       const trendingData = {
         results: [
-          { id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' },
+          {
+            id: 100,
+            media_type: 'movie',
+            title: 'Movie',
+            poster_path: '/m.jpg',
+          },
         ],
       };
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       await service.fetchTrending('all', 'day');
@@ -526,12 +573,21 @@ describe('RankingsService', () => {
     it('일부 카테고리 fetchTrending이 실패해도 revalidatePath를 1회 호출해야 한다', async () => {
       mockTmdbService.getTrending
         .mockResolvedValueOnce({
-          results: [{ id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' }],
+          results: [
+            {
+              id: 100,
+              media_type: 'movie',
+              title: 'Movie',
+              poster_path: '/m.jpg',
+            },
+          ],
         })
         .mockRejectedValueOnce(new Error('TMDB 일시 장애'));
 
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       await service.fetchAllTrending();
@@ -544,12 +600,21 @@ describe('RankingsService', () => {
       const trendingError = new Error('TMDB 일시 장애');
       mockTmdbService.getTrending
         .mockResolvedValueOnce({
-          results: [{ id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' }],
+          results: [
+            {
+              id: 100,
+              media_type: 'movie',
+              title: 'Movie',
+              poster_path: '/m.jpg',
+            },
+          ],
         })
         .mockRejectedValueOnce(trendingError);
 
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       await service.fetchAllTrending();
@@ -577,13 +642,20 @@ describe('RankingsService', () => {
       mockTmdbService.searchByType.mockResolvedValue({
         results: [{ id: 999, title: 'Test Movie', release_date: '2026-03-01' }],
       });
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 42, posterUrl: '/poster.jpg' });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 42,
+        posterUrl: '/poster.jpg',
+      });
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       await service.fetchDailyBoxOffice();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([42]);
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
+        42,
+      ]);
     });
 
     it('fetchDailyBoxOffice에서 contentId가 없으면 metadata 캐싱을 호출하지 않아야 한다', async () => {
@@ -602,18 +674,27 @@ describe('RankingsService', () => {
 
       mockKobisService.getDailyBoxOffice.mockResolvedValue(kobisItems);
       mockTmdbService.searchByType.mockResolvedValue({ results: [] });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       await service.fetchDailyBoxOffice();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).not.toHaveBeenCalled();
+      expect(
+        mockEmbeddingService.batchCacheByContentIds,
+      ).not.toHaveBeenCalled();
     });
 
     it('fetchTrending 완료 후 contentId가 있는 항목의 metadata 캐싱을 호출해야 한다', async () => {
       const trendingData = {
         results: [
-          { id: 100, media_type: 'movie', title: 'Movie', poster_path: '/m.jpg' },
+          {
+            id: 100,
+            media_type: 'movie',
+            title: 'Movie',
+            poster_path: '/m.jpg',
+          },
           { id: 200, media_type: 'tv', name: 'Show', poster_path: '/s.jpg' },
         ],
       };
@@ -622,12 +703,16 @@ describe('RankingsService', () => {
       mockContentsService.findOrFetchByTmdbId
         .mockResolvedValueOnce({ id: 10 })
         .mockResolvedValueOnce({ id: 20 });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       await service.fetchTrending('all', 'day');
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([10, 20]);
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
+        10, 20,
+      ]);
     });
 
     it('fetchWeeklyBoxOffice 완료 후 contentId가 있는 항목의 metadata 캐싱을 호출해야 한다', async () => {
@@ -646,15 +731,24 @@ describe('RankingsService', () => {
 
       mockKobisService.getWeeklyBoxOffice.mockResolvedValue(kobisItems);
       mockTmdbService.searchByType.mockResolvedValue({
-        results: [{ id: 888, title: 'Weekly Movie', release_date: '2026-03-01' }],
+        results: [
+          { id: 888, title: 'Weekly Movie', release_date: '2026-03-01' },
+        ],
       });
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 55, posterUrl: '/poster.jpg' });
-      mockRankingRepo.create.mockImplementation((data: object) => ({ ...data }));
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 55,
+        posterUrl: '/poster.jpg',
+      });
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
       mockRankingRepo.upsert.mockResolvedValue(undefined);
 
       await service.fetchWeeklyBoxOffice();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([55]);
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
+        55,
+      ]);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
@@ -669,9 +763,7 @@ describe('RankingsService', () => {
         ],
       };
       const page2 = {
-        results: [
-          { id: 1003, name: 'Korean Drama 3' },
-        ],
+        results: [{ id: 1003, name: 'Korean Drama 3' }],
       };
 
       mockTmdbService.discoverByFilters
@@ -686,19 +778,34 @@ describe('RankingsService', () => {
       await service.fetchKoreanTvDiscover();
 
       expect(mockTmdbService.discoverByFilters).toHaveBeenCalledTimes(2);
-      expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith('tv', expect.objectContaining({
-        originCountry: 'KR',
-        sort: 'first_air_date.desc',
-        page: 1,
-      }));
-      expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith('tv', expect.objectContaining({
-        page: 2,
-      }));
+      expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith(
+        'tv',
+        expect.objectContaining({
+          originCountry: 'KR',
+          sort: 'first_air_date.desc',
+          page: 1,
+        }),
+      );
+      expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith(
+        'tv',
+        expect.objectContaining({
+          page: 2,
+        }),
+      );
 
       expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledTimes(3);
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(1001, 'tv');
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(1002, 'tv');
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(1003, 'tv');
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
+        1001,
+        'tv',
+      );
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
+        1002,
+        'tv',
+      );
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
+        1003,
+        'tv',
+      );
     });
 
     it('캐싱 성공한 contentId로 metadata 캐싱을 호출해야 한다', async () => {
@@ -710,7 +817,9 @@ describe('RankingsService', () => {
 
       await service.fetchKoreanTvDiscover();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([201]);
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
+        201,
+      ]);
     });
 
     it('contents 캐싱 실패 시에도 에러를 throw하지 않아야 한다', async () => {
@@ -726,15 +835,21 @@ describe('RankingsService', () => {
 
       await expect(service.fetchKoreanTvDiscover()).resolves.not.toThrow();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([301]);
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
+        301,
+      ]);
     });
 
     it('Discover API 실패 시 에러 로깅만 하고 throw하지 않아야 한다', async () => {
-      mockTmdbService.discoverByFilters.mockRejectedValue(new Error('TMDB Discover error'));
+      mockTmdbService.discoverByFilters.mockRejectedValue(
+        new Error('TMDB Discover error'),
+      );
 
       await expect(service.fetchKoreanTvDiscover()).resolves.not.toThrow();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).not.toHaveBeenCalled();
+      expect(
+        mockEmbeddingService.batchCacheByContentIds,
+      ).not.toHaveBeenCalled();
     });
 
     it('Discover API 실패 시 Sentry.captureException을 호출해야 한다', async () => {
@@ -754,7 +869,9 @@ describe('RankingsService', () => {
       await service.fetchKoreanTvDiscover();
 
       expect(mockContentsService.findOrFetchByTmdbId).not.toHaveBeenCalled();
-      expect(mockEmbeddingService.batchCacheByContentIds).not.toHaveBeenCalled();
+      expect(
+        mockEmbeddingService.batchCacheByContentIds,
+      ).not.toHaveBeenCalled();
     });
   });
 });

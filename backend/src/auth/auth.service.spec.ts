@@ -3,7 +3,11 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
-import { UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  UnauthorizedException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { AuthProvider } from '../users/enums/auth-provider.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
 import { UserRole } from '../users/enums/user-role.enum';
@@ -51,7 +55,10 @@ describe('AuthService', () => {
         AuthService,
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
-        { provide: getRepositoryToken(RefreshToken), useValue: mockRefreshTokenRepo },
+        {
+          provide: getRepositoryToken(RefreshToken),
+          useValue: mockRefreshTokenRepo,
+        },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -67,58 +74,89 @@ describe('AuthService', () => {
   describe('validateUser', () => {
     it('유효한 자격 증명이 제공되면 비밀번호 없는 사용자 정보를 반환해야 한다', async () => {
       const mockUser = {
-        id: 1, nickname: 'testuser', email: 'test@example.com',
-        password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.USER,
+        id: 1,
+        nickname: 'testuser',
+        email: 'test@example.com',
+        password: 'hashedpassword',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
       };
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      const result = await service.validateUser('test@example.com', 'password123');
+      const result = await service.validateUser(
+        'test@example.com',
+        'password123',
+      );
 
       expect(result).toEqual({
-        id: 1, nickname: 'testuser', email: 'test@example.com',
-        status: UserStatus.ACTIVE, role: UserRole.USER,
+        id: 1,
+        nickname: 'testuser',
+        email: 'test@example.com',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
       });
-      expect(bcrypt.compare).toHaveBeenCalledWith('password123', 'hashedpassword');
+      expect(bcrypt.compare).toHaveBeenCalledWith(
+        'password123',
+        'hashedpassword',
+      );
     });
 
     it('비밀번호가 일치하지 않으면 UnauthorizedException을 던져야 한다', async () => {
       const mockUser = {
-        id: 1, nickname: 'testuser', email: 'test@example.com',
-        password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.USER,
+        id: 1,
+        nickname: 'testuser',
+        email: 'test@example.com',
+        password: 'hashedpassword',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
       };
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.validateUser('test@example.com', 'wrongpass')).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.validateUser('test@example.com', 'wrongpass'),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('사용자를 찾을 수 없으면 UnauthorizedException을 던져야 한다', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
 
-      await expect(service.validateUser('notfound@example.com', 'password123')).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.validateUser('notfound@example.com', 'password123'),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('DELETED 사용자에 대해 메시지와 함께 UnauthorizedException을 던져야 한다', async () => {
       const mockUser = {
-        id: 1, nickname: 'deleted_1_123', email: 'deleted_1_123@deleted.local',
-        password: 'hashedpassword', status: UserStatus.DELETED, role: UserRole.USER,
+        id: 1,
+        nickname: 'deleted_1_123',
+        email: 'deleted_1_123@deleted.local',
+        password: 'hashedpassword',
+        status: UserStatus.DELETED,
+        role: UserRole.USER,
       };
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
 
-      await expect(service.validateUser('deleted_1_123@deleted.local', 'password123'))
-        .rejects.toThrow(new UnauthorizedException('탈퇴한 계정입니다.'));
+      await expect(
+        service.validateUser('deleted_1_123@deleted.local', 'password123'),
+      ).rejects.toThrow(new UnauthorizedException('탈퇴한 계정입니다.'));
     });
 
     it('SUSPENDED 사용자에 대해 메시지와 함께 UnauthorizedException을 던져야 한다', async () => {
       const mockUser = {
-        id: 1, nickname: 'testuser', email: 'test@example.com',
-        password: 'hashedpassword', status: UserStatus.SUSPENDED, role: UserRole.USER,
+        id: 1,
+        nickname: 'testuser',
+        email: 'test@example.com',
+        password: 'hashedpassword',
+        status: UserStatus.SUSPENDED,
+        role: UserRole.USER,
       };
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
 
-      await expect(service.validateUser('test@example.com', 'password123'))
-        .rejects.toThrow(new UnauthorizedException('정지된 계정입니다.'));
+      await expect(
+        service.validateUser('test@example.com', 'password123'),
+      ).rejects.toThrow(new UnauthorizedException('정지된 계정입니다.'));
     });
   });
 
@@ -126,8 +164,14 @@ describe('AuthService', () => {
     it('access_token과 refresh_token을 반환해야 한다', async () => {
       const user = { id: 1, nickname: 'testuser', role: UserRole.USER };
       mockJwtService.sign.mockReturnValue('mocked.jwt.token');
-      mockRefreshTokenRepo.create.mockReturnValue({ token: 'mock-refresh', userId: 1 });
-      mockRefreshTokenRepo.save.mockResolvedValue({ token: 'mock-refresh', userId: 1 });
+      mockRefreshTokenRepo.create.mockReturnValue({
+        token: 'mock-refresh',
+        userId: 1,
+      });
+      mockRefreshTokenRepo.save.mockResolvedValue({
+        token: 'mock-refresh',
+        userId: 1,
+      });
 
       const result = await service.generateTokens(user);
 
@@ -136,14 +180,18 @@ describe('AuthService', () => {
       expect(typeof result.refresh_token).toBe('string');
       expect(result.refresh_token.length).toBe(64);
       expect(mockJwtService.sign).toHaveBeenCalledWith({
-        nickname: 'testuser', sub: 1, role: UserRole.USER,
+        nickname: 'testuser',
+        sub: 1,
+        role: UserRole.USER,
       });
     });
 
     it('refresh token의 SHA-256 해시를 DB에 저장해야 한다', async () => {
       const user = { id: 1, nickname: 'testuser', role: UserRole.USER };
       mockJwtService.sign.mockReturnValue('mocked.jwt.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data,
+      );
       mockRefreshTokenRepo.save.mockResolvedValue({});
 
       const result = await service.generateTokens(user);
@@ -158,13 +206,19 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.save).toHaveBeenCalled();
 
       // DB에 저장된 토큰은 반환된 rawToken의 SHA-256 해시여야 한다
-      const createArg = mockRefreshTokenRepo.create.mock.calls[0][0] as { token: string; expiresAt: Date };
-      const expectedHash = createHash('sha256').update(result.refresh_token).digest('hex');
+      const createArg = mockRefreshTokenRepo.create.mock.calls[0][0] as {
+        token: string;
+        expiresAt: Date;
+      };
+      const expectedHash = createHash('sha256')
+        .update(result.refresh_token)
+        .digest('hex');
       expect(createArg.token).toBe(expectedHash);
       expect(createArg.token).not.toBe(result.refresh_token);
 
       const now = new Date();
-      const daysDiff = (createArg.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+      const daysDiff =
+        (createArg.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
       expect(daysDiff).toBeGreaterThan(6.9);
       expect(daysDiff).toBeLessThan(7.1);
     });
@@ -185,14 +239,24 @@ describe('AuthService', () => {
       const mockManager = {
         findOne: jest.fn().mockResolvedValue(mockTokenEntity),
         remove: jest.fn().mockResolvedValue(mockTokenEntity),
-        create: jest.fn().mockImplementation((_entity: unknown, data: Partial<RefreshToken>) => data),
+        create: jest
+          .fn()
+          .mockImplementation(
+            (_entity: unknown, data: Partial<RefreshToken>) => data,
+          ),
         save: jest.fn().mockResolvedValue({}),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
       mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.ACTIVE, role: UserRole.USER, profileImage: null, subscribedOtts: [],
+        id: 1,
+        nickname: 'testuser',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
+        profileImage: null,
+        subscribedOtts: [],
       });
       mockJwtService.sign.mockReturnValue('new.jwt.token');
 
@@ -202,7 +266,11 @@ describe('AuthService', () => {
       expect(result.refresh_token).toBeDefined();
       expect(result.refresh_token.length).toBe(64);
       expect(result.user).toEqual({
-        id: 1, nickname: 'testuser', role: UserRole.USER, profileImage: null, subscribedOtts: [],
+        id: 1,
+        nickname: 'testuser',
+        role: UserRole.USER,
+        profileImage: null,
+        subscribedOtts: [],
       });
       // 트랜잭션이 사용되었는지 확인
       expect(mockDataSource.transaction).toHaveBeenCalled();
@@ -225,11 +293,13 @@ describe('AuthService', () => {
         findOne: jest.fn().mockResolvedValue(null),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
 
-      await expect(service.refreshTokens('nonexistent-token'))
-        .rejects.toThrow(new UnauthorizedException('유효하지 않은 리프레시 토큰입니다.'));
+      await expect(service.refreshTokens('nonexistent-token')).rejects.toThrow(
+        new UnauthorizedException('유효하지 않은 리프레시 토큰입니다.'),
+      );
     });
 
     it('만료된 토큰이면 삭제 후 UnauthorizedException을 던져야 한다', async () => {
@@ -248,11 +318,13 @@ describe('AuthService', () => {
         remove: jest.fn().mockResolvedValue(expiredTokenEntity),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
 
-      await expect(service.refreshTokens(rawToken))
-        .rejects.toThrow(new UnauthorizedException('만료된 리프레시 토큰입니다.'));
+      await expect(service.refreshTokens(rawToken)).rejects.toThrow(
+        new UnauthorizedException('만료된 리프레시 토큰입니다.'),
+      );
       expect(mockManager.remove).toHaveBeenCalledWith(expiredTokenEntity);
     });
 
@@ -272,14 +344,19 @@ describe('AuthService', () => {
         remove: jest.fn().mockResolvedValue(mockTokenEntity),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
       mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.SUSPENDED, role: UserRole.USER,
+        id: 1,
+        nickname: 'testuser',
+        status: UserStatus.SUSPENDED,
+        role: UserRole.USER,
       });
 
-      await expect(service.refreshTokens(rawToken))
-        .rejects.toThrow(new UnauthorizedException('정지된 계정입니다.'));
+      await expect(service.refreshTokens(rawToken)).rejects.toThrow(
+        new UnauthorizedException('정지된 계정입니다.'),
+      );
     });
 
     it('DELETED 사용자의 토큰이면 삭제 후 UnauthorizedException을 던져야 한다', async () => {
@@ -298,14 +375,19 @@ describe('AuthService', () => {
         remove: jest.fn().mockResolvedValue(mockTokenEntity),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
       mockUsersService.findByIdWithStatus.mockResolvedValue({
-        id: 1, nickname: 'testuser', status: UserStatus.DELETED, role: UserRole.USER,
+        id: 1,
+        nickname: 'testuser',
+        status: UserStatus.DELETED,
+        role: UserRole.USER,
       });
 
-      await expect(service.refreshTokens(rawToken))
-        .rejects.toThrow(new UnauthorizedException('탈퇴한 계정입니다.'));
+      await expect(service.refreshTokens(rawToken)).rejects.toThrow(
+        new UnauthorizedException('탈퇴한 계정입니다.'),
+      );
     });
   });
 
@@ -317,7 +399,9 @@ describe('AuthService', () => {
 
       await service.revokeRefreshToken(rawToken);
 
-      expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({ token: expectedHash });
+      expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({
+        token: expectedHash,
+      });
     });
   });
 
@@ -342,9 +426,13 @@ describe('AuthService', () => {
 
       await service.cleanExpiredTokens();
 
-      expect(mockRefreshTokenRepo.createQueryBuilder).toHaveBeenCalledWith('rt');
+      expect(mockRefreshTokenRepo.createQueryBuilder).toHaveBeenCalledWith(
+        'rt',
+      );
       expect(mockQb.delete).toHaveBeenCalled();
-      expect(mockQb.where).toHaveBeenCalledWith('expires_at < :now', { now: expect.any(Date) });
+      expect(mockQb.where).toHaveBeenCalledWith('expires_at < :now', {
+        now: expect.any(Date),
+      });
       expect(mockQb.execute).toHaveBeenCalled();
     });
   });
@@ -352,41 +440,59 @@ describe('AuthService', () => {
   describe('login', () => {
     it('ADMIN은 이메일 로그인이 가능해야 한다', async () => {
       const mockUser = {
-        id: 1, nickname: 'adminuser', email: 'admin@example.com',
-        password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.ADMIN,
+        id: 1,
+        nickname: 'adminuser',
+        email: 'admin@example.com',
+        password: 'hashedpassword',
+        status: UserStatus.ACTIVE,
+        role: UserRole.ADMIN,
       };
       const loginDto = { email: 'admin@example.com', password: 'password123' };
 
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockJwtService.sign.mockReturnValue('mocked.jwt.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data,
+      );
       mockRefreshTokenRepo.save.mockResolvedValue({});
 
       const result = await service.login(loginDto);
 
       expect(jwtService.sign).toHaveBeenCalledWith({
-        nickname: mockUser.nickname, sub: mockUser.id, role: UserRole.ADMIN,
+        nickname: mockUser.nickname,
+        sub: mockUser.id,
+        role: UserRole.ADMIN,
       });
       expect(result.access_token).toBe('mocked.jwt.token');
       expect(result.refresh_token).toBeDefined();
       expect(result.user).toEqual({
-        id: 1, nickname: 'adminuser', email: 'admin@example.com', role: UserRole.ADMIN, profileImage: null, subscribedOtts: [],
+        id: 1,
+        nickname: 'adminuser',
+        email: 'admin@example.com',
+        role: UserRole.ADMIN,
+        profileImage: null,
+        subscribedOtts: [],
       });
     });
 
     it('일반 USER가 이메일 로그인 시도하면 UnauthorizedException을 던져야 한다', async () => {
       const mockUser = {
-        id: 2, nickname: 'normaluser', email: 'user@example.com',
-        password: 'hashedpassword', status: UserStatus.ACTIVE, role: UserRole.USER,
+        id: 2,
+        nickname: 'normaluser',
+        email: 'user@example.com',
+        password: 'hashedpassword',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
       };
       const loginDto = { email: 'user@example.com', password: 'password123' };
 
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      await expect(service.login(loginDto))
-        .rejects.toThrow(new UnauthorizedException('소셜 로그인을 이용해주세요.'));
+      await expect(service.login(loginDto)).rejects.toThrow(
+        new UnauthorizedException('소셜 로그인을 이용해주세요.'),
+      );
     });
   });
 
@@ -414,7 +520,9 @@ describe('AuthService', () => {
       };
       mockUsersService.findByProvider.mockResolvedValue(existingUser);
       mockJwtService.sign.mockReturnValue('access.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data,
+      );
       mockRefreshTokenRepo.save.mockResolvedValue({});
 
       const result = await service.handleSocialCallback(googleProfile);
@@ -474,8 +582,9 @@ describe('AuthService', () => {
       };
       mockUsersService.findByProvider.mockResolvedValue(suspendedUser);
 
-      await expect(service.handleSocialCallback(googleProfile))
-        .rejects.toThrow(new UnauthorizedException('정지된 계정입니다.'));
+      await expect(service.handleSocialCallback(googleProfile)).rejects.toThrow(
+        new UnauthorizedException('정지된 계정입니다.'),
+      );
     });
 
     it('DELETED 기존 유저면 UnauthorizedException을 던져야 한다', async () => {
@@ -491,8 +600,9 @@ describe('AuthService', () => {
       };
       mockUsersService.findByProvider.mockResolvedValue(deletedUser);
 
-      await expect(service.handleSocialCallback(googleProfile))
-        .rejects.toThrow(new UnauthorizedException('탈퇴한 계정입니다.'));
+      await expect(service.handleSocialCallback(googleProfile)).rejects.toThrow(
+        new UnauthorizedException('탈퇴한 계정입니다.'),
+      );
     });
   });
 
@@ -520,10 +630,15 @@ describe('AuthService', () => {
       };
       mockUsersService.createSocialUser.mockResolvedValue(createdUser);
       mockJwtService.sign.mockReturnValue('access.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data,
+      );
       mockRefreshTokenRepo.save.mockResolvedValue({});
 
-      const result = await service.completeSocialSignup('valid-temp-token', 'mynickname');
+      const result = await service.completeSocialSignup(
+        'valid-temp-token',
+        'mynickname',
+      );
 
       expect(mockJwtService.verify).toHaveBeenCalledWith('valid-temp-token');
       expect(mockUsersService.createSocialUser).toHaveBeenCalledWith({
@@ -543,8 +658,9 @@ describe('AuthService', () => {
         throw new Error('jwt expired');
       });
 
-      await expect(service.completeSocialSignup('expired-token', 'nickname'))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        service.completeSocialSignup('expired-token', 'nickname'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('유효하지 않은 토큰 타입이면 BadRequestException을 던져야 한다', async () => {
@@ -557,8 +673,11 @@ describe('AuthService', () => {
         type: 'wrong_type',
       });
 
-      await expect(service.completeSocialSignup('wrong-type-token', 'nickname'))
-        .rejects.toThrow(new BadRequestException('유효하지 않은 토큰 타입입니다.'));
+      await expect(
+        service.completeSocialSignup('wrong-type-token', 'nickname'),
+      ).rejects.toThrow(
+        new BadRequestException('유효하지 않은 토큰 타입입니다.'),
+      );
     });
 
     it('subscribedOtts를 포함하여 유저를 생성해야 한다', async () => {
@@ -585,10 +704,16 @@ describe('AuthService', () => {
       };
       mockUsersService.createSocialUser.mockResolvedValue(createdUser);
       mockJwtService.sign.mockReturnValue('access.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data,
+      );
       mockRefreshTokenRepo.save.mockResolvedValue({});
 
-      const result = await service.completeSocialSignup('valid-temp-token', 'ottuser', ['netflix', 'tving']);
+      const result = await service.completeSocialSignup(
+        'valid-temp-token',
+        'ottuser',
+        ['netflix', 'tving'],
+      );
 
       expect(mockUsersService.createSocialUser).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -622,10 +747,15 @@ describe('AuthService', () => {
       };
       mockUsersService.createSocialUser.mockResolvedValue(createdUser);
       mockJwtService.sign.mockReturnValue('access.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data,
+      );
       mockRefreshTokenRepo.save.mockResolvedValue({});
 
-      const result = await service.completeSocialSignup('valid-temp-token', 'noottuser');
+      const result = await service.completeSocialSignup(
+        'valid-temp-token',
+        'noottuser',
+      );
 
       expect(mockUsersService.createSocialUser).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -652,35 +782,52 @@ describe('AuthService', () => {
         providerId: 'google-123',
       });
 
-      await expect(service.completeSocialSignup('reused-temp-token', 'newnickname'))
-        .rejects.toThrow(new ConflictException('이미 가입된 소셜 계정입니다.'));
+      await expect(
+        service.completeSocialSignup('reused-temp-token', 'newnickname'),
+      ).rejects.toThrow(new ConflictException('이미 가입된 소셜 계정입니다.'));
     });
   });
 
   describe('register', () => {
     it('사용자를 생성하고 access_token, refresh_token, 사용자 정보를 반환해야 한다', async () => {
-      const createUserDto = { nickname: 'newuser', email: 'new@example.com', password: 'password123' };
+      const createUserDto = {
+        nickname: 'newuser',
+        email: 'new@example.com',
+        password: 'password123',
+      };
       const createdUser = {
-        id: 2, nickname: 'newuser', email: 'new@example.com',
-        status: UserStatus.ACTIVE, role: UserRole.USER,
+        id: 2,
+        nickname: 'newuser',
+        email: 'new@example.com',
+        status: UserStatus.ACTIVE,
+        role: UserRole.USER,
       };
 
       mockUsersService.create.mockResolvedValue(createdUser);
       mockJwtService.sign.mockReturnValue('new.jwt.token');
-      mockRefreshTokenRepo.create.mockImplementation((data: Partial<RefreshToken>) => data);
+      mockRefreshTokenRepo.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data,
+      );
       mockRefreshTokenRepo.save.mockResolvedValue({});
 
       const result = await service.register(createUserDto);
 
       expect(mockUsersService.create).toHaveBeenCalledWith(createUserDto);
       expect(mockJwtService.sign).toHaveBeenCalledWith({
-        nickname: createdUser.nickname, sub: createdUser.id, role: UserRole.USER,
+        nickname: createdUser.nickname,
+        sub: createdUser.id,
+        role: UserRole.USER,
       });
       expect(result.access_token).toBe('new.jwt.token');
       expect(result.refresh_token).toBeDefined();
       expect(typeof result.refresh_token).toBe('string');
       expect(result.user).toEqual({
-        id: 2, nickname: 'newuser', email: 'new@example.com', role: UserRole.USER, profileImage: null, subscribedOtts: [],
+        id: 2,
+        nickname: 'newuser',
+        email: 'new@example.com',
+        role: UserRole.USER,
+        profileImage: null,
+        subscribedOtts: [],
       });
     });
   });

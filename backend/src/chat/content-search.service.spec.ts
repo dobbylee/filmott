@@ -66,13 +66,14 @@ describe('ContentSearchService', () => {
     it('1순위가 content_metadata 기준으로 검색해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      const result = await service.searchWithFilters(
-        '스릴러 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      const result = await service.searchWithFilters('스릴러 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       expect(result).toHaveLength(5);
-      expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledWith('스릴러 추천');
+      expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledWith(
+        '스릴러 추천',
+      );
       expect(mockDataSource.query).toHaveBeenCalledTimes(1);
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
@@ -84,10 +85,9 @@ describe('ContentSearchService', () => {
     it('adult 콘텐츠를 검색 결과에서 제외해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('c.adult IS NOT TRUE');
@@ -96,10 +96,9 @@ describe('ContentSearchService', () => {
     it('한국 시청 가능 필터가 1순위 블록에 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       // 1순위 블록: KR origin OR watch_providers OR KOBIS EXISTS
@@ -110,16 +109,34 @@ describe('ContentSearchService', () => {
 
     it('2단계 우선순위로 정렬되어야 한다', async () => {
       const mixedRows = [
-        { ...baseRow, content_id: 1, priority: 1, score: 0.9, description: '설명1' },
-        { ...baseRow, content_id: 2, priority: 1, score: 0.85, description: '설명2' },
-        { ...baseRow, content_id: 3, priority: 2, score: 0, description: null, overview: '줄거리3' },
+        {
+          ...baseRow,
+          content_id: 1,
+          priority: 1,
+          score: 0.9,
+          description: '설명1',
+        },
+        {
+          ...baseRow,
+          content_id: 2,
+          priority: 1,
+          score: 0.85,
+          description: '설명2',
+        },
+        {
+          ...baseRow,
+          content_id: 3,
+          priority: 2,
+          score: 0,
+          description: null,
+          overview: '줄거리3',
+        },
       ];
       mockDataSource.query.mockResolvedValue(mixedRows);
 
-      const result = await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      const result = await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       // UNION ALL로 2단계 분리 (1순위 content_metadata + 2순위 KOBIS)
@@ -137,10 +154,9 @@ describe('ContentSearchService', () => {
     it('OTT 필터가 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '넷플릭스 영화', 20, [],
-        { ottProviderNames: ['Netflix'] },
-      );
+      await service.searchWithFilters('넷플릭스 영화', 20, [], {
+        ottProviderNames: ['Netflix'],
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain("watch_providers->'flatrate'");
@@ -152,10 +168,9 @@ describe('ContentSearchService', () => {
     it('국가 필터가 정확한 boundary 매칭으로 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '한국 영화', 20, [],
-        { countries: ['KR'] },
-      );
+      await service.searchWithFilters('한국 영화', 20, [], {
+        countries: ['KR'],
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('origin_country =');
@@ -169,10 +184,9 @@ describe('ContentSearchService', () => {
     it('인물 필터가 director + credits jsonb 검색으로 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '봉준호 영화', 20, [],
-        { personNames: ['봉준호'] },
-      );
+      await service.searchWithFilters('봉준호 영화', 20, [], {
+        personNames: ['봉준호'],
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('director LIKE');
@@ -186,10 +200,9 @@ describe('ContentSearchService', () => {
     it('genres 필터가 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '스릴러 영화', 20, [],
-        { genres: ['스릴러', '범죄'] },
-      );
+      await service.searchWithFilters('스릴러 영화', 20, [], {
+        genres: ['스릴러', '범죄'],
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('jsonb_array_elements(c.genres)');
@@ -201,10 +214,9 @@ describe('ContentSearchService', () => {
     it('contentType 필터가 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '드라마 추천', 20, [],
-        { contentType: 'tv' },
-      );
+      await service.searchWithFilters('드라마 추천', 20, [], {
+        contentType: 'tv',
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('content_type =');
@@ -215,10 +227,9 @@ describe('ContentSearchService', () => {
     it('dateRange 필터가 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '최신 영화', 20, [],
-        { dateRange: { from: '2024-01-01', to: null } },
-      );
+      await service.searchWithFilters('최신 영화', 20, [], {
+        dateRange: { from: '2024-01-01', to: null },
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('release_date >=');
@@ -236,12 +247,13 @@ describe('ContentSearchService', () => {
       };
       mockDataSource.query.mockResolvedValue([rowWithoutEmbedding]);
 
-      const result = await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      const result = await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
-      expect(result[0].description).toBe('대통령의 음모를 파헤치는 기자의 이야기');
+      expect(result[0].description).toBe(
+        '대통령의 음모를 파헤치는 기자의 이야기',
+      );
       expect(result[0].overview).toBe('대통령의 음모를 파헤치는 기자의 이야기');
     });
 
@@ -255,10 +267,9 @@ describe('ContentSearchService', () => {
       };
       mockDataSource.query.mockResolvedValue([rowWithoutBoth]);
 
-      const result = await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      const result = await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       expect(result[0].description).toBe('');
     });
@@ -266,10 +277,9 @@ describe('ContentSearchService', () => {
     it('제외할 tmdbId를 쿼리에 전달해야 한다', async () => {
       mockDataSource.query.mockResolvedValue([]);
 
-      await service.searchWithFilters(
-        '테스트', 10, [100, 200],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('테스트', 10, [100, 200], {
+        contentType: 'movie',
+      });
 
       const params = mockDataSource.query.mock.calls[0][1] as unknown[];
       expect(params[0]).toEqual([100, 200]);
@@ -278,10 +288,9 @@ describe('ContentSearchService', () => {
     it('제외 목록이 비어있으면 [-1]로 대체해야 한다', async () => {
       mockDataSource.query.mockResolvedValue([]);
 
-      await service.searchWithFilters(
-        '테스트', 10, [],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('테스트', 10, [], {
+        contentType: 'movie',
+      });
 
       const params = mockDataSource.query.mock.calls[0][1] as unknown[];
       expect(params[0]).toEqual([-1]);
@@ -299,14 +308,16 @@ describe('ContentSearchService', () => {
       }));
 
       mockDataSource.query
-        .mockResolvedValueOnce(twoRows)    // 전체 필터
-        .mockResolvedValueOnce(twoRows)    // -genres
-        .mockResolvedValueOnce(threeRows)  // -인물
-        .mockResolvedValueOnce(fourRows)   // -국가
-        .mockResolvedValueOnce(sixRows);   // -OTT
+        .mockResolvedValueOnce(twoRows) // 전체 필터
+        .mockResolvedValueOnce(twoRows) // -genres
+        .mockResolvedValueOnce(threeRows) // -인물
+        .mockResolvedValueOnce(fourRows) // -국가
+        .mockResolvedValueOnce(sixRows); // -OTT
 
       const result = await service.searchWithFilters(
-        '넷플릭스 한국 봉준호 스릴러 영화', 10, [],
+        '넷플릭스 한국 봉준호 스릴러 영화',
+        10,
+        [],
         {
           ottProviderNames: ['Netflix'],
           countries: ['KR'],
@@ -355,14 +366,11 @@ describe('ContentSearchService', () => {
     it('fallback: 결과가 충분하면 추가 쿼리를 실행하지 않아야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '넷플릭스 한국 영화', 10, [],
-        {
-          ottProviderNames: ['Netflix'],
-          countries: ['KR'],
-          genres: ['스릴러'],
-        },
-      );
+      await service.searchWithFilters('넷플릭스 한국 영화', 10, [], {
+        ottProviderNames: ['Netflix'],
+        countries: ['KR'],
+        genres: ['스릴러'],
+      });
 
       // 1차 쿼리만 실행
       expect(mockDataSource.query).toHaveBeenCalledTimes(1);
@@ -371,24 +379,24 @@ describe('ContentSearchService', () => {
     it('벡터 유사도 가중 스코어 수식이 쿼리에 포함되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '스릴러 영화', 20, [],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('스릴러 영화', 20, [], {
+        contentType: 'movie',
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       // 가중 스코어 수식 (content_metadata의 embedding 컬럼 직접 사용)
       expect(query).toContain('(1 - (cm.embedding <=> $2::vector)) * 0.7');
-      expect(query).toContain('LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, 0.3)');
+      expect(query).toContain(
+        'LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, 0.3)',
+      );
     });
 
     it('반환 데이터가 SimilarContent 형식으로 매핑되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue([baseRow]);
 
-      const result = await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      const result = await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       expect(result[0]).toEqual({
         contentId: 1,
@@ -410,7 +418,9 @@ describe('ContentSearchService', () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       await service.searchWithFilters(
-        '넷플릭스 한국 봉준호 최신 스릴러 영화', 20, [],
+        '넷플릭스 한국 봉준호 최신 스릴러 영화',
+        20,
+        [],
         {
           ottProviderNames: ['Netflix'],
           countries: ['KR'],
@@ -434,10 +444,9 @@ describe('ContentSearchService', () => {
     it('dateRange.to만 있으면 release_date <= 조건만 생성해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '90년대 이전 영화', 20, [],
-        { dateRange: { from: null, to: '1999-12-31' } },
-      );
+      await service.searchWithFilters('90년대 이전 영화', 20, [], {
+        dateRange: { from: null, to: '1999-12-31' },
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('release_date <=');
@@ -451,10 +460,9 @@ describe('ContentSearchService', () => {
       const twoRows = fiveRows.slice(0, 2);
       mockDataSource.query.mockResolvedValue(twoRows);
 
-      const result = await service.searchWithFilters(
-        '드라마 추천', 10, [],
-        { contentType: 'tv' },
-      );
+      const result = await service.searchWithFilters('드라마 추천', 10, [], {
+        contentType: 'tv',
+      });
 
       expect(mockDataSource.query).toHaveBeenCalledTimes(1);
       expect(result).toHaveLength(2);
@@ -464,7 +472,9 @@ describe('ContentSearchService', () => {
       mockDataSource.query.mockResolvedValue([]);
 
       const result = await service.searchWithFilters(
-        '존재하지 않는 영화', 10, [],
+        '존재하지 않는 영화',
+        10,
+        [],
         { ottProviderNames: ['Netflix'] },
       );
 
@@ -474,10 +484,9 @@ describe('ContentSearchService', () => {
     it('복수 국가 필터가 OR 조건으로 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '한국 또는 일본 영화', 20, [],
-        { countries: ['KR', 'JP'] },
-      );
+      await service.searchWithFilters('한국 또는 일본 영화', 20, [], {
+        countries: ['KR', 'JP'],
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       // 각 국가 조건이 OR로 묶임
@@ -490,10 +499,9 @@ describe('ContentSearchService', () => {
     it('복수 인물 필터가 적용되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '송강호 최민식 영화', 20, [],
-        { personNames: ['송강호', '최민식'] },
-      );
+      await service.searchWithFilters('송강호 최민식 영화', 20, [], {
+        personNames: ['송강호', '최민식'],
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('director LIKE');
@@ -518,10 +526,9 @@ describe('ContentSearchService', () => {
       );
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      const result = await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      const result = await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       expect(result).toHaveLength(5);
       // 쿼리에 벡터 유사도 블록이 없어야 한다
@@ -542,10 +549,10 @@ describe('ContentSearchService', () => {
       );
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '드라마 추천', 20, [],
-        { contentType: 'tv', dateRange: { from: '2024-01-01', to: null } },
-      );
+      await service.searchWithFilters('드라마 추천', 20, [], {
+        contentType: 'tv',
+        dateRange: { from: '2024-01-01', to: null },
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('content_type =');
@@ -558,10 +565,9 @@ describe('ContentSearchService', () => {
     it('2순위에서 rankings를 직접 JOIN으로 조회해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       // 2순위: FROM rankings r JOIN contents c
@@ -574,7 +580,9 @@ describe('ContentSearchService', () => {
       const precomputed = [0.5, 0.6, 0.7];
 
       await service.searchWithFilters(
-        '영야성하 비슷한 드라마', 20, [],
+        '영야성하 비슷한 드라마',
+        20,
+        [],
         { contentType: 'tv' },
         precomputed,
       );
@@ -588,21 +596,21 @@ describe('ContentSearchService', () => {
     it('precomputedEmbedding이 없으면 generateEmbedding을 호출해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '스릴러 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('스릴러 추천', 20, [], {
+        contentType: 'movie',
+      });
 
-      expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledWith('스릴러 추천');
+      expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledWith(
+        '스릴러 추천',
+      );
     });
 
     it('1순위 블록에서 content_metadata를 직접 조인하여 재조인이 불필요해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       // 1순위: FROM content_metadata cm 직접 시작
@@ -616,23 +624,23 @@ describe('ContentSearchService', () => {
     it('2순위 KOBIS 결과에서 content_metadata에 이미 있는 작품을 제외해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       // 2순위 블록에 NOT EXISTS로 content_metadata 중복 제거
-      expect(query).toContain('NOT EXISTS (SELECT 1 FROM content_metadata cm2 WHERE cm2.content_id = c.id)');
+      expect(query).toContain(
+        'NOT EXISTS (SELECT 1 FROM content_metadata cm2 WHERE cm2.content_id = c.id)',
+      );
     });
 
     it('excludeGenres 필터가 SQL에 NOT EXISTS 조건으로 생성되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { excludeGenres: ['공포', '스릴러'] },
-      );
+      await service.searchWithFilters('영화 추천', 20, [], {
+        excludeGenres: ['공포', '스릴러'],
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('NOT EXISTS');
@@ -644,10 +652,9 @@ describe('ContentSearchService', () => {
     it('excludePersonNames 필터가 SQL에 NOT (director LIKE) 조건으로 생성되어야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { excludePersonNames: ['감독A'] },
-      );
+      await service.searchWithFilters('영화 추천', 20, [], {
+        excludePersonNames: ['감독A'],
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('AND NOT (');
@@ -662,10 +669,9 @@ describe('ContentSearchService', () => {
       );
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchWithFilters(
-        '영화 추천', 20, [],
-        { contentType: 'movie' },
-      );
+      await service.searchWithFilters('영화 추천', 20, [], {
+        contentType: 'movie',
+      });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       // 벡터 유사도 없이 인기도만 사용
@@ -674,8 +680,9 @@ describe('ContentSearchService', () => {
       // 1순위 블록이 여전히 content_metadata 기준
       expect(query).toContain('FROM content_metadata cm');
       // 인기도 점수가 score로 사용
-      expect(query).toContain('LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, 0.3)');
+      expect(query).toContain(
+        'LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, 0.3)',
+      );
     });
-
   });
 });

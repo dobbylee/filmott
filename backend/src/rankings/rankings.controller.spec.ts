@@ -57,7 +57,11 @@ describe('RankingsController', () => {
     it('사용자 지정 limit을 전달해야 한다', async () => {
       mockRankingsService.getRankings.mockResolvedValue([]);
 
-      await controller.getRankings({ source: 'tmdb', category: 'trending-all-day', limit: '5' });
+      await controller.getRankings({
+        source: 'tmdb',
+        category: 'trending-all-day',
+        limit: '5',
+      });
 
       expect(mockRankingsService.getRankings).toHaveBeenCalledWith(
         'tmdb',
@@ -88,11 +92,15 @@ describe('RankingsController', () => {
     });
 
     it('제거된 trending-movie-day 카테고리에 대해 BadRequestException을 던져야 한다', async () => {
-      await expect(controller.refresh('trending-movie-day')).rejects.toThrow(BadRequestException);
+      await expect(controller.refresh('trending-movie-day')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('제거된 trending-tv-day 카테고리에 대해 BadRequestException을 던져야 한다', async () => {
-      await expect(controller.refresh('trending-tv-day')).rejects.toThrow(BadRequestException);
+      await expect(controller.refresh('trending-tv-day')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('all 타입과 week 윈도우로 fetchTrending을 호출해야 한다', async () => {
@@ -107,13 +115,18 @@ describe('RankingsController', () => {
     });
 
     it('알 수 없는 카테고리에 대해 BadRequestException을 던져야 한다', async () => {
-      await expect(controller.refresh('unknown')).rejects.toThrow(BadRequestException);
+      await expect(controller.refresh('unknown')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
   describe('가드 적용 확인', () => {
     it('refresh 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
-      const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.refresh);
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        RankingsController.prototype.refresh,
+      );
       expect(guards).toBeDefined();
       expect(guards).toHaveLength(2);
       expect(guards[0]).toBe(JwtAuthGuard);
@@ -121,18 +134,27 @@ describe('RankingsController', () => {
     });
 
     it('refresh 메서드에 ADMIN 역할이 필요해야 한다', () => {
-      const roles = reflector.get<UserRole[]>(ROLES_KEY, RankingsController.prototype.refresh);
+      const roles = reflector.get<UserRole[]>(
+        ROLES_KEY,
+        RankingsController.prototype.refresh,
+      );
       expect(roles).toBeDefined();
       expect(roles).toContain(UserRole.ADMIN);
     });
 
     it('getRankings 메서드에는 가드가 없어야 한다', () => {
-      const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.getRankings);
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        RankingsController.prototype.getRankings,
+      );
       expect(guards).toBeUndefined();
     });
 
     it('getUnmatched 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
-      const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.getUnmatched);
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        RankingsController.prototype.getUnmatched,
+      );
       expect(guards).toBeDefined();
       expect(guards).toHaveLength(2);
       expect(guards[0]).toBe(JwtAuthGuard);
@@ -140,13 +162,19 @@ describe('RankingsController', () => {
     });
 
     it('getUnmatched 메서드에 ADMIN 역할이 필요해야 한다', () => {
-      const roles = reflector.get<UserRole[]>(ROLES_KEY, RankingsController.prototype.getUnmatched);
+      const roles = reflector.get<UserRole[]>(
+        ROLES_KEY,
+        RankingsController.prototype.getUnmatched,
+      );
       expect(roles).toBeDefined();
       expect(roles).toContain(UserRole.ADMIN);
     });
 
     it('updatePosterUrl 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
-      const guards = Reflect.getMetadata('__guards__', RankingsController.prototype.updatePosterUrl);
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        RankingsController.prototype.updatePosterUrl,
+      );
       expect(guards).toBeDefined();
       expect(guards).toHaveLength(2);
       expect(guards[0]).toBe(JwtAuthGuard);
@@ -154,7 +182,10 @@ describe('RankingsController', () => {
     });
 
     it('updatePosterUrl 메서드에 ADMIN 역할이 필요해야 한다', () => {
-      const roles = reflector.get<UserRole[]>(ROLES_KEY, RankingsController.prototype.updatePosterUrl);
+      const roles = reflector.get<UserRole[]>(
+        ROLES_KEY,
+        RankingsController.prototype.updatePosterUrl,
+      );
       expect(roles).toBeDefined();
       expect(roles).toContain(UserRole.ADMIN);
     });

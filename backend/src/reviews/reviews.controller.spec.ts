@@ -48,7 +48,13 @@ describe('ReviewsController', () => {
   describe('GET /api/reviews/my', () => {
     it('콘텐츠에 대한 내 리뷰를 반환해야 한다', async () => {
       const user = { id: 1, nickname: 'test', role: 'USER' };
-      const review = { id: 1, userId: 1, contentId: 5, rating: 8, commentsCount: 2 };
+      const review = {
+        id: 1,
+        userId: 1,
+        contentId: 5,
+        rating: 8,
+        commentsCount: 2,
+      };
       mockReviewsService.findMyReview.mockResolvedValue(review);
 
       const result = await controller.findMyReview(user, 5);
@@ -74,7 +80,10 @@ describe('ReviewsController', () => {
 
       const result = await controller.getLikedIds(user, undefined, '2,4,6');
 
-      expect(mockReviewsService.getLikedReviewIdsByIds).toHaveBeenCalledWith(1, [2, 4, 6]);
+      expect(mockReviewsService.getLikedReviewIdsByIds).toHaveBeenCalledWith(
+        1,
+        [2, 4, 6],
+      );
       expect(result).toEqual([2, 4]);
     });
 
@@ -135,15 +144,28 @@ describe('ReviewsController', () => {
 
       await controller.findByContent(1);
 
-      expect(mockReviewsService.findByContent).toHaveBeenCalledWith(1, 1, 'latest');
+      expect(mockReviewsService.findByContent).toHaveBeenCalledWith(
+        1,
+        1,
+        'latest',
+      );
     });
 
     it('page와 sort 파라미터를 전달해야 한다', async () => {
-      mockReviewsService.findByContent.mockResolvedValue({ data: [], total: 0, page: 2, totalPages: 1 });
+      mockReviewsService.findByContent.mockResolvedValue({
+        data: [],
+        total: 0,
+        page: 2,
+        totalPages: 1,
+      });
 
       await controller.findByContent(1, '2', 'likes');
 
-      expect(mockReviewsService.findByContent).toHaveBeenCalledWith(1, 2, 'likes');
+      expect(mockReviewsService.findByContent).toHaveBeenCalledWith(
+        1,
+        2,
+        'likes',
+      );
     });
   });
 
@@ -181,33 +203,48 @@ describe('ReviewsController', () => {
     });
 
     it('숫자가 아닌 limit에 대해 BadRequestException을 던져야 한다', async () => {
-      await expect(controller.getRecent('abc')).rejects.toThrow(BadRequestException);
+      await expect(controller.getRecent('abc')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
   describe('parseInt NaN 검증', () => {
     it('findByContent에서 숫자가 아닌 page에 대해 BadRequestException을 던져야 한다', async () => {
-      await expect(controller.findByContent(1, 'abc')).rejects.toThrow(BadRequestException);
+      await expect(controller.findByContent(1, 'abc')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('findByUser에서 숫자가 아닌 page에 대해 BadRequestException을 던져야 한다', async () => {
-      await expect(controller.findByUser(1, 'xyz')).rejects.toThrow(BadRequestException);
+      await expect(controller.findByUser(1, 'xyz')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('getComments에서 숫자가 아닌 page에 대해 BadRequestException을 던져야 한다', async () => {
-      await expect(controller.getComments(1, 'notanumber')).rejects.toThrow(BadRequestException);
+      await expect(controller.getComments(1, 'notanumber')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('getLikedIds에서 숫자가 아닌 contentId에 대해 BadRequestException을 던져야 한다', async () => {
       const user = { id: 1, nickname: 'test', role: 'USER' };
 
-      await expect(controller.getLikedIds(user, 'abc')).rejects.toThrow(BadRequestException);
+      await expect(controller.getLikedIds(user, 'abc')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
   describe('GET /api/reviews/user/:userId', () => {
     it('사용자별 리뷰를 반환해야 한다', async () => {
-      mockReviewsService.findByUser.mockResolvedValue({ data: [], total: 0, page: 1, totalPages: 0 });
+      mockReviewsService.findByUser.mockResolvedValue({
+        data: [],
+        total: 0,
+        page: 1,
+        totalPages: 0,
+      });
 
       await controller.findByUser(1);
 
@@ -248,7 +285,12 @@ describe('ReviewsController', () => {
 
   describe('GET /api/reviews/:id/comments', () => {
     it('기본 page로 댓글을 반환해야 한다', async () => {
-      mockCommentsService.findByReview.mockResolvedValue({ data: [], total: 0, page: 1, totalPages: 0 });
+      mockCommentsService.findByReview.mockResolvedValue({
+        data: [],
+        total: 0,
+        page: 1,
+        totalPages: 0,
+      });
 
       await controller.getComments(1);
 
@@ -256,7 +298,12 @@ describe('ReviewsController', () => {
     });
 
     it('사용자 지정 page 파라미터를 전달해야 한다', async () => {
-      mockCommentsService.findByReview.mockResolvedValue({ data: [], total: 0, page: 2, totalPages: 1 });
+      mockCommentsService.findByReview.mockResolvedValue({
+        data: [],
+        total: 0,
+        page: 2,
+        totalPages: 1,
+      });
 
       await controller.getComments(1, '2');
 

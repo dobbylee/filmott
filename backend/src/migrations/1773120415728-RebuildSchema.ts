@@ -5,15 +5,27 @@ export class RebuildSchema1773120415728 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Drop posts table
-    await queryRunner.query(`ALTER TABLE "posts" DROP CONSTRAINT IF EXISTS "FK_c5a322ad12a7bf95460c958e80e"`);
+    await queryRunner.query(
+      `ALTER TABLE "posts" DROP CONSTRAINT IF EXISTS "FK_c5a322ad12a7bf95460c958e80e"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "posts"`);
 
     // Modify users table: rename username -> nickname, add profile_image, add created_at, rename deletedAt -> deleted_at
-    await queryRunner.query(`ALTER TABLE "users" RENAME COLUMN "username" TO "nickname"`);
-    await queryRunner.query(`ALTER TABLE "users" RENAME CONSTRAINT "UQ_fe0bb3f6520ee0469504521e710" TO "UQ_users_nickname"`);
-    await queryRunner.query(`ALTER TABLE "users" ADD COLUMN "profile_image" character varying`);
-    await queryRunner.query(`ALTER TABLE "users" ADD COLUMN "created_at" TIMESTAMPTZ NOT NULL DEFAULT now()`);
-    await queryRunner.query(`ALTER TABLE "users" RENAME COLUMN "deletedAt" TO "deleted_at"`);
+    await queryRunner.query(
+      `ALTER TABLE "users" RENAME COLUMN "username" TO "nickname"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" RENAME CONSTRAINT "UQ_fe0bb3f6520ee0469504521e710" TO "UQ_users_nickname"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" ADD COLUMN "profile_image" character varying`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" ADD COLUMN "created_at" TIMESTAMPTZ NOT NULL DEFAULT now()`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" RENAME COLUMN "deletedAt" TO "deleted_at"`,
+    );
 
     // Create contents table
     await queryRunner.query(`
@@ -123,19 +135,35 @@ export class RebuildSchema1773120415728 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "review_comments"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "review_likes"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "reviews"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_rankings_source_category"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_rankings_source_category"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "rankings"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "contents"`);
 
     // Revert users table changes
-    await queryRunner.query(`ALTER TABLE "users" RENAME COLUMN "deleted_at" TO "deletedAt"`);
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "created_at"`);
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "profile_image"`);
-    await queryRunner.query(`ALTER TABLE "users" RENAME CONSTRAINT "UQ_users_nickname" TO "UQ_fe0bb3f6520ee0469504521e710"`);
-    await queryRunner.query(`ALTER TABLE "users" RENAME COLUMN "nickname" TO "username"`);
+    await queryRunner.query(
+      `ALTER TABLE "users" RENAME COLUMN "deleted_at" TO "deletedAt"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" DROP COLUMN IF EXISTS "created_at"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" DROP COLUMN IF EXISTS "profile_image"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" RENAME CONSTRAINT "UQ_users_nickname" TO "UQ_fe0bb3f6520ee0469504521e710"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" RENAME COLUMN "nickname" TO "username"`,
+    );
 
     // Recreate posts table
-    await queryRunner.query(`CREATE TABLE "posts" ("id" SERIAL NOT NULL, "title" character varying NOT NULL, "content" text NOT NULL, "views" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "authorId" integer, CONSTRAINT "PK_2829ac61eff60fcec60d7274b9e" PRIMARY KEY ("id"))`);
-    await queryRunner.query(`ALTER TABLE "posts" ADD CONSTRAINT "FK_c5a322ad12a7bf95460c958e80e" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
+    await queryRunner.query(
+      `CREATE TABLE "posts" ("id" SERIAL NOT NULL, "title" character varying NOT NULL, "content" text NOT NULL, "views" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "authorId" integer, CONSTRAINT "PK_2829ac61eff60fcec60d7274b9e" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "posts" ADD CONSTRAINT "FK_c5a322ad12a7bf95460c958e80e" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    );
   }
 }

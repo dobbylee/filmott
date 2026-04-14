@@ -60,7 +60,11 @@ describe('R2StorageService', () => {
       mockSend.mockResolvedValue({});
       const buffer = Buffer.from('test-image');
 
-      const result = await service.upload('profiles/test.webp', buffer, 'image/webp');
+      const result = await service.upload(
+        'profiles/test.webp',
+        buffer,
+        'image/webp',
+      );
 
       expect(result).toBe('https://test.r2.dev/profiles/test.webp');
       expect(mockSend).toHaveBeenCalledWith(

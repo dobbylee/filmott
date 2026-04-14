@@ -9,8 +9,14 @@ export class RevalidateService {
   private readonly frontendUrl: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.revalidateSecret = this.configService.get<string>('REVALIDATE_SECRET', '');
-    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
+    this.revalidateSecret = this.configService.get<string>(
+      'REVALIDATE_SECRET',
+      '',
+    );
+    this.frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
   }
 
   async revalidatePath(path: string = '/'): Promise<void> {
@@ -21,7 +27,7 @@ export class RevalidateService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.revalidateSecret}`,
+          Authorization: `Bearer ${this.revalidateSecret}`,
         },
         body: JSON.stringify({ path }),
       });
@@ -36,7 +42,11 @@ export class RevalidateService {
   }
 
   async revalidatePaths(paths: string[]): Promise<void> {
-    const uniquePaths = [...new Set(paths.filter((path): path is string => Boolean(path)))];
-    await Promise.allSettled(uniquePaths.map((path) => this.revalidatePath(path)));
+    const uniquePaths = [
+      ...new Set(paths.filter((path): path is string => Boolean(path))),
+    ];
+    await Promise.allSettled(
+      uniquePaths.map((path) => this.revalidatePath(path)),
+    );
   }
 }

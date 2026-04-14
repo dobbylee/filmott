@@ -51,7 +51,9 @@ describe('KakaoService', () => {
 
       expect(url).toContain('https://kauth.kakao.com/oauth/authorize');
       expect(url).toContain('client_id=test-kakao-client-id');
-      expect(url).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fauth%2Fkakao%2Fcallback');
+      expect(url).toContain(
+        'redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fauth%2Fkakao%2Fcallback',
+      );
       expect(url).toContain('response_type=code');
       expect(url).toContain(`state=${state}`);
     });

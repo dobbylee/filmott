@@ -44,6 +44,20 @@ export interface BatchResult {
   failed: number;
 }
 
+function stripControlCharacters(value: string | null | undefined): string {
+  if (!value) return '정보 없음';
+
+  const sanitized = Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return code >= 0x20 && code !== 0x7f;
+    })
+    .join('')
+    .trim();
+
+  return sanitized || '정보 없음';
+}
+
 @Injectable()
 export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
@@ -59,9 +73,7 @@ export class EmbeddingService {
     private readonly dataSource: DataSource,
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY', '');
-    this.openai = apiKey
-      ? new OpenAI({ apiKey })
-      : null;
+    this.openai = apiKey ? new OpenAI({ apiKey }) : null;
   }
 
   private ensureOpenAI(): OpenAI {
@@ -96,9 +108,6 @@ export class EmbeddingService {
   async generateDescription(content: Content): Promise<string> {
     const openai = this.ensureOpenAI();
 
-    const sanitize = (text: string | null | undefined): string =>
-      (text || '').replace(/[\x00-\x1F\x7F]/g, '').trim() || '정보 없음';
-
     const genreNames = (content.genres || []).map((g) => g.name).join(', ');
     const cast = (content.credits || [])
       .slice(0, 5)
@@ -116,14 +125,14 @@ export class EmbeddingService {
 
     const prompt = `아래 작품 정보를 바탕으로 분위기, 감성, 테마, 시청 상황을 포함한 한국어 설명을 3~5문장으로 작성하세요.
 첫 문장에 연도, 국가, 타입, 플랫폼 정보를 자연스럽게 포함하세요.
-제목: ${sanitize(content.title)}
+제목: ${stripControlCharacters(content.title)}
 타입: ${contentType}
 장르: ${genreNames || '정보 없음'}
-줄거리: ${sanitize(content.overview)}
-감독: ${sanitize(content.director)}
+줄거리: ${stripControlCharacters(content.overview)}
+감독: ${stripControlCharacters(content.director)}
 출연진: ${cast || '정보 없음'}
 연도: ${year}
-제작 국가: ${sanitize(content.originCountry)}
+제작 국가: ${stripControlCharacters(content.originCountry)}
 OTT 플랫폼: ${ottNames || '정보 없음'}
 평점: ${content.voteAverage ?? '정보 없음'}
 러닝타임: ${content.runtime ? content.runtime + '분' : '정보 없음'}`;
@@ -174,7 +183,9 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 
     this.hasMetadataCache = true;
 
-    return this.metadataRepo.findOne({ where: { contentId } }) as Promise<ContentMetadata>;
+    return this.metadataRepo.findOne({
+      where: { contentId },
+    }) as Promise<ContentMetadata>;
   }
 
   async searchSimilar(
@@ -186,20 +197,27 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
   ): Promise<SimilarContent[]> {
     if (!this.openai) return [];
 
-    const embedding = precomputedEmbedding ?? await this.generateEmbedding(queryText);
+    const embedding =
+      precomputedEmbedding ?? (await this.generateEmbedding(queryText));
     const embeddingStr = `[${embedding.join(',')}]`;
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];
 
-    const hasFilters = filters && (
-      (filters.ottProviderNames?.length ?? 0) > 0 ||
-      (filters.countries?.length ?? 0) > 0 ||
-      (filters.personNames?.length ?? 0) > 0 ||
-      (filters.dateRange?.from || filters.dateRange?.to) ||
-      filters.contentType !== undefined
-    );
+    const hasFilters =
+      filters &&
+      ((filters.ottProviderNames?.length ?? 0) > 0 ||
+        (filters.countries?.length ?? 0) > 0 ||
+        (filters.personNames?.length ?? 0) > 0 ||
+        filters.dateRange?.from ||
+        filters.dateRange?.to ||
+        filters.contentType !== undefined);
 
     // 1차: 전체 필터 적용
-    let results = await this.executeSearch(embeddingStr, limit, excludeIds, filters);
+    let results = await this.executeSearch(
+      embeddingStr,
+      limit,
+      excludeIds,
+      filters,
+    );
 
     // 2차: 결과 부족 시 필터 단계적 완화
     if (results.length < 5 && hasFilters) {
@@ -207,17 +225,35 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 
       if (results.length < 5 && (relaxedFilters.personNames?.length ?? 0) > 0) {
         delete relaxedFilters.personNames;
-        results = await this.executeSearch(embeddingStr, limit, excludeIds, relaxedFilters);
+        results = await this.executeSearch(
+          embeddingStr,
+          limit,
+          excludeIds,
+          relaxedFilters,
+        );
       }
 
       if (results.length < 5 && (relaxedFilters.countries?.length ?? 0) > 0) {
         delete relaxedFilters.countries;
-        results = await this.executeSearch(embeddingStr, limit, excludeIds, relaxedFilters);
+        results = await this.executeSearch(
+          embeddingStr,
+          limit,
+          excludeIds,
+          relaxedFilters,
+        );
       }
 
-      if (results.length < 5 && (relaxedFilters.ottProviderNames?.length ?? 0) > 0) {
+      if (
+        results.length < 5 &&
+        (relaxedFilters.ottProviderNames?.length ?? 0) > 0
+      ) {
         delete relaxedFilters.ottProviderNames;
-        results = await this.executeSearch(embeddingStr, limit, excludeIds, relaxedFilters);
+        results = await this.executeSearch(
+          embeddingStr,
+          limit,
+          excludeIds,
+          relaxedFilters,
+        );
       }
     }
 
@@ -231,7 +267,10 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     filters?: SearchFilters,
   ): Promise<SimilarContent[]> {
     const conditions: string[] = [];
-    const params: (string | number | number[] | string[])[] = [embeddingStr, excludeIds];
+    const params: (string | number | number[] | string[])[] = [
+      embeddingStr,
+      excludeIds,
+    ];
     let paramIndex = 3;
 
     // OTT 필터
@@ -245,26 +284,24 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 
     // 국가 필터 (정확한 boundary 매칭: 쉼표 구분 문자열에서 오탐 방지)
     if (filters?.countries?.length) {
-      const countryConditions = filters.countries
-        .map(() => {
-          const idx = paramIndex;
-          paramIndex++;
-          return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ', %' OR c.origin_country LIKE '%, ' || $${idx} OR c.origin_country LIKE '%, ' || $${idx} || ', %')`;
-        });
+      const countryConditions = filters.countries.map(() => {
+        const idx = paramIndex;
+        paramIndex++;
+        return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ', %' OR c.origin_country LIKE '%, ' || $${idx} OR c.origin_country LIKE '%, ' || $${idx} || ', %')`;
+      });
       conditions.push(`AND (${countryConditions.join(' OR ')})`);
       filters.countries.forEach((country) => params.push(country));
     }
 
     // 인물 필터 (director LIKE + credits jsonb name/character 필드만 검색)
     if (filters?.personNames?.length) {
-      const personConditions = filters.personNames
-        .flatMap(() => {
-          const idx = paramIndex;
-          const directorCond = `c.director LIKE $${idx}`;
-          const creditsCond = `EXISTS (SELECT 1 FROM jsonb_array_elements(c.credits) AS cr WHERE cr->>'name' LIKE $${idx} OR cr->>'character' LIKE $${idx})`;
-          paramIndex++;
-          return [directorCond, creditsCond];
-        });
+      const personConditions = filters.personNames.flatMap(() => {
+        const idx = paramIndex;
+        const directorCond = `c.director LIKE $${idx}`;
+        const creditsCond = `EXISTS (SELECT 1 FROM jsonb_array_elements(c.credits) AS cr WHERE cr->>'name' LIKE $${idx} OR cr->>'character' LIKE $${idx})`;
+        paramIndex++;
+        return [directorCond, creditsCond];
+      });
       conditions.push(`AND (${personConditions.join(' OR ')})`);
       filters.personNames.forEach((name) => params.push(`%${name}%`));
     }

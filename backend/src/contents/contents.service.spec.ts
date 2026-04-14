@@ -118,9 +118,24 @@ describe('ContentsService', () => {
 
   describe('searchContents', () => {
     it('type이 지정되지 않으면 person, movie, tv에 대해 searchByType을 호출해야 한다', async () => {
-      const personResult = { page: 1, total_pages: 1, total_results: 2, results: [{ id: 1, media_type: 'person' }] };
-      const movieResult = { page: 1, total_pages: 2, total_results: 5, results: [{ id: 2, media_type: 'movie' }] };
-      const tvResult = { page: 1, total_pages: 1, total_results: 3, results: [{ id: 3, media_type: 'tv' }] };
+      const personResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 2,
+        results: [{ id: 1, media_type: 'person' }],
+      };
+      const movieResult = {
+        page: 1,
+        total_pages: 2,
+        total_results: 5,
+        results: [{ id: 2, media_type: 'movie' }],
+      };
+      const tvResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 3,
+        results: [{ id: 3, media_type: 'tv' }],
+      };
 
       mockTmdbService.searchByType
         .mockResolvedValueOnce(personResult)
@@ -130,9 +145,21 @@ describe('ContentsService', () => {
       const result = await service.searchContents('test');
 
       expect(mockTmdbService.searchByType).toHaveBeenCalledTimes(3);
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'person', 1);
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'movie', 1);
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'tv', 1);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        'test',
+        'person',
+        1,
+      );
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        'test',
+        'movie',
+        1,
+      );
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        'test',
+        'tv',
+        1,
+      );
       expect(result.page).toBe(1);
       expect(result.total_pages).toBe(2); // max(2, 1)
       expect((result as { personTotal: number }).personTotal).toBe(2);
@@ -142,12 +169,21 @@ describe('ContentsService', () => {
     });
 
     it('type이 지정되면 searchByType을 호출해야 한다', async () => {
-      const searchResult = { page: 1, total_pages: 1, total_results: 1, results: [] };
+      const searchResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 1,
+        results: [],
+      };
       mockTmdbService.searchByType.mockResolvedValue(searchResult);
 
       const result = await service.searchContents('test', 'movie', 2);
 
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'movie', 2);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        'test',
+        'movie',
+        2,
+      );
       expect(result).toEqual(searchResult);
     });
   });
@@ -167,13 +203,25 @@ describe('ContentsService', () => {
         runtime: 95,
         credits: {
           cast: [
-            { id: 1, name: 'Actor 1', character: 'Role 1', profile_path: '/a1.jpg', order: 0 },
+            {
+              id: 1,
+              name: 'Actor 1',
+              character: 'Role 1',
+              profile_path: '/a1.jpg',
+              order: 0,
+            },
           ],
         },
         'watch/providers': {
           results: {
             KR: {
-              flatrate: [{ provider_id: 8, provider_name: 'Netflix', logo_path: '/nf.jpg' }],
+              flatrate: [
+                {
+                  provider_id: 8,
+                  provider_name: 'Netflix',
+                  logo_path: '/nf.jpg',
+                },
+              ],
             },
           },
         },
@@ -311,9 +359,9 @@ describe('ContentsService', () => {
       mockContentRepo.findOne.mockResolvedValue(null);
       mockTmdbService.getDetails.mockResolvedValue({});
 
-      await expect(
-        service.getContentDetail(999, 'movie'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getContentDetail(999, 'movie')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -337,7 +385,12 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getDetails.mockResolvedValue(tvData);
 
-      const savedContent = { id: 5, tmdbId: 456, title: 'TV Show', contentType: 'tv' };
+      const savedContent = {
+        id: 5,
+        tmdbId: 456,
+        title: 'TV Show',
+        contentType: 'tv',
+      };
       mockContentRepo.create.mockReturnValue(savedContent);
       mockContentRepo.save.mockResolvedValue(savedContent);
 
@@ -409,12 +462,36 @@ describe('ContentsService', () => {
     it('movie/tv로 필터링하고 날짜 내림차순으로 정렬해야 한다', async () => {
       const creditsData = {
         cast: [
-          { id: 1, media_type: 'movie', title: 'Old Movie', release_date: '2010-05-01', vote_average: 7.0 },
-          { id: 2, media_type: 'tv', name: 'New Show', first_air_date: '2024-01-15', vote_average: 8.5 },
-          { id: 3, media_type: 'movie', title: 'No Date Movie', vote_average: 6.0 },
+          {
+            id: 1,
+            media_type: 'movie',
+            title: 'Old Movie',
+            release_date: '2010-05-01',
+            vote_average: 7.0,
+          },
+          {
+            id: 2,
+            media_type: 'tv',
+            name: 'New Show',
+            first_air_date: '2024-01-15',
+            vote_average: 8.5,
+          },
+          {
+            id: 3,
+            media_type: 'movie',
+            title: 'No Date Movie',
+            vote_average: 6.0,
+          },
         ],
         crew: [
-          { id: 4, media_type: 'movie', title: 'Directed Movie', release_date: '2020-06-01', job: 'Director', vote_average: 7.5 },
+          {
+            id: 4,
+            media_type: 'movie',
+            title: 'Directed Movie',
+            release_date: '2020-06-01',
+            job: 'Director',
+            vote_average: 7.5,
+          },
         ],
       };
       mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
@@ -435,7 +512,13 @@ describe('ContentsService', () => {
     it('크레딧에서 movie/tv가 아닌 미디어 타입을 제외해야 한다', async () => {
       const creditsData = {
         cast: [
-          { id: 1, media_type: 'movie', title: 'A Movie', release_date: '2020-01-01', vote_average: 7.0 },
+          {
+            id: 1,
+            media_type: 'movie',
+            title: 'A Movie',
+            release_date: '2020-01-01',
+            vote_average: 7.0,
+          },
           { id: 2, media_type: 'person', name: 'Someone', vote_average: 0 },
         ],
         crew: [],
@@ -451,7 +534,12 @@ describe('ContentsService', () => {
 
   describe('discoverContents', () => {
     it('올바른 파라미터로 discoverByFilters를 호출해야 한다', async () => {
-      const discoverResult = { page: 1, total_pages: 5, total_results: 100, results: [] };
+      const discoverResult = {
+        page: 1,
+        total_pages: 5,
+        total_results: 100,
+        results: [],
+      };
       mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
 
       const result = await service.discoverContents('tv', {
@@ -471,7 +559,12 @@ describe('ContentsService', () => {
     });
 
     it('기본 파라미터 없이 호출해도 정상 동작해야 한다', async () => {
-      const discoverResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const discoverResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
 
       const result = await service.discoverContents('movie', {});
@@ -548,7 +641,9 @@ describe('ContentsService', () => {
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
       mockContentRepo.create.mockImplementation((data: any) => data);
-      mockContentRepo.save.mockImplementation((data: any) => Promise.resolve(data));
+      mockContentRepo.save.mockImplementation((data: any) =>
+        Promise.resolve(data),
+      );
 
       await service.findOrFetchByTmdbId(888, 'movie');
 
@@ -581,8 +676,12 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
-      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
-      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+      mockContentRepo.create.mockImplementation(
+        (data: Partial<Content>) => data,
+      );
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) =>
+        Promise.resolve(data),
+      );
 
       await service.findOrFetchByTmdbId(777, 'movie');
 
@@ -612,8 +711,12 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
-      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
-      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+      mockContentRepo.create.mockImplementation(
+        (data: Partial<Content>) => data,
+      );
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) =>
+        Promise.resolve(data),
+      );
 
       await service.findOrFetchByTmdbId(778, 'movie');
 
@@ -627,29 +730,62 @@ describe('ContentsService', () => {
 
   describe('searchContents - 추가 케이스', () => {
     it('person 타입으로 검색하면 searchByType에 person을 전달해야 한다', async () => {
-      const searchResult = { page: 1, total_pages: 1, total_results: 2, results: [{ id: 1 }] };
+      const searchResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 2,
+        results: [{ id: 1 }],
+      };
       mockTmdbService.searchByType.mockResolvedValue(searchResult);
 
       const result = await service.searchContents('배우', 'person', 1);
 
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('배우', 'person', 1);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        '배우',
+        'person',
+        1,
+      );
       expect(result).toEqual(searchResult);
     });
 
     it('tv 타입으로 검색하면 searchByType에 tv를 전달해야 한다', async () => {
-      const searchResult = { page: 2, total_pages: 5, total_results: 50, results: [] };
+      const searchResult = {
+        page: 2,
+        total_pages: 5,
+        total_results: 50,
+        results: [],
+      };
       mockTmdbService.searchByType.mockResolvedValue(searchResult);
 
       const result = await service.searchContents('드라마', 'tv', 2);
 
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('드라마', 'tv', 2);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        '드라마',
+        'tv',
+        2,
+      );
       expect(result.page).toBe(2);
     });
 
     it('전체 검색 시 person은 항상 page 1로 호출해야 한다', async () => {
-      const personResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
-      const movieResult = { page: 3, total_pages: 3, total_results: 10, results: [] };
-      const tvResult = { page: 3, total_pages: 2, total_results: 5, results: [] };
+      const personResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
+      const movieResult = {
+        page: 3,
+        total_pages: 3,
+        total_results: 10,
+        results: [],
+      };
+      const tvResult = {
+        page: 3,
+        total_pages: 2,
+        total_results: 5,
+        results: [],
+      };
 
       mockTmdbService.searchByType
         .mockResolvedValueOnce(personResult)
@@ -658,9 +794,21 @@ describe('ContentsService', () => {
 
       await service.searchContents('test', undefined, 3);
 
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'person', 1);
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'movie', 3);
-      expect(mockTmdbService.searchByType).toHaveBeenCalledWith('test', 'tv', 3);
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        'test',
+        'person',
+        1,
+      );
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        'test',
+        'movie',
+        3,
+      );
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        'test',
+        'tv',
+        3,
+      );
     });
   });
 
@@ -690,7 +838,12 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
-      const savedContent = { id: 20, tmdbId: 700, contentType: 'movie', title: 'Non-KR Movie' };
+      const savedContent = {
+        id: 20,
+        tmdbId: 700,
+        contentType: 'movie',
+        title: 'Non-KR Movie',
+      };
       mockContentRepo.create.mockReturnValue(savedContent);
       mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
 
@@ -728,7 +881,12 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
-      const savedContent = { id: 21, tmdbId: 800, contentType: 'movie', title: 'Big Cast Movie' };
+      const savedContent = {
+        id: 21,
+        tmdbId: 800,
+        contentType: 'movie',
+        title: 'Big Cast Movie',
+      };
       mockContentRepo.create.mockReturnValue(savedContent);
       mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
 
@@ -759,8 +917,12 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
-      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
-      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+      mockContentRepo.create.mockImplementation(
+        (data: Partial<Content>) => data,
+      );
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) =>
+        Promise.resolve(data),
+      );
 
       await service.findOrFetchByTmdbId(900, 'movie');
 
@@ -791,8 +953,12 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
-      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
-      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+      mockContentRepo.create.mockImplementation(
+        (data: Partial<Content>) => data,
+      );
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) =>
+        Promise.resolve(data),
+      );
 
       await service.findOrFetchByTmdbId(901, 'movie');
 
@@ -822,8 +988,12 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
-      mockContentRepo.create.mockImplementation((data: Partial<Content>) => data);
-      mockContentRepo.save.mockImplementation((data: Partial<Content>) => Promise.resolve(data));
+      mockContentRepo.create.mockImplementation(
+        (data: Partial<Content>) => data,
+      );
+      mockContentRepo.save.mockImplementation((data: Partial<Content>) =>
+        Promise.resolve(data),
+      );
 
       await service.findOrFetchByTmdbId(902, 'movie');
 
@@ -866,7 +1036,9 @@ describe('ContentsService', () => {
       mockContentRepo.findOne
         .mockResolvedValueOnce(null) // getContentDetail 캐시 미스
         .mockResolvedValueOnce(existingContent); // upsertFromTmdb 내부 findOne
-      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c as Content));
+      mockContentRepo.save.mockImplementation((c: Partial<Content>) =>
+        Promise.resolve(c as Content),
+      );
 
       const result = await service.getContentDetail(999, 'movie');
 
@@ -905,7 +1077,9 @@ describe('ContentsService', () => {
       mockContentRepo.findOne
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(existingContent);
-      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c as Content));
+      mockContentRepo.save.mockImplementation((c: Partial<Content>) =>
+        Promise.resolve(c as Content),
+      );
 
       await service.getContentDetail(998, 'movie');
 
@@ -917,8 +1091,20 @@ describe('ContentsService', () => {
   describe('getAdultContents', () => {
     it('adult=true인 콘텐츠를 페이징하여 반환해야 한다', async () => {
       const adultList = [
-        { id: 1, tmdbId: 123, contentType: 'movie', title: 'Adult Movie', posterUrl: '/poster.jpg' },
-        { id: 2, tmdbId: 456, contentType: 'tv', title: 'Adult TV', posterUrl: null },
+        {
+          id: 1,
+          tmdbId: 123,
+          contentType: 'movie',
+          title: 'Adult Movie',
+          posterUrl: '/poster.jpg',
+        },
+        {
+          id: 2,
+          tmdbId: 456,
+          contentType: 'tv',
+          title: 'Adult TV',
+          posterUrl: null,
+        },
       ];
       mockContentRepo.findAndCount.mockResolvedValue([adultList, 2]);
 
@@ -950,7 +1136,9 @@ describe('ContentsService', () => {
         adult: false,
       };
       mockContentRepo.findOne.mockResolvedValue(existingContent);
-      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c));
+      mockContentRepo.save.mockImplementation((c: Partial<Content>) =>
+        Promise.resolve(c),
+      );
 
       const result = await service.toggleAdult(123, 'movie', true);
 
@@ -998,7 +1186,9 @@ describe('ContentsService', () => {
         adult: false,
       };
       mockContentRepo.create.mockReturnValue(fetchedContent);
-      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c));
+      mockContentRepo.save.mockImplementation((c: Partial<Content>) =>
+        Promise.resolve(c),
+      );
 
       const result = await service.toggleAdult(456, 'movie', true);
 
@@ -1019,7 +1209,9 @@ describe('ContentsService', () => {
         adult: true,
       };
       mockContentRepo.findOne.mockResolvedValue(existingContent);
-      mockContentRepo.save.mockImplementation((c: Partial<Content>) => Promise.resolve(c));
+      mockContentRepo.save.mockImplementation((c: Partial<Content>) =>
+        Promise.resolve(c),
+      );
 
       const result = await service.toggleAdult(789, 'tv', false);
 
@@ -1057,13 +1249,22 @@ describe('ContentsService', () => {
       ]);
 
       const personResult = {
-        page: 1, total_pages: 1, total_results: 0, results: [],
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
       };
       const movieResult = {
-        page: 1, total_pages: 1, total_results: 1, results: [{ id: 5 }],
+        page: 1,
+        total_pages: 1,
+        total_results: 1,
+        results: [{ id: 5 }],
       };
       const tvResult = {
-        page: 1, total_pages: 1, total_results: 2, results: [{ id: 5 }, { id: 6 }],
+        page: 1,
+        total_pages: 1,
+        total_results: 2,
+        results: [{ id: 5 }, { id: 6 }],
       };
 
       mockTmdbService.searchByType
@@ -1109,14 +1310,20 @@ describe('ContentsService', () => {
   describe('getSitemapContents', () => {
     it('adult=true 콘텐츠를 제외하고 tmdbId, contentType, updatedAt을 반환해야 한다', async () => {
       const mockRows = [
-        { tmdbId: 123, contentType: 'movie', updatedAt: new Date('2026-03-15') },
+        {
+          tmdbId: 123,
+          contentType: 'movie',
+          updatedAt: new Date('2026-03-15'),
+        },
         { tmdbId: 456, contentType: 'tv', updatedAt: new Date('2026-03-14') },
       ];
       mockQueryBuilder.getMany.mockResolvedValue(mockRows);
 
       const result = await service.getSitemapContents();
 
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith('c.adult IS NOT TRUE');
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'c.adult IS NOT TRUE',
+      );
       expect(result).toEqual(mockRows);
       expect(result).toHaveLength(2);
       expect(result[0]).toHaveProperty('tmdbId', 123);
@@ -1147,7 +1354,11 @@ describe('ContentsService', () => {
       await service.getPersonDetail(2);
 
       // 내부 캐시 접근: personDetailCache에 expiresAt을 강제로 과거로 변경
-      const detailCache = (service as unknown as { personDetailCache: Map<number, { data: unknown; expiresAt: number }> }).personDetailCache;
+      const detailCache = (
+        service as unknown as {
+          personDetailCache: Map<number, { data: unknown; expiresAt: number }>;
+        }
+      ).personDetailCache;
       const entry1 = detailCache.get(1);
       if (entry1) entry1.expiresAt = Date.now() - 1000; // 만료
 
@@ -1171,7 +1382,11 @@ describe('ContentsService', () => {
       await service.getPersonCredits(10);
       await service.getPersonCredits(20);
 
-      const creditsCache = (service as unknown as { personCreditsCache: Map<number, { data: unknown; expiresAt: number }> }).personCreditsCache;
+      const creditsCache = (
+        service as unknown as {
+          personCreditsCache: Map<number, { data: unknown; expiresAt: number }>;
+        }
+      ).personCreditsCache;
       const entry10 = creditsCache.get(10);
       if (entry10) entry10.expiresAt = Date.now() - 1000; // 만료
 
@@ -1189,7 +1404,11 @@ describe('ContentsService', () => {
       mockTmdbService.getPersonDetail.mockResolvedValue(personData);
       await service.getPersonDetail(5);
 
-      const detailCache = (service as unknown as { personDetailCache: Map<number, { data: unknown; expiresAt: number }> }).personDetailCache;
+      const detailCache = (
+        service as unknown as {
+          personDetailCache: Map<number, { data: unknown; expiresAt: number }>;
+        }
+      ).personDetailCache;
       expect(detailCache.size).toBe(1);
 
       service.cleanupExpiredPersonCache();
@@ -1228,12 +1447,25 @@ describe('ContentsService', () => {
 
       // movie:300은 DB에 없으므로 fetch
       mockContentRepo.findOne.mockResolvedValueOnce(null);
-      const fetchedContent = { id: 3, tmdbId: 300, contentType: 'movie', adult: false };
+      const fetchedContent = {
+        id: 3,
+        tmdbId: 300,
+        contentType: 'movie',
+        adult: false,
+      };
       mockTmdbService.getDetails.mockResolvedValue({
-        id: 300, title: 'Movie C', original_title: 'Movie C',
-        poster_path: null, backdrop_path: null, overview: null,
-        release_date: null, vote_average: null, genres: [], runtime: null,
-        credits: { cast: [] }, 'watch/providers': { results: {} },
+        id: 300,
+        title: 'Movie C',
+        original_title: 'Movie C',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        genres: [],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
       });
       mockContentRepo.create.mockReturnValue(fetchedContent);
       mockContentRepo.save.mockResolvedValue(fetchedContent);
@@ -1307,19 +1539,34 @@ describe('ContentsService', () => {
 
       // movie:100 fetch 성공
       mockContentRepo.findOne.mockResolvedValueOnce(null);
-      const fetchedContent = { id: 1, tmdbId: 100, contentType: 'movie', adult: false };
+      const fetchedContent = {
+        id: 1,
+        tmdbId: 100,
+        contentType: 'movie',
+        adult: false,
+      };
       mockTmdbService.getDetails.mockResolvedValueOnce({
-        id: 100, title: 'Movie A', original_title: 'Movie A',
-        poster_path: null, backdrop_path: null, overview: null,
-        release_date: null, vote_average: null, genres: [], runtime: null,
-        credits: { cast: [] }, 'watch/providers': { results: {} },
+        id: 100,
+        title: 'Movie A',
+        original_title: 'Movie A',
+        poster_path: null,
+        backdrop_path: null,
+        overview: null,
+        release_date: null,
+        vote_average: null,
+        genres: [],
+        runtime: null,
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
       });
       mockContentRepo.create.mockReturnValueOnce(fetchedContent);
       mockContentRepo.save.mockResolvedValueOnce(fetchedContent);
 
       // movie:200 fetch 실패
       mockContentRepo.findOne.mockResolvedValueOnce(null);
-      mockTmdbService.getDetails.mockRejectedValueOnce(new Error('TMDB API Error'));
+      mockTmdbService.getDetails.mockRejectedValueOnce(
+        new Error('TMDB API Error'),
+      );
 
       mockContentRepo.update.mockResolvedValue({ affected: 1 });
       mockContentRepo.find.mockResolvedValue([
@@ -1337,5 +1584,4 @@ describe('ContentsService', () => {
       ]);
     });
   });
-
 });

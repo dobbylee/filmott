@@ -39,12 +39,14 @@ describe('JwtStrategy', () => {
 
   describe('jwt extractor', () => {
     it('쿠키 토큰을 우선적으로 읽어야 한다', () => {
-      const extractor = (strategy as unknown as {
-        _jwtFromRequest: (req: {
-          cookies?: Record<string, string>;
-          headers?: Record<string, string>;
-        }) => string | null;
-      })._jwtFromRequest;
+      const extractor = (
+        strategy as unknown as {
+          _jwtFromRequest: (req: {
+            cookies?: Record<string, string>;
+            headers?: Record<string, string>;
+          }) => string | null;
+        }
+      )._jwtFromRequest;
 
       const token = extractor({
         cookies: { [AUTH_ACCESS_TOKEN_COOKIE]: 'cookie-token' },
@@ -55,12 +57,14 @@ describe('JwtStrategy', () => {
     });
 
     it('쿠키가 없으면 Authorization 헤더를 fallback으로 사용해야 한다', () => {
-      const extractor = (strategy as unknown as {
-        _jwtFromRequest: (req: {
-          cookies?: Record<string, string>;
-          headers?: Record<string, string>;
-        }) => string | null;
-      })._jwtFromRequest;
+      const extractor = (
+        strategy as unknown as {
+          _jwtFromRequest: (req: {
+            cookies?: Record<string, string>;
+            headers?: Record<string, string>;
+          }) => string | null;
+        }
+      )._jwtFromRequest;
 
       const token = extractor({
         headers: { authorization: 'Bearer header-token' },

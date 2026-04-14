@@ -5,11 +5,13 @@ export class CreateContentMetadata1774000000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // pgvector 확장이 없으면 테이블 생성 스킵 (로컬 개발 환경)
-    const hasVector = await queryRunner.query(
+    const hasVector = (await queryRunner.query(
       `SELECT 1 FROM pg_extension WHERE extname = 'vector'`,
-    );
+    )) as unknown[];
     if (!hasVector.length) {
-      console.warn('pgvector 확장 미설치 — content_metadata 테이블 생성을 건너뜁니다.');
+      console.warn(
+        'pgvector 확장 미설치 — content_metadata 테이블 생성을 건너뜁니다.',
+      );
       return;
     }
 
@@ -31,7 +33,9 @@ export class CreateContentMetadata1774000000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('DROP INDEX IF EXISTS "IDX_content_metadata_embedding"');
+    await queryRunner.query(
+      'DROP INDEX IF EXISTS "IDX_content_metadata_embedding"',
+    );
     await queryRunner.query('DROP TABLE IF EXISTS "content_metadata"');
   }
 }

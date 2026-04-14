@@ -8,7 +8,8 @@ import { UserStatus } from '../../users/enums/user-status.enum';
 import { AUTH_ACCESS_TOKEN_COOKIE } from '../auth-cookie.util';
 
 const cookieExtractor = (req: Request): string | null => {
-  const token = req?.cookies?.[AUTH_ACCESS_TOKEN_COOKIE];
+  const cookies = req?.cookies as Record<string, unknown> | undefined;
+  const token = cookies?.[AUTH_ACCESS_TOKEN_COOKIE];
   return typeof token === 'string' ? token : null;
 };
 

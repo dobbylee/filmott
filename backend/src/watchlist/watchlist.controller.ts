@@ -116,7 +116,11 @@ export class WatchlistController {
       const tmdbId = parseInt(tmdbIdStr, 10);
       if (isNaN(tmdbId)) return { status: null, watchlistId: null };
       const ct = contentType === 'tv' ? 'tv' : 'movie';
-      return this.watchlistService.getWatchlistStatusByTmdbId(user.id, tmdbId, ct);
+      return this.watchlistService.getWatchlistStatusByTmdbId(
+        user.id,
+        tmdbId,
+        ct,
+      );
     }
     return { status: null, watchlistId: null };
   }

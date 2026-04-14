@@ -39,7 +39,12 @@ export interface PublicProfile {
 }
 
 /** 프로필 이미지 업로드 허용 MIME 타입 */
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+];
 /** 프로필 이미지 업로드 최대 크기 (5MB) */
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
@@ -80,7 +85,10 @@ export class UsersService {
   /**
    * provider + providerId로 사용자 조회 (DELETED 제외)
    */
-  async findByProvider(provider: AuthProvider, providerId: string): Promise<User | null> {
+  async findByProvider(
+    provider: AuthProvider,
+    providerId: string,
+  ): Promise<User | null> {
     return this.usersRepo.findOne({
       where: { provider, providerId, status: Not(UserStatus.DELETED) },
     });
@@ -93,15 +101,15 @@ export class UsersService {
 
   async verifyPassword(id: number, password: string): Promise<boolean> {
     const user = await this.usersRepo.findOne({ where: { id } });
-    if (!user || user.status !== UserStatus.ACTIVE || !user.password) return false;
+    if (!user || user.status !== UserStatus.ACTIVE || !user.password)
+      return false;
     return bcrypt.compare(password, user.password);
   }
 
   async findById(id: number): Promise<SafeUser | null> {
     const user = await this.usersRepo.findOne({ where: { id } });
     if (!user) return null;
-    const { password: _, ...result } = user;
-    return result;
+    return this.toSafeUser(user);
   }
 
   /**
@@ -156,10 +164,20 @@ export class UsersService {
    */
   async findByIdWithStatus(
     id: number,
-  ): Promise<Pick<User, 'id' | 'nickname' | 'status' | 'role' | 'profileImage' | 'subscribedOtts'> | null> {
+  ): Promise<Pick<
+    User,
+    'id' | 'nickname' | 'status' | 'role' | 'profileImage' | 'subscribedOtts'
+  > | null> {
     const user = await this.usersRepo.findOne({
       where: { id },
-      select: ['id', 'nickname', 'status', 'role', 'profileImage', 'subscribedOtts'],
+      select: [
+        'id',
+        'nickname',
+        'status',
+        'role',
+        'profileImage',
+        'subscribedOtts',
+      ],
     });
     return user ?? null;
   }
@@ -200,8 +218,7 @@ export class UsersService {
     const savedUser = await this.usersRepo.save(newUser);
 
     // Return user without password
-    const { password: _, ...result } = savedUser;
-    return result;
+    return this.toSafeUser(savedUser);
   }
 
   /**
@@ -235,8 +252,7 @@ export class UsersService {
     });
 
     const savedUser = await this.usersRepo.save(newUser);
-    const { password: _, ...result } = savedUser;
-    return result;
+    return this.toSafeUser(savedUser);
   }
 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<SafeUser> {
@@ -280,8 +296,7 @@ export class UsersService {
     }
 
     const savedUser = await this.usersRepo.save(user);
-    const { password: _, ...result } = savedUser;
-    return result;
+    return this.toSafeUser(savedUser);
   }
 
   async deactivate(id: number): Promise<void> {
@@ -316,7 +331,10 @@ export class UsersService {
    */
   async findAllForAdmin(dto: AdminGetUsersDto): Promise<AdminUsersResult> {
     const page = Math.max(1, parseInt(dto.page ?? '1', 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(dto.limit ?? '20', 10) || 20));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(dto.limit ?? '20', 10) || 20),
+    );
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.usersRepo
@@ -349,10 +367,7 @@ export class UsersService {
       );
     }
 
-    queryBuilder
-      .orderBy('user.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit);
+    queryBuilder.orderBy('user.createdAt', 'DESC').skip(skip).take(limit);
 
     const [users, total] = await queryBuilder.getManyAndCount();
 
@@ -394,8 +409,7 @@ export class UsersService {
       await this.refreshTokenRepo.delete({ userId });
     }
 
-    const { password: _, ...result } = savedUser;
-    return result;
+    return this.toSafeUser(savedUser);
   }
 
   /**
@@ -439,8 +453,7 @@ export class UsersService {
 
     user.profileImage = url;
     const savedUser = await this.usersRepo.save(user);
-    const { password: _, ...result } = savedUser;
-    return result;
+    return this.toSafeUser(savedUser);
   }
 
   /**
@@ -461,18 +474,22 @@ export class UsersService {
 
     user.profileImage = undefined;
     const savedUser = await this.usersRepo.save(user);
-    const { password: _, ...result } = savedUser;
-    return result;
+    return this.toSafeUser(savedUser);
   }
 
   /**
    * OTT 구독 정보 업데이트
    * OTT_PROVIDERS에 정의된 id만 허용
    */
-  async updateSubscribedOtts(userId: number, otts: string[]): Promise<SafeUser> {
+  async updateSubscribedOtts(
+    userId: number,
+    otts: string[],
+  ): Promise<SafeUser> {
     const invalidOtts = otts.filter((id) => !VALID_OTT_IDS.includes(id));
     if (invalidOtts.length > 0) {
-      throw new BadRequestException(`유효하지 않은 OTT: ${invalidOtts.join(', ')}`);
+      throw new BadRequestException(
+        `유효하지 않은 OTT: ${invalidOtts.join(', ')}`,
+      );
     }
 
     const user = await this.usersRepo.findOne({ where: { id: userId } });
@@ -482,8 +499,7 @@ export class UsersService {
 
     user.subscribedOtts = otts;
     const savedUser = await this.usersRepo.save(user);
-    const { password: _, ...result } = savedUser;
-    return result;
+    return this.toSafeUser(savedUser);
   }
 
   /**
@@ -494,5 +510,11 @@ export class UsersService {
     const publicUrl = this.r2Storage.getPublicUrl();
     if (!url.startsWith(publicUrl)) return null;
     return url.slice(publicUrl.length + 1); // +1 for '/'
+  }
+
+  private toSafeUser(user: User): SafeUser {
+    const { password, ...safeUser } = user;
+    void password;
+    return safeUser;
   }
 }

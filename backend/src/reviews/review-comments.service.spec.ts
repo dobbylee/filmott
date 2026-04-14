@@ -36,7 +36,10 @@ describe('ReviewCommentsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ReviewCommentsService,
-        { provide: getRepositoryToken(ReviewComment), useValue: mockCommentRepo },
+        {
+          provide: getRepositoryToken(ReviewComment),
+          useValue: mockCommentRepo,
+        },
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
       ],
     }).compile();
@@ -51,7 +54,12 @@ describe('ReviewCommentsService', () => {
   describe('create', () => {
     it('존재하는 리뷰에 댓글을 생성해야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue({ id: 1 });
-      const created = { id: 1, userId: 1, reviewId: 1, content: 'Nice review!' };
+      const created = {
+        id: 1,
+        userId: 1,
+        reviewId: 1,
+        content: 'Nice review!',
+      };
       mockCommentRepo.create.mockReturnValue(created);
       mockCommentRepo.save.mockResolvedValue(created);
 
@@ -68,9 +76,9 @@ describe('ReviewCommentsService', () => {
     it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.create(1, 999, { content: 'Test' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create(1, 999, { content: 'Test' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -130,7 +138,13 @@ describe('ReviewCommentsService', () => {
 
     it('페이지네이션된 댓글을 반환해야 한다', async () => {
       const comments = [
-        { id: 1, reviewId: 1, userId: 1, content: 'Comment 1', user: { id: 1, nickname: 'user1' } },
+        {
+          id: 1,
+          reviewId: 1,
+          userId: 1,
+          content: 'Comment 1',
+          user: { id: 1, nickname: 'user1' },
+        },
       ];
       mockQb.getManyAndCount.mockResolvedValue([comments, 1]);
 
@@ -164,7 +178,13 @@ describe('ReviewCommentsService', () => {
 
     it('user 관계가 없는 댓글을 처리해야 한다', async () => {
       const comments = [
-        { id: 1, reviewId: 1, userId: 1, content: 'No user loaded', user: null },
+        {
+          id: 1,
+          reviewId: 1,
+          userId: 1,
+          content: 'No user loaded',
+          user: null,
+        },
       ];
       mockQb.getManyAndCount.mockResolvedValue([comments, 1]);
 

@@ -48,11 +48,13 @@ describe('RevalidateService', () => {
           {
             provide: ConfigService,
             useValue: {
-              get: jest.fn().mockImplementation((key: string, defaultValue?: string) => {
-                if (key === 'REVALIDATE_SECRET') return 'test-secret';
-                if (key === 'FRONTEND_URL') return 'http://frontend:3000';
-                return defaultValue ?? '';
-              }),
+              get: jest
+                .fn()
+                .mockImplementation((key: string, defaultValue?: string) => {
+                  if (key === 'REVALIDATE_SECRET') return 'test-secret';
+                  if (key === 'FRONTEND_URL') return 'http://frontend:3000';
+                  return defaultValue ?? '';
+                }),
             },
           },
         ],
@@ -75,7 +77,7 @@ describe('RevalidateService', () => {
           method: 'POST',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer test-secret',
+            Authorization: 'Bearer test-secret',
           }),
           body: JSON.stringify({ path: '/' }),
         }),

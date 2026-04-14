@@ -17,7 +17,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // Enable CORS (콤마 구분 다중 origin 지원: "https://filmott.kr,https://www.filmott.kr")
-  const corsOrigin = configService.get<string>('CORS_ORIGIN', 'http://localhost:3000');
+  const corsOrigin = configService.get<string>(
+    'CORS_ORIGIN',
+    'http://localhost:3000',
+  );
   const origin = corsOrigin.includes(',')
     ? corsOrigin.split(',').map((s) => s.trim())
     : corsOrigin;

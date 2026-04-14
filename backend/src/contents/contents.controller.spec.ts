@@ -23,9 +23,7 @@ describe('ContentsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ContentsController],
-      providers: [
-        { provide: ContentsService, useValue: mockContentsService },
-      ],
+      providers: [{ provide: ContentsService, useValue: mockContentsService }],
     }).compile();
 
     controller = module.get<ContentsController>(ContentsController);
@@ -37,27 +35,50 @@ describe('ContentsController', () => {
 
   describe('search', () => {
     it('올바른 파라미터로 searchContents를 호출해야 한다', async () => {
-      const searchResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const searchResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockContentsService.searchContents.mockResolvedValue(searchResult);
 
       await controller.search({ q: 'test', type: 'movie', page: '2' });
 
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith('test', 'movie', 2);
+      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
+        'test',
+        'movie',
+        2,
+      );
     });
 
     it('page가 제공되지 않으면 기본값 1을 사용해야 한다', async () => {
-      const searchResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const searchResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockContentsService.searchContents.mockResolvedValue(searchResult);
 
       await controller.search({ q: 'test' });
 
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith('test', undefined, 1);
+      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
+        'test',
+        undefined,
+        1,
+      );
     });
   });
 
   describe('discover', () => {
     it('올바른 파라미터로 discoverContents를 호출해야 한다', async () => {
-      const discoverResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const discoverResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockContentsService.discoverContents.mockResolvedValue(discoverResult);
 
       await controller.discover({
@@ -78,18 +99,26 @@ describe('ContentsController', () => {
     });
 
     it('type 기본값을 movie로 사용해야 한다', async () => {
-      const discoverResult = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const discoverResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockContentsService.discoverContents.mockResolvedValue(discoverResult);
 
       await controller.discover({});
 
-      expect(mockContentsService.discoverContents).toHaveBeenCalledWith('movie', {
-        genres: undefined,
-        providers: undefined,
-        year: undefined,
-        sort: undefined,
-        page: 1,
-      });
+      expect(mockContentsService.discoverContents).toHaveBeenCalledWith(
+        'movie',
+        {
+          genres: undefined,
+          providers: undefined,
+          year: undefined,
+          sort: undefined,
+          page: 1,
+        },
+      );
     });
   });
 
@@ -100,12 +129,19 @@ describe('ContentsController', () => {
 
       await controller.getDetail('movie', 123);
 
-      expect(mockContentsService.getContentDetail).toHaveBeenCalledWith(123, 'movie');
+      expect(mockContentsService.getContentDetail).toHaveBeenCalledWith(
+        123,
+        'movie',
+      );
     });
 
     it('type이 movie/tv가 아니면 BadRequestException을 던져야 한다', async () => {
-      await expect(controller.getDetail('anime', 123)).rejects.toThrow(BadRequestException);
-      await expect(controller.getDetail('series', 456)).rejects.toThrow(BadRequestException);
+      await expect(controller.getDetail('anime', 123)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(controller.getDetail('series', 456)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

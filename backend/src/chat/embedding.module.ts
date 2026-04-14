@@ -6,10 +6,7 @@ import { Content } from '../contents/content.entity';
 import { EmbeddingService } from './embedding.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([ContentMetadata, Content]),
-    ConfigModule,
-  ],
+  imports: [TypeOrmModule.forFeature([ContentMetadata, Content]), ConfigModule],
   providers: [EmbeddingService],
   exports: [EmbeddingService],
 })

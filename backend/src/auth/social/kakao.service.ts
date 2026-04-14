@@ -39,8 +39,11 @@ export class KakaoService {
     private readonly httpService: HttpService,
   ) {
     this.clientId = this.configService.getOrThrow<string>('KAKAO_CLIENT_ID');
-    this.clientSecret = this.configService.getOrThrow<string>('KAKAO_CLIENT_SECRET');
-    this.callbackUrl = this.configService.getOrThrow<string>('KAKAO_CALLBACK_URL');
+    this.clientSecret = this.configService.getOrThrow<string>(
+      'KAKAO_CLIENT_SECRET',
+    );
+    this.callbackUrl =
+      this.configService.getOrThrow<string>('KAKAO_CALLBACK_URL');
   }
 
   getAuthUrl(state: string): string {
@@ -110,7 +113,9 @@ export class KakaoService {
         profileImage,
       };
     } catch {
-      throw new InternalServerErrorException('Kakao 사용자 정보 조회에 실패했습니다.');
+      throw new InternalServerErrorException(
+        'Kakao 사용자 정보 조회에 실패했습니다.',
+      );
     }
   }
 }

@@ -5,7 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { CHAT_MODEL } from './chat.constants';
 import { EmbeddingService, SimilarContent } from './embedding.service';
-import { ContentSearchService, ContentSearchFilters } from './content-search.service';
+import {
+  ContentSearchService,
+  ContentSearchFilters,
+} from './content-search.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
@@ -18,7 +21,10 @@ import {
   WantToWatchContent,
 } from './prompts/system-prompt';
 import { OTT_PROVIDERS } from '../common/ott-providers';
-import { extractUserPreference, enrichQueryWithPreference } from './user-preference';
+import {
+  extractUserPreference,
+  enrichQueryWithPreference,
+} from './user-preference';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
@@ -82,9 +88,7 @@ export class ChatService {
     private readonly configService: ConfigService,
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY', '');
-    this.openai = apiKey
-      ? new OpenAI({ apiKey })
-      : null;
+    this.openai = apiKey ? new OpenAI({ apiKey }) : null;
   }
 
   async sendMessageStream(
@@ -105,7 +109,10 @@ export class ChatService {
     if (userId !== null) {
       const [ctx, user] = await Promise.all([
         this.buildUserContext(userId),
-        this.userRepo.findOne({ where: { id: userId }, select: ['id', 'subscribedOtts'] }),
+        this.userRepo.findOne({
+          where: { id: userId },
+          select: ['id', 'subscribedOtts'],
+        }),
       ]);
       userContext = ctx;
       subscribedOtts = user?.subscribedOtts ?? [];
@@ -151,29 +158,47 @@ export class ChatService {
       const filters = this.buildFiltersFromIntent(intent);
 
       // 5. 쿼리 정제: 메타데이터 키워드 제거 후 의미적 쿼리만 사용
-      const semanticQuery = this.intentAnalyzer.buildSemanticQuery(searchQuery, intent);
+      const semanticQuery = this.intentAnalyzer.buildSemanticQuery(
+        searchQuery,
+        intent,
+      );
 
       // 6. 참조 작품 임베딩 해결
-      const referenceResult = await this.resolveReferenceEmbedding(intent.referenceTitles);
+      const referenceResult = await this.resolveReferenceEmbedding(
+        intent.referenceTitles,
+      );
       const referenceEmbedding = referenceResult?.embedding ?? null;
       const referenceExcludeTmdbIds = referenceResult?.tmdbId
         ? [...userContext.watchedTmdbIds, referenceResult.tmdbId]
         : userContext.watchedTmdbIds;
 
       // 7. 유저 선호 추출 + 2분기 검색
-      const userPref = extractUserPreference(userContext, subscribedOtts, intent.personNames);
+      const userPref = extractUserPreference(
+        userContext,
+        subscribedOtts,
+        intent.personNames,
+      );
 
       if (intent.confidence === 'high') {
         // 구체적 요청: SQL 필터 우선, 유저 선호는 명시적 필터가 없는 필드에만 합산
         const mergedFilters: ContentSearchFilters = { ...filters };
 
-        if (!mergedFilters.ottProviderNames?.length && userPref.ottProviderNames.length > 0) {
+        if (
+          !mergedFilters.ottProviderNames?.length &&
+          userPref.ottProviderNames.length > 0
+        ) {
           mergedFilters.ottProviderNames = userPref.ottProviderNames;
         }
-        if (!mergedFilters.genres?.length && userPref.preferredGenres.length > 0) {
+        if (
+          !mergedFilters.genres?.length &&
+          userPref.preferredGenres.length > 0
+        ) {
           mergedFilters.genres = userPref.preferredGenres;
         }
-        if (!mergedFilters.countries?.length && userPref.preferredCountries.length > 0) {
+        if (
+          !mergedFilters.countries?.length &&
+          userPref.preferredCountries.length > 0
+        ) {
           mergedFilters.countries = userPref.preferredCountries;
         }
 
@@ -195,10 +220,17 @@ export class ChatService {
           }
         }
 
-        const enrichedQuery = enrichQueryWithPreference(semanticQuery, userPref, intent);
+        const enrichedQuery = enrichQueryWithPreference(
+          semanticQuery,
+          userPref,
+          intent,
+        );
 
         similarContents = await this.contentSearchService.searchWithFilters(
-          enrichedQuery, 20, referenceExcludeTmdbIds, mergedFilters,
+          enrichedQuery,
+          20,
+          referenceExcludeTmdbIds,
+          mergedFilters,
           referenceEmbedding ?? undefined,
         );
       } else {
@@ -206,22 +238,36 @@ export class ChatService {
         if (userPref.hasData) {
           // 유저 선호 있음: intent 필터 스킵, 유저 선호만으로 검색
           const prefOnlyFilters: ContentSearchFilters = {};
-          if (userPref.ottProviderNames.length > 0) prefOnlyFilters.ottProviderNames = userPref.ottProviderNames;
-          if (userPref.preferredGenres.length > 0) prefOnlyFilters.genres = userPref.preferredGenres;
-          if (userPref.preferredCountries.length > 0) prefOnlyFilters.countries = userPref.preferredCountries;
-          if (userPref.excludeGenres.length > 0) prefOnlyFilters.excludeGenres = userPref.excludeGenres;
-          if (userPref.excludePersonNames.length > 0) prefOnlyFilters.excludePersonNames = userPref.excludePersonNames;
+          if (userPref.ottProviderNames.length > 0)
+            prefOnlyFilters.ottProviderNames = userPref.ottProviderNames;
+          if (userPref.preferredGenres.length > 0)
+            prefOnlyFilters.genres = userPref.preferredGenres;
+          if (userPref.preferredCountries.length > 0)
+            prefOnlyFilters.countries = userPref.preferredCountries;
+          if (userPref.excludeGenres.length > 0)
+            prefOnlyFilters.excludeGenres = userPref.excludeGenres;
+          if (userPref.excludePersonNames.length > 0)
+            prefOnlyFilters.excludePersonNames = userPref.excludePersonNames;
 
-          const enrichedQuery = enrichQueryWithPreference(semanticQuery, userPref, intent);
+          const enrichedQuery = enrichQueryWithPreference(
+            semanticQuery,
+            userPref,
+            intent,
+          );
 
           similarContents = await this.contentSearchService.searchWithFilters(
-            enrichedQuery, 20, referenceExcludeTmdbIds, prefOnlyFilters,
+            enrichedQuery,
+            20,
+            referenceExcludeTmdbIds,
+            prefOnlyFilters,
             referenceEmbedding ?? undefined,
           );
         } else {
           // 신규 유저: 벡터 유사도만
           similarContents = await this.embeddingService.searchSimilar(
-            semanticQuery, 20, referenceExcludeTmdbIds,
+            semanticQuery,
+            20,
+            referenceExcludeTmdbIds,
             undefined,
             referenceEmbedding ?? undefined,
           );
@@ -250,7 +296,7 @@ export class ChatService {
     // 10. 대화 이력 구성
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       ...(history || []).map((msg) => ({
-        role: msg.role as 'user' | 'assistant',
+        role: msg.role,
         content: msg.content,
       })),
       { role: 'user' as const, content },
@@ -263,10 +309,7 @@ export class ChatService {
         reasoning_effort: 'low',
         max_completion_tokens: 4096,
         stream: true,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages,
-        ],
+        messages: [{ role: 'system', content: systemPrompt }, ...messages],
       },
       { timeout: OPENAI_STREAM_TIMEOUT_MS },
     );
@@ -295,7 +338,10 @@ export class ChatService {
     // 13. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
     const titles = this.extractTitlesFromText(fullText);
     if (titles.length > 0) {
-      const { matched, unmatched } = this.matchTitlesToCandidates(titles, similarContents);
+      const { matched, unmatched } = this.matchTitlesToCandidates(
+        titles,
+        similarContents,
+      );
 
       if (matched.length > 0) {
         emit('recommendations', { recommendations: matched });
@@ -310,7 +356,9 @@ export class ChatService {
     emit('done', {});
   }
 
-  extractTitlesFromText(text: string): { korean: string; english: string | null }[] {
+  extractTitlesFromText(
+    text: string,
+  ): { korean: string; english: string | null }[] {
     // **한국어 제목 (영어 원제)** 또는 **제목** 패턴에서 추출
     const boldPattern = /\*\*(.+?)\*\*/g;
     const results: { korean: string; english: string | null }[] = [];
@@ -338,7 +386,10 @@ export class ChatService {
   matchTitlesToCandidates(
     titles: { korean: string; english: string | null }[],
     candidates: SimilarContent[],
-  ): { matched: ChatRecommendation[]; unmatched: { korean: string; english: string | null }[] } {
+  ): {
+    matched: ChatRecommendation[];
+    unmatched: { korean: string; english: string | null }[];
+  } {
     const matched: ChatRecommendation[] = [];
     const unmatched: { korean: string; english: string | null }[] = [];
 
@@ -356,8 +407,11 @@ export class ChatService {
       if (!candidate) {
         candidate = candidates.find((c) => {
           const cTitle = c.title.toLowerCase();
-          return cTitle.includes(korean) || korean.includes(cTitle)
-            || (english && (cTitle.includes(english) || english.includes(cTitle)));
+          return (
+            cTitle.includes(korean) ||
+            korean.includes(cTitle) ||
+            (english && (cTitle.includes(english) || english.includes(cTitle)))
+          );
         });
       }
 
@@ -383,20 +437,30 @@ export class ChatService {
       try {
         const searchQuery = title.english || title.korean;
         const [movieResult, tvResult] = await Promise.all([
-          this.contentsService.searchContents(searchQuery, 'movie', 1).catch(() => null),
-          this.contentsService.searchContents(searchQuery, 'tv', 1).catch(() => null),
+          this.contentsService
+            .searchContents(searchQuery, 'movie', 1)
+            .catch(() => null),
+          this.contentsService
+            .searchContents(searchQuery, 'tv', 1)
+            .catch(() => null),
         ]);
 
         const firstMatch =
-          (movieResult?.results?.[0] ? { id: movieResult.results[0].id, type: 'movie' as const } : null)
-          ?? (tvResult?.results?.[0] ? { id: tvResult.results[0].id, type: 'tv' as const } : null);
+          (movieResult?.results?.[0]
+            ? { id: movieResult.results[0].id, type: 'movie' as const }
+            : null) ??
+          (tvResult?.results?.[0]
+            ? { id: tvResult.results[0].id, type: 'tv' as const }
+            : null);
 
         if (firstMatch) {
           const content = await this.contentsService.findOrFetchByTmdbId(
             firstMatch.id,
             firstMatch.type,
           );
-          this.embeddingService.cacheContentMetadata(content.id).catch(() => {});
+          this.embeddingService
+            .cacheContentMetadata(content.id)
+            .catch(() => {});
         }
       } catch (error) {
         this.logger.warn(
@@ -407,17 +471,30 @@ export class ChatService {
   }
 
   async buildUserContext(userId: number): Promise<UserContext> {
-    const [favorites, disliked, genreStats, watchedTmdbIds, wantToWatch, watchedGenres] =
-      await Promise.all([
-        this.getFavorites(userId),
-        this.getDisliked(userId),
-        this.getGenreStats(userId),
-        this.getWatchedTmdbIds(userId),
-        this.getWantToWatch(userId),
-        this.getWatchedGenres(userId),
-      ]);
+    const [
+      favorites,
+      disliked,
+      genreStats,
+      watchedTmdbIds,
+      wantToWatch,
+      watchedGenres,
+    ] = await Promise.all([
+      this.getFavorites(userId),
+      this.getDisliked(userId),
+      this.getGenreStats(userId),
+      this.getWatchedTmdbIds(userId),
+      this.getWantToWatch(userId),
+      this.getWatchedGenres(userId),
+    ]);
 
-    return { favorites, disliked, genreStats, watchedTmdbIds, wantToWatch, watchedGenres };
+    return {
+      favorites,
+      disliked,
+      genreStats,
+      watchedTmdbIds,
+      wantToWatch,
+      watchedGenres,
+    };
   }
 
   private async getFavorites(userId: number): Promise<FavoriteContent[]> {
@@ -485,7 +562,7 @@ export class ChatService {
       .createQueryBuilder('r')
       .innerJoin('r.content', 'c')
       .select([
-        "jsonb_array_elements(c.genres) ->> 'name' AS \"genre\"",
+        'jsonb_array_elements(c.genres) ->> \'name\' AS "genre"',
         'ROUND(AVG(r.rating), 1) AS "avgRating"',
         'COUNT(*) AS "count"',
       ])
@@ -544,10 +621,14 @@ export class ChatService {
     const rows: RawGenreStatRow[] = await this.watchlistRepo
       .createQueryBuilder('w')
       .innerJoin('w.content', 'c')
-      .leftJoin(Review, 'r', 'r.userId = w.userId AND r.contentId = w.contentId')
+      .leftJoin(
+        Review,
+        'r',
+        'r.userId = w.userId AND r.contentId = w.contentId',
+      )
       .select([
-        "jsonb_array_elements(c.genres) ->> 'name' AS \"genre\"",
-        "'0' AS \"avgRating\"",
+        'jsonb_array_elements(c.genres) ->> \'name\' AS "genre"',
+        '\'0\' AS "avgRating"',
         'COUNT(*) AS "count"',
       ])
       .where('w.userId = :userId', { userId })
@@ -589,36 +670,52 @@ export class ChatService {
         if (rows.length > 0 && rows[0].embedding) {
           try {
             const embedding = JSON.parse(rows[0].embedding) as number[];
-            this.logger.log(`참조 작품 임베딩 사용: "${title}" (tmdbId: ${rows[0].tmdb_id})`);
+            this.logger.log(
+              `참조 작품 임베딩 사용: "${title}" (tmdbId: ${rows[0].tmdb_id})`,
+            );
             return { embedding, tmdbId: rows[0].tmdb_id };
           } catch {
-            this.logger.warn(`참조 작품 임베딩 파싱 실패: "${title}" (tmdbId: ${rows[0].tmdb_id})`);
+            this.logger.warn(
+              `참조 작품 임베딩 파싱 실패: "${title}" (tmdbId: ${rows[0].tmdb_id})`,
+            );
           }
         }
 
         // 2. DB에 없으면 TMDB 검색 → findOrFetchByTmdbId → 임베딩 캐싱
         const [movieResult, tvResult] = await Promise.all([
-          this.contentsService.searchContents(title, 'movie', 1).catch(() => null),
+          this.contentsService
+            .searchContents(title, 'movie', 1)
+            .catch(() => null),
           this.contentsService.searchContents(title, 'tv', 1).catch(() => null),
         ]);
 
         const firstMatch =
-          (movieResult?.results?.[0] ? { id: movieResult.results[0].id, type: 'movie' as const } : null)
-          ?? (tvResult?.results?.[0] ? { id: tvResult.results[0].id, type: 'tv' as const } : null);
+          (movieResult?.results?.[0]
+            ? { id: movieResult.results[0].id, type: 'movie' as const }
+            : null) ??
+          (tvResult?.results?.[0]
+            ? { id: tvResult.results[0].id, type: 'tv' as const }
+            : null);
 
         if (firstMatch) {
           const content = await this.contentsService.findOrFetchByTmdbId(
             firstMatch.id,
             firstMatch.type,
           );
-          const metadata = await this.embeddingService.cacheContentMetadata(content.id);
+          const metadata = await this.embeddingService.cacheContentMetadata(
+            content.id,
+          );
           if (metadata?.embedding) {
             try {
               const embedding = JSON.parse(metadata.embedding) as number[];
-              this.logger.log(`참조 작품 TMDB 검색 후 임베딩 생성: "${title}" (tmdbId: ${content.tmdbId})`);
+              this.logger.log(
+                `참조 작품 TMDB 검색 후 임베딩 생성: "${title}" (tmdbId: ${content.tmdbId})`,
+              );
               return { embedding, tmdbId: content.tmdbId };
             } catch {
-              this.logger.warn(`참조 작품 TMDB 임베딩 파싱 실패: "${title}" (tmdbId: ${content.tmdbId})`);
+              this.logger.warn(
+                `참조 작품 TMDB 임베딩 파싱 실패: "${title}" (tmdbId: ${content.tmdbId})`,
+              );
             }
           }
         }
@@ -634,9 +731,11 @@ export class ChatService {
 
   private buildFiltersFromIntent(intent: ParsedIntent): ContentSearchFilters {
     const filters: ContentSearchFilters = {};
-    if (intent.ottProviderNames.length > 0) filters.ottProviderNames = intent.ottProviderNames;
+    if (intent.ottProviderNames.length > 0)
+      filters.ottProviderNames = intent.ottProviderNames;
     if (intent.countries.length > 0) filters.countries = intent.countries;
-    if (intent.excludeCountries.length > 0) filters.excludeCountries = intent.excludeCountries;
+    if (intent.excludeCountries.length > 0)
+      filters.excludeCountries = intent.excludeCountries;
     if (intent.personNames.length > 0) filters.personNames = intent.personNames;
     if (intent.dateRange && (intent.dateRange.from || intent.dateRange.to)) {
       filters.dateRange = intent.dateRange;

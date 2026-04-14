@@ -35,8 +35,11 @@ export class NaverService {
     private readonly httpService: HttpService,
   ) {
     this.clientId = this.configService.getOrThrow<string>('NAVER_CLIENT_ID');
-    this.clientSecret = this.configService.getOrThrow<string>('NAVER_CLIENT_SECRET');
-    this.callbackUrl = this.configService.getOrThrow<string>('NAVER_CALLBACK_URL');
+    this.clientSecret = this.configService.getOrThrow<string>(
+      'NAVER_CLIENT_SECRET',
+    );
+    this.callbackUrl =
+      this.configService.getOrThrow<string>('NAVER_CALLBACK_URL');
   }
 
   getAuthUrl(state: string): string {
@@ -54,7 +57,10 @@ export class NaverService {
     return this.fetchUserInfo(tokenData.access_token);
   }
 
-  private async exchangeToken(code: string, state: string): Promise<NaverTokenResponse> {
+  private async exchangeToken(
+    code: string,
+    state: string,
+  ): Promise<NaverTokenResponse> {
     try {
       const params = new URLSearchParams({
         grant_type: 'authorization_code',
@@ -98,7 +104,9 @@ export class NaverService {
         profileImage: profile.profile_image ?? null,
       };
     } catch {
-      throw new InternalServerErrorException('Naver 사용자 정보 조회에 실패했습니다.');
+      throw new InternalServerErrorException(
+        'Naver 사용자 정보 조회에 실패했습니다.',
+      );
     }
   }
 }

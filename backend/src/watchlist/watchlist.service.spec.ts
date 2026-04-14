@@ -1,9 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { WatchlistService } from './watchlist.service';
 import { Watchlist } from './watchlist.entity';
 import { ContentsService } from '../contents/contents.service';
@@ -51,13 +48,22 @@ describe('WatchlistService', () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
       mockWatchlistRepo.findOne.mockResolvedValue(null);
-      const created = { id: 1, userId: 1, contentId: 1, status: 'want_to_watch', watchedAt: null };
+      const created = {
+        id: 1,
+        userId: 1,
+        contentId: 1,
+        status: 'want_to_watch',
+        watchedAt: null,
+      };
       mockWatchlistRepo.create.mockReturnValue(created);
       mockWatchlistRepo.save.mockResolvedValue(created);
 
       const result = await service.addToWatchlist(1, dto);
 
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(550, 'movie');
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
+        550,
+        'movie',
+      );
       expect(mockWatchlistRepo.create).toHaveBeenCalledWith({
         userId: 1,
         contentId: 1,
@@ -72,8 +78,18 @@ describe('WatchlistService', () => {
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
       mockWatchlistRepo.findOne.mockResolvedValue(null);
 
-      const watchedDto = { ...dto, status: 'watched' as const, watchedAt: '2026-03-10T00:00:00Z' };
-      const created = { id: 1, userId: 1, contentId: 1, status: 'watched', watchedAt: new Date('2026-03-10T00:00:00Z') };
+      const watchedDto = {
+        ...dto,
+        status: 'watched' as const,
+        watchedAt: '2026-03-10T00:00:00Z',
+      };
+      const created = {
+        id: 1,
+        userId: 1,
+        contentId: 1,
+        status: 'watched',
+        watchedAt: new Date('2026-03-10T00:00:00Z'),
+      };
       mockWatchlistRepo.create.mockReturnValue(created);
       mockWatchlistRepo.save.mockResolvedValue(created);
 
@@ -92,9 +108,17 @@ describe('WatchlistService', () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
 
-      const existing = { id: 5, userId: 1, contentId: 1, status: 'want_to_watch', watchedAt: null };
+      const existing = {
+        id: 5,
+        userId: 1,
+        contentId: 1,
+        status: 'want_to_watch',
+        watchedAt: null,
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(existing);
-      mockWatchlistRepo.save.mockImplementation((item: any) => Promise.resolve(item));
+      mockWatchlistRepo.save.mockImplementation((item: any) =>
+        Promise.resolve(item),
+      );
 
       const watchedDto = { ...dto, status: 'watched' as const };
       const result = await service.addToWatchlist(1, watchedDto);
@@ -108,11 +132,23 @@ describe('WatchlistService', () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
 
-      const existing = { id: 5, userId: 1, contentId: 1, status: 'want_to_watch', watchedAt: null };
+      const existing = {
+        id: 5,
+        userId: 1,
+        contentId: 1,
+        status: 'want_to_watch',
+        watchedAt: null,
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(existing);
-      mockWatchlistRepo.save.mockImplementation((item: any) => Promise.resolve(item));
+      mockWatchlistRepo.save.mockImplementation((item: any) =>
+        Promise.resolve(item),
+      );
 
-      const watchedDto = { ...dto, status: 'watched' as const, watchedAt: '2026-01-15T00:00:00Z' };
+      const watchedDto = {
+        ...dto,
+        status: 'watched' as const,
+        watchedAt: '2026-01-15T00:00:00Z',
+      };
       const result = await service.addToWatchlist(1, watchedDto);
 
       expect(result.status).toBe('watched');
@@ -123,9 +159,17 @@ describe('WatchlistService', () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
       mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
 
-      const existing = { id: 5, userId: 1, contentId: 1, status: 'watched', watchedAt: new Date() };
+      const existing = {
+        id: 5,
+        userId: 1,
+        contentId: 1,
+        status: 'watched',
+        watchedAt: new Date(),
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(existing);
-      mockWatchlistRepo.save.mockImplementation((item: any) => Promise.resolve(item));
+      mockWatchlistRepo.save.mockImplementation((item: any) =>
+        Promise.resolve(item),
+      );
 
       const wantDto = { ...dto, status: 'want_to_watch' as const };
       const result = await service.addToWatchlist(1, wantDto);
@@ -137,7 +181,12 @@ describe('WatchlistService', () => {
 
   describe('updateStatus', () => {
     it('want_to_watch에서 watched로 상태를 업데이트해야 한다', async () => {
-      const item = { id: 1, userId: 1, status: 'want_to_watch', watchedAt: null };
+      const item = {
+        id: 1,
+        userId: 1,
+        status: 'want_to_watch',
+        watchedAt: null,
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
 
@@ -148,22 +197,36 @@ describe('WatchlistService', () => {
     });
 
     it('want_to_watch로 변경 시 watchedAt을 null로 설정해야 한다', async () => {
-      const item = { id: 1, userId: 1, status: 'watched', watchedAt: new Date() };
+      const item = {
+        id: 1,
+        userId: 1,
+        status: 'watched',
+        watchedAt: new Date(),
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
 
-      const result = await service.updateStatus(1, 1, { status: 'want_to_watch' });
+      const result = await service.updateStatus(1, 1, {
+        status: 'want_to_watch',
+      });
 
       expect(result.status).toBe('want_to_watch');
       expect(result.watchedAt).toBeNull();
     });
 
     it('watched 항목에 watchedAt만 제공되면 watchedAt을 업데이트해야 한다', async () => {
-      const item = { id: 1, userId: 1, status: 'watched', watchedAt: new Date('2026-01-01') };
+      const item = {
+        id: 1,
+        userId: 1,
+        status: 'watched',
+        watchedAt: new Date('2026-01-01'),
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
 
-      const result = await service.updateStatus(1, 1, { watchedAt: '2026-03-10T00:00:00Z' });
+      const result = await service.updateStatus(1, 1, {
+        watchedAt: '2026-03-10T00:00:00Z',
+      });
 
       expect(result.watchedAt).toEqual(new Date('2026-03-10T00:00:00Z'));
     });
@@ -171,36 +234,51 @@ describe('WatchlistService', () => {
     it('항목을 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.updateStatus(1, 999, { status: 'watched' })).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.updateStatus(1, 999, { status: 'watched' }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('소유자가 아니면 ForbiddenException을 던져야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
-      await expect(service.updateStatus(1, 1, { status: 'watched' })).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.updateStatus(1, 1, { status: 'watched' }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('watched 상태에서 watchedAt을 지정하면 해당 날짜로 설정해야 한다', async () => {
-      const item = { id: 1, userId: 1, status: 'want_to_watch', watchedAt: null };
+      const item = {
+        id: 1,
+        userId: 1,
+        status: 'want_to_watch',
+        watchedAt: null,
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
 
-      const result = await service.updateStatus(1, 1, { status: 'watched', watchedAt: '2026-06-15T00:00:00Z' });
+      const result = await service.updateStatus(1, 1, {
+        status: 'watched',
+        watchedAt: '2026-06-15T00:00:00Z',
+      });
 
       expect(result.status).toBe('watched');
       expect(result.watchedAt).toEqual(new Date('2026-06-15T00:00:00Z'));
     });
 
     it('status 없이 watchedAt만 주어지고 want_to_watch 상태이면 변경하지 않아야 한다', async () => {
-      const item = { id: 1, userId: 1, status: 'want_to_watch', watchedAt: null };
+      const item = {
+        id: 1,
+        userId: 1,
+        status: 'want_to_watch',
+        watchedAt: null,
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
 
-      const result = await service.updateStatus(1, 1, { watchedAt: '2026-06-15T00:00:00Z' });
+      const result = await service.updateStatus(1, 1, {
+        watchedAt: '2026-06-15T00:00:00Z',
+      });
 
       expect(result.status).toBe('want_to_watch');
       expect(result.watchedAt).toBeNull();
@@ -221,13 +299,17 @@ describe('WatchlistService', () => {
     it('항목을 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.removeFromWatchlist(1, 999)).rejects.toThrow(NotFoundException);
+      await expect(service.removeFromWatchlist(1, 999)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('소유자가 아니면 ForbiddenException을 던져야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue({ id: 1, userId: 2 });
 
-      await expect(service.removeFromWatchlist(1, 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.removeFromWatchlist(1, 1)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -242,7 +324,14 @@ describe('WatchlistService', () => {
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
         getManyAndCount: jest.fn().mockResolvedValue([
-          [{ id: 1, contentId: 1, status: 'want_to_watch', content: { id: 1, title: 'Movie' } }],
+          [
+            {
+              id: 1,
+              contentId: 1,
+              status: 'want_to_watch',
+              content: { id: 1, title: 'Movie' },
+            },
+          ],
           1,
         ]),
       };
@@ -319,7 +408,7 @@ describe('WatchlistService', () => {
   describe('getMyWatchlistCounts', () => {
     it('올바른 카운트를 반환해야 한다', async () => {
       mockWatchlistRepo.count
-        .mockResolvedValueOnce(5)  // watched
+        .mockResolvedValueOnce(5) // watched
         .mockResolvedValueOnce(3); // want_to_watch
 
       const result = await service.getMyWatchlistCounts(1);
@@ -390,8 +479,16 @@ describe('WatchlistService', () => {
 
     it('want_to_watch 항목을 반환해야 한다', async () => {
       const items = [
-        { id: 1, status: 'want_to_watch', content: { id: 1, title: 'Movie A' } },
-        { id: 2, status: 'want_to_watch', content: { id: 2, title: 'Movie B' } },
+        {
+          id: 1,
+          status: 'want_to_watch',
+          content: { id: 1, title: 'Movie A' },
+        },
+        {
+          id: 2,
+          status: 'want_to_watch',
+          content: { id: 2, title: 'Movie B' },
+        },
       ];
       const mockQb = createWantToWatchQb(items, 2);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
@@ -401,10 +498,9 @@ describe('WatchlistService', () => {
       expect(result.items).toHaveLength(2);
       expect(result.total).toBe(2);
       expect(result.hasMore).toBe(false);
-      expect(mockQb.andWhere).toHaveBeenCalledWith(
-        'w.status = :status',
-        { status: 'want_to_watch' },
-      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith('w.status = :status', {
+        status: 'want_to_watch',
+      });
       expect(mockQb.take).toHaveBeenCalledWith(30);
     });
 
@@ -520,25 +616,25 @@ describe('WatchlistService', () => {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([
-          { year: '2026' },
-          { year: '2025' },
-          { year: '2024' },
-        ]),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValue([
+            { year: '2026' },
+            { year: '2025' },
+            { year: '2024' },
+          ]),
       };
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       const result = await service.getWatchedYears(1);
 
       expect(result.years).toEqual([2026, 2025, 2024]);
-      expect(mockQb.where).toHaveBeenCalledWith(
-        'w.userId = :userId',
-        { userId: 1 },
-      );
-      expect(mockQb.andWhere).toHaveBeenCalledWith(
-        'w.status = :status',
-        { status: 'watched' },
-      );
+      expect(mockQb.where).toHaveBeenCalledWith('w.userId = :userId', {
+        userId: 1,
+      });
+      expect(mockQb.andWhere).toHaveBeenCalledWith('w.status = :status', {
+        status: 'watched',
+      });
     });
 
     it('감상 항목이 없으면 빈 연도를 반환해야 한다', async () => {
@@ -683,7 +779,13 @@ describe('WatchlistService', () => {
   describe('addToWatchlistByContentId', () => {
     it('존재하지 않으면 새 워치리스트 항목을 생성해야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue(null);
-      const created = { id: 10, userId: 1, contentId: 5, status: 'watched', watchedAt: expect.any(Date) };
+      const created = {
+        id: 10,
+        userId: 1,
+        contentId: 5,
+        status: 'watched',
+        watchedAt: expect.any(Date),
+      };
       mockWatchlistRepo.create.mockReturnValue(created);
       mockWatchlistRepo.save.mockResolvedValue(created);
 
@@ -704,7 +806,13 @@ describe('WatchlistService', () => {
 
     it('새 항목에서 status가 want_to_watch이면 watchedAt을 null로 설정해야 한다', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue(null);
-      const created = { id: 11, userId: 1, contentId: 5, status: 'want_to_watch', watchedAt: null };
+      const created = {
+        id: 11,
+        userId: 1,
+        contentId: 5,
+        status: 'want_to_watch',
+        watchedAt: null,
+      };
       mockWatchlistRepo.create.mockReturnValue(created);
       mockWatchlistRepo.save.mockResolvedValue(created);
 
@@ -719,9 +827,17 @@ describe('WatchlistService', () => {
     });
 
     it('기존 워치리스트 항목을 업데이트해야 한다', async () => {
-      const existing = { id: 5, userId: 1, contentId: 5, status: 'want_to_watch', watchedAt: null };
+      const existing = {
+        id: 5,
+        userId: 1,
+        contentId: 5,
+        status: 'want_to_watch',
+        watchedAt: null,
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(existing);
-      mockWatchlistRepo.save.mockImplementation((item: any) => Promise.resolve(item));
+      mockWatchlistRepo.save.mockImplementation((item: any) =>
+        Promise.resolve(item),
+      );
 
       const result = await service.addToWatchlistByContentId(1, 5, 'watched');
 
@@ -731,11 +847,23 @@ describe('WatchlistService', () => {
     });
 
     it('기존 항목을 want_to_watch로 업데이트 시 watchedAt을 null로 설정해야 한다', async () => {
-      const existing = { id: 5, userId: 1, contentId: 5, status: 'watched', watchedAt: new Date() };
+      const existing = {
+        id: 5,
+        userId: 1,
+        contentId: 5,
+        status: 'watched',
+        watchedAt: new Date(),
+      };
       mockWatchlistRepo.findOne.mockResolvedValue(existing);
-      mockWatchlistRepo.save.mockImplementation((item: any) => Promise.resolve(item));
+      mockWatchlistRepo.save.mockImplementation((item: any) =>
+        Promise.resolve(item),
+      );
 
-      const result = await service.addToWatchlistByContentId(1, 5, 'want_to_watch');
+      const result = await service.addToWatchlistByContentId(
+        1,
+        5,
+        'want_to_watch',
+      );
 
       expect(result.status).toBe('want_to_watch');
       expect(result.watchedAt).toBeNull();
@@ -747,7 +875,9 @@ describe('WatchlistService', () => {
       const transactionalRepo = {
         findOne: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockImplementation((data: any) => data),
-        save: jest.fn().mockImplementation((data: any) => Promise.resolve(data)),
+        save: jest
+          .fn()
+          .mockImplementation((data: any) => Promise.resolve(data)),
       };
       const mockManager = {
         getRepository: jest.fn().mockReturnValue(transactionalRepo),
@@ -787,7 +917,9 @@ describe('WatchlistService', () => {
       const transactionalRepo = {
         findOne: jest.fn().mockResolvedValue(existing),
         create: jest.fn(),
-        save: jest.fn().mockImplementation((data: any) => Promise.resolve(data)),
+        save: jest
+          .fn()
+          .mockImplementation((data: any) => Promise.resolve(data)),
       };
       const mockManager = {
         getRepository: jest.fn().mockReturnValue(transactionalRepo),

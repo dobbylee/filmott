@@ -43,7 +43,10 @@ export class KobisService {
 
       return data.boxOfficeResult.dailyBoxOfficeList ?? [];
     } catch (error) {
-      this.logger.error(`Failed to fetch daily box office for ${targetDt}`, error);
+      this.logger.error(
+        `Failed to fetch daily box office for ${targetDt}`,
+        error,
+      );
       throw error;
     }
   }
@@ -67,7 +70,10 @@ export class KobisService {
 
       return data.boxOfficeResult.weeklyBoxOfficeList ?? [];
     } catch (error) {
-      this.logger.error(`Failed to fetch weekly box office for ${targetDt}`, error);
+      this.logger.error(
+        `Failed to fetch weekly box office for ${targetDt}`,
+        error,
+      );
       throw error;
     }
   }

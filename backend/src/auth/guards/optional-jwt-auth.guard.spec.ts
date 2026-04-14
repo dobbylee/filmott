@@ -29,10 +29,16 @@ describe('OptionalJwtAuthGuard', () => {
   });
 
   it('access cookie가 있으면 JWT 검증을 시도해야 한다', async () => {
-    const request = { headers: {}, cookies: { [AUTH_ACCESS_TOKEN_COOKIE]: 'cookie-token' } };
+    const request = {
+      headers: {},
+      cookies: { [AUTH_ACCESS_TOKEN_COOKIE]: 'cookie-token' },
+    };
     const context = createContext(request);
     const parentCanActivate = jest
-      .spyOn(Object.getPrototypeOf(OptionalJwtAuthGuard.prototype), 'canActivate')
+      .spyOn(
+        Object.getPrototypeOf(OptionalJwtAuthGuard.prototype),
+        'canActivate',
+      )
       .mockReturnValue(true);
 
     expect(guard.canActivate(context)).toBe(true);
@@ -45,7 +51,10 @@ describe('OptionalJwtAuthGuard', () => {
     const request = { headers: { authorization: 'Bearer token' }, cookies: {} };
     const context = createContext(request);
     const parentCanActivate = jest
-      .spyOn(Object.getPrototypeOf(OptionalJwtAuthGuard.prototype), 'canActivate')
+      .spyOn(
+        Object.getPrototypeOf(OptionalJwtAuthGuard.prototype),
+        'canActivate',
+      )
       .mockReturnValue(true);
 
     expect(guard.canActivate(context)).toBe(true);
@@ -69,7 +78,12 @@ describe('OptionalJwtAuthGuard', () => {
     });
 
     expect(() =>
-      guard.handleRequest(new UnauthorizedException('jwt expired'), null, null, context),
+      guard.handleRequest(
+        new UnauthorizedException('jwt expired'),
+        null,
+        null,
+        context,
+      ),
     ).toThrow(UnauthorizedException);
   });
 

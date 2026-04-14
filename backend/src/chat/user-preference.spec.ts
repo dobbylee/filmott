@@ -1,5 +1,9 @@
 import { extractUserPreference } from './user-preference';
-import { UserContext, FavoriteContent, GenreStat } from './prompts/system-prompt';
+import {
+  UserContext,
+  FavoriteContent,
+  GenreStat,
+} from './prompts/system-prompt';
 
 function makeGenreStat(
   genre: string,
@@ -22,7 +26,12 @@ function makeWantToWatch(
   title: string,
   genres: string,
   originCountry: string | null = null,
-): { title: string; year: string; genres: string; originCountry: string | null } {
+): {
+  title: string;
+  year: string;
+  genres: string;
+  originCountry: string | null;
+} {
   return { title, year: '2024', genres, originCountry };
 }
 
@@ -43,13 +52,13 @@ describe('extractUserPreference', () => {
       const context: UserContext = {
         ...makeEmptyContext(),
         genreStats: [
-          makeGenreStat('드라마', 8.5, 10),     // 8.5 * log2(11) = 29.4
-          makeGenreStat('액션', 7.0, 8),         // 7.0 * log2(9) = 22.1
-          makeGenreStat('코미디', 6.5, 6),       // 6.5 * log2(7) = 18.2
-          makeGenreStat('스릴러', 9.0, 3),       // 9.0 * log2(4) = 18.0
-          makeGenreStat('로맨스', 7.5, 4),       // 7.5 * log2(5) = 17.4
-          makeGenreStat('공포', 5.0, 5),         // 5.0 * log2(6) = 12.9
-          makeGenreStat('다큐멘터리', 8.0, 2),   // 8.0 * log2(3) = 12.7
+          makeGenreStat('드라마', 8.5, 10), // 8.5 * log2(11) = 29.4
+          makeGenreStat('액션', 7.0, 8), // 7.0 * log2(9) = 22.1
+          makeGenreStat('코미디', 6.5, 6), // 6.5 * log2(7) = 18.2
+          makeGenreStat('스릴러', 9.0, 3), // 9.0 * log2(4) = 18.0
+          makeGenreStat('로맨스', 7.5, 4), // 7.5 * log2(5) = 17.4
+          makeGenreStat('공포', 5.0, 5), // 5.0 * log2(6) = 12.9
+          makeGenreStat('다큐멘터리', 8.0, 2), // 8.0 * log2(3) = 12.7
         ],
       };
 
@@ -69,9 +78,9 @@ describe('extractUserPreference', () => {
       const context: UserContext = {
         ...makeEmptyContext(),
         genreStats: [
-          makeGenreStat('드라마', 9.0, 1),   // count < 2 → 제외
-          makeGenreStat('액션', 7.0, 3),     // 포함
-          makeGenreStat('코미디', 6.0, 1),   // count < 2 → 제외
+          makeGenreStat('드라마', 9.0, 1), // count < 2 → 제외
+          makeGenreStat('액션', 7.0, 3), // 포함
+          makeGenreStat('코미디', 6.0, 1), // count < 2 → 제외
         ],
       };
 
@@ -139,11 +148,9 @@ describe('extractUserPreference', () => {
       const context: UserContext = {
         ...makeEmptyContext(),
         genreStats: [
-          makeGenreStat('드라마', 9.0, 1),  // count < 2 → 제외
+          makeGenreStat('드라마', 9.0, 1), // count < 2 → 제외
         ],
-        favorites: [
-          makeFavorite('인터스텔라', 'SF, 드라마', 10),
-        ],
+        favorites: [makeFavorite('인터스텔라', 'SF, 드라마', 10)],
       };
 
       const result = extractUserPreference(context, []);
@@ -154,28 +161,26 @@ describe('extractUserPreference', () => {
 
   describe('ottProviderNames', () => {
     it('subscribedOtts를 TMDB provider_name으로 변환해야 한다', () => {
-      const result = extractUserPreference(
-        makeEmptyContext(),
-        ['netflix', 'tving', 'wavve'],
-      );
+      const result = extractUserPreference(makeEmptyContext(), [
+        'netflix',
+        'tving',
+        'wavve',
+      ]);
 
       expect(result.ottProviderNames).toEqual(['Netflix', 'Tving', 'wavve']);
     });
 
     it('OTT_ID_TO_TMDB_NAME에 없는 ID는 결과에서 제외해야 한다', () => {
-      const result = extractUserPreference(
-        makeEmptyContext(),
-        ['custom_ott', 'netflix'],
-      );
+      const result = extractUserPreference(makeEmptyContext(), [
+        'custom_ott',
+        'netflix',
+      ]);
 
       expect(result.ottProviderNames).toEqual(['Netflix']);
     });
 
     it('빈 subscribedOtts는 빈 배열을 반환해야 한다', () => {
-      const result = extractUserPreference(
-        makeEmptyContext(),
-        [],
-      );
+      const result = extractUserPreference(makeEmptyContext(), []);
 
       expect(result.ottProviderNames).toEqual([]);
     });
@@ -183,10 +188,7 @@ describe('extractUserPreference', () => {
 
   describe('hasData', () => {
     it('유저 데이터가 없으면 hasData=false여야 한다', () => {
-      const result = extractUserPreference(
-        makeEmptyContext(),
-        [],
-      );
+      const result = extractUserPreference(makeEmptyContext(), []);
 
       expect(result.hasData).toBe(false);
     });
@@ -236,10 +238,7 @@ describe('extractUserPreference', () => {
     });
 
     it('OTT 구독만 있어도 hasData=true여야 한다', () => {
-      const result = extractUserPreference(
-        makeEmptyContext(),
-        ['netflix'],
-      );
+      const result = extractUserPreference(makeEmptyContext(), ['netflix']);
 
       expect(result.hasData).toBe(true);
     });
@@ -266,9 +265,7 @@ describe('extractUserPreference', () => {
     it('originCountry가 없으면 빈 배열이어야 한다', () => {
       const context: UserContext = {
         ...makeEmptyContext(),
-        favorites: [
-          makeFavorite('기생충', '드라마', 10),
-        ],
+        favorites: [makeFavorite('기생충', '드라마', 10)],
       };
 
       const result = extractUserPreference(context, []);
@@ -293,9 +290,7 @@ describe('extractUserPreference', () => {
     it('wantToWatch의 originCountry도 국가 추출에 반영되어야 한다', () => {
       const context: UserContext = {
         ...makeEmptyContext(),
-        favorites: [
-          makeFavorite('기생충', '드라마', 10, 'KR'),
-        ],
+        favorites: [makeFavorite('기생충', '드라마', 10, 'KR')],
         wantToWatch: [
           makeWantToWatch('인셉션', 'SF', 'US'),
           makeWantToWatch('어벤져스', '액션', 'US'),
@@ -381,9 +376,7 @@ describe('extractUserPreference', () => {
     it('선호 장르(preferredGenres)와 겹치는 비선호 장르는 제외하지 않아야 한다', () => {
       const context: UserContext = {
         ...makeEmptyContext(),
-        genreStats: [
-          makeGenreStat('스릴러', 8.0, 5),
-        ],
+        genreStats: [makeGenreStat('스릴러', 8.0, 5)],
         disliked: [
           makeFavorite('영화A', '스릴러, 공포', 2),
           makeFavorite('영화B', '스릴러, 공포', 1),

@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Post,
-  Body,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Body, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
@@ -58,9 +52,7 @@ export class ChatController {
       );
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : '추천 중 오류가 발생했습니다.';
+        error instanceof Error ? error.message : '추천 중 오류가 발생했습니다.';
       safeSend('error', { message });
     } finally {
       try {

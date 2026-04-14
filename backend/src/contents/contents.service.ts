@@ -9,7 +9,11 @@ import {
   TmdbPersonDetail,
   TmdbPersonCredit,
 } from '../tmdb/tmdb.service';
-import { TMDB_IMAGE_BASE, GENRE_NAME_MAP, CONTENT_DETAIL_TTL_MS } from '../common/constants';
+import {
+  TMDB_IMAGE_BASE,
+  GENRE_NAME_MAP,
+  CONTENT_DETAIL_TTL_MS,
+} from '../common/constants';
 import { RevalidateService } from '../common/revalidate.service';
 
 const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000; // 5분
@@ -25,8 +29,14 @@ export class ContentsService {
   private readonly logger = new Logger(ContentsService.name);
   private readonly refreshingIds = new Set<string>();
   private blockedIdsCache: CacheEntry<Set<string>> | null = null;
-  private readonly personDetailCache = new Map<number, CacheEntry<TmdbPersonDetail>>();
-  private readonly personCreditsCache = new Map<number, CacheEntry<{ cast: TmdbPersonCredit[]; crew: TmdbPersonCredit[] }>>();
+  private readonly personDetailCache = new Map<
+    number,
+    CacheEntry<TmdbPersonDetail>
+  >();
+  private readonly personCreditsCache = new Map<
+    number,
+    CacheEntry<{ cast: TmdbPersonCredit[]; crew: TmdbPersonCredit[] }>
+  >();
 
   constructor(
     @InjectRepository(Content)
@@ -57,7 +67,11 @@ export class ContentsService {
   /**
    * 검색: TMDB API 호출 후 결과 반환 (캐싱은 하지 않음, 목록은 가볍게)
    */
-  async searchContents(query: string, type?: 'movie' | 'tv' | 'person', page = 1) {
+  async searchContents(
+    query: string,
+    type?: 'movie' | 'tv' | 'person',
+    page = 1,
+  ) {
     const blockedIds = await this.getBlockedTmdbIds();
 
     if (type === 'person') {
@@ -91,7 +105,11 @@ export class ContentsService {
 
     const movieRemoved = movieResult.results.length - filteredMovies.length;
     const tvRemoved = tvResult.results.length - filteredTv.length;
-    const contentTotal = movieResult.total_results + tvResult.total_results - movieRemoved - tvRemoved;
+    const contentTotal =
+      movieResult.total_results +
+      tvResult.total_results -
+      movieRemoved -
+      tvRemoved;
 
     return {
       page,
@@ -168,8 +186,7 @@ export class ContentsService {
       );
     }
 
-    const watchProviders =
-      tmdbData['watch/providers']?.results?.KR ?? null;
+    const watchProviders = tmdbData['watch/providers']?.results?.KR ?? null;
     const credits = tmdbData.credits?.cast?.slice(0, 20) ?? [];
 
     const content = await this.upsertFromTmdb(tmdbData, type);
@@ -301,8 +318,14 @@ export class ContentsService {
   /**
    * 차단된 콘텐츠 목록 조회 (관리자용)
    */
-  async getAdultContents(page = 1, limit = 20): Promise<{
-    data: Pick<Content, 'id' | 'tmdbId' | 'contentType' | 'title' | 'posterUrl'>[];
+  async getAdultContents(
+    page = 1,
+    limit = 20,
+  ): Promise<{
+    data: Pick<
+      Content,
+      'id' | 'tmdbId' | 'contentType' | 'title' | 'posterUrl'
+    >[];
     total: number;
     page: number;
     totalPages: number;
@@ -365,22 +388,26 @@ export class ContentsService {
 
     // 일괄 조회: DB에 이미 존재하는 콘텐츠
     const uniqueEntries = [...unique.values()];
-    const existingContents = uniqueEntries.length > 0
-      ? await this.contentRepo
-          .createQueryBuilder('c')
-          .where(
-            uniqueEntries.map((_, i) =>
-              `(c.tmdb_id = :tmdbId${i} AND c.content_type = :type${i})`
-            ).join(' OR '),
-            Object.fromEntries(
-              uniqueEntries.flatMap((item, i) => [
-                [`tmdbId${i}`, item.id],
-                [`type${i}`, item.media_type],
-              ]),
-            ),
-          )
-          .getMany()
-      : [];
+    const existingContents =
+      uniqueEntries.length > 0
+        ? await this.contentRepo
+            .createQueryBuilder('c')
+            .where(
+              uniqueEntries
+                .map(
+                  (_, i) =>
+                    `(c.tmdb_id = :tmdbId${i} AND c.content_type = :type${i})`,
+                )
+                .join(' OR '),
+              Object.fromEntries(
+                uniqueEntries.flatMap((item, i) => [
+                  [`tmdbId${i}`, item.id],
+                  [`type${i}`, item.media_type],
+                ]),
+              ) as Record<string, number | string>,
+            )
+            .getMany()
+        : [];
 
     const existingMap = new Map<string, Content>();
     for (const c of existingContents) {
@@ -427,17 +454,20 @@ export class ContentsService {
     }
 
     // 차단된 콘텐츠 정보 반환 (프론트에서 캐시 무효화용)
-    const blockedContents = toBlockIds.length > 0
-      ? await this.contentRepo.find({
-          where: { id: In(toBlockIds) },
-          select: ['tmdbId', 'contentType'],
-        })
-      : [];
+    const blockedContents =
+      toBlockIds.length > 0
+        ? await this.contentRepo.find({
+            where: { id: In(toBlockIds) },
+            select: ['tmdbId', 'contentType'],
+          })
+        : [];
 
     if (blockedContents.length > 0) {
       await this.revalidateService.revalidatePaths([
         '/',
-        ...blockedContents.map((content) => `/contents/${content.contentType}/${content.tmdbId}`),
+        ...blockedContents.map(
+          (content) => `/contents/${content.contentType}/${content.tmdbId}`,
+        ),
       ]);
     }
 
@@ -528,7 +558,7 @@ export class ContentsService {
     if (detailRemoved > 0 || creditsRemoved > 0) {
       this.logger.log(
         `인물 캐시 정리: detail ${detailRemoved}건, credits ${creditsRemoved}건 제거 ` +
-        `(남은: detail ${this.personDetailCache.size}, credits ${this.personCreditsCache.size})`,
+          `(남은: detail ${this.personDetailCache.size}, credits ${this.personCreditsCache.size})`,
       );
     }
   }
@@ -550,21 +580,24 @@ export class ContentsService {
     }
 
     // 감독 추출 (crew에서 job === 'Director')
-    const director = tmdbData.credits?.crew
-      ?.filter((c) => c.job === 'Director')
-      .map((c) => c.name)
-      .slice(0, 2)
-      .join(', ') || null;
+    const director =
+      tmdbData.credits?.crew
+        ?.filter((c) => c.job === 'Director')
+        .map((c) => c.name)
+        .slice(0, 2)
+        .join(', ') || null;
 
     // 제작 국가 추출
-    const originCountryRaw = (
-      tmdbData.origin_country
-      ?? tmdbData.production_countries?.map((c) => c.iso_3166_1)
-      ?? []
-    ).join(', ') || null;
-    const originCountry = originCountryRaw && originCountryRaw.length <= 100
-      ? originCountryRaw
-      : null;
+    const originCountryRaw =
+      (
+        tmdbData.origin_country ??
+        tmdbData.production_countries?.map((c) => c.iso_3166_1) ??
+        []
+      ).join(', ') || null;
+    const originCountry =
+      originCountryRaw && originCountryRaw.length <= 100
+        ? originCountryRaw
+        : null;
 
     return {
       tmdbId: tmdbData.id,

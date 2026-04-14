@@ -88,8 +88,10 @@ export class ReviewsService {
       throw new BadRequestException('rating은 필수입니다.');
     }
 
-    const ratingChanged = dto.rating !== undefined && dto.rating !== review.rating;
-    const commentChanged = dto.comment !== undefined && dto.comment !== review.comment;
+    const ratingChanged =
+      dto.rating !== undefined && dto.rating !== review.rating;
+    const commentChanged =
+      dto.comment !== undefined && dto.comment !== review.comment;
 
     if (dto.rating !== undefined) review.rating = dto.rating;
     if (dto.comment !== undefined) review.comment = dto.comment;
@@ -110,7 +112,11 @@ export class ReviewsService {
     return result;
   }
 
-  async delete(userId: number, reviewId: number, userRole?: string): Promise<void> {
+  async delete(
+    userId: number,
+    reviewId: number,
+    userRole?: string,
+  ): Promise<void> {
     const review = await this.reviewRepo.findOne({
       where: { id: reviewId },
     });
@@ -126,11 +132,19 @@ export class ReviewsService {
     void this.revalidateService.revalidatePath('/');
   }
 
-  async findMyReview(userId: number, contentId: number): Promise<(Review & { commentsCount: number }) | null> {
+  async findMyReview(
+    userId: number,
+    contentId: number,
+  ): Promise<(Review & { commentsCount: number }) | null> {
     const review = await this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
-      .addSelect(['user.id', 'user.nickname', 'user.profileImage', 'user.status'])
+      .addSelect([
+        'user.id',
+        'user.nickname',
+        'user.profileImage',
+        'user.status',
+      ])
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .where('review.userId = :userId', { userId })
       .andWhere('review.contentId = :contentId', { contentId })
@@ -149,7 +163,12 @@ export class ReviewsService {
     const qb = this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
-      .addSelect(['user.id', 'user.nickname', 'user.profileImage', 'user.status'])
+      .addSelect([
+        'user.id',
+        'user.nickname',
+        'user.profileImage',
+        'user.status',
+      ])
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .where('review.contentId = :contentId', { contentId })
       .skip(skip)
@@ -199,7 +218,12 @@ export class ReviewsService {
     return this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
-      .addSelect(['user.id', 'user.nickname', 'user.profileImage', 'user.status'])
+      .addSelect([
+        'user.id',
+        'user.nickname',
+        'user.profileImage',
+        'user.status',
+      ])
       .leftJoinAndSelect('review.content', 'content')
       .where('content.adult IS NOT TRUE')
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')
@@ -215,7 +239,7 @@ export class ReviewsService {
       .addSelect('COUNT(*)', 'reviewCount')
       .where('review.contentId = :contentId', { contentId })
       .andWhere('review.rating IS NOT NULL')
-      .getRawOne();
+      .getRawOne<{ averageRating: string | null; reviewCount: string }>();
 
     return {
       averageRating: result?.averageRating
@@ -225,26 +249,32 @@ export class ReviewsService {
     };
   }
 
-  async getLikedReviewIds(userId: number, contentId: number): Promise<number[]> {
+  async getLikedReviewIds(
+    userId: number,
+    contentId: number,
+  ): Promise<number[]> {
     const result = await this.reviewLikeRepo
       .createQueryBuilder('rl')
       .innerJoin('rl.review', 'review')
       .where('rl.userId = :userId', { userId })
       .andWhere('review.contentId = :contentId', { contentId })
       .select('rl.reviewId', 'reviewId')
-      .getRawMany();
-    return result.map((r) => r.reviewId);
+      .getRawMany<{ reviewId: string | number }>();
+    return result.map((r) => Number(r.reviewId));
   }
 
-  async getLikedReviewIdsByIds(userId: number, reviewIds: number[]): Promise<number[]> {
+  async getLikedReviewIdsByIds(
+    userId: number,
+    reviewIds: number[],
+  ): Promise<number[]> {
     if (reviewIds.length === 0) return [];
     const result = await this.reviewLikeRepo
       .createQueryBuilder('rl')
       .where('rl.userId = :userId', { userId })
       .andWhere('rl.reviewId IN (:...reviewIds)', { reviewIds })
       .select('rl.reviewId', 'reviewId')
-      .getRawMany();
-    return result.map((r) => r.reviewId);
+      .getRawMany<{ reviewId: string | number }>();
+    return result.map((r) => Number(r.reviewId));
   }
 
   async toggleLike(
@@ -293,5 +323,4 @@ export class ReviewsService {
       }
     });
   }
-
 }

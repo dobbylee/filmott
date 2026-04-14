@@ -10,7 +10,11 @@ import { R2StorageService } from '../common/r2-storage.service';
 import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
 import { UserRole } from './enums/user-role.enum';
-import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { VALID_OTT_IDS } from '../common/ott-providers';
 import * as bcrypt from 'bcrypt';
 
@@ -75,7 +79,10 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         { provide: getRepositoryToken(User), useValue: mockUsersRepo },
-        { provide: getRepositoryToken(RefreshToken), useValue: mockRefreshTokenRepo },
+        {
+          provide: getRepositoryToken(RefreshToken),
+          useValue: mockRefreshTokenRepo,
+        },
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
         { provide: R2StorageService, useValue: mockR2Storage },
@@ -141,7 +148,10 @@ describe('UsersService', () => {
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
 
-      const result = await service.findByProvider(AuthProvider.GOOGLE, 'google-123');
+      const result = await service.findByProvider(
+        AuthProvider.GOOGLE,
+        'google-123',
+      );
 
       expect(result).toEqual(mockUser);
     });
@@ -149,7 +159,10 @@ describe('UsersService', () => {
     it('일치하는 사용자가 없으면 null을 반환해야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
 
-      const result = await service.findByProvider(AuthProvider.KAKAO, 'kakao-999');
+      const result = await service.findByProvider(
+        AuthProvider.KAKAO,
+        'kakao-999',
+      );
 
       expect(result).toBeNull();
     });
@@ -186,27 +199,56 @@ describe('UsersService', () => {
 
   describe('create', () => {
     it('닉네임이 이미 사용 중이면 ConflictException을 던져야 한다', async () => {
-      mockUsersRepo.findOne.mockResolvedValueOnce({ id: 1, nickname: 'existing' });
+      mockUsersRepo.findOne.mockResolvedValueOnce({
+        id: 1,
+        nickname: 'existing',
+      });
 
-      await expect(service.create({ nickname: 'existing', email: 'test@test.com', password: 'password' }))
-        .rejects.toThrow(ConflictException);
+      await expect(
+        service.create({
+          nickname: 'existing',
+          email: 'test@test.com',
+          password: 'password',
+        }),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('이메일이 이미 사용 중이면 ConflictException을 던져야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValueOnce(null); // nickname not found
-      mockUsersRepo.findOne.mockResolvedValueOnce({ id: 1, email: 'taken@test.com' }); // email found
+      mockUsersRepo.findOne.mockResolvedValueOnce({
+        id: 1,
+        email: 'taken@test.com',
+      }); // email found
 
-      await expect(service.create({ nickname: 'new', email: 'taken@test.com', password: 'password' }))
-        .rejects.toThrow(ConflictException);
+      await expect(
+        service.create({
+          nickname: 'new',
+          email: 'taken@test.com',
+          password: 'password',
+        }),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('새 사용자를 성공적으로 생성하고 비밀번호 없이 반환해야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashedpass');
-      mockUsersRepo.create.mockReturnValue({ nickname: 'test', email: 'test@test.com', password: 'hashedpass' });
-      mockUsersRepo.save.mockResolvedValue({ id: 1, nickname: 'test', email: 'test@test.com', password: 'hashedpass' });
+      mockUsersRepo.create.mockReturnValue({
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'hashedpass',
+      });
+      mockUsersRepo.save.mockResolvedValue({
+        id: 1,
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'hashedpass',
+      });
 
-      const result = await service.create({ nickname: 'test', email: 'test@test.com', password: 'password' });
+      const result = await service.create({
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'password',
+      });
 
       expect(bcrypt.hash).toHaveBeenCalledWith('password', 10);
       expect(result).not.toHaveProperty('password');
@@ -326,38 +368,62 @@ describe('UsersService', () => {
   describe('update', () => {
     it('사용자를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
-      await expect(service.update(999, { nickname: 'changed' })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.update(999, { nickname: 'changed' }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('currentPassword 없이 newPassword가 제공되면 BadRequestException을 던져야 한다', async () => {
-      mockUsersRepo.findOne.mockResolvedValue({ id: 1, nickname: 'test', password: 'hashed' });
-      await expect(service.update(1, { newPassword: 'newpass12' })).rejects.toThrow(BadRequestException);
+      mockUsersRepo.findOne.mockResolvedValue({
+        id: 1,
+        nickname: 'test',
+        password: 'hashed',
+      });
+      await expect(
+        service.update(1, { newPassword: 'newpass12' }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('currentPassword가 틀리면 BadRequestException을 던져야 한다', async () => {
-      mockUsersRepo.findOne.mockResolvedValue({ id: 1, nickname: 'test', password: 'hashed' });
+      mockUsersRepo.findOne.mockResolvedValue({
+        id: 1,
+        nickname: 'test',
+        password: 'hashed',
+      });
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(
-        service.update(1, { currentPassword: 'wrongpass', newPassword: 'newpass12' }),
+        service.update(1, {
+          currentPassword: 'wrongpass',
+          newPassword: 'newpass12',
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('새 닉네임이 이미 사용 중이면 ConflictException을 던져야 한다', async () => {
       mockUsersRepo.findOne
-        .mockResolvedValueOnce({ id: 1, nickname: 'original', password: 'hashed' }) // findOne by id
+        .mockResolvedValueOnce({
+          id: 1,
+          nickname: 'original',
+          password: 'hashed',
+        }) // findOne by id
         .mockResolvedValueOnce({ id: 2, nickname: 'taken' }); // findOne by new nickname
 
-      await expect(
-        service.update(1, { nickname: 'taken' }),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.update(1, { nickname: 'taken' })).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('닉네임을 성공적으로 업데이트해야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'original', email: 'test@test.com', password: 'hashed' };
+      const mockUser = {
+        id: 1,
+        nickname: 'original',
+        email: 'test@test.com',
+        password: 'hashed',
+      };
       mockUsersRepo.findOne
         .mockResolvedValueOnce(mockUser) // findOne by id
-        .mockResolvedValueOnce(null);   // findOne by new nickname (not taken)
+        .mockResolvedValueOnce(null); // findOne by new nickname (not taken)
       mockUsersRepo.save.mockImplementation((u: any) => Promise.resolve(u));
 
       const result = await service.update(1, { nickname: 'updated' });
@@ -367,7 +433,12 @@ describe('UsersService', () => {
     });
 
     it('비밀번호를 성공적으로 업데이트해야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'test', email: 'test@test.com', password: 'oldhashed' };
+      const mockUser = {
+        id: 1,
+        nickname: 'test',
+        email: 'test@test.com',
+        password: 'oldhashed',
+      };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (bcrypt.hash as jest.Mock).mockResolvedValue('newhashed');
@@ -383,7 +454,12 @@ describe('UsersService', () => {
     });
 
     it('현재와 동일한 닉네임이면 업데이트를 건너뛰어야 한다', async () => {
-      const mockUser = { id: 1, nickname: 'same', email: 'test@test.com', password: 'hashed' };
+      const mockUser = {
+        id: 1,
+        nickname: 'same',
+        email: 'test@test.com',
+        password: 'hashed',
+      };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
       mockUsersRepo.save.mockImplementation((u: any) => Promise.resolve(u));
 
@@ -445,7 +521,9 @@ describe('UsersService', () => {
 
       // Should anonymize user data, set status to DELETED, and save
       expect(mockUser.nickname).toEqual(`deleted_5_${fixedTimestamp}`);
-      expect(mockUser.email).toEqual(`deleted_5_${fixedTimestamp}@deleted.local`);
+      expect(mockUser.email).toEqual(
+        `deleted_5_${fixedTimestamp}@deleted.local`,
+      );
       expect(mockUser.providerId).toBeNull();
       expect(mockUser.status).toEqual(UserStatus.DELETED);
       expect(mockUsersRepo.save).toHaveBeenCalledWith(mockUser);
@@ -494,7 +572,9 @@ describe('UsersService', () => {
 
       await service.deactivate(6);
 
-      expect(mockR2Storage.delete).toHaveBeenCalledWith('profiles/profile-6-123.webp');
+      expect(mockR2Storage.delete).toHaveBeenCalledWith(
+        'profiles/profile-6-123.webp',
+      );
       expect(mockUser.status).toEqual(UserStatus.DELETED);
 
       jest.restoreAllMocks();
@@ -660,7 +740,9 @@ describe('UsersService', () => {
         role: UserRole.USER,
       };
       mockUsersRepo.findOne.mockResolvedValue({ ...mockUser });
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
       mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 1 });
 
       const result = await service.updateStatusByAdmin(1, UserStatus.SUSPENDED);
@@ -680,7 +762,9 @@ describe('UsersService', () => {
         role: UserRole.USER,
       };
       mockUsersRepo.findOne.mockResolvedValue({ ...mockUser });
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
 
       const result = await service.updateStatusByAdmin(2, UserStatus.ACTIVE);
 
@@ -730,7 +814,9 @@ describe('UsersService', () => {
         role: UserRole.USER,
       };
       mockUsersRepo.findOne.mockResolvedValue({ ...mockUser });
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
       mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 2 });
 
       await service.updateStatusByAdmin(5, UserStatus.SUSPENDED);
@@ -757,8 +843,12 @@ describe('UsersService', () => {
         profileImage: undefined,
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
-      mockR2Storage.upload.mockResolvedValue('https://test.r2.dev/profiles/profile-1-123.webp');
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockR2Storage.upload.mockResolvedValue(
+        'https://test.r2.dev/profiles/profile-1-123.webp',
+      );
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
 
       const fixedTimestamp = 1740000000000;
       jest.spyOn(Date, 'now').mockReturnValue(fixedTimestamp);
@@ -771,7 +861,9 @@ describe('UsersService', () => {
         'image/webp',
       );
       expect(result).not.toHaveProperty('password');
-      expect(result.profileImage).toBe('https://test.r2.dev/profiles/profile-1-123.webp');
+      expect(result.profileImage).toBe(
+        'https://test.r2.dev/profiles/profile-1-123.webp',
+      );
 
       jest.restoreAllMocks();
     });
@@ -785,12 +877,18 @@ describe('UsersService', () => {
         profileImage: 'https://test.r2.dev/profiles/profile-1-old.webp',
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
-      mockR2Storage.upload.mockResolvedValue('https://test.r2.dev/profiles/profile-1-new.webp');
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockR2Storage.upload.mockResolvedValue(
+        'https://test.r2.dev/profiles/profile-1-new.webp',
+      );
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
 
       await service.updateProfileImage(1, mockFile);
 
-      expect(mockR2Storage.delete).toHaveBeenCalledWith('profiles/profile-1-old.webp');
+      expect(mockR2Storage.delete).toHaveBeenCalledWith(
+        'profiles/profile-1-old.webp',
+      );
       expect(mockR2Storage.upload).toHaveBeenCalled();
     });
 
@@ -803,8 +901,12 @@ describe('UsersService', () => {
         profileImage: 'https://lh3.googleusercontent.com/photo.jpg',
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
-      mockR2Storage.upload.mockResolvedValue('https://test.r2.dev/profiles/profile-1-new.webp');
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockR2Storage.upload.mockResolvedValue(
+        'https://test.r2.dev/profiles/profile-1-new.webp',
+      );
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
 
       await service.updateProfileImage(1, mockFile);
 
@@ -813,21 +915,33 @@ describe('UsersService', () => {
     });
 
     it('지원하지 않는 이미지 형식이면 BadRequestException을 던져야 한다', async () => {
-      const badFile = { ...mockFile, mimetype: 'application/pdf' } as Express.Multer.File;
+      const badFile = {
+        ...mockFile,
+        mimetype: 'application/pdf',
+      } as Express.Multer.File;
 
-      await expect(service.updateProfileImage(1, badFile)).rejects.toThrow(BadRequestException);
+      await expect(service.updateProfileImage(1, badFile)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('이미지 크기가 5MB를 초과하면 BadRequestException을 던져야 한다', async () => {
-      const bigFile = { ...mockFile, size: 6 * 1024 * 1024 } as Express.Multer.File;
+      const bigFile = {
+        ...mockFile,
+        size: 6 * 1024 * 1024,
+      } as Express.Multer.File;
 
-      await expect(service.updateProfileImage(1, bigFile)).rejects.toThrow(BadRequestException);
+      await expect(service.updateProfileImage(1, bigFile)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('사용자가 존재하지 않으면 NotFoundException을 던져야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.updateProfileImage(999, mockFile)).rejects.toThrow(NotFoundException);
+      await expect(service.updateProfileImage(999, mockFile)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -841,11 +955,15 @@ describe('UsersService', () => {
         profileImage: 'https://test.r2.dev/profiles/profile-1-123.webp',
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
 
       const result = await service.removeProfileImage(1);
 
-      expect(mockR2Storage.delete).toHaveBeenCalledWith('profiles/profile-1-123.webp');
+      expect(mockR2Storage.delete).toHaveBeenCalledWith(
+        'profiles/profile-1-123.webp',
+      );
       expect(result).not.toHaveProperty('password');
       expect(result.profileImage).toBeUndefined();
     });
@@ -858,7 +976,9 @@ describe('UsersService', () => {
         profileImage: 'https://lh3.googleusercontent.com/photo.jpg',
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
 
       await service.removeProfileImage(1);
 
@@ -873,7 +993,9 @@ describe('UsersService', () => {
         profileImage: undefined,
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
 
       const result = await service.removeProfileImage(1);
 
@@ -884,7 +1006,9 @@ describe('UsersService', () => {
     it('사용자가 존재하지 않으면 NotFoundException을 던져야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.removeProfileImage(999)).rejects.toThrow(NotFoundException);
+      await expect(service.removeProfileImage(999)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -898,9 +1022,14 @@ describe('UsersService', () => {
         subscribedOtts: [],
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
 
-      const result = await service.updateSubscribedOtts(1, ['netflix', 'tving']);
+      const result = await service.updateSubscribedOtts(1, [
+        'netflix',
+        'tving',
+      ]);
 
       expect(result).not.toHaveProperty('password');
       expect(result.subscribedOtts).toEqual(['netflix', 'tving']);
@@ -915,7 +1044,9 @@ describe('UsersService', () => {
         subscribedOtts: ['netflix'],
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
-      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) => Promise.resolve(u));
+      mockUsersRepo.save.mockImplementation((u: Record<string, unknown>) =>
+        Promise.resolve(u),
+      );
 
       const result = await service.updateSubscribedOtts(1, []);
 
@@ -929,7 +1060,14 @@ describe('UsersService', () => {
     });
 
     it('모든 유효한 OTT ID가 VALID_OTT_IDS에 포함되어야 한다', () => {
-      const validIds = ['netflix', 'disney_plus', 'watcha', 'wavve', 'tving', 'coupang_play'];
+      const validIds = [
+        'netflix',
+        'disney_plus',
+        'watcha',
+        'wavve',
+        'tving',
+        'coupang_play',
+      ];
       validIds.forEach((id) => {
         expect(VALID_OTT_IDS).toContain(id);
       });
@@ -1034,7 +1172,10 @@ describe('UsersService', () => {
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
       mockReviewRepo.count.mockResolvedValue(5);
-      mockWatchlistQueryBuilder.getRawOne.mockResolvedValue({ watched: '10', want: '3' });
+      mockWatchlistQueryBuilder.getRawOne.mockResolvedValue({
+        watched: '10',
+        want: '3',
+      });
 
       const result = await service.getPublicProfile(1);
 
@@ -1047,9 +1188,14 @@ describe('UsersService', () => {
         watchedCount: 10,
         wantToWatchCount: 3,
       });
-      expect(mockReviewRepo.count).toHaveBeenCalledWith({ where: { userId: 1 } });
+      expect(mockReviewRepo.count).toHaveBeenCalledWith({
+        where: { userId: 1 },
+      });
       expect(mockWatchlistRepo.createQueryBuilder).toHaveBeenCalledWith('w');
-      expect(mockWatchlistQueryBuilder.where).toHaveBeenCalledWith('w.userId = :userId', { userId: 1 });
+      expect(mockWatchlistQueryBuilder.where).toHaveBeenCalledWith(
+        'w.userId = :userId',
+        { userId: 1 },
+      );
     });
 
     it('DELETED 유저는 NotFoundException을 던져야 한다', async () => {
@@ -1059,13 +1205,17 @@ describe('UsersService', () => {
         status: UserStatus.DELETED,
       });
 
-      await expect(service.getPublicProfile(2)).rejects.toThrow(NotFoundException);
+      await expect(service.getPublicProfile(2)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('존재하지 않는 유저는 NotFoundException을 던져야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.getPublicProfile(999)).rejects.toThrow(NotFoundException);
+      await expect(service.getPublicProfile(999)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('SUSPENDED 유저는 닉네임을 마스킹하고 통계를 0으로 반환해야 한다', async () => {
@@ -1104,7 +1254,10 @@ describe('UsersService', () => {
       };
       mockUsersRepo.findOne.mockResolvedValue(mockUser);
       mockReviewRepo.count.mockResolvedValue(0);
-      mockWatchlistQueryBuilder.getRawOne.mockResolvedValue({ watched: '0', want: '0' });
+      mockWatchlistQueryBuilder.getRawOne.mockResolvedValue({
+        watched: '0',
+        want: '0',
+      });
 
       const result = await service.getPublicProfile(4);
 

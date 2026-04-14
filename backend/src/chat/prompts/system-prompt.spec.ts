@@ -24,7 +24,9 @@ describe('buildSystemPrompt', () => {
     confidence: 'low',
   };
 
-  const makeCandidates = (overrides: Partial<SimilarContent>[]): SimilarContent[] =>
+  const makeCandidates = (
+    overrides: Partial<SimilarContent>[],
+  ): SimilarContent[] =>
     overrides.map((o, i) => ({
       contentId: i + 1,
       tmdbId: 1000 + i,
@@ -43,14 +45,26 @@ describe('buildSystemPrompt', () => {
 
   it('유사도 점수가 0보다 큰 후보는 유사도 %를 포함해야 한다', () => {
     const candidates = makeCandidates([{ similarity: 0.95, title: '기생충' }]);
-    const prompt = buildSystemPrompt(emptyContext, [], [], candidates, emptyIntent);
+    const prompt = buildSystemPrompt(
+      emptyContext,
+      [],
+      [],
+      candidates,
+      emptyIntent,
+    );
 
     expect(prompt).toContain('유사도: 95%');
   });
 
   it('유사도 0인 후보는 유사도 텍스트를 포함하지 않아야 한다', () => {
     const candidates = makeCandidates([{ similarity: 0, title: 'KOBIS작품' }]);
-    const prompt = buildSystemPrompt(emptyContext, [], [], candidates, emptyIntent);
+    const prompt = buildSystemPrompt(
+      emptyContext,
+      [],
+      [],
+      candidates,
+      emptyIntent,
+    );
 
     expect(prompt).not.toContain('유사도:');
   });
@@ -61,7 +75,13 @@ describe('buildSystemPrompt', () => {
       { similarity: 0.9, title: '높은작품', tmdbId: 2002 },
       { similarity: 0.3, title: '낮은작품', tmdbId: 2003 },
     ]);
-    const prompt = buildSystemPrompt(emptyContext, [], [], candidates, emptyIntent);
+    const prompt = buildSystemPrompt(
+      emptyContext,
+      [],
+      [],
+      candidates,
+      emptyIntent,
+    );
 
     const idx1 = prompt.indexOf('높은작품');
     const idx2 = prompt.indexOf('중간작품');

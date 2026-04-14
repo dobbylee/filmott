@@ -29,7 +29,13 @@ import { NaverService } from './social/naver.service';
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy, GoogleService, KakaoService, NaverService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    GoogleService,
+    KakaoService,
+    NaverService,
+  ],
   controllers: [AuthController],
   exports: [AuthService],
 })

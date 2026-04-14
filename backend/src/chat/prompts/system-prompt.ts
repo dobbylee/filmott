@@ -49,34 +49,27 @@ export function buildSystemPrompt(
   const favoritesSection =
     context.favorites.length > 0
       ? context.favorites
-          .map(
-            (f) => {
-              const countryStr = f.originCountry ? ` | ${f.originCountry}` : '';
-              return `- ${f.title} (${f.year}, ${f.genres}${countryStr}) - ${f.rating}점`;
-            },
-          )
+          .map((f) => {
+            const countryStr = f.originCountry ? ` | ${f.originCountry}` : '';
+            return `- ${f.title} (${f.year}, ${f.genres}${countryStr}) - ${f.rating}점`;
+          })
           .join('\n')
       : '(아직 높은 점수를 준 작품이 없습니다)';
 
   const dislikedSection =
     context.disliked.length > 0
       ? context.disliked
-          .map(
-            (d) => {
-              const countryStr = d.originCountry ? ` | ${d.originCountry}` : '';
-              return `- ${d.title} (${d.year}, ${d.genres}${countryStr}) - ${d.rating}점`;
-            },
-          )
+          .map((d) => {
+            const countryStr = d.originCountry ? ` | ${d.originCountry}` : '';
+            return `- ${d.title} (${d.year}, ${d.genres}${countryStr}) - ${d.rating}점`;
+          })
           .join('\n')
       : '(아직 낮은 점수를 준 작품이 없습니다)';
 
   const genreSection =
     context.genreStats.length > 0
       ? context.genreStats
-          .map(
-            (g) =>
-              `- ${g.genre}: 평균 ${g.avgRating}점, ${g.count}편 시청`,
-          )
+          .map((g) => `- ${g.genre}: 평균 ${g.avgRating}점, ${g.count}편 시청`)
           .join('\n')
       : '(장르 통계가 없습니다)';
 
@@ -95,7 +88,9 @@ export function buildSystemPrompt(
     ? `### 구독 중인 OTT\n${ottNames}\n\n해당 OTT에서 볼 수 있는 작품을 우선적으로 추천하세요. 다른 플랫폼의 작품도 추천할 수 있지만, 구독 중인 OTT에서 볼 수 있는 작품을 먼저 제안하세요.`
     : '';
 
-  const sortedCandidates = [...candidates].sort((a, b) => b.similarity - a.similarity);
+  const sortedCandidates = [...candidates].sort(
+    (a, b) => b.similarity - a.similarity,
+  );
 
   const candidatesSection =
     sortedCandidates.length > 0
@@ -103,8 +98,13 @@ export function buildSystemPrompt(
           .map((c, i) => {
             const genreStr = (c.genres || []).map((g) => g.name).join(', ');
             const directorStr = c.director ? ` | 감독: ${c.director}` : '';
-            const countryStr = c.originCountry ? ` | 국가: ${c.originCountry}` : '';
-            const similarityStr = c.similarity > 0 ? ` | 유사도: ${(c.similarity * 100).toFixed(0)}%` : '';
+            const countryStr = c.originCountry
+              ? ` | 국가: ${c.originCountry}`
+              : '';
+            const similarityStr =
+              c.similarity > 0
+                ? ` | 유사도: ${(c.similarity * 100).toFixed(0)}%`
+                : '';
             const descriptionText = c.description || c.overview || '';
             return `${i + 1}. [ID:${c.tmdbId}|${c.contentType}] ${c.title} (${c.voteAverage}점${similarityStr}) - 장르: ${genreStr}${directorStr}${countryStr}\n   ${descriptionText}`;
           })
@@ -115,7 +115,9 @@ export function buildSystemPrompt(
   const filterDescriptions: string[] = [];
   if (intent) {
     if (intent.ottProviderNames.length > 0) {
-      filterDescriptions.push(`사용자가 ${intent.ottProviderNames.join(', ')}에서 볼 수 있는 작품을 요청했습니다.`);
+      filterDescriptions.push(
+        `사용자가 ${intent.ottProviderNames.join(', ')}에서 볼 수 있는 작품을 요청했습니다.`,
+      );
     }
     if (intent.countries.length > 0) {
       const countryLabels = intent.countries.join(', ');
@@ -123,18 +125,28 @@ export function buildSystemPrompt(
     }
     if (intent.excludeCountries.length > 0) {
       const excludeLabels = intent.excludeCountries.join(', ');
-      filterDescriptions.push(`사용자가 ${excludeLabels} 작품을 제외하고 요청했습니다. 해당 국가 작품은 절대 추천하지 마세요.`);
+      filterDescriptions.push(
+        `사용자가 ${excludeLabels} 작품을 제외하고 요청했습니다. 해당 국가 작품은 절대 추천하지 마세요.`,
+      );
     }
     if (intent.personNames.length > 0) {
-      filterDescriptions.push(`사용자가 ${intent.personNames.join(', ')}의 작품을 요청했습니다.`);
+      filterDescriptions.push(
+        `사용자가 ${intent.personNames.join(', ')}의 작품을 요청했습니다.`,
+      );
     }
     if (intent.dateRange) {
       if (intent.dateRange.from && intent.dateRange.to) {
-        filterDescriptions.push(`사용자가 ${intent.dateRange.from} ~ ${intent.dateRange.to} 기간의 작품을 요청했습니다.`);
+        filterDescriptions.push(
+          `사용자가 ${intent.dateRange.from} ~ ${intent.dateRange.to} 기간의 작품을 요청했습니다.`,
+        );
       } else if (intent.dateRange.from) {
-        filterDescriptions.push(`사용자가 ${intent.dateRange.from} 이후의 작품을 요청했습니다.`);
+        filterDescriptions.push(
+          `사용자가 ${intent.dateRange.from} 이후의 작품을 요청했습니다.`,
+        );
       } else if (intent.dateRange.to) {
-        filterDescriptions.push(`사용자가 ${intent.dateRange.to} 이전의 작품을 요청했습니다.`);
+        filterDescriptions.push(
+          `사용자가 ${intent.dateRange.to} 이전의 작품을 요청했습니다.`,
+        );
       }
     }
     if (intent.contentType) {
@@ -142,13 +154,16 @@ export function buildSystemPrompt(
       filterDescriptions.push(`사용자가 ${typeLabel}를 요청했습니다.`);
     }
     if (intent.genres && intent.genres.length > 0) {
-      filterDescriptions.push(`사용자가 ${intent.genres.join(', ')} 장르를 요청했습니다.`);
+      filterDescriptions.push(
+        `사용자가 ${intent.genres.join(', ')} 장르를 요청했습니다.`,
+      );
     }
   }
 
-  const filterSection = filterDescriptions.length > 0
-    ? `\n## 검색 필터 맥락\n${filterDescriptions.join('\n')}\n아래 후보 목록은 이 조건이 반영된 결과입니다. 필터 조건에 맞는 작품을 우선 추천하세요.\n`
-    : '';
+  const filterSection =
+    filterDescriptions.length > 0
+      ? `\n## 검색 필터 맥락\n${filterDescriptions.join('\n')}\n아래 후보 목록은 이 조건이 반영된 결과입니다. 필터 조건에 맞는 작품을 우선 추천하세요.\n`
+      : '';
 
   const today = new Date().toISOString().split('T')[0];
 

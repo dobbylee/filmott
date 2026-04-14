@@ -103,7 +103,9 @@ export class UsersController {
   // 프로필 이미지 업로드 (multipart/form-data)
   @UseGuards(JwtAuthGuard)
   @Post('me/profile-image')
-  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   async uploadProfileImage(
     @CurrentUser() user: JwtPayload,
     @UploadedFile() file: Express.Multer.File,

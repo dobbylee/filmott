@@ -51,7 +51,9 @@ describe('GoogleService', () => {
 
       expect(url).toContain('https://accounts.google.com/o/oauth2/v2/auth');
       expect(url).toContain('client_id=test-client-id');
-      expect(url).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fauth%2Fgoogle%2Fcallback');
+      expect(url).toContain(
+        'redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fauth%2Fgoogle%2Fcallback',
+      );
       expect(url).toContain('response_type=code');
       expect(url).toContain('scope=openid+email+profile');
       expect(url).toContain(`state=${state}`);

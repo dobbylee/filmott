@@ -55,7 +55,10 @@ describe('EmbeddingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmbeddingService,
-        { provide: getRepositoryToken(ContentMetadata), useValue: mockMetadataRepo },
+        {
+          provide: getRepositoryToken(ContentMetadata),
+          useValue: mockMetadataRepo,
+        },
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: DataSource, useValue: mockDataSource },
@@ -122,12 +125,17 @@ describe('EmbeddingService', () => {
   describe('generateDescription', () => {
     it('작품 정보를 기반으로 설명을 생성해야 한다', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{ message: { content: '어두운 분위기의 범죄 스릴러입니다.' } }],
+        choices: [
+          { message: { content: '어두운 분위기의 범죄 스릴러입니다.' } },
+        ],
       });
 
       const content = {
         title: '기생충',
-        genres: [{ id: 18, name: '드라마' }, { id: 53, name: '스릴러' }],
+        genres: [
+          { id: 18, name: '드라마' },
+          { id: 53, name: '스릴러' },
+        ],
         overview: '전원 백수로 살아가는 기택 가족.',
         credits: [{ name: '송강호' }, { name: '이선균' }],
         releaseDate: new Date('2019-05-30'),
@@ -179,7 +187,12 @@ describe('EmbeddingService', () => {
     });
 
     it('force 옵션이 true이면 재생성해야 한다', async () => {
-      const existing = { id: 1, contentId: 100, description: '새로운 설명', embedding: '[0.1,0.2,0.3]' };
+      const existing = {
+        id: 1,
+        contentId: 100,
+        description: '새로운 설명',
+        embedding: '[0.1,0.2,0.3]',
+      };
 
       const content = {
         id: 100,
@@ -302,10 +315,11 @@ describe('EmbeddingService', () => {
 
       await service.searchSimilar('테스트', 10, [100, 200]);
 
-      expect(mockDataSource.query).toHaveBeenCalledWith(
+      expect(mockDataSource.query).toHaveBeenCalledWith(expect.any(String), [
         expect.any(String),
-        [expect.any(String), [100, 200], 10],
-      );
+        [100, 200],
+        10,
+      ]);
     });
 
     it('제외 목록이 비어있으면 [-1]로 대체해야 한다', async () => {
@@ -313,10 +327,11 @@ describe('EmbeddingService', () => {
 
       await service.searchSimilar('테스트', 10, []);
 
-      expect(mockDataSource.query).toHaveBeenCalledWith(
+      expect(mockDataSource.query).toHaveBeenCalledWith(expect.any(String), [
         expect.any(String),
-        [expect.any(String), [-1], 10],
-      );
+        [-1],
+        10,
+      ]);
     });
 
     it('필터 없으면 기본 조건(OTT 또는 한국 작품 또는 KOBIS)만 포함해야 한다', async () => {
@@ -325,8 +340,12 @@ describe('EmbeddingService', () => {
       await service.searchSimilar('테스트', 10, []);
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      expect(query).toContain('LEFT JOIN rankings r ON r.content_id = c.id AND r.source = \'kobis\'');
-      expect(query).toContain('c.watch_providers IS NOT NULL OR c.origin_country LIKE');
+      expect(query).toContain(
+        "LEFT JOIN rankings r ON r.content_id = c.id AND r.source = 'kobis'",
+      );
+      expect(query).toContain(
+        'c.watch_providers IS NOT NULL OR c.origin_country LIKE',
+      );
       expect(query).toContain('r.id IS NOT NULL');
       expect(query).not.toContain('content_type =');
       expect(query).not.toContain('release_date >=');
@@ -373,8 +392,8 @@ describe('EmbeddingService', () => {
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain('director LIKE');
       expect(query).toContain('jsonb_array_elements(c.credits)');
-      expect(query).toContain('cr->>\'name\'');
-      expect(query).toContain('cr->>\'character\'');
+      expect(query).toContain("cr->>'name'");
+      expect(query).toContain("cr->>'character'");
       expect(query).not.toContain('credits::text LIKE');
       const params = mockDataSource.query.mock.calls[0][1] as unknown[];
       expect(params).toContain('%봉준호%');
@@ -422,16 +441,21 @@ describe('EmbeddingService', () => {
       }));
 
       mockDataSource.query
-        .mockResolvedValueOnce(twoRows)    // 전체 필터
-        .mockResolvedValueOnce(threeRows)  // -인물
-        .mockResolvedValueOnce(fourRows)   // -국가
-        .mockResolvedValueOnce(sixRows);   // -OTT
+        .mockResolvedValueOnce(twoRows) // 전체 필터
+        .mockResolvedValueOnce(threeRows) // -인물
+        .mockResolvedValueOnce(fourRows) // -국가
+        .mockResolvedValueOnce(sixRows); // -OTT
 
-      const result = await service.searchSimilar('넷플릭스 한국 봉준호 영화', 10, [], {
-        ottProviderNames: ['Netflix'],
-        countries: ['KR'],
-        personNames: ['봉준호'],
-      });
+      const result = await service.searchSimilar(
+        '넷플릭스 한국 봉준호 영화',
+        10,
+        [],
+        {
+          ottProviderNames: ['Netflix'],
+          countries: ['KR'],
+          personNames: ['봉준호'],
+        },
+      );
 
       // 4번의 쿼리가 실행되어야 한다
       expect(mockDataSource.query).toHaveBeenCalledTimes(4);
@@ -616,18 +640,13 @@ describe('EmbeddingService', () => {
         select: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([
-          { id: 1 },
-          { id: 2 },
-        ]),
+        getMany: jest.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]),
       };
       mockContentRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       const metadataQb = {
         select: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([
-          { contentId: 1 },
-        ]),
+        getMany: jest.fn().mockResolvedValue([{ contentId: 1 }]),
       };
       mockMetadataRepo.createQueryBuilder.mockReturnValue(metadataQb);
 
@@ -669,9 +688,7 @@ describe('EmbeddingService', () => {
         select: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([
-          { id: 1 },
-        ]),
+        getMany: jest.fn().mockResolvedValue([{ id: 1 }]),
       };
       mockContentRepo.createQueryBuilder.mockReturnValue(mockQb);
 

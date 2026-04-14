@@ -54,7 +54,8 @@ export class AuthController {
     private readonly naverService: NaverService,
   ) {
     this.frontendUrl = this.configService.getOrThrow<string>('FRONTEND_URL');
-    this.isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    this.isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
   }
 
   // --- 기존 엔드포인트 ---
@@ -87,7 +88,10 @@ export class AuthController {
     @Body() refreshTokenDto: RefreshTokenDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = this.getRefreshToken(req, refreshTokenDto?.refresh_token);
+    const refreshToken = this.getRefreshToken(
+      req,
+      refreshTokenDto?.refresh_token,
+    );
     if (!refreshToken) {
       this.clearSessionCookies(res);
       throw new UnauthorizedException('리프레시 토큰이 필요합니다.');
@@ -111,7 +115,10 @@ export class AuthController {
     @Body() refreshTokenDto: RefreshTokenDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = this.getRefreshToken(req, refreshTokenDto?.refresh_token);
+    const refreshToken = this.getRefreshToken(
+      req,
+      refreshTokenDto?.refresh_token,
+    );
     try {
       if (refreshToken) {
         await this.authService.revokeRefreshToken(refreshToken);
@@ -200,7 +207,9 @@ export class AuthController {
     const signupToken = this.getSocialSignupToken(req);
     if (!signupToken) {
       this.clearSignupCookie(res);
-      throw new BadRequestException('회원가입 세션이 만료되었습니다. 다시 시도해주세요.');
+      throw new BadRequestException(
+        '회원가입 세션이 만료되었습니다. 다시 시도해주세요.',
+      );
     }
 
     try {
@@ -231,7 +240,7 @@ export class AuthController {
   }
 
   private verifyState(req: Request, res: Response, urlState: string): boolean {
-    const cookieState = req.cookies?.[OAUTH_STATE_COOKIE] as string | undefined;
+    const cookieState = this.getCookieValue(req, OAUTH_STATE_COOKIE);
 
     // state 쿠키 삭제
     res.clearCookie(OAUTH_STATE_COOKIE, { path: '/' });
@@ -242,17 +251,25 @@ export class AuthController {
     return true;
   }
 
-  private getRefreshToken(req: Request, bodyRefreshToken?: string): string | undefined {
-    const cookieRefreshToken = req.cookies?.[AUTH_REFRESH_TOKEN_COOKIE];
-    if (typeof cookieRefreshToken === 'string' && cookieRefreshToken.length > 0) {
-      return cookieRefreshToken;
-    }
-    return bodyRefreshToken;
+  private getRefreshToken(
+    req: Request,
+    bodyRefreshToken?: string,
+  ): string | undefined {
+    return (
+      this.getCookieValue(req, AUTH_REFRESH_TOKEN_COOKIE) ?? bodyRefreshToken
+    );
   }
 
   private getSocialSignupToken(req: Request): string | undefined {
-    const signupToken = req.cookies?.[SOCIAL_SIGNUP_COOKIE];
-    return typeof signupToken === 'string' && signupToken.length > 0 ? signupToken : undefined;
+    return this.getCookieValue(req, SOCIAL_SIGNUP_COOKIE);
+  }
+
+  private getCookieValue(req: Request, cookieName: string): string | undefined {
+    const cookies = req.cookies as Record<string, unknown> | undefined;
+    const cookieValue = cookies?.[cookieName];
+    return typeof cookieValue === 'string' && cookieValue.length > 0
+      ? cookieValue
+      : undefined;
   }
 
   private setSessionCookies(

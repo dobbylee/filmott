@@ -38,11 +38,14 @@ export class AddUserStatusAndRole1773600000000 implements MigrationInterface {
     if (adminEmail && adminPassword) {
       const hashedPassword = await bcrypt.hash(adminPassword, 10);
       // Use ON CONFLICT to avoid duplicate if admin already exists
-      await queryRunner.query(`
+      await queryRunner.query(
+        `
         INSERT INTO "users" ("nickname", "email", "password", "status", "role")
         VALUES ('admin', $1, $2, 'ACTIVE', 'ADMIN')
         ON CONFLICT ("email") DO UPDATE SET "role" = 'ADMIN';
-      `, [adminEmail, hashedPassword]);
+      `,
+        [adminEmail, hashedPassword],
+      );
     }
   }
 

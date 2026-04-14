@@ -30,9 +30,7 @@ describe('UsersController', () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [UsersController],
-      providers: [
-        { provide: UsersService, useValue: mockUsersService },
-      ],
+      providers: [{ provide: UsersService, useValue: mockUsersService }],
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
@@ -48,7 +46,9 @@ describe('UsersController', () => {
 
       const result = await controller.checkNickname('newuser');
 
-      expect(mockUsersService.isNicknameAvailable).toHaveBeenCalledWith('newuser');
+      expect(mockUsersService.isNicknameAvailable).toHaveBeenCalledWith(
+        'newuser',
+      );
       expect(result).toEqual({ available: true });
     });
 
@@ -75,30 +75,42 @@ describe('UsersController', () => {
       const mockUser = { id: 1, nickname: 'test', role: 'USER' };
       mockUsersService.verifyPassword.mockResolvedValue(true);
 
-      const result = await controller.verifyPassword(mockUser, 'correct!Password1');
+      const result = await controller.verifyPassword(
+        mockUser,
+        'correct!Password1',
+      );
 
-      expect(mockUsersService.verifyPassword).toHaveBeenCalledWith(1, 'correct!Password1');
+      expect(mockUsersService.verifyPassword).toHaveBeenCalledWith(
+        1,
+        'correct!Password1',
+      );
       expect(result).toEqual({ verified: true });
     });
 
     it('비밀번호가 비어있으면 BadRequestException을 던져야 한다', async () => {
       const mockUser = { id: 1, nickname: 'test', role: 'USER' };
 
-      await expect(controller.verifyPassword(mockUser, '')).rejects.toThrow(BadRequestException);
+      await expect(controller.verifyPassword(mockUser, '')).rejects.toThrow(
+        BadRequestException,
+      );
       expect(mockUsersService.verifyPassword).not.toHaveBeenCalled();
     });
 
     it('비밀번호가 undefined이면 BadRequestException을 던져야 한다', async () => {
       const mockUser = { id: 1, nickname: 'test', role: 'USER' };
 
-      await expect(controller.verifyPassword(mockUser, undefined as any)).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.verifyPassword(mockUser, undefined as any),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('비밀번호가 틀리면 BadRequestException을 던져야 한다', async () => {
       const mockUser = { id: 1, nickname: 'test', role: 'USER' };
       mockUsersService.verifyPassword.mockResolvedValue(false);
 
-      await expect(controller.verifyPassword(mockUser, 'wrong!Pass1')).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.verifyPassword(mockUser, 'wrong!Pass1'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -118,7 +130,9 @@ describe('UsersController', () => {
       const mockUser = { id: 999, nickname: 'ghost', role: 'USER' };
       mockUsersService.findById.mockResolvedValue(null);
 
-      await expect(controller.getProfile(mockUser)).rejects.toThrow(NotFoundException);
+      await expect(controller.getProfile(mockUser)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -132,9 +146,14 @@ describe('UsersController', () => {
       };
       mockUsersService.updateSubscribedOtts.mockResolvedValue(mockResult);
 
-      const result = await controller.updateOtts(mockUser, { otts: ['netflix', 'tving'] });
+      const result = await controller.updateOtts(mockUser, {
+        otts: ['netflix', 'tving'],
+      });
 
-      expect(mockUsersService.updateSubscribedOtts).toHaveBeenCalledWith(1, ['netflix', 'tving']);
+      expect(mockUsersService.updateSubscribedOtts).toHaveBeenCalledWith(1, [
+        'netflix',
+        'tving',
+      ]);
       expect(result).toEqual(mockResult);
     });
 
@@ -173,7 +192,10 @@ describe('UsersController', () => {
       const mockUser = { id: 1, nickname: 'test', role: 'USER' };
 
       await expect(
-        controller.uploadProfileImage(mockUser, undefined as unknown as Express.Multer.File),
+        controller.uploadProfileImage(
+          mockUser,
+          undefined as unknown as Express.Multer.File,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -184,12 +206,19 @@ describe('UsersController', () => {
         mimetype: 'image/jpeg',
         size: 1024,
       } as Express.Multer.File;
-      const mockResult = { id: 1, nickname: 'test', profileImage: 'https://test.r2.dev/profiles/test.webp' };
+      const mockResult = {
+        id: 1,
+        nickname: 'test',
+        profileImage: 'https://test.r2.dev/profiles/test.webp',
+      };
       mockUsersService.updateProfileImage.mockResolvedValue(mockResult);
 
       const result = await controller.uploadProfileImage(mockUser, mockFile);
 
-      expect(mockUsersService.updateProfileImage).toHaveBeenCalledWith(1, mockFile);
+      expect(mockUsersService.updateProfileImage).toHaveBeenCalledWith(
+        1,
+        mockFile,
+      );
       expect(result).toEqual(mockResult);
     });
 
@@ -269,7 +298,9 @@ describe('UsersController', () => {
         new NotFoundException('사용자를 찾을 수 없습니다.'),
       );
 
-      await expect(controller.getPublicProfile(999)).rejects.toThrow(NotFoundException);
+      await expect(controller.getPublicProfile(999)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('인증 가드가 적용되지 않아야 한다', () => {

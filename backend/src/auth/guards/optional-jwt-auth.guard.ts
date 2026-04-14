@@ -1,14 +1,19 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import type { Request } from 'express';
 import { AUTH_ACCESS_TOKEN_COOKIE } from '../auth-cookie.util';
 
 @Injectable()
 export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
   canActivate(context: ExecutionContext): boolean | Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<Request>();
 
     if (!this.hasCredentials(request)) {
-      request.user = null;
+      this.markAsAnonymous(request);
       return true;
     }
 
@@ -21,10 +26,10 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
     _info: unknown,
     context: ExecutionContext,
   ): T | null {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<Request>();
 
     if (!this.hasCredentials(request)) {
-      request.user = null;
+      this.markAsAnonymous(request);
       return null;
     }
 
@@ -39,16 +44,18 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
     return user;
   }
 
-  private hasCredentials(request: {
-    headers?: { authorization?: string };
-    cookies?: Record<string, string | undefined>;
-  }): boolean {
+  private hasCredentials(request: Request): boolean {
     const authHeader = request.headers?.authorization;
-    const accessCookie = request.cookies?.[AUTH_ACCESS_TOKEN_COOKIE];
+    const cookies = request.cookies as Record<string, unknown> | undefined;
+    const accessCookie = cookies?.[AUTH_ACCESS_TOKEN_COOKIE];
 
     return (
       (typeof authHeader === 'string' && authHeader.length > 0) ||
       (typeof accessCookie === 'string' && accessCookie.length > 0)
     );
+  }
+
+  private markAsAnonymous(request: Request): void {
+    (request as unknown as { user?: null }).user = null;
   }
 }

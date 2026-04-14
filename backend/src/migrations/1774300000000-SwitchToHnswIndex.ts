@@ -5,9 +5,9 @@ export class SwitchToHnswIndex1774300000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // pgvector 확장이 없으면 스킵
-    const hasVector = await queryRunner.query(
+    const hasVector = (await queryRunner.query(
       `SELECT 1 FROM pg_extension WHERE extname = 'vector'`,
-    );
+    )) as unknown[];
     if (!hasVector.length) return;
 
     // 기존 IVFFlat 인덱스 삭제 후 HNSW로 재생성

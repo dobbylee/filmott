@@ -33,7 +33,10 @@ export class RankingsService {
    * KOBIS 일별 박스오피스를 가져와 rankings에 저장
    * 매일 00:05 + 12:00 실행 (전일자 데이터, KOBIS 보정 반영)
    */
-  @Cron('5 0 * * *', { name: 'daily-box-office-midnight', timeZone: 'Asia/Seoul' })
+  @Cron('5 0 * * *', {
+    name: 'daily-box-office-midnight',
+    timeZone: 'Asia/Seoul',
+  })
   @Cron('0 12 * * *', { name: 'daily-box-office-noon', timeZone: 'Asia/Seoul' })
   async fetchDailyBoxOffice(): Promise<Ranking[]> {
     const yesterday = this.getYesterdayDate();
@@ -41,17 +44,23 @@ export class RankingsService {
     this.logger.log(`Fetching daily box office for ${yesterday}`);
 
     try {
-      const boxOfficeItems = await this.kobisService.getDailyBoxOffice(yesterday);
+      const boxOfficeItems =
+        await this.kobisService.getDailyBoxOffice(yesterday);
       const fetchedAt = new Date();
 
       // TMDB 매칭을 순차 처리 (rate limit 방어: 250ms 간격)
-      const matchResults: PromiseSettledResult<{ id: number; posterUrl?: string } | null>[] = [];
+      const matchResults: PromiseSettledResult<{
+        id: number;
+        posterUrl?: string;
+      } | null>[] = [];
       for (const item of boxOfficeItems) {
         try {
           const value = await this.matchKobisToTmdb(item.movieNm, item.openDt);
           matchResults.push({ status: 'fulfilled', value });
         } catch (reason) {
-          matchResults.push({ status: 'rejected', reason });
+          const error =
+            reason instanceof Error ? reason : new Error(String(reason));
+          matchResults.push({ status: 'rejected', reason: error });
         }
         await sleep(TMDB_CALL_DELAY_MS);
       }
@@ -83,7 +92,9 @@ export class RankingsService {
         'targetDate',
       ]);
 
-      this.logger.log(`Saved ${rankingsToUpsert.length} daily box office rankings`);
+      this.logger.log(
+        `Saved ${rankingsToUpsert.length} daily box office rankings`,
+      );
 
       const contentIds = rankingsToUpsert
         .map((r) => r.contentId)
@@ -112,17 +123,23 @@ export class RankingsService {
     this.logger.log(`Fetching weekly box office for ${lastWeek}`);
 
     try {
-      const boxOfficeItems = await this.kobisService.getWeeklyBoxOffice(lastWeek);
+      const boxOfficeItems =
+        await this.kobisService.getWeeklyBoxOffice(lastWeek);
       const fetchedAt = new Date();
 
       // TMDB 매칭을 순차 처리 (rate limit 방어: 250ms 간격)
-      const matchResults: PromiseSettledResult<{ id: number; posterUrl?: string } | null>[] = [];
+      const matchResults: PromiseSettledResult<{
+        id: number;
+        posterUrl?: string;
+      } | null>[] = [];
       for (const item of boxOfficeItems) {
         try {
           const value = await this.matchKobisToTmdb(item.movieNm, item.openDt);
           matchResults.push({ status: 'fulfilled', value });
         } catch (reason) {
-          matchResults.push({ status: 'rejected', reason });
+          const error =
+            reason instanceof Error ? reason : new Error(String(reason));
+          matchResults.push({ status: 'rejected', reason: error });
         }
         await sleep(TMDB_CALL_DELAY_MS);
       }
@@ -154,7 +171,9 @@ export class RankingsService {
         'targetDate',
       ]);
 
-      this.logger.log(`Saved ${rankingsToUpsert.length} weekly box office rankings`);
+      this.logger.log(
+        `Saved ${rankingsToUpsert.length} weekly box office rankings`,
+      );
 
       const contentIds = rankingsToUpsert
         .map((r) => r.contentId)
@@ -178,7 +197,10 @@ export class RankingsService {
    */
   @Cron('0 6 * * *', { name: 'daily-trending', timeZone: 'Asia/Seoul' })
   async fetchAllTrending(): Promise<void> {
-    const categories: { type: 'movie' | 'tv' | 'all'; timeWindow: 'day' | 'week' }[] = [
+    const categories: {
+      type: 'movie' | 'tv' | 'all';
+      timeWindow: 'day' | 'week';
+    }[] = [
       { type: 'all', timeWindow: 'day' },
       { type: 'all', timeWindow: 'week' },
     ];
@@ -187,7 +209,10 @@ export class RankingsService {
       try {
         await this.fetchTrending(type, timeWindow);
       } catch (error) {
-        this.logger.error(`Failed to fetch trending-${type}-${timeWindow}`, error);
+        this.logger.error(
+          `Failed to fetch trending-${type}-${timeWindow}`,
+          error,
+        );
         Sentry.captureException(error);
       }
     }
@@ -215,43 +240,47 @@ export class RankingsService {
         try {
           const value = await this.contentsService.findOrFetchByTmdbId(
             item.id,
-            mediaType as 'movie' | 'tv',
+            mediaType,
           );
           cacheResults.push({ status: 'fulfilled', value });
         } catch (reason) {
-          cacheResults.push({ status: 'rejected', reason });
+          const error =
+            reason instanceof Error ? reason : new Error(String(reason));
+          cacheResults.push({ status: 'rejected', reason: error });
         }
         await sleep(TMDB_CALL_DELAY_MS);
       }
 
-      const rankingsToUpsert: Ranking[] = trendingData.results.map((item, i) => {
-        const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
-        const title = mediaType === 'movie' ? item.title : item.name;
-        const posterUrl = item.poster_path
-          ? `${TMDB_IMAGE_BASE}/w500${item.poster_path}`
-          : undefined;
+      const rankingsToUpsert: Ranking[] = trendingData.results.map(
+        (item, i) => {
+          const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
+          const title = mediaType === 'movie' ? item.title : item.name;
+          const posterUrl = item.poster_path
+            ? `${TMDB_IMAGE_BASE}/w500${item.poster_path}`
+            : undefined;
 
-        let contentId: number | undefined;
-        const cacheResult = cacheResults[i];
-        if (cacheResult.status === 'fulfilled') {
-          contentId = cacheResult.value.id;
-        } else {
-          this.logger.warn(
-            `Failed to cache trending content: ${title} (tmdb:${item.id})`,
-          );
-        }
+          let contentId: number | undefined;
+          const cacheResult = cacheResults[i];
+          if (cacheResult.status === 'fulfilled') {
+            contentId = cacheResult.value.id;
+          } else {
+            this.logger.warn(
+              `Failed to cache trending content: ${title} (tmdb:${item.id})`,
+            );
+          }
 
-        return this.rankingRepo.create({
-          source: 'tmdb',
-          category,
-          rank: i + 1,
-          title: title ?? undefined,
-          posterUrl,
-          contentId,
-          targetDate,
-          fetchedAt,
-        });
-      });
+          return this.rankingRepo.create({
+            source: 'tmdb',
+            category,
+            rank: i + 1,
+            title: title ?? undefined,
+            posterUrl,
+            contentId,
+            targetDate,
+            fetchedAt,
+          });
+        },
+      );
 
       await this.rankingRepo.upsert(rankingsToUpsert, [
         'source',
@@ -260,7 +289,9 @@ export class RankingsService {
         'targetDate',
       ]);
 
-      this.logger.log(`Saved ${rankingsToUpsert.length} trending rankings for ${category}`);
+      this.logger.log(
+        `Saved ${rankingsToUpsert.length} trending rankings for ${category}`,
+      );
 
       const contentIds = rankingsToUpsert
         .map((r) => r.contentId)
@@ -375,9 +406,10 @@ export class RankingsService {
         // 제목 완전 일치 또는 연도 일치
         const titleMatch =
           item.title === movieNm || item.original_title === movieNm;
-        const yearMatch = openYear && releaseYear
-          ? Math.abs(releaseYear - openYear) <= 1
-          : true;
+        const yearMatch =
+          openYear && releaseYear
+            ? Math.abs(releaseYear - openYear) <= 1
+            : true;
 
         return titleMatch && yearMatch;
       });
@@ -411,14 +443,18 @@ export class RankingsService {
   private getLastWeekDate(): string {
     const date = new Date();
     date.setDate(date.getDate() - 7);
-    return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }).replace(/-/g, '');
+    return date
+      .toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
+      .replace(/-/g, '');
   }
 
   private getYesterdayDate(): string {
     const date = new Date();
     date.setDate(date.getDate() - 1);
     // Asia/Seoul 기준 YYYYMMDD
-    return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }).replace(/-/g, '');
+    return date
+      .toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
+      .replace(/-/g, '');
   }
 
   private getTodayDate(): string {
@@ -447,8 +483,12 @@ export class RankingsService {
       const sixMonthsAgo = new Date(today);
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-      const airDateLte = today.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
-      const airDateGte = sixMonthsAgo.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+      const airDateLte = today.toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Seoul',
+      });
+      const airDateGte = sixMonthsAgo.toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Seoul',
+      });
 
       // 1-2 페이지 순차 수집
       const allResults: { id: number }[] = [];
@@ -460,7 +500,9 @@ export class RankingsService {
           airDateGte,
           page,
         });
-        allResults.push(...discoverData.results.map((item) => ({ id: item.id })));
+        allResults.push(
+          ...discoverData.results.map((item) => ({ id: item.id })),
+        );
         await sleep(TMDB_CALL_DELAY_MS);
       }
 
@@ -471,7 +513,10 @@ export class RankingsService {
       let failCount = 0;
       for (const item of allResults) {
         try {
-          const content = await this.contentsService.findOrFetchByTmdbId(item.id, 'tv');
+          const content = await this.contentsService.findOrFetchByTmdbId(
+            item.id,
+            'tv',
+          );
           contentIds.push(content.id);
         } catch {
           failCount++;
@@ -494,7 +539,8 @@ export class RankingsService {
   }
 
   private cacheMetadataInBackground(contentIds: number[]): void {
-    this.embeddingService.batchCacheByContentIds(contentIds)
+    this.embeddingService
+      .batchCacheByContentIds(contentIds)
       .then((result) => {
         this.logger.log(
           `Metadata 배치 캐싱 완료: cached=${result.cached}, skipped=${result.skipped}, failed=${result.failed}`,
@@ -506,5 +552,4 @@ export class RankingsService {
         );
       });
   }
-
 }

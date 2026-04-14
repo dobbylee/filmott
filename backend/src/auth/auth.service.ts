@@ -42,7 +42,9 @@ interface SocialCallbackResultNew {
   signupToken: string;
 }
 
-export type SocialCallbackResult = SocialCallbackResultExisting | SocialCallbackResultNew;
+export type SocialCallbackResult =
+  | SocialCallbackResultExisting
+  | SocialCallbackResultNew;
 
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
 
@@ -59,7 +61,9 @@ export class AuthService {
   async validateUser(email: string, pass: string): Promise<SafeUser> {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+      throw new UnauthorizedException(
+        '이메일 또는 비밀번호가 올바르지 않습니다.',
+      );
     }
 
     if (user.status === UserStatus.DELETED) {
@@ -72,10 +76,13 @@ export class AuthService {
 
     const isMatch = await bcrypt.compare(pass, user.password || '');
     if (!isMatch) {
-      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+      throw new UnauthorizedException(
+        '이메일 또는 비밀번호가 올바르지 않습니다.',
+      );
     }
 
-    const { password: _, ...result } = user;
+    const { password, ...result } = user;
+    void password;
     return result;
   }
 
@@ -119,7 +126,9 @@ export class AuthService {
         throw new UnauthorizedException('만료된 리프레시 토큰입니다.');
       }
 
-      const user = await this.usersService.findByIdWithStatus(tokenEntity.userId);
+      const user = await this.usersService.findByIdWithStatus(
+        tokenEntity.userId,
+      );
       if (!user) {
         await manager.remove(tokenEntity);
         throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
@@ -138,15 +147,23 @@ export class AuthService {
       // Rotation: 기존 토큰 삭제 후 새 토큰 쌍 발급
       await manager.remove(tokenEntity);
 
-      const payload = { nickname: user.nickname, sub: user.id, role: user.role };
+      const payload = {
+        nickname: user.nickname,
+        sub: user.id,
+        role: user.role,
+      };
       const accessToken = this.jwtService.sign(payload);
       const rawToken = randomBytes(32).toString('hex');
-      const hashedNewToken = createHash('sha256').update(rawToken).digest('hex');
+      const hashedNewToken = createHash('sha256')
+        .update(rawToken)
+        .digest('hex');
 
       const newRefreshToken = manager.create(RefreshToken, {
         token: hashedNewToken,
         userId: user.id,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(
+          Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+        ),
       });
       await manager.save(newRefreshToken);
 
@@ -182,7 +199,9 @@ export class AuthService {
       .execute();
   }
 
-  async handleSocialCallback(profile: SocialProfile): Promise<SocialCallbackResult> {
+  async handleSocialCallback(
+    profile: SocialProfile,
+  ): Promise<SocialCallbackResult> {
     const existingUser = await this.usersService.findByProvider(
       profile.provider,
       profile.providerId,
@@ -218,7 +237,11 @@ export class AuthService {
     return { type: 'new', signupToken };
   }
 
-  async completeSocialSignup(signupToken: string, nickname: string, subscribedOtts?: string[]) {
+  async completeSocialSignup(
+    signupToken: string,
+    nickname: string,
+    subscribedOtts?: string[],
+  ) {
     let payload: {
       provider: string;
       providerId: string;

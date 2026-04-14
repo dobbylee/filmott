@@ -67,7 +67,7 @@ function sliceRecentHistory(
   if (!history || history.length === 0) return [];
   const sliced = history.slice(-(maxTurns * 2));
   return sliced.map((msg) => ({
-    role: msg.role as 'user' | 'assistant',
+    role: msg.role,
     content: msg.content,
   }));
 }
@@ -90,33 +90,36 @@ interface RawDateRange {
 }
 
 function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === 'string')
+  );
 }
 
-function parseIntentResponse(raw: RawIntentResponse): ParsedIntent {
-  const ottProviderNames = isStringArray(raw.ottProviderNames)
-    ? raw.ottProviderNames
+function parseIntentResponse(raw: unknown): ParsedIntent {
+  const payload =
+    typeof raw === 'object' && raw !== null ? (raw as RawIntentResponse) : {};
+
+  const ottProviderNames = isStringArray(payload.ottProviderNames)
+    ? payload.ottProviderNames
     : [];
 
-  const countries = isStringArray(raw.countries)
-    ? raw.countries
+  const countries = isStringArray(payload.countries) ? payload.countries : [];
+
+  const excludeCountries = isStringArray(payload.excludeCountries)
+    ? payload.excludeCountries
     : [];
 
-  const excludeCountries = isStringArray(raw.excludeCountries)
-    ? raw.excludeCountries
+  const personNames = isStringArray(payload.personNames)
+    ? payload.personNames
     : [];
 
-  const personNames = isStringArray(raw.personNames)
-    ? raw.personNames
-    : [];
-
-  const referenceTitles = isStringArray(raw.referenceTitles)
-    ? raw.referenceTitles
+  const referenceTitles = isStringArray(payload.referenceTitles)
+    ? payload.referenceTitles
     : [];
 
   let dateRange: ParsedIntent['dateRange'] = null;
-  if (raw.dateRange && typeof raw.dateRange === 'object') {
-    const dr = raw.dateRange as RawDateRange;
+  if (payload.dateRange && typeof payload.dateRange === 'object') {
+    const dr = payload.dateRange as RawDateRange;
     dateRange = {
       from: typeof dr.from === 'string' ? dr.from : null,
       to: typeof dr.to === 'string' ? dr.to : null,
@@ -127,39 +130,66 @@ function parseIntentResponse(raw: RawIntentResponse): ParsedIntent {
   }
 
   let contentType: ParsedIntent['contentType'] = null;
-  if (raw.contentType === 'movie' || raw.contentType === 'tv') {
-    contentType = raw.contentType;
+  if (payload.contentType === 'movie' || payload.contentType === 'tv') {
+    contentType = payload.contentType;
   }
 
-  const genres = isStringArray(raw.genres) ? raw.genres : [];
+  const genres = isStringArray(payload.genres) ? payload.genres : [];
 
-  const confidence: ParsedIntent['confidence'] = raw.confidence === 'high' ? 'high' : 'low';
+  const confidence: ParsedIntent['confidence'] =
+    payload.confidence === 'high' ? 'high' : 'low';
 
-  return { ottProviderNames, countries, excludeCountries, personNames, referenceTitles, dateRange, contentType, genres, confidence };
+  return {
+    ottProviderNames,
+    countries,
+    excludeCountries,
+    personNames,
+    referenceTitles,
+    dateRange,
+    contentType,
+    genres,
+    confidence,
+  };
 }
 
 // OTT명 정규식: 한/영 변형 포함
-const OTT_PATTERN = /(?:넷플릭스|넷플|netflix|티빙|tving|웨이브|wavve|왓챠|watcha|디즈니플러스|디즈니\+|disney\s*plus|disney\+|쿠팡플레이|쿠팡|coupang\s*play)/gi;
+const OTT_PATTERN =
+  /(?:넷플릭스|넷플|netflix|티빙|tving|웨이브|wavve|왓챠|watcha|디즈니플러스|디즈니\+|disney\s*plus|disney\+|쿠팡플레이|쿠팡|coupang\s*play)/gi;
 
 // 국가명 매핑 (한국어 → ISO)
 const COUNTRY_NAMES: Record<string, string> = {
-  '한국': 'KR', '미국': 'US', '일본': 'JP', '영국': 'GB',
-  '프랑스': 'FR', '독일': 'DE', '중국': 'CN', '대만': 'TW',
-  '홍콩': 'HK', '인도': 'IN', '스페인': 'ES', '이탈리아': 'IT',
-  '캐나다': 'CA', '호주': 'AU', '태국': 'TH',
+  한국: 'KR',
+  미국: 'US',
+  일본: 'JP',
+  영국: 'GB',
+  프랑스: 'FR',
+  독일: 'DE',
+  중국: 'CN',
+  대만: 'TW',
+  홍콩: 'HK',
+  인도: 'IN',
+  스페인: 'ES',
+  이탈리아: 'IT',
+  캐나다: 'CA',
+  호주: 'AU',
+  태국: 'TH',
 };
 
 // 연도/시기 표현 정규식
-const DATE_PATTERN = /(?:최신|요즘|올해|작년|재작년|신작|근작|최근|\d{4}년?(?:\s*대)?|\d{2}년대)/g;
+const DATE_PATTERN =
+  /(?:최신|요즘|올해|작년|재작년|신작|근작|최근|\d{4}년?(?:\s*대)?|\d{2}년대)/g;
 
 // 요청 표현 정규식 (독립적인 요청 표현만. "볼 만한", "볼 수 있는" 등 문맥 의존 표현 제외)
-const REQUEST_PATTERN = /(?:추천해\s*(?:줘|주세요|줄래|줄\s*수\s*있어)?|추천|알려\s*(?:줘|주세요)|보여\s*(?:줘|주세요)|찾아\s*(?:줘|주세요)|있을까\??|있나요\??|뭐\s*있어\??|어때\??)/g;
+const REQUEST_PATTERN =
+  /(?:추천해\s*(?:줘|주세요|줄래|줄\s*수\s*있어)?|추천|알려\s*(?:줘|주세요)|보여\s*(?:줘|주세요)|찾아\s*(?:줘|주세요)|있을까\??|있나요\??|뭐\s*있어\??|어때\??)/g;
 
 // 인물 제거 후 남는 고립 수식어 정규식
-const ORPHAN_PERSON_MODIFIER = /(?:감독(?:의)?|배우|나오는|주연의?|출연(?:하는|한)?)\s*/g;
+const ORPHAN_PERSON_MODIFIER =
+  /(?:감독(?:의)?|배우|나오는|주연의?|출연(?:하는|한)?)\s*/g;
 
 // 참조 작품 제거 후 남는 고립 수식어 정규식
-const ORPHAN_REFERENCE_MODIFIER = /(?:같은|비슷한|느낌의|느낌인|스타일의|류의|종류의)\s*/g;
+const ORPHAN_REFERENCE_MODIFIER =
+  /(?:같은|비슷한|느낌의|느낌인|스타일의|류의|종류의)\s*/g;
 
 // 메타데이터 제거 후 남는 고립 잔여 표현 정규식 ("볼만한거" 등은 의미적 표현이므로 제외)
 // 문두: "이후 ..." / 문중: "... 중에 ..." / 문미: "... 이전"
@@ -171,33 +201,33 @@ const ORPHAN_RESIDUAL_END = /\s+(?:중에|이후|이전)$/;
 // DB 장르명: GENRE_NAME_MAP (backend/src/common/constants.ts) 참조
 // TV 전용 장르: "액션 & 어드벤처", "SF & 판타지" 등은 contentType=tv일 때 자동 포함
 export const GENRE_ALIAS_MAP: Record<string, string[]> = {
-  '호러': ['공포'],
-  '공포': ['공포'],
-  '느와르': ['범죄', '액션'],
-  '액션': ['액션'],
-  '판타지': ['판타지'],
-  '스릴러': ['스릴러'],
-  '코미디': ['코미디'],
-  '로맨스': ['로맨스'],
-  'SF': ['SF'],
-  '드라마': ['드라마'],
-  '애니메이션': ['애니메이션'],
-  '다큐멘터리': ['다큐멘터리'],
-  '범죄': ['범죄'],
-  '미스터리': ['미스터리'],
-  '전쟁': ['전쟁'],
-  '역사': ['역사'],
-  '가족': ['가족'],
-  '음악': ['음악'],
-  '모험': ['모험'],
-  '서부': ['서부'],
+  호러: ['공포'],
+  공포: ['공포'],
+  느와르: ['범죄', '액션'],
+  액션: ['액션'],
+  판타지: ['판타지'],
+  스릴러: ['스릴러'],
+  코미디: ['코미디'],
+  로맨스: ['로맨스'],
+  SF: ['SF'],
+  드라마: ['드라마'],
+  애니메이션: ['애니메이션'],
+  다큐멘터리: ['다큐멘터리'],
+  범죄: ['범죄'],
+  미스터리: ['미스터리'],
+  전쟁: ['전쟁'],
+  역사: ['역사'],
+  가족: ['가족'],
+  음악: ['음악'],
+  모험: ['모험'],
+  서부: ['서부'],
 };
 
 // TV contentType일 때 추가할 TV 전용 장르 매핑
 const TV_GENRE_EXPANSION: Record<string, string> = {
-  '액션': '액션 & 어드벤처',
-  '판타지': 'SF & 판타지',
-  'SF': 'SF & 판타지',
+  액션: '액션 & 어드벤처',
+  판타지: 'SF & 판타지',
+  SF: 'SF & 판타지',
 };
 
 @Injectable()
@@ -207,9 +237,7 @@ export class IntentAnalyzerService {
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY', '');
-    this.openai = apiKey
-      ? new OpenAI({ apiKey })
-      : null;
+    this.openai = apiKey ? new OpenAI({ apiKey }) : null;
   }
 
   async analyzeIntent(
@@ -243,7 +271,7 @@ export class IntentAnalyzerService {
         return { ...EMPTY_INTENT };
       }
 
-      const parsed: RawIntentResponse = JSON.parse(text);
+      const parsed = JSON.parse(text) as unknown;
       const intent = parseIntentResponse(parsed);
 
       // contentType 후처리: 메시지 키워드와 LLM 결과 교차 검증
@@ -266,9 +294,7 @@ export class IntentAnalyzerService {
 
       // "드라마"가 contentType=tv로 잡혔으면 genres에서 제거 (장르 Drama 필터 방지)
       if (intent.contentType === 'tv' && hasTvKeyword) {
-        intent.genres = intent.genres.filter(
-          (g) => !/^드라마$/i.test(g),
-        );
+        intent.genres = intent.genres.filter((g) => !/^드라마$/i.test(g));
       }
 
       // confidence 후처리: 코드에서 교차 검증
@@ -334,12 +360,18 @@ export class IntentAnalyzerService {
 
     // 인물명 제거 (intent에서 추출된 이름)
     for (const name of intent.personNames) {
-      cleaned = cleaned.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
+      cleaned = cleaned.replace(
+        new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+        '',
+      );
     }
 
     // 참조 작품명 제거 (intent에서 추출된 제목)
     for (const title of intent.referenceTitles) {
-      cleaned = cleaned.replace(new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
+      cleaned = cleaned.replace(
+        new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+        '',
+      );
     }
 
     // 국가 관련 표현 제거 (intent.countries에 값이 있을 때만)
@@ -375,7 +407,9 @@ export class IntentAnalyzerService {
         }
       }
       // 길이 역순 정렬 (긴 키워드부터 제거하여 부분 매칭 방지)
-      const sortedKeywords = [...genreKeywords].sort((a, b) => b.length - a.length);
+      const sortedKeywords = [...genreKeywords].sort(
+        (a, b) => b.length - a.length,
+      );
       for (const keyword of sortedKeywords) {
         const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         cleaned = cleaned.replace(new RegExp(escaped, 'g'), '');

@@ -21,7 +21,10 @@ export class WatchlistService {
   /**
    * Add content to watchlist (upsert pattern)
    */
-  async addToWatchlist(userId: number, dto: AddToWatchlistDto): Promise<Watchlist> {
+  async addToWatchlist(
+    userId: number,
+    dto: AddToWatchlistDto,
+  ): Promise<Watchlist> {
     // Ensure content exists in DB
     const content = await this.contentsService.findOrFetchByTmdbId(
       dto.tmdbId,
@@ -36,9 +39,12 @@ export class WatchlistService {
     if (existing) {
       // Update status
       existing.status = dto.status;
-      existing.watchedAt = dto.status === 'watched'
-        ? (dto.watchedAt ? new Date(dto.watchedAt) : new Date())
-        : null;
+      existing.watchedAt =
+        dto.status === 'watched'
+          ? dto.watchedAt
+            ? new Date(dto.watchedAt)
+            : new Date()
+          : null;
       return this.watchlistRepo.save(existing);
     }
 
@@ -47,9 +53,12 @@ export class WatchlistService {
       userId,
       contentId: content.id,
       status: dto.status,
-      watchedAt: dto.status === 'watched'
-        ? (dto.watchedAt ? new Date(dto.watchedAt) : new Date())
-        : null,
+      watchedAt:
+        dto.status === 'watched'
+          ? dto.watchedAt
+            ? new Date(dto.watchedAt)
+            : new Date()
+          : null,
     });
 
     return this.watchlistRepo.save(watchlist);
@@ -64,7 +73,13 @@ export class WatchlistService {
     status: 'watched' | 'want_to_watch',
     watchedAt?: string,
   ): Promise<Watchlist> {
-    return this.upsertByContentId(this.watchlistRepo, userId, contentId, status, watchedAt);
+    return this.upsertByContentId(
+      this.watchlistRepo,
+      userId,
+      contentId,
+      status,
+      watchedAt,
+    );
   }
 
   async addToWatchlistByContentIdWithManager(
@@ -100,7 +115,9 @@ export class WatchlistService {
     }
 
     if (item.userId !== userId) {
-      throw new ForbiddenException('본인의 워치리스트 항목만 수정할 수 있습니다.');
+      throw new ForbiddenException(
+        '본인의 워치리스트 항목만 수정할 수 있습니다.',
+      );
     }
 
     if (dto.status) {
@@ -120,7 +137,10 @@ export class WatchlistService {
   /**
    * Remove from watchlist
    */
-  async removeFromWatchlist(userId: number, watchlistId: number): Promise<void> {
+  async removeFromWatchlist(
+    userId: number,
+    watchlistId: number,
+  ): Promise<void> {
     const item = await this.watchlistRepo.findOne({
       where: { id: watchlistId },
     });
@@ -130,7 +150,9 @@ export class WatchlistService {
     }
 
     if (item.userId !== userId) {
-      throw new ForbiddenException('본인의 워치리스트 항목만 수정할 수 있습니다.');
+      throw new ForbiddenException(
+        '본인의 워치리스트 항목만 수정할 수 있습니다.',
+      );
     }
 
     await this.watchlistRepo.remove(item);
@@ -162,15 +184,10 @@ export class WatchlistService {
         'review',
         'review.userId = w.userId AND review.contentId = w.contentId',
       );
-      qb.loadRelationCountAndMap(
-        'review.commentsCount',
-        'review.comments',
-      );
+      qb.loadRelationCountAndMap('review.commentsCount', 'review.comments');
     }
 
-    qb.orderBy('w.updatedAt', 'DESC')
-      .skip(skip)
-      .take(take);
+    qb.orderBy('w.updatedAt', 'DESC').skip(skip).take(take);
 
     const [items, total] = await qb.getManyAndCount();
 
@@ -220,11 +237,14 @@ export class WatchlistService {
   async getWatchedYears(userId: number): Promise<{ years: number[] }> {
     const result = await this.watchlistRepo
       .createQueryBuilder('w')
-      .select('DISTINCT EXTRACT(YEAR FROM COALESCE(w.watchedAt, w.updatedAt))', 'year')
+      .select(
+        'DISTINCT EXTRACT(YEAR FROM COALESCE(w.watchedAt, w.updatedAt))',
+        'year',
+      )
       .where('w.userId = :userId', { userId })
       .andWhere('w.status = :status', { status: 'watched' })
       .orderBy('year', 'DESC')
-      .getRawMany();
+      .getRawMany<{ year: string }>();
 
     const years = result.map((r) => parseInt(r.year, 10));
     return { years };
@@ -248,22 +268,17 @@ export class WatchlistService {
       )
       .where('w.userId = :userId', { userId })
       .andWhere('w.status = :status', { status: 'watched' })
-      .andWhere(
-        'COALESCE(w.watchedAt, w.updatedAt) >= :startDate',
-        { startDate },
-      )
-      .andWhere(
-        'COALESCE(w.watchedAt, w.updatedAt) < :endDate',
-        { endDate },
-      );
+      .andWhere('COALESCE(w.watchedAt, w.updatedAt) >= :startDate', {
+        startDate,
+      })
+      .andWhere('COALESCE(w.watchedAt, w.updatedAt) < :endDate', { endDate });
 
-    qb.loadRelationCountAndMap(
-      'review.commentsCount',
-      'review.comments',
+    qb.loadRelationCountAndMap('review.commentsCount', 'review.comments');
+
+    qb.orderBy('COALESCE(w.watchedAt, w.updatedAt)', 'DESC').addOrderBy(
+      'w.id',
+      'DESC',
     );
-
-    qb.orderBy('COALESCE(w.watchedAt, w.updatedAt)', 'DESC')
-      .addOrderBy('w.id', 'DESC');
 
     const items = await qb.getMany();
 
@@ -342,9 +357,12 @@ export class WatchlistService {
       where: { userId, contentId },
     });
 
-    const resolvedDate = status === 'watched'
-      ? (watchedAt ? new Date(watchedAt) : new Date())
-      : null;
+    const resolvedDate =
+      status === 'watched'
+        ? watchedAt
+          ? new Date(watchedAt)
+          : new Date()
+        : null;
 
     if (existing) {
       existing.status = status;

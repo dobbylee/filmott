@@ -40,7 +40,11 @@ export class ReviewCommentsService {
     return this.commentRepo.save(comment);
   }
 
-  async delete(userId: number, commentId: number, userRole?: string): Promise<void> {
+  async delete(
+    userId: number,
+    commentId: number,
+    userRole?: string,
+  ): Promise<void> {
     const comment = await this.commentRepo.findOne({
       where: { id: commentId },
     });
@@ -62,7 +66,13 @@ export class ReviewCommentsService {
     const [comments, total] = await this.commentRepo
       .createQueryBuilder('comment')
       .leftJoin('comment.user', 'user')
-      .addSelect(['user.id', 'user.nickname', 'user.email', 'user.profileImage', 'user.status'])
+      .addSelect([
+        'user.id',
+        'user.nickname',
+        'user.email',
+        'user.profileImage',
+        'user.status',
+      ])
       .where('comment.reviewId = :reviewId', { reviewId })
       .orderBy('comment.createdAt', 'ASC')
       .skip(skip)

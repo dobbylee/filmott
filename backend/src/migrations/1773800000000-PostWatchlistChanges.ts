@@ -102,7 +102,9 @@ export class PostWatchlistChanges1773800000000 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     // 역순 DROP
     // 6. chat_messages
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_chat_messages_session";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_chat_messages_session";`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "chat_messages";`);
 
     // 5. chat_sessions
@@ -110,21 +112,31 @@ export class PostWatchlistChanges1773800000000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "chat_sessions";`);
 
     // 4. subscribedOtts
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "subscribed_otts";`);
+    await queryRunner.query(
+      `ALTER TABLE "users" DROP COLUMN IF EXISTS "subscribed_otts";`,
+    );
 
     // 3. profileImage
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "profile_image";`);
+    await queryRunner.query(
+      `ALTER TABLE "users" DROP COLUMN IF EXISTS "profile_image";`,
+    );
 
     // 2. 소셜 로그인
     await queryRunner.query(`
       ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "UQ_users_provider_provider_id";
     `);
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "provider_id";`);
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "provider";`);
+    await queryRunner.query(
+      `ALTER TABLE "users" DROP COLUMN IF EXISTS "provider_id";`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" DROP COLUMN IF EXISTS "provider";`,
+    );
     await queryRunner.query(`DROP TYPE IF EXISTS "auth_provider_enum";`);
 
     // 1. refresh_tokens
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_refresh_tokens_expires";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_refresh_tokens_expires";`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_refresh_tokens_user";`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_refresh_tokens_token";`);
     await queryRunner.query(`DROP TABLE IF EXISTS "refresh_tokens";`);

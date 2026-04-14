@@ -51,7 +51,9 @@ describe('NaverService', () => {
 
       expect(url).toContain('https://nid.naver.com/oauth2.0/authorize');
       expect(url).toContain('client_id=test-naver-client-id');
-      expect(url).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fauth%2Fnaver%2Fcallback');
+      expect(url).toContain(
+        'redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fauth%2Fnaver%2Fcallback',
+      );
       expect(url).toContain('response_type=code');
       expect(url).toContain(`state=${state}`);
     });

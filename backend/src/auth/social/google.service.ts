@@ -31,8 +31,12 @@ export class GoogleService {
     private readonly httpService: HttpService,
   ) {
     this.clientId = this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID');
-    this.clientSecret = this.configService.getOrThrow<string>('GOOGLE_CLIENT_SECRET');
-    this.callbackUrl = this.configService.getOrThrow<string>('GOOGLE_CALLBACK_URL');
+    this.clientSecret = this.configService.getOrThrow<string>(
+      'GOOGLE_CLIENT_SECRET',
+    );
+    this.callbackUrl = this.configService.getOrThrow<string>(
+      'GOOGLE_CALLBACK_URL',
+    );
   }
 
   getAuthUrl(state: string): string {
@@ -71,7 +75,9 @@ export class GoogleService {
       );
       return data;
     } catch {
-      throw new InternalServerErrorException('Google 토큰 교환에 실패했습니다.');
+      throw new InternalServerErrorException(
+        'Google 토큰 교환에 실패했습니다.',
+      );
     }
   }
 
@@ -93,7 +99,9 @@ export class GoogleService {
         profileImage: data.picture ?? null,
       };
     } catch {
-      throw new InternalServerErrorException('Google 사용자 정보 조회에 실패했습니다.');
+      throw new InternalServerErrorException(
+        'Google 사용자 정보 조회에 실패했습니다.',
+      );
     }
   }
 }

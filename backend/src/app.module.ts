@@ -39,9 +39,9 @@ import { ChatModule } from './chat/chat.module';
         extra: {
           options: '-c timezone=Asia/Seoul',
           // pg-pool 설정
-          max: 50,                       // 최대 커넥션 수 (기본 10 -> 50)
-          min: 5,                        // 최소 유휴 커넥션
-          idleTimeoutMillis: 30000,      // 유휴 커넥션 30초 후 해제
+          max: 50, // 최대 커넥션 수 (기본 10 -> 50)
+          min: 5, // 최소 유휴 커넥션
+          idleTimeoutMillis: 30000, // 유휴 커넥션 30초 후 해제
           connectionTimeoutMillis: 5000, // 커넥션 획득 대기 최대 5초
         },
       }),

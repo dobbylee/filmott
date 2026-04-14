@@ -17,7 +17,9 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 if (!ADMIN_NICKNAME || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
-  console.error('환경변수 ADMIN_NICKNAME, ADMIN_EMAIL, ADMIN_PASSWORD가 필요합니다.');
+  console.error(
+    '환경변수 ADMIN_NICKNAME, ADMIN_EMAIL, ADMIN_PASSWORD가 필요합니다.',
+  );
   process.exit(1);
 }
 
@@ -33,13 +35,16 @@ async function seed() {
 
   await ds.initialize();
 
-  const existing = await ds.query(
+  const existingResult: unknown = await ds.query(
     `SELECT id FROM users WHERE email = $1 AND role = 'ADMIN'`,
     [ADMIN_EMAIL],
   );
+  const existing = existingResult as Array<{ id: number }>;
 
   if (existing.length > 0) {
-    console.log(`ADMIN 계정이 이미 존재합니다 (id: ${existing[0].id}). 스킵합니다.`);
+    console.log(
+      `ADMIN 계정이 이미 존재합니다 (id: ${existing[0].id}). 스킵합니다.`,
+    );
     await ds.destroy();
     return;
   }

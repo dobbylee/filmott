@@ -17,7 +17,8 @@ import { UserPreference } from './user-preference';
 // extractUserPreference mock
 const mockExtractUserPreference = jest.fn<UserPreference, []>();
 jest.mock('./user-preference', () => ({
-  extractUserPreference: (...args: unknown[]) => mockExtractUserPreference(...(args as [])),
+  extractUserPreference: (...args: unknown[]) =>
+    mockExtractUserPreference(...(args as [])),
   enrichQueryWithPreference: (query: string) => query,
 }));
 
@@ -125,12 +126,24 @@ describe('ChatService', () => {
     it('사용자 컨텍스트를 올바르게 구성해야 한다', async () => {
       const favoritesQb = mockQueryBuilder();
       favoritesQb.getRawMany.mockResolvedValue([
-        { title: '기생충', releaseDate: '2019-05-30', genres: '드라마, 스릴러', rating: 10, originCountry: 'KR' },
+        {
+          title: '기생충',
+          releaseDate: '2019-05-30',
+          genres: '드라마, 스릴러',
+          rating: 10,
+          originCountry: 'KR',
+        },
       ]);
 
       const dislikedQb = mockQueryBuilder();
       dislikedQb.getRawMany.mockResolvedValue([
-        { title: '영화X', releaseDate: '2020-01-01', genres: '액션', rating: 2, originCountry: 'US' },
+        {
+          title: '영화X',
+          releaseDate: '2020-01-01',
+          genres: '액션',
+          rating: 2,
+          originCountry: 'US',
+        },
       ]);
 
       const genreStatsQb = mockQueryBuilder();
@@ -139,13 +152,16 @@ describe('ChatService', () => {
       ]);
 
       const watchedTmdbIdsQb = mockQueryBuilder();
-      watchedTmdbIdsQb.getRawMany.mockResolvedValue([
-        { tmdbId: 496243 },
-      ]);
+      watchedTmdbIdsQb.getRawMany.mockResolvedValue([{ tmdbId: 496243 }]);
 
       const wantToWatchQb = mockQueryBuilder();
       wantToWatchQb.getRawMany.mockResolvedValue([
-        { title: '인셉션', releaseDate: '2010-07-16', genres: 'SF, 액션', originCountry: 'US' },
+        {
+          title: '인셉션',
+          releaseDate: '2010-07-16',
+          genres: 'SF, 액션',
+          originCountry: 'US',
+        },
       ]);
 
       const watchedGenresQb = mockQueryBuilder();
@@ -253,10 +269,17 @@ describe('ChatService', () => {
 
       mockReviewRepo.createQueryBuilder.mockReturnValue(emptyQb);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(emptyQb);
-      mockUserRepo.findOne.mockResolvedValue({ id: 1, subscribedOtts: ['netflix'] });
+      mockUserRepo.findOne.mockResolvedValue({
+        id: 1,
+        subscribedOtts: ['netflix'],
+      });
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent });
-      mockIntentAnalyzerService.buildSemanticQuery.mockImplementation((query: string) => query);
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockImplementation(
+        (query: string) => query,
+      );
       mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference });
     };
 
@@ -283,8 +306,18 @@ describe('ChatService', () => {
 
       // OpenAI 스트리밍 mock: 볼드 제목을 포함한 텍스트만
       const chunks = [
-        { choices: [{ delta: { content: '좋은 영화를 추천해 드릴게요!\n\n' } }] },
-        { choices: [{ delta: { content: '**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.' } }] },
+        {
+          choices: [{ delta: { content: '좋은 영화를 추천해 드릴게요!\n\n' } }],
+        },
+        {
+          choices: [
+            {
+              delta: {
+                content: '**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.',
+              },
+            },
+          ],
+        },
       ];
 
       mockStreamCreate.mockResolvedValue({
@@ -305,12 +338,18 @@ describe('ChatService', () => {
       // text 이벤트 확인
       const textEvents = emittedEvents.filter((e) => e.event === 'text');
       expect(textEvents.length).toBeGreaterThan(0);
-      expect((textEvents[0].data as { content: string }).content).toContain('좋은 영화');
+      expect((textEvents[0].data as { content: string }).content).toContain(
+        '좋은 영화',
+      );
 
       // recommendations 이벤트 확인 (후보 매칭 성공 시)
-      const recEvents = emittedEvents.filter((e) => e.event === 'recommendations');
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
       expect(recEvents).toHaveLength(1);
-      const recs = (recEvents[0].data as { recommendations: { tmdbId: number }[] }).recommendations;
+      const recs = (
+        recEvents[0].data as { recommendations: { tmdbId: number }[] }
+      ).recommendations;
       expect(recs[0].tmdbId).toBe(496243);
 
       // done 이벤트 확인
@@ -341,7 +380,9 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '안녕', [], emit);
 
-      const recEvents = emittedEvents.filter((e) => e.event === 'recommendations');
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
       expect(recEvents).toHaveLength(0);
 
       const doneEvents = emittedEvents.filter((e) => e.event === 'done');
@@ -371,14 +412,23 @@ describe('ChatService', () => {
           ChatService,
           { provide: EmbeddingService, useValue: mockEmbeddingService },
           { provide: ContentSearchService, useValue: mockContentSearchService },
-          { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
+          {
+            provide: IntentAnalyzerService,
+            useValue: mockIntentAnalyzerService,
+          },
           { provide: ContentsService, useValue: mockContentsService },
-          { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
+          {
+            provide: getRepositoryToken(Watchlist),
+            useValue: mockWatchlistRepo,
+          },
           { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
           { provide: getRepositoryToken(User), useValue: mockUserRepo },
           { provide: getRepositoryToken(Content), useValue: mockContentRepo },
           { provide: DataSource, useValue: mockDataSource },
-          { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('') } },
+          {
+            provide: ConfigService,
+            useValue: { get: jest.fn().mockReturnValue('') },
+          },
         ],
       }).compile();
 
@@ -429,7 +479,10 @@ describe('ChatService', () => {
           messages: expect.arrayContaining([
             expect.objectContaining({ role: 'system' }),
             expect.objectContaining({ role: 'user', content: '이전 질문' }),
-            expect.objectContaining({ role: 'assistant', content: '이전 답변' }),
+            expect.objectContaining({
+              role: 'assistant',
+              content: '이전 답변',
+            }),
             expect.objectContaining({ role: 'user', content: '새 질문' }),
           ]),
         }),
@@ -444,7 +497,9 @@ describe('ChatService', () => {
         ottProviderNames: ['Netflix'],
         confidence: 'high',
       });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('볼만한 영화');
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
+        '볼만한 영화',
+      );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -453,7 +508,12 @@ describe('ChatService', () => {
         },
       });
 
-      await service.sendMessageStream(1, '넷플릭스에서 볼만한 영화', [], jest.fn());
+      await service.sendMessageStream(
+        1,
+        '넷플릭스에서 볼만한 영화',
+        [],
+        jest.fn(),
+      );
 
       expect(mockIntentAnalyzerService.analyzeIntent).toHaveBeenCalled();
       expect(mockIntentAnalyzerService.buildSemanticQuery).toHaveBeenCalled();
@@ -469,8 +529,13 @@ describe('ChatService', () => {
 
     it('confidence=low + 신규 유저 메시지는 EmbeddingService.searchSimilar를 호출해야 한다', async () => {
       setupEmptyUserContext();
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent, confidence: 'low' });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('재미있는 영화');
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        confidence: 'low',
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
+        '재미있는 영화',
+      );
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -479,7 +544,12 @@ describe('ChatService', () => {
         },
       });
 
-      await service.sendMessageStream(1, '재미있는 영화 추천해줘', [], jest.fn());
+      await service.sendMessageStream(
+        1,
+        '재미있는 영화 추천해줘',
+        [],
+        jest.fn(),
+      );
 
       expect(mockIntentAnalyzerService.analyzeIntent).toHaveBeenCalled();
       expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
@@ -512,7 +582,12 @@ describe('ChatService', () => {
         },
       });
 
-      await service.sendMessageStream(1, '봉준호 감독의 최신 한국 영화', [], jest.fn());
+      await service.sendMessageStream(
+        1,
+        '봉준호 감독의 최신 한국 영화',
+        [],
+        jest.fn(),
+      );
 
       expect(mockIntentAnalyzerService.buildSemanticQuery).toHaveBeenCalledWith(
         expect.any(String),
@@ -542,7 +617,9 @@ describe('ChatService', () => {
         personNames: ['봉준호'],
         confidence: 'high',
       });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('사회 풍자 영화');
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
+        '사회 풍자 영화',
+      );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -605,7 +682,9 @@ describe('ChatService', () => {
         dateRange: { from: null, to: '1999-12-31' },
         confidence: 'high',
       });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('90년대 이전 영화');
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
+        '90년대 이전 영화',
+      );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -636,7 +715,9 @@ describe('ChatService', () => {
         contentType: 'movie',
         confidence: 'high',
       });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('무서운 영화');
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
+        '무서운 영화',
+      );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -645,7 +726,12 @@ describe('ChatService', () => {
         },
       });
 
-      await service.sendMessageStream(1, '호러 스릴러 영화 추천해줘', [], jest.fn());
+      await service.sendMessageStream(
+        1,
+        '호러 스릴러 영화 추천해줘',
+        [],
+        jest.fn(),
+      );
 
       expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
         '무서운 영화',
@@ -662,15 +748,21 @@ describe('ChatService', () => {
 
     it('confidence=low + 유저 데이터 있음: 유저 선호만으로 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
+      mockExtractUserPreference.mockReturnValue({
+        ...defaultEmptyPreference,
         ...defaultEmptyPreference,
         preferredGenres: ['드라마', '스릴러'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
         hasData: true,
       });
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent, confidence: 'low' });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('잔잔한 영화');
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        confidence: 'low',
+      });
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
+        '잔잔한 영화',
+      );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -679,7 +771,12 @@ describe('ChatService', () => {
         },
       });
 
-      await service.sendMessageStream(1, '비 오는 날에 볼 만한 잔잔한 영화', [], jest.fn());
+      await service.sendMessageStream(
+        1,
+        '비 오는 날에 볼 만한 잔잔한 영화',
+        [],
+        jest.fn(),
+      );
 
       // confidence=low이므로 intent 필터를 스킵하고 유저 선호만 전달
       expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
@@ -698,7 +795,8 @@ describe('ChatService', () => {
 
     it('필터 있음: 명시적 필터가 유저 선호보다 우선해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
+      mockExtractUserPreference.mockReturnValue({
+        ...defaultEmptyPreference,
         preferredGenres: ['드라마'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
@@ -710,7 +808,9 @@ describe('ChatService', () => {
         countries: ['US'],
         confidence: 'high',
       });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('히어로 영화');
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
+        '히어로 영화',
+      );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -719,9 +819,15 @@ describe('ChatService', () => {
         },
       });
 
-      await service.sendMessageStream(1, '디즈니플러스 미국 히어로 영화', [], jest.fn());
+      await service.sendMessageStream(
+        1,
+        '디즈니플러스 미국 히어로 영화',
+        [],
+        jest.fn(),
+      );
 
-      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      const calledFilters =
+        mockContentSearchService.searchWithFilters.mock.calls[0][3];
       // 명시적 필터가 있는 필드에는 유저 선호가 합쳐지지 않는다
       expect(calledFilters.ottProviderNames).toEqual(['Disney Plus']);
       expect(calledFilters.countries).toEqual(['US']);
@@ -732,7 +838,8 @@ describe('ChatService', () => {
 
     it('명시적 OTT 필터 있음: 유저 장르/국가 선호는 WHERE 필터에 합쳐져야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
+      mockExtractUserPreference.mockReturnValue({
+        ...defaultEmptyPreference,
         preferredGenres: ['드라마', '로맨스'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
@@ -743,7 +850,9 @@ describe('ChatService', () => {
         ottProviderNames: ['Tving'],
         confidence: 'high',
       });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('로맨스 영화');
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
+        '로맨스 영화',
+      );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -754,7 +863,8 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '티빙에서 볼만한 영화', [], jest.fn());
 
-      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      const calledFilters =
+        mockContentSearchService.searchWithFilters.mock.calls[0][3];
       // 명시적 OTT(Tving)가 유저 구독 OTT(Netflix)를 덮어야 한다
       expect(calledFilters.ottProviderNames).toEqual(['Tving']);
       // 명시적 필터가 없는 장르/국가는 유저 선호가 WHERE 필터로 합쳐져야 한다
@@ -764,13 +874,17 @@ describe('ChatService', () => {
 
     it('confidence=low + 유저 OTT 구독만 있고 장르/국가 선호 없는 경우 OTT 필터만 적용해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
+      mockExtractUserPreference.mockReturnValue({
+        ...defaultEmptyPreference,
         preferredGenres: [],
         preferredCountries: [],
         ottProviderNames: ['wavve'],
         hasData: true,
       });
-      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({ ...emptyIntent, confidence: 'low' });
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        confidence: 'low',
+      });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('추천 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
@@ -780,9 +894,15 @@ describe('ChatService', () => {
         },
       });
 
-      await service.sendMessageStream(1, '오늘 볼 영화 추천해줘', [], jest.fn());
+      await service.sendMessageStream(
+        1,
+        '오늘 볼 영화 추천해줘',
+        [],
+        jest.fn(),
+      );
 
-      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      const calledFilters =
+        mockContentSearchService.searchWithFilters.mock.calls[0][3];
       // confidence=low이므로 유저 선호만 적용
       expect(calledFilters.ottProviderNames).toEqual(['wavve']);
       expect(calledFilters.genres).toBeUndefined();
@@ -792,7 +912,8 @@ describe('ChatService', () => {
 
     it('confidence=high이면 의도 필터 우선으로 ContentSearchService를 호출해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
+      mockExtractUserPreference.mockReturnValue({
+        ...defaultEmptyPreference,
         preferredGenres: ['로맨스'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
@@ -804,7 +925,9 @@ describe('ChatService', () => {
         countries: ['US'],
         confidence: 'high',
       });
-      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('미국 액션 SF');
+      mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
+        '미국 액션 SF',
+      );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
       mockStreamCreate.mockResolvedValue({
@@ -813,9 +936,15 @@ describe('ChatService', () => {
         },
       });
 
-      await service.sendMessageStream(1, '미국 액션 SF 영화 추천해줘', [], jest.fn());
+      await service.sendMessageStream(
+        1,
+        '미국 액션 SF 영화 추천해줘',
+        [],
+        jest.fn(),
+      );
 
-      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      const calledFilters =
+        mockContentSearchService.searchWithFilters.mock.calls[0][3];
       // confidence=high: 의도 필터가 우선, 유저 선호는 빈 필드에만 합산
       expect(calledFilters.genres).toEqual(['액션', 'SF']);
       expect(calledFilters.countries).toEqual(['US']);
@@ -826,7 +955,8 @@ describe('ChatService', () => {
 
     it('confidence=low이면 의도 필터를 스킵하고 유저 선호만으로 검색해야 한다', async () => {
       setupEmptyUserContext();
-      mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference,
+      mockExtractUserPreference.mockReturnValue({
+        ...defaultEmptyPreference,
         preferredGenres: ['드라마'],
         preferredCountries: ['KR'],
         ottProviderNames: ['Netflix'],
@@ -849,7 +979,8 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '뭐 볼까', [], jest.fn());
 
-      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      const calledFilters =
+        mockContentSearchService.searchWithFilters.mock.calls[0][3];
       // confidence=low: 의도 필터(genres: ['액션'])를 스킵, 유저 선호만 사용
       expect(calledFilters.genres).toEqual(['드라마']);
       expect(calledFilters.countries).toEqual(['KR']);
@@ -906,7 +1037,8 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '영화 추천해줘', [], jest.fn());
 
-      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      const calledFilters =
+        mockContentSearchService.searchWithFilters.mock.calls[0][3];
       expect(calledFilters.excludeGenres).toEqual(['공포', '스릴러']);
     });
 
@@ -937,7 +1069,8 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '공포 영화 추천해줘', [], jest.fn());
 
-      const calledFilters = mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      const calledFilters =
+        mockContentSearchService.searchWithFilters.mock.calls[0][3];
       // '공포'는 명시적 요청 장르이므로 excludeGenres에서 제거
       expect(calledFilters.genres).toEqual(['공포']);
       expect(calledFilters.excludeGenres).toEqual(['스릴러']);
@@ -946,7 +1079,8 @@ describe('ChatService', () => {
 
   describe('extractTitlesFromText', () => {
     it('볼드 제목을 올바르게 추출해야 한다', () => {
-      const text = '**기생충 (Parasite)** — 봉준호 감독 걸작.\n**인셉션 (Inception)** — 꿈 속의 꿈.';
+      const text =
+        '**기생충 (Parasite)** — 봉준호 감독 걸작.\n**인셉션 (Inception)** — 꿈 속의 꿈.';
       const result = service.extractTitlesFromText(text);
 
       expect(result).toHaveLength(2);
@@ -966,7 +1100,8 @@ describe('ChatService', () => {
     });
 
     it('최대 5개까지만 추출해야 한다', () => {
-      const text = '**작품1** **작품2** **작품3** **작품4** **작품5** **작품6**';
+      const text =
+        '**작품1** **작품2** **작품3** **작품4** **작품5** **작품6**';
       const result = service.extractTitlesFromText(text);
 
       expect(result).toHaveLength(5);
@@ -985,7 +1120,8 @@ describe('ChatService', () => {
     });
 
     it('3자 미만의 볼드 텍스트는 무시해야 한다', () => {
-      const text = '**AB** 이것은 제목이 아닙니다. **기생충** 이것은 제목입니다.';
+      const text =
+        '**AB** 이것은 제목이 아닙니다. **기생충** 이것은 제목입니다.';
       const result = service.extractTitlesFromText(text);
 
       expect(result).toHaveLength(1);
@@ -1027,7 +1163,10 @@ describe('ChatService', () => {
 
     it('한국어 제목으로 후보를 정확 매칭해야 한다', () => {
       const titles = [{ korean: '기생충', english: 'Parasite' }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(titles, candidates);
+      const { matched, unmatched } = service.matchTitlesToCandidates(
+        titles,
+        candidates,
+      );
 
       expect(matched).toHaveLength(1);
       expect(matched[0].tmdbId).toBe(496243);
@@ -1038,7 +1177,10 @@ describe('ChatService', () => {
 
     it('영어 원제로 후보를 정확 매칭해야 한다', () => {
       const titles = [{ korean: '인셉션', english: 'Inception' }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(titles, candidates);
+      const { matched, unmatched } = service.matchTitlesToCandidates(
+        titles,
+        candidates,
+      );
 
       expect(matched).toHaveLength(1);
       expect(matched[0].tmdbId).toBe(27205);
@@ -1063,7 +1205,10 @@ describe('ChatService', () => {
         },
       ];
       const titles = [{ korean: '오징어 게임', english: null }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(titles, candidatesWithSeason);
+      const { matched, unmatched } = service.matchTitlesToCandidates(
+        titles,
+        candidatesWithSeason,
+      );
 
       expect(matched).toHaveLength(1);
       expect(matched[0].tmdbId).toBe(12345);
@@ -1072,7 +1217,10 @@ describe('ChatService', () => {
 
     it('매칭 실패 시 unmatched에 포함해야 한다', () => {
       const titles = [{ korean: '존재하지 않는 영화', english: null }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(titles, candidates);
+      const { matched, unmatched } = service.matchTitlesToCandidates(
+        titles,
+        candidates,
+      );
 
       expect(matched).toHaveLength(0);
       expect(unmatched).toHaveLength(1);
@@ -1080,7 +1228,10 @@ describe('ChatService', () => {
     });
 
     it('빈 titles이면 matched/unmatched 모두 빈 배열이어야 한다', () => {
-      const { matched, unmatched } = service.matchTitlesToCandidates([], candidates);
+      const { matched, unmatched } = service.matchTitlesToCandidates(
+        [],
+        candidates,
+      );
 
       expect(matched).toEqual([]);
       expect(unmatched).toEqual([]);
@@ -1088,7 +1239,10 @@ describe('ChatService', () => {
 
     it('빈 candidates이면 모두 unmatched가 되어야 한다', () => {
       const titles = [{ korean: '기생충', english: null }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(titles, []);
+      const { matched, unmatched } = service.matchTitlesToCandidates(
+        titles,
+        [],
+      );
 
       expect(matched).toHaveLength(0);
       expect(unmatched).toHaveLength(1);
@@ -1114,8 +1268,12 @@ describe('ChatService', () => {
       mockUserRepo.findOne.mockResolvedValue({ id: 1, subscribedOtts: [] });
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
       mockExtractUserPreference.mockReturnValue({
-        preferredGenres: [], preferredCountries: [], ottProviderNames: [], hasData: false,
-        excludeGenres: [], excludePersonNames: [],
+        preferredGenres: [],
+        preferredCountries: [],
+        ottProviderNames: [],
+        hasData: false,
+        excludeGenres: [],
+        excludePersonNames: [],
       });
       mockStreamCreate.mockResolvedValue({
         [Symbol.asyncIterator]: async function* () {
@@ -1129,16 +1287,25 @@ describe('ChatService', () => {
 
       const fakeEmbedding = [0.1, 0.2, 0.3];
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
-        ottProviderNames: [], countries: [], excludeCountries: [],
-        personNames: [], referenceTitles: ['기생충'],
-        dateRange: null, contentType: 'movie', genres: [],
+        ottProviderNames: [],
+        countries: [],
+        excludeCountries: [],
+        personNames: [],
+        referenceTitles: ['기생충'],
+        dateRange: null,
+        contentType: 'movie',
+        genres: [],
         confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
 
       // DB에서 임베딩 찾음
       mockDataSource.query.mockResolvedValue([
-        { content_id: 1, tmdb_id: 496243, embedding: JSON.stringify(fakeEmbedding) },
+        {
+          content_id: 1,
+          tmdb_id: 496243,
+          embedding: JSON.stringify(fakeEmbedding),
+        },
       ]);
 
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
@@ -1153,7 +1320,9 @@ describe('ChatService', () => {
 
       // precomputedEmbedding이 searchWithFilters에 전달됨
       expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
-        expect.any(String), 20, expect.any(Array),
+        expect.any(String),
+        20,
+        expect.any(Array),
         expect.any(Object),
         fakeEmbedding,
       );
@@ -1164,9 +1333,14 @@ describe('ChatService', () => {
 
       const fakeEmbedding = [0.4, 0.5, 0.6];
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
-        ottProviderNames: [], countries: [], excludeCountries: [],
-        personNames: [], referenceTitles: ['영야성하'],
-        dateRange: null, contentType: 'tv', genres: [],
+        ottProviderNames: [],
+        countries: [],
+        excludeCountries: [],
+        personNames: [],
+        referenceTitles: ['영야성하'],
+        dateRange: null,
+        contentType: 'tv',
+        genres: [],
         confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
@@ -1179,7 +1353,10 @@ describe('ChatService', () => {
         .mockResolvedValueOnce({ results: [] }) // movie 검색 실패
         .mockResolvedValueOnce({ results: [{ id: 12345 }] }); // tv 검색 성공
 
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 100, tmdbId: 12345 });
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 100,
+        tmdbId: 12345,
+      });
       mockEmbeddingService.cacheContentMetadata.mockResolvedValue({
         embedding: JSON.stringify(fakeEmbedding),
       });
@@ -1189,16 +1366,31 @@ describe('ChatService', () => {
       await service.sendMessageStream(1, '영야성하 같은 드라마', [], jest.fn());
 
       // TMDB 검색 호출 확인
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith('영야성하', 'movie', 1);
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith('영야성하', 'tv', 1);
+      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
+        '영야성하',
+        'movie',
+        1,
+      );
+      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
+        '영야성하',
+        'tv',
+        1,
+      );
 
       // findOrFetchByTmdbId + cacheContentMetadata 호출 확인
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(12345, 'tv');
-      expect(mockEmbeddingService.cacheContentMetadata).toHaveBeenCalledWith(100);
+      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
+        12345,
+        'tv',
+      );
+      expect(mockEmbeddingService.cacheContentMetadata).toHaveBeenCalledWith(
+        100,
+      );
 
       // precomputedEmbedding 전달 확인
       expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
-        expect.any(String), 20, expect.any(Array),
+        expect.any(String),
+        20,
+        expect.any(Array),
         expect.any(Object),
         fakeEmbedding,
       );
@@ -1208,9 +1400,14 @@ describe('ChatService', () => {
       setupForReferenceTest();
 
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
-        ottProviderNames: [], countries: [], excludeCountries: [],
-        personNames: [], referenceTitles: ['기생충'],
-        dateRange: null, contentType: null, genres: [],
+        ottProviderNames: [],
+        countries: [],
+        excludeCountries: [],
+        personNames: [],
+        referenceTitles: ['기생충'],
+        dateRange: null,
+        contentType: null,
+        genres: [],
         confidence: 'low',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
@@ -1224,7 +1421,8 @@ describe('ChatService', () => {
       await service.sendMessageStream(1, '기생충 같은 영화', [], jest.fn());
 
       // searchSimilar의 excludeTmdbIds에 496243이 포함되어야 함
-      const excludeArg = mockEmbeddingService.searchSimilar.mock.calls[0][2] as number[];
+      const excludeArg = mockEmbeddingService.searchSimilar.mock
+        .calls[0][2] as number[];
       expect(excludeArg).toContain(496243);
     });
   });

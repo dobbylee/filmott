@@ -8,7 +8,10 @@ const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000;
 const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const SOCIAL_SIGNUP_MAX_AGE = 5 * 60 * 1000;
 
-function createCookieOptions(isProduction: boolean, maxAge?: number): CookieOptions {
+function createCookieOptions(
+  isProduction: boolean,
+  maxAge?: number,
+): CookieOptions {
   return {
     httpOnly: true,
     sameSite: 'lax',
@@ -53,6 +56,9 @@ export function setSocialSignupCookie(
   );
 }
 
-export function clearSocialSignupCookie(res: Response, isProduction: boolean): void {
+export function clearSocialSignupCookie(
+  res: Response,
+  isProduction: boolean,
+): void {
   res.clearCookie(SOCIAL_SIGNUP_COOKIE, createCookieOptions(isProduction));
 }

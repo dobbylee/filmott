@@ -1,22 +1,27 @@
-import { UserContext, FavoriteContent, GenreStat, WantToWatchContent } from './prompts/system-prompt';
+import {
+  UserContext,
+  FavoriteContent,
+  GenreStat,
+  WantToWatchContent,
+} from './prompts/system-prompt';
 
 export interface UserPreference {
-  preferredGenres: string[];       // 상위 5개 선호 장르 (DB 장르명)
-  preferredCountries: string[];    // 선호 국가 ISO 코드 (상위 2개)
-  ottProviderNames: string[];      // 구독 OTT TMDB provider_name
-  hasData: boolean;                // 유저 데이터 존재 여부
-  excludeGenres: string[];         // 비선호 장르 (disliked 2회 이상)
-  excludePersonNames: string[];    // 비선호 감독 (disliked 2회 이상)
+  preferredGenres: string[]; // 상위 5개 선호 장르 (DB 장르명)
+  preferredCountries: string[]; // 선호 국가 ISO 코드 (상위 2개)
+  ottProviderNames: string[]; // 구독 OTT TMDB provider_name
+  hasData: boolean; // 유저 데이터 존재 여부
+  excludeGenres: string[]; // 비선호 장르 (disliked 2회 이상)
+  excludePersonNames: string[]; // 비선호 감독 (disliked 2회 이상)
 }
 
 // [동기화 주의] intent-analyzer.ts INTENT_SYSTEM_PROMPT의 OTT provider_name과 동일 유지
 const OTT_ID_TO_TMDB_NAME: Record<string, string> = {
-  'netflix': 'Netflix',
-  'disney_plus': 'Disney Plus',
-  'watcha': 'Watcha',
-  'wavve': 'wavve',
-  'tving': 'Tving',
-  'coupang_play': 'Coupang Play',
+  netflix: 'Netflix',
+  disney_plus: 'Disney Plus',
+  watcha: 'Watcha',
+  wavve: 'wavve',
+  tving: 'Tving',
+  coupang_play: 'Coupang Play',
 };
 
 const MAX_GENRES = 5;
@@ -51,11 +56,16 @@ function extractGenresFromWatchedGenres(watchedGenres: GenreStat[]): string[] {
 }
 
 // wantToWatch 작품의 장르 빈도 기반 추출
-function extractGenresFromWantToWatch(wantToWatch: WantToWatchContent[]): string[] {
+function extractGenresFromWantToWatch(
+  wantToWatch: WantToWatchContent[],
+): string[] {
   const genreCount = new Map<string, number>();
 
   for (const item of wantToWatch) {
-    const genres = item.genres.split(',').map((g) => g.trim()).filter(Boolean);
+    const genres = item.genres
+      .split(',')
+      .map((g) => g.trim())
+      .filter(Boolean);
     for (const genre of genres) {
       genreCount.set(genre, (genreCount.get(genre) ?? 0) + 1);
     }
@@ -69,7 +79,10 @@ function extractGenresFromFavorites(favorites: FavoriteContent[]): string[] {
   const genreCount = new Map<string, number>();
 
   for (const fav of favorites) {
-    const genres = fav.genres.split(',').map((g) => g.trim()).filter(Boolean);
+    const genres = fav.genres
+      .split(',')
+      .map((g) => g.trim())
+      .filter(Boolean);
     for (const genre of genres) {
       genreCount.set(genre, (genreCount.get(genre) ?? 0) + 1);
     }
@@ -85,7 +98,10 @@ function extractCountries(
 ): string[] {
   const countryCount = new Map<string, number>();
 
-  const sources: { originCountry: string | null }[] = [...favorites, ...wantToWatch];
+  const sources: { originCountry: string | null }[] = [
+    ...favorites,
+    ...wantToWatch,
+  ];
   for (const item of sources) {
     if (item.originCountry) {
       const countries = item.originCountry.split(',').map((c) => c.trim());
@@ -107,24 +123,31 @@ function extractExcludeGenres(
 ): string[] {
   const genreCount = new Map<string, number>();
   for (const item of disliked) {
-    const genres = item.genres.split(',').map((g) => g.trim()).filter(Boolean);
+    const genres = item.genres
+      .split(',')
+      .map((g) => g.trim())
+      .filter(Boolean);
     for (const genre of genres) {
       genreCount.set(genre, (genreCount.get(genre) ?? 0) + 1);
     }
   }
   return [...genreCount.entries()]
-    .filter(([genre, count]) => count >= MIN_DISLIKE_COUNT && !preferredGenres.includes(genre))
+    .filter(
+      ([genre, count]) =>
+        count >= MIN_DISLIKE_COUNT && !preferredGenres.includes(genre),
+    )
     .map(([genre]) => genre);
 }
 
 // disliked 작품에서 2회 이상 등장한 감독을 제외 대상으로 추출
-function extractExcludePersonNames(
-  disliked: FavoriteContent[],
-): string[] {
+function extractExcludePersonNames(disliked: FavoriteContent[]): string[] {
   const directorCount = new Map<string, number>();
   for (const item of disliked) {
     if (item.director) {
-      directorCount.set(item.director, (directorCount.get(item.director) ?? 0) + 1);
+      directorCount.set(
+        item.director,
+        (directorCount.get(item.director) ?? 0) + 1,
+      );
     }
   }
   return [...directorCount.entries()]
@@ -133,9 +156,7 @@ function extractExcludePersonNames(
 }
 
 // OTT_ID_TO_TMDB_NAME에 없으면 null (한국어명은 TMDB provider_name과 매칭 불가)
-function mapOttNames(
-  subscribedOtts: string[],
-): string[] {
+function mapOttNames(subscribedOtts: string[]): string[] {
   return subscribedOtts
     .map((id) => OTT_ID_TO_TMDB_NAME[id] ?? null)
     .filter((name): name is string => name !== null);
@@ -143,19 +164,30 @@ function mapOttNames(
 
 // ISO 코드 → 한국어 국가명 (임베딩 쿼리 보강용)
 const ISO_TO_KOREAN: Record<string, string> = {
-  'KR': '한국', 'US': '미국', 'JP': '일본', 'GB': '영국',
-  'FR': '프랑스', 'DE': '독일', 'CN': '중국', 'TW': '대만',
-  'HK': '홍콩', 'IN': '인도', 'ES': '스페인', 'IT': '이탈리아',
-  'CA': '캐나다', 'AU': '호주', 'TH': '태국',
+  KR: '한국',
+  US: '미국',
+  JP: '일본',
+  GB: '영국',
+  FR: '프랑스',
+  DE: '독일',
+  CN: '중국',
+  TW: '대만',
+  HK: '홍콩',
+  IN: '인도',
+  ES: '스페인',
+  IT: '이탈리아',
+  CA: '캐나다',
+  AU: '호주',
+  TH: '태국',
 };
 
 // TMDB provider_name → 한국어 OTT명 (임베딩 쿼리 보강용)
 const TMDB_NAME_TO_KOREAN: Record<string, string> = {
-  'Netflix': '넷플릭스',
+  Netflix: '넷플릭스',
   'Disney Plus': '디즈니플러스',
-  'Watcha': '왓챠',
-  'wavve': '웨이브',
-  'Tving': '티빙',
+  Watcha: '왓챠',
+  wavve: '웨이브',
+  Tving: '티빙',
   'Coupang Play': '쿠팡플레이',
 };
 
@@ -166,12 +198,19 @@ const TMDB_NAME_TO_KOREAN: Record<string, string> = {
 export function enrichQueryWithPreference(
   semanticQuery: string,
   userPref: UserPreference,
-  intent: { ottProviderNames: string[]; countries: string[]; excludeCountries: string[] },
+  intent: {
+    ottProviderNames: string[];
+    countries: string[];
+    excludeCountries: string[];
+  },
 ): string {
   const additions: string[] = [];
 
   // OTT: 명시적 OTT 요청 없을 때만 유저 구독 OTT 주입
-  if (intent.ottProviderNames.length === 0 && userPref.ottProviderNames.length > 0) {
+  if (
+    intent.ottProviderNames.length === 0 &&
+    userPref.ottProviderNames.length > 0
+  ) {
     const koreanOtt = userPref.ottProviderNames
       .map((name) => TMDB_NAME_TO_KOREAN[name])
       .filter(Boolean);
@@ -181,7 +220,11 @@ export function enrichQueryWithPreference(
   }
 
   // 국가: 명시적 국가/제외 요청 없을 때만 유저 선호 국가 주입
-  if (intent.countries.length === 0 && intent.excludeCountries.length === 0 && userPref.preferredCountries.length > 0) {
+  if (
+    intent.countries.length === 0 &&
+    intent.excludeCountries.length === 0 &&
+    userPref.preferredCountries.length > 0
+  ) {
     const koreanCountry = ISO_TO_KOREAN[userPref.preferredCountries[0]];
     if (koreanCountry) {
       additions.push(koreanCountry);
@@ -216,19 +259,24 @@ export function extractUserPreference(
     preferredGenres = extractGenresFromWantToWatch(context.wantToWatch);
   }
 
-  const preferredCountries = extractCountries(context.favorites, context.wantToWatch);
+  const preferredCountries = extractCountries(
+    context.favorites,
+    context.wantToWatch,
+  );
 
   const ottProviderNames = mapOttNames(subscribedOtts);
 
-  const hasData = context.genreStats.length > 0
-    || context.favorites.length > 0
-    || context.watchedGenres.length > 0
-    || context.wantToWatch.length > 0
-    || subscribedOtts.length > 0;
+  const hasData =
+    context.genreStats.length > 0 ||
+    context.favorites.length > 0 ||
+    context.watchedGenres.length > 0 ||
+    context.wantToWatch.length > 0 ||
+    subscribedOtts.length > 0;
 
   const excludeGenres = extractExcludeGenres(context.disliked, preferredGenres);
-  const excludePersonNames = extractExcludePersonNames(context.disliked)
-    .filter((name) => !intentPersonNames.includes(name));
+  const excludePersonNames = extractExcludePersonNames(context.disliked).filter(
+    (name) => !intentPersonNames.includes(name),
+  );
 
   return {
     preferredGenres,

@@ -19,7 +19,7 @@ import { UpdateReviewDto } from './dto/update-review.dto';
 import { CreateReviewCommentDto } from './dto/create-review-comment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import type{ JwtPayload } from '../auth/decorators/current-user.decorator';
+import type { JwtPayload } from '../auth/decorators/current-user.decorator';
 
 @Controller('reviews')
 export class ReviewsController {
@@ -28,7 +28,11 @@ export class ReviewsController {
     private readonly reviewCommentsService: ReviewCommentsService,
   ) {}
 
-  private parseIntOrDefault(value: string | undefined, defaultValue: number, name: string): number {
+  private parseIntOrDefault(
+    value: string | undefined,
+    defaultValue: number,
+    name: string,
+  ): number {
     if (value === undefined || value === '') return defaultValue;
     const parsed = parseInt(value, 10);
     if (isNaN(parsed)) {
@@ -41,10 +45,7 @@ export class ReviewsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  async create(
-    @CurrentUser() user: JwtPayload,
-    @Body() dto: CreateReviewDto,
-  ) {
+  async create(@CurrentUser() user: JwtPayload, @Body() dto: CreateReviewDto) {
     return this.reviewsService.create(user.id, dto);
   }
 

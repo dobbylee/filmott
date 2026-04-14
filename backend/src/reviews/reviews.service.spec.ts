@@ -51,7 +51,10 @@ describe('ReviewsService', () => {
       providers: [
         ReviewsService,
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
-        { provide: getRepositoryToken(ReviewLike), useValue: mockReviewLikeRepo },
+        {
+          provide: getRepositoryToken(ReviewLike),
+          useValue: mockReviewLikeRepo,
+        },
         { provide: DataSource, useValue: mockDataSource },
         { provide: WatchlistService, useValue: mockWatchlistService },
         { provide: RevalidateService, useValue: mockRevalidateService },
@@ -87,10 +90,13 @@ describe('ReviewsService', () => {
       const dto = { contentId: 1, rating: 8, comment: 'Great movie!' };
       const created = { id: 1, userId: 1, ...dto, likesCount: 0 };
       const mockManager = createManager({ createdReview: created as Review });
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
-        cb(mockManager as unknown as EntityManager),
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
-      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue({});
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue(
+        {},
+      );
 
       const result = await service.create(1, dto);
 
@@ -101,13 +107,9 @@ describe('ReviewsService', () => {
         comment: 'Great movie!',
       });
       expect(result).toEqual(created);
-      expect(mockWatchlistService.addToWatchlistByContentIdWithManager).toHaveBeenCalledWith(
-        mockManager,
-        1,
-        1,
-        'watched',
-        undefined,
-      );
+      expect(
+        mockWatchlistService.addToWatchlistByContentIdWithManager,
+      ).toHaveBeenCalledWith(mockManager, 1, 1, 'watched', undefined);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
 
@@ -115,10 +117,13 @@ describe('ReviewsService', () => {
       const dto = { contentId: 1, rating: 7 };
       const created = { id: 2, userId: 1, ...dto, likesCount: 0 };
       const mockManager = createManager({ createdReview: created as Review });
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
-        cb(mockManager as unknown as EntityManager),
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
-      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue({});
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue(
+        {},
+      );
 
       const result = await service.create(1, dto);
       expect(result.id).toBe(2);
@@ -129,10 +134,13 @@ describe('ReviewsService', () => {
       const dto = { contentId: 1, rating: 5, comment: '좋아요' };
       const created = { id: 3, userId: 1, ...dto, likesCount: 0 };
       const mockManager = createManager({ createdReview: created as Review });
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
-        cb(mockManager as unknown as EntityManager),
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
-      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue({});
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue(
+        {},
+      );
 
       const result = await service.create(1, dto);
       expect(result.rating).toBe(5);
@@ -145,12 +153,15 @@ describe('ReviewsService', () => {
         createdReview: created as Review,
         existingWatchlist: { status: 'watched' },
       });
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
-        cb(mockManager as unknown as EntityManager),
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
 
       await service.create(1, dto);
-      expect(mockWatchlistService.addToWatchlistByContentIdWithManager).not.toHaveBeenCalled();
+      expect(
+        mockWatchlistService.addToWatchlistByContentIdWithManager,
+      ).not.toHaveBeenCalled();
     });
 
     it('리뷰 생성 시 want_to_watch를 watched로 전환해야 한다', async () => {
@@ -160,27 +171,27 @@ describe('ReviewsService', () => {
         createdReview: created as Review,
         existingWatchlist: { status: 'want_to_watch' },
       });
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
-        cb(mockManager as unknown as EntityManager),
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
-      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue({});
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue(
+        {},
+      );
 
       await service.create(1, dto);
-      expect(mockWatchlistService.addToWatchlistByContentIdWithManager).toHaveBeenCalledWith(
-        mockManager,
-        1,
-        1,
-        'watched',
-        undefined,
-      );
+      expect(
+        mockWatchlistService.addToWatchlistByContentIdWithManager,
+      ).toHaveBeenCalledWith(mockManager, 1, 1, 'watched', undefined);
     });
 
     it('워치리스트 저장이 실패하면 리뷰 생성도 롤백해야 한다', async () => {
       const dto = { contentId: 1, rating: 6 };
       const created = { id: 6, userId: 1, ...dto, likesCount: 0 };
       const mockManager = createManager({ createdReview: created as Review });
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
-        cb(mockManager as unknown as EntityManager),
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
       mockWatchlistService.addToWatchlistByContentIdWithManager.mockRejectedValue(
         new Error('watchlist failed'),
@@ -193,10 +204,13 @@ describe('ReviewsService', () => {
     it('리뷰가 이미 존재하면 ConflictException을 던져야 한다', async () => {
       const dto = { contentId: 1, rating: 8 };
       const mockManager = {
-        findOne: jest.fn().mockResolvedValueOnce({ id: 1, userId: 1, contentId: 1 }),
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce({ id: 1, userId: 1, contentId: 1 }),
       };
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) =>
-        cb(mockManager as unknown as EntityManager),
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
 
       await expect(service.create(1, dto)).rejects.toThrow(ConflictException);
@@ -218,15 +232,22 @@ describe('ReviewsService', () => {
 
       const mockManager = {
         delete: jest.fn().mockResolvedValue({ affected: 5 }),
-        save: jest.fn().mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
+        save: jest
+          .fn()
+          .mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
       };
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager));
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
+      );
 
       const result = await service.update(1, 1, { rating: 9 });
 
       expect(result.rating).toBe(9);
       expect(result.likesCount).toBe(0);
-      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
+      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), {
+        reviewId: 1,
+      });
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
     });
 
@@ -244,16 +265,23 @@ describe('ReviewsService', () => {
 
       const mockManager = {
         delete: jest.fn().mockResolvedValue({ affected: 5 }),
-        save: jest.fn().mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
+        save: jest
+          .fn()
+          .mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
       };
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager));
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
+      );
 
       const result = await service.update(1, 1, { comment: 'Updated comment' });
 
       expect(result.comment).toBe('Updated comment');
       expect(result.rating).toBe(7);
       expect(result.likesCount).toBe(0);
-      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
+      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), {
+        reviewId: 1,
+      });
     });
 
     it('rating과 코멘트 동시 변경 시 좋아요를 초기화해야 한다', async () => {
@@ -270,16 +298,26 @@ describe('ReviewsService', () => {
 
       const mockManager = {
         delete: jest.fn().mockResolvedValue({ affected: 3 }),
-        save: jest.fn().mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
+        save: jest
+          .fn()
+          .mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
       };
-      mockDataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager));
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
+      );
 
-      const result = await service.update(1, 1, { rating: 9, comment: 'New comment' });
+      const result = await service.update(1, 1, {
+        rating: 9,
+        comment: 'New comment',
+      });
 
       expect(result.rating).toBe(9);
       expect(result.comment).toBe('New comment');
       expect(result.likesCount).toBe(0);
-      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), { reviewId: 1 });
+      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), {
+        reviewId: 1,
+      });
     });
 
     it('rating과 코멘트 모두 동일하면 좋아요를 유지해야 한다', async () => {
@@ -293,7 +331,9 @@ describe('ReviewsService', () => {
         likesCount: 10,
       };
       mockReviewRepo.findOne.mockResolvedValue({ ...review });
-      mockReviewRepo.save.mockImplementation((r: Partial<Review>) => Promise.resolve(r));
+      mockReviewRepo.save.mockImplementation((r: Partial<Review>) =>
+        Promise.resolve(r),
+      );
 
       const result = await service.update(1, 1, { rating: 7, comment: 'Good' });
 
@@ -387,7 +427,13 @@ describe('ReviewsService', () => {
 
   describe('findMyReview', () => {
     it('commentsCount가 포함된 내 리뷰를 반환해야 한다', async () => {
-      const review = { id: 1, userId: 1, contentId: 5, rating: 8, commentsCount: 3 };
+      const review = {
+        id: 1,
+        userId: 1,
+        contentId: 5,
+        rating: 8,
+        commentsCount: 3,
+      };
       const mockQb = {
         leftJoin: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
@@ -401,8 +447,13 @@ describe('ReviewsService', () => {
       const result = await service.findMyReview(1, 5);
 
       expect(result).toEqual(review);
-      expect(mockQb.where).toHaveBeenCalledWith('review.userId = :userId', { userId: 1 });
-      expect(mockQb.andWhere).toHaveBeenCalledWith('review.contentId = :contentId', { contentId: 5 });
+      expect(mockQb.where).toHaveBeenCalledWith('review.userId = :userId', {
+        userId: 1,
+      });
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'review.contentId = :contentId',
+        { contentId: 5 },
+      );
     });
 
     it('내 리뷰가 존재하지 않으면 null을 반환해야 한다', async () => {
@@ -429,14 +480,18 @@ describe('ReviewsService', () => {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([{ reviewId: 1 }, { reviewId: 3 }]),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValue([{ reviewId: 1 }, { reviewId: 3 }]),
       };
       mockReviewLikeRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       const result = await service.getLikedReviewIds(1, 5);
 
       expect(result).toEqual([1, 3]);
-      expect(mockQb.where).toHaveBeenCalledWith('rl.userId = :userId', { userId: 1 });
+      expect(mockQb.where).toHaveBeenCalledWith('rl.userId = :userId', {
+        userId: 1,
+      });
     });
 
     it('좋아요가 없으면 빈 배열을 반환해야 한다', async () => {
@@ -468,15 +523,22 @@ describe('ReviewsService', () => {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([{ reviewId: 2 }, { reviewId: 4 }]),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValue([{ reviewId: 2 }, { reviewId: 4 }]),
       };
       mockReviewLikeRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       const result = await service.getLikedReviewIdsByIds(1, [2, 4, 6]);
 
       expect(result).toEqual([2, 4]);
-      expect(mockQb.where).toHaveBeenCalledWith('rl.userId = :userId', { userId: 1 });
-      expect(mockQb.andWhere).toHaveBeenCalledWith('rl.reviewId IN (:...reviewIds)', { reviewIds: [2, 4, 6] });
+      expect(mockQb.where).toHaveBeenCalledWith('rl.userId = :userId', {
+        userId: 1,
+      });
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'rl.reviewId IN (:...reviewIds)',
+        { reviewIds: [2, 4, 6] },
+      );
     });
   });
 
@@ -491,10 +553,9 @@ describe('ReviewsService', () => {
         take: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([
-          [{ id: 1, userId: 1, rating: 8 }],
-          1,
-        ]),
+        getManyAndCount: jest
+          .fn()
+          .mockResolvedValue([[{ id: 1, userId: 1, rating: 8 }], 1]),
       };
       mockReviewRepo.createQueryBuilder.mockReturnValue(mockQb);
 
@@ -543,7 +604,12 @@ describe('ReviewsService', () => {
   describe('getRecentReviews', () => {
     it('사용자와 콘텐츠가 포함된 최근 리뷰를 반환해야 한다', async () => {
       const mockReviews = [
-        { id: 1, userId: 1, user: { id: 1, nickname: 'test' }, content: { id: 1 } },
+        {
+          id: 1,
+          userId: 1,
+          user: { id: 1, nickname: 'test' },
+          content: { id: 1 },
+        },
       ];
       const mockQb = {
         leftJoin: jest.fn().mockReturnThis(),
@@ -658,7 +724,8 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
       mockReviewLikeRepo.create.mockReturnValue({ reviewId: 1, userId: 1 });
 
@@ -670,7 +737,11 @@ describe('ReviewsService', () => {
 
     it('이미 좋아요한 상태에서 좋아요를 제거해야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 1 });
-      mockReviewLikeRepo.findOne.mockResolvedValue({ id: 1, reviewId: 1, userId: 1 });
+      mockReviewLikeRepo.findOne.mockResolvedValue({
+        id: 1,
+        reviewId: 1,
+        userId: 1,
+      });
 
       const mockManager = {
         save: jest.fn(),
@@ -684,7 +755,8 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
 
       const result = await service.toggleLike(1, 1);
@@ -709,7 +781,8 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
       mockReviewLikeRepo.create.mockReturnValue({ reviewId: 1, userId: 1 });
 
@@ -721,7 +794,11 @@ describe('ReviewsService', () => {
 
     it('좋아요 제거 후 수정된 리뷰가 null이면 likesCount 0을 반환해야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 1 });
-      mockReviewLikeRepo.findOne.mockResolvedValue({ id: 1, reviewId: 1, userId: 1 });
+      mockReviewLikeRepo.findOne.mockResolvedValue({
+        id: 1,
+        reviewId: 1,
+        userId: 1,
+      });
 
       const mockManager = {
         save: jest.fn(),
@@ -735,7 +812,8 @@ describe('ReviewsService', () => {
         }),
       };
       mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) => cb(mockManager as unknown as EntityManager),
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
       );
 
       const result = await service.toggleLike(1, 1);

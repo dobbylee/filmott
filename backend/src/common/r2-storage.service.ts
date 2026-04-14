@@ -22,7 +22,9 @@ export class R2StorageService {
       endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: this.configService.getOrThrow<string>('R2_ACCESS_KEY_ID'),
-        secretAccessKey: this.configService.getOrThrow<string>('R2_SECRET_ACCESS_KEY'),
+        secretAccessKey: this.configService.getOrThrow<string>(
+          'R2_SECRET_ACCESS_KEY',
+        ),
       },
     });
   }
@@ -31,7 +33,11 @@ export class R2StorageService {
     return this.publicUrl;
   }
 
-  async upload(key: string, body: Buffer, contentType: string): Promise<string> {
+  async upload(
+    key: string,
+    body: Buffer,
+    contentType: string,
+  ): Promise<string> {
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucket,

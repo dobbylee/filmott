@@ -130,7 +130,13 @@ export class TmdbService {
   ): Promise<TmdbSearchResult> {
     const { data } = await firstValueFrom(
       this.httpService.get<TmdbSearchResult>(`/search/${type}`, {
-        params: { query, page, language: 'ko-KR', region: 'KR', include_adult: false },
+        params: {
+          query,
+          page,
+          language: 'ko-KR',
+          region: 'KR',
+          include_adult: false,
+        },
       }),
     );
     // media_type 주입 (search/{type}은 media_type을 반환하지 않음)
@@ -153,10 +159,7 @@ export class TmdbService {
     return data;
   }
 
-  async getPopular(
-    type: 'movie' | 'tv',
-    page = 1,
-  ): Promise<TmdbSearchResult> {
+  async getPopular(type: 'movie' | 'tv', page = 1): Promise<TmdbSearchResult> {
     const { data } = await firstValueFrom(
       this.httpService.get<TmdbSearchResult>(`/${type}/popular`, {
         params: { page, language: 'ko-KR', region: 'KR', include_adult: false },
@@ -210,9 +213,7 @@ export class TmdbService {
     return data;
   }
 
-  async getPersonCredits(
-    personId: number,
-  ): Promise<TmdbPersonCreditsResult> {
+  async getPersonCredits(personId: number): Promise<TmdbPersonCreditsResult> {
     const { data } = await firstValueFrom(
       this.httpService.get<TmdbPersonCreditsResult>(
         `/person/${personId}/combined_credits`,

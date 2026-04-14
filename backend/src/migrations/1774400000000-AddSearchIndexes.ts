@@ -22,9 +22,13 @@ export class AddSearchIndexes1774400000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('DROP INDEX IF EXISTS "idx_rankings_content_source"');
+    await queryRunner.query(
+      'DROP INDEX IF EXISTS "idx_rankings_content_source"',
+    );
     await queryRunner.query('DROP INDEX IF EXISTS "idx_contents_vote_count"');
-    await queryRunner.query('DROP INDEX IF EXISTS "idx_contents_origin_country"');
+    await queryRunner.query(
+      'DROP INDEX IF EXISTS "idx_contents_origin_country"',
+    );
     await queryRunner.query('DROP INDEX IF EXISTS "idx_contents_release_date"');
     await queryRunner.query('DROP INDEX IF EXISTS "idx_contents_content_type"');
   }

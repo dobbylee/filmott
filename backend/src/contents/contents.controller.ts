@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Param, Query, Body, ParseIntPipe, BadRequestException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Query,
+  Body,
+  ParseIntPipe,
+  BadRequestException,
+  UseGuards,
+} from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { SearchContentsDto } from './dto/search-contents.dto';
 import { DiscoverContentsDto } from './dto/discover-contents.dto';
@@ -34,16 +45,12 @@ export class ContentsController {
   }
 
   @Get('person/:personId')
-  async getPersonDetail(
-    @Param('personId', ParseIntPipe) personId: number,
-  ) {
+  async getPersonDetail(@Param('personId', ParseIntPipe) personId: number) {
     return this.contentsService.getPersonDetail(personId);
   }
 
   @Get('person/:personId/credits')
-  async getPersonCredits(
-    @Param('personId', ParseIntPipe) personId: number,
-  ) {
+  async getPersonCredits(@Param('personId', ParseIntPipe) personId: number) {
     return this.contentsService.getPersonCredits(personId);
   }
 
@@ -56,7 +63,11 @@ export class ContentsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   async toggleAdult(@Body() dto: ToggleAdultDto) {
-    return this.contentsService.toggleAdult(dto.tmdbId, dto.contentType, dto.adult);
+    return this.contentsService.toggleAdult(
+      dto.tmdbId,
+      dto.contentType,
+      dto.adult,
+    );
   }
 
   @Get('adult-list')
@@ -74,9 +85,7 @@ export class ContentsController {
   @Post('adult/block-person/:personId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  async blockPersonContents(
-    @Param('personId', ParseIntPipe) personId: number,
-  ) {
+  async blockPersonContents(@Param('personId', ParseIntPipe) personId: number) {
     return this.contentsService.blockPersonContents(personId);
   }
 

@@ -18,7 +18,12 @@ export class DiscoverContentsDto {
   year?: string;
 
   @IsOptional()
-  @IsIn(['popularity.desc', 'vote_average.desc', 'primary_release_date.desc', 'revenue.desc'])
+  @IsIn([
+    'popularity.desc',
+    'vote_average.desc',
+    'primary_release_date.desc',
+    'revenue.desc',
+  ])
   sort?: string;
 
   @IsOptional()

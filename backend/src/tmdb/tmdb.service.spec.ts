@@ -54,12 +54,14 @@ describe('TmdbService', () => {
       const result = await service.searchMulti('test');
 
       expect(result.results).toHaveLength(3);
-      expect(result.results.every(
-        (r) =>
-          r.media_type === 'movie' ||
-          r.media_type === 'tv' ||
-          r.media_type === 'person',
-      )).toBe(true);
+      expect(
+        result.results.every(
+          (r) =>
+            r.media_type === 'movie' ||
+            r.media_type === 'tv' ||
+            r.media_type === 'person',
+        ),
+      ).toBe(true);
       expect(mockHttpService.get).toHaveBeenCalledWith('/search/multi', {
         params: { query: 'test', page: 1, language: 'ko-KR', region: 'KR' },
       });
@@ -80,7 +82,13 @@ describe('TmdbService', () => {
 
       expect(result.results[0].media_type).toBe('movie');
       expect(mockHttpService.get).toHaveBeenCalledWith('/search/movie', {
-        params: { query: 'test', page: 1, language: 'ko-KR', region: 'KR', include_adult: false },
+        params: {
+          query: 'test',
+          page: 1,
+          language: 'ko-KR',
+          region: 'KR',
+          include_adult: false,
+        },
       });
     });
   });
@@ -109,33 +117,58 @@ describe('TmdbService', () => {
 
   describe('getPopular', () => {
     it('인기 콘텐츠를 가져와야 한다', async () => {
-      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const mockData = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
       await service.getPopular('tv', 2);
 
       expect(mockHttpService.get).toHaveBeenCalledWith('/tv/popular', {
-        params: { page: 2, language: 'ko-KR', region: 'KR', include_adult: false },
+        params: {
+          page: 2,
+          language: 'ko-KR',
+          region: 'KR',
+          include_adult: false,
+        },
       });
     });
   });
 
   describe('getNowPlaying', () => {
     it('현재 상영 중인 영화를 가져와야 한다', async () => {
-      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const mockData = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
       await service.getNowPlaying();
 
       expect(mockHttpService.get).toHaveBeenCalledWith('/movie/now_playing', {
-        params: { page: 1, language: 'ko-KR', region: 'KR', include_adult: false },
+        params: {
+          page: 1,
+          language: 'ko-KR',
+          region: 'KR',
+          include_adult: false,
+        },
       });
     });
   });
 
   describe('getTrending', () => {
     it('시간 범위와 함께 트렌딩 콘텐츠를 가져와야 한다', async () => {
-      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const mockData = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
       await service.getTrending('all', 'week');
@@ -149,7 +182,9 @@ describe('TmdbService', () => {
   describe('getWatchProviders', () => {
     it('KR 제공자가 있을 때 반환해야 한다', async () => {
       const krProviders = {
-        flatrate: [{ provider_id: 8, provider_name: 'Netflix', logo_path: '/logo.jpg' }],
+        flatrate: [
+          { provider_id: 8, provider_name: 'Netflix', logo_path: '/logo.jpg' },
+        ],
       };
       const mockData = { results: { KR: krProviders } };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
@@ -195,10 +230,20 @@ describe('TmdbService', () => {
     it('ko-KR 언어로 인물 통합 출연작을 가져와야 한다', async () => {
       const mockData = {
         cast: [
-          { id: 1396, media_type: 'tv', name: 'Breaking Bad', character: 'Walter White' },
+          {
+            id: 1396,
+            media_type: 'tv',
+            name: 'Breaking Bad',
+            character: 'Walter White',
+          },
         ],
         crew: [
-          { id: 100, media_type: 'movie', title: 'Some Movie', job: 'Director' },
+          {
+            id: 100,
+            media_type: 'movie',
+            title: 'Some Movie',
+            job: 'Director',
+          },
         ],
       };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
@@ -215,7 +260,12 @@ describe('TmdbService', () => {
 
   describe('discoverByFilters', () => {
     it('영화에 대해 필터 파라미터를 올바르게 전달해야 한다', async () => {
-      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const mockData = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
       await service.discoverByFilters('movie', {
@@ -241,7 +291,12 @@ describe('TmdbService', () => {
     });
 
     it('TV 타입에 대해 first_air_date_year를 사용해야 한다', async () => {
-      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const mockData = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
       await service.discoverByFilters('tv', { year: 2024 });
@@ -255,7 +310,12 @@ describe('TmdbService', () => {
     });
 
     it('originCountry가 with_origin_country 파라미터로 전달되어야 한다', async () => {
-      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const mockData = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
       await service.discoverByFilters('tv', { originCountry: 'KR' });
@@ -268,7 +328,12 @@ describe('TmdbService', () => {
     });
 
     it('TV 타입에서 airDateGte/Lte가 first_air_date 파라미터로 전달되어야 한다', async () => {
-      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const mockData = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
       await service.discoverByFilters('tv', {
@@ -285,7 +350,12 @@ describe('TmdbService', () => {
     });
 
     it('영화 타입에서 airDateGte/Lte가 release_date 파라미터로 전달되어야 한다', async () => {
-      const mockData = { page: 1, total_pages: 1, total_results: 0, results: [] };
+      const mockData = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
       mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
 
       await service.discoverByFilters('movie', {

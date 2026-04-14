@@ -70,7 +70,10 @@ export class ContentSearchService {
 
     // 1차: 전체 필터 적용
     let results = await this.executeFilteredSearch(
-      embeddingStr, limit, excludeIds, filters,
+      embeddingStr,
+      limit,
+      excludeIds,
+      filters,
     );
 
     // 2차: 결과 부족 시 필터 단계적 완화
@@ -81,28 +84,43 @@ export class ContentSearchService {
       if (results.length < 5 && (relaxedFilters.genres?.length ?? 0) > 0) {
         delete relaxedFilters.genres;
         results = await this.executeFilteredSearch(
-          embeddingStr, limit, excludeIds, relaxedFilters,
+          embeddingStr,
+          limit,
+          excludeIds,
+          relaxedFilters,
         );
       }
 
       if (results.length < 5 && (relaxedFilters.personNames?.length ?? 0) > 0) {
         delete relaxedFilters.personNames;
         results = await this.executeFilteredSearch(
-          embeddingStr, limit, excludeIds, relaxedFilters,
+          embeddingStr,
+          limit,
+          excludeIds,
+          relaxedFilters,
         );
       }
 
       if (results.length < 5 && (relaxedFilters.countries?.length ?? 0) > 0) {
         delete relaxedFilters.countries;
         results = await this.executeFilteredSearch(
-          embeddingStr, limit, excludeIds, relaxedFilters,
+          embeddingStr,
+          limit,
+          excludeIds,
+          relaxedFilters,
         );
       }
 
-      if (results.length < 5 && (relaxedFilters.ottProviderNames?.length ?? 0) > 0) {
+      if (
+        results.length < 5 &&
+        (relaxedFilters.ottProviderNames?.length ?? 0) > 0
+      ) {
         delete relaxedFilters.ottProviderNames;
         results = await this.executeFilteredSearch(
-          embeddingStr, limit, excludeIds, relaxedFilters,
+          embeddingStr,
+          limit,
+          excludeIds,
+          relaxedFilters,
         );
       }
     }
@@ -156,38 +174,35 @@ export class ContentSearchService {
     // PostgreSQL `||`는 문자열 연결 연산자 (JavaScript의 OR 연산자와 다름)
     // 예: $3 || ', %' → 'KR, %' (LIKE 패턴으로 "KR, US" 매칭)
     if (filters.countries?.length) {
-      const countryConditions = filters.countries
-        .map(() => {
-          const idx = paramIndex;
-          paramIndex++;
-          return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ', %' OR c.origin_country LIKE '%, ' || $${idx} OR c.origin_country LIKE '%, ' || $${idx} || ', %')`;
-        });
+      const countryConditions = filters.countries.map(() => {
+        const idx = paramIndex;
+        paramIndex++;
+        return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ', %' OR c.origin_country LIKE '%, ' || $${idx} OR c.origin_country LIKE '%, ' || $${idx} || ', %')`;
+      });
       conditions.push(`AND (${countryConditions.join(' OR ')})`);
       filters.countries.forEach((country) => params.push(country));
     }
 
     // 국가 제외 필터 ("외국"/"해외" → KR 제외)
     if (filters.excludeCountries?.length) {
-      const excludeConditions = filters.excludeCountries
-        .map(() => {
-          const idx = paramIndex;
-          paramIndex++;
-          return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ', %' OR c.origin_country LIKE '%, ' || $${idx} OR c.origin_country LIKE '%, ' || $${idx} || ', %')`;
-        });
+      const excludeConditions = filters.excludeCountries.map(() => {
+        const idx = paramIndex;
+        paramIndex++;
+        return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ', %' OR c.origin_country LIKE '%, ' || $${idx} OR c.origin_country LIKE '%, ' || $${idx} || ', %')`;
+      });
       conditions.push(`AND NOT (${excludeConditions.join(' OR ')})`);
       filters.excludeCountries.forEach((country) => params.push(country));
     }
 
     // 인물 필터
     if (filters.personNames?.length) {
-      const personConditions = filters.personNames
-        .flatMap(() => {
-          const idx = paramIndex;
-          const directorCond = `c.director LIKE $${idx}`;
-          const creditsCond = `EXISTS (SELECT 1 FROM jsonb_array_elements(c.credits) AS cr WHERE cr->>'name' LIKE $${idx} OR cr->>'character' LIKE $${idx})`;
-          paramIndex++;
-          return [directorCond, creditsCond];
-        });
+      const personConditions = filters.personNames.flatMap(() => {
+        const idx = paramIndex;
+        const directorCond = `c.director LIKE $${idx}`;
+        const creditsCond = `EXISTS (SELECT 1 FROM jsonb_array_elements(c.credits) AS cr WHERE cr->>'name' LIKE $${idx} OR cr->>'character' LIKE $${idx})`;
+        paramIndex++;
+        return [directorCond, creditsCond];
+      });
       conditions.push(`AND (${personConditions.join(' OR ')})`);
       filters.personNames.forEach((name) => params.push(`%${name}%`));
     }
@@ -233,12 +248,11 @@ export class ContentSearchService {
 
     // 비선호 감독 제외
     if (filters.excludePersonNames?.length) {
-      const excludePersonConditions = filters.excludePersonNames
-        .map(() => {
-          const idx = paramIndex;
-          paramIndex++;
-          return `c.director LIKE $${idx}`;
-        });
+      const excludePersonConditions = filters.excludePersonNames.map(() => {
+        const idx = paramIndex;
+        paramIndex++;
+        return `c.director LIKE $${idx}`;
+      });
       conditions.push(`AND NOT (${excludePersonConditions.join(' OR ')})`);
       filters.excludePersonNames.forEach((name) => params.push(`%${name}%`));
     }
@@ -262,10 +276,11 @@ SELECT * FROM (
           c.genres, c.vote_average, c.vote_count, c.overview,
           c.director, c.origin_country,
           cm.description, 1 AS priority,
-          ${embeddingParamIndex !== null
-    ? buildEmbeddingScore(embeddingParamIndex)
-    : popularityOnlyScore
-  } AS score
+          ${
+            embeddingParamIndex !== null
+              ? buildEmbeddingScore(embeddingParamIndex)
+              : popularityOnlyScore
+          } AS score
    FROM content_metadata cm
    JOIN contents c ON c.id = cm.content_id
    WHERE c.tmdb_id != ALL($1::int[])
