@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Unique,
+  Index,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
@@ -14,6 +15,7 @@ import { Review } from '../reviews/review.entity';
 
 @Entity('watchlist')
 @Unique(['userId', 'contentId'])
+@Index('IDX_watchlist_user_status', ['userId', 'status'])
 export class Watchlist {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -21,14 +23,14 @@ export class Watchlist {
   @Column({ name: 'user_id' })
   userId!: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user!: User;
 
   @Column({ name: 'content_id' })
   contentId!: number;
 
-  @ManyToOne(() => Content)
+  @ManyToOne(() => Content, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'content_id' })
   content!: Content;
 

@@ -17,7 +17,7 @@ export class ContentMetadata {
   @Column({ name: 'content_id', unique: true })
   contentId!: number;
 
-  @ManyToOne(() => Content)
+  @ManyToOne(() => Content, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'content_id' })
   content!: Content;
 
@@ -25,7 +25,7 @@ export class ContentMetadata {
   description!: string;
 
   // pgvector 컬럼은 TypeORM에서 string으로 취급하고 raw query로 조회
-  @Column({ type: 'varchar' })
+  @Column({ type: 'vector', length: 1536 })
   embedding!: string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

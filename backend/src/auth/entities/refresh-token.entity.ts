@@ -9,11 +9,13 @@ import {
 import { User } from '../../users/user.entity';
 
 @Entity('refresh_tokens')
+@Index('IDX_refresh_tokens_token', ['token'])
+@Index('IDX_refresh_tokens_user', ['userId'])
+@Index('IDX_refresh_tokens_expires', ['expiresAt'])
 export class RefreshToken {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Index()
   @Column({ type: 'varchar', length: 64, unique: true })
   token!: string;
 

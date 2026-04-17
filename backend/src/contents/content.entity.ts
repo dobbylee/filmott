@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Unique,
+  Index,
 } from 'typeorm';
 
 export interface ContentProvider {
@@ -30,6 +31,9 @@ export interface ContentCredit {
 
 @Entity('contents')
 @Unique(['tmdbId', 'contentType'])
+@Index('idx_contents_content_type', ['contentType'])
+@Index('idx_contents_release_date', ['releaseDate'])
+@Index('idx_contents_origin_country', ['originCountry'])
 export class Content {
   @PrimaryGeneratedColumn()
   id!: number;

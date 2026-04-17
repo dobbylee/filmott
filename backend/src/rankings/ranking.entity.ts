@@ -11,6 +11,7 @@ import { Content } from '../contents/content.entity';
 
 @Entity('rankings')
 @Index('idx_rankings_source_category', ['source', 'category', 'fetchedAt'])
+@Index('idx_rankings_content_source', ['contentId', 'source'])
 @Unique('uq_rankings_source_category_rank_target_date', [
   'source',
   'category',
