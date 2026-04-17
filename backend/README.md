@@ -31,6 +31,29 @@
 $ npm install
 ```
 
+## Migration workflow
+
+프로젝트의 현재 기준 스키마는 가능한 한 엔티티에 먼저 반영한다.
+
+- 컬럼 추가/삭제, nullable, default, unique, 일반 index, relation, `onDelete`는 엔티티를 먼저 수정한다.
+- 그 다음 `migration:generate`로 초안을 만들고 검토한다.
+- 아래 항목만 raw SQL migration으로 직접 보강한다.
+  - rename
+  - 기존 데이터 backfill / 정리
+  - enum type 생성/변경
+  - extension 설치 (`pgvector`)
+  - partial index / custom index method (예: HNSW, IVFFlat)
+  - seed / 운영 데이터 보정
+
+현재 정리 계획과 배경은 [docs/plans/26-04-17_typeorm-entity-alignment.md](../docs/plans/26-04-17_typeorm-entity-alignment.md)에 기록되어 있다.
+
+### Schema checklist
+
+- 엔티티를 수정한 뒤 migration 초안이 예상과 다르게 나오지 않는지 확인한다.
+- migration을 수동으로 작성했다면 엔티티가 현재 스키마를 빠뜨리지 않았는지 다시 확인한다.
+- `vector`, partial index, operator class 같은 DB 특화 기능은 엔티티와 raw migration을 함께 관리한다.
+- 로컬에서 프로덕션 데이터를 덮어쓴 뒤에는 필요한 시퀀스를 재정렬한다.
+
 ## Compile and run the project
 
 ```bash
