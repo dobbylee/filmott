@@ -34,6 +34,9 @@ export interface ContentCredit {
 @Index('idx_contents_content_type', ['contentType'])
 @Index('idx_contents_release_date', ['releaseDate'])
 @Index('idx_contents_origin_country', ['originCountry'])
+@Index('idx_contents_adult_lookup', ['contentType', 'tmdbId'], {
+  where: '"adult" = true',
+})
 export class Content {
   @PrimaryGeneratedColumn()
   id!: number;
