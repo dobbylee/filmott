@@ -16,6 +16,7 @@ export default function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   // 헤더 스크롤 배경 변경
   useEffect(() => {
@@ -49,13 +50,18 @@ export default function Header() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [isSearchOpen]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
-      setIsSearchOpen(false);
-    }
+  const handleSearch = (e?: React.SyntheticEvent) => {
+    e?.preventDefault();
+
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery) return;
+
+    searchInputRef.current?.blur();
+    mobileSearchInputRef.current?.blur();
+    router.push(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+    setSearchQuery('');
+    setIsSearchOpen(false);
+    setShowMobileMenu(false);
   };
 
   const openSearch = () => {
@@ -175,15 +181,16 @@ export default function Header() {
               </>
             )}
 
-            <form onSubmit={(e) => { handleSearch(e); setShowMobileMenu(false); }} className="mt-2 px-2">
+            <form onSubmit={handleSearch} className="mt-2 px-2">
               <div className="relative w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                 <input
+                  ref={mobileSearchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="작품 / 인물 검색"
-                  className="w-full rounded-full border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-white/40 outline-none focus:border-white/30"
+                  className="w-full rounded-full border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-base text-white placeholder-white/40 outline-none focus:border-white/30"
                 />
               </div>
             </form>

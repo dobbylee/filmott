@@ -90,4 +90,20 @@ describe('Header', () => {
 
     expect(mockPush).toHaveBeenCalledWith('/search?q=%EC%9D%B8%EC%85%89%EC%85%98');
   });
+
+  it('모바일 검색 제출 후 입력 포커스를 해제해야 한다', async () => {
+    const user = userEvent.setup();
+
+    render(<Header />);
+
+    await user.click(screen.getByLabelText('메뉴'));
+
+    const searchInput = screen.getByPlaceholderText('작품 / 인물 검색');
+    const blurSpy = vi.spyOn(searchInput, 'blur');
+
+    await user.type(searchInput, '듄{enter}');
+
+    expect(mockPush).toHaveBeenCalledWith('/search?q=%EB%93%84');
+    expect(blurSpy).toHaveBeenCalled();
+  });
 });
