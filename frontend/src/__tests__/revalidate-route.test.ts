@@ -85,6 +85,22 @@ describe('revalidate route', () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith('/contents');
   });
 
+  it('허용된 동적 contents 경로를 revalidate해야 한다', async () => {
+    const req = createRequest({
+      authorization: 'Bearer test-secret',
+      body: { path: '/contents/movie/550' },
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      revalidated: true,
+      path: '/contents/movie/550',
+    });
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/contents/movie/550');
+  });
+
   it('허용되지 않은 경로는 기본값 /로 fallback해야 한다', async () => {
     const req = createRequest({
       authorization: 'Bearer test-secret',

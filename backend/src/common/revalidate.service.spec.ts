@@ -72,7 +72,8 @@ describe('RevalidateService', () => {
 
       await service.revalidatePath('/');
 
-      expect(fetchSpy).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
         'http://frontend:3000/internal/revalidate',
         expect.objectContaining({
           method: 'POST',
@@ -81,6 +82,17 @@ describe('RevalidateService', () => {
             Authorization: 'Bearer test-secret',
           }),
           body: JSON.stringify({ path: '/' }),
+        }),
+      );
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        'http://frontend:3000/',
+        expect.objectContaining({
+          method: 'GET',
+          cache: 'no-store',
+          headers: expect.objectContaining({
+            'x-filmott-cache-warmup': '1',
+          }),
         }),
       );
     });
@@ -93,12 +105,32 @@ describe('RevalidateService', () => {
 
       await service.revalidatePath('/contents/123');
 
-      expect(fetchSpy).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
         'http://frontend:3000/internal/revalidate',
         expect.objectContaining({
           body: JSON.stringify({ path: '/contents/123' }),
         }),
       );
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        'http://frontend:3000/contents/123',
+        expect.objectContaining({
+          method: 'GET',
+          cache: 'no-store',
+        }),
+      );
+    });
+
+    it('워밍 대상이 아닌 path는 revalidate만 호출해야 한다', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      } as Response);
+
+      await service.revalidatePath('/person/17419');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
     it('fetch 실패 시 에러를 throw하지 않고 warn 로깅해야 한다', async () => {
@@ -115,6 +147,19 @@ describe('RevalidateService', () => {
       } as Response);
 
       await expect(service.revalidatePath('/')).resolves.not.toThrow();
+    });
+
+    it('워밍 fetch 실패 시에도 에러를 throw하지 않아야 한다', async () => {
+      const fetchSpy = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({}),
+        } as Response)
+        .mockRejectedValueOnce(new Error('warmup failed'));
+
+      await expect(service.revalidatePath('/')).resolves.not.toThrow();
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
   });
 });

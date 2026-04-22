@@ -1,7 +1,9 @@
 import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 
-const ALLOWED_PATHS = new Set(['/', '/contents']);
+function isAllowedPath(path: string): boolean {
+  return path === '/' || path === '/contents' || path.startsWith('/contents/');
+}
 
 export async function POST(request: NextRequest) {
   // 인증: Bearer 토큰만 허용 (배치 전용, Docker 내부 네트워크에서 호출)
@@ -15,7 +17,7 @@ export async function POST(request: NextRequest) {
   let path = '/';
   try {
     const body: { path?: string } = await request.json();
-    if (body.path && ALLOWED_PATHS.has(body.path)) {
+    if (body.path && isAllowedPath(body.path)) {
       path = body.path;
     }
   } catch {
