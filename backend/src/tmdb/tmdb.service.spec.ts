@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { TmdbService } from './tmdb.service';
-import { AxiosResponse, AxiosHeaders } from 'axios';
+import { AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
+import { GatewayTimeoutException } from '@nestjs/common';
 
 describe('TmdbService', () => {
   let service: TmdbService;
@@ -19,6 +20,11 @@ describe('TmdbService', () => {
     headers: {},
     config: { headers: new AxiosHeaders() },
   });
+
+  const makeTimeoutError = () =>
+    new AxiosError('timeout of 10000ms exceeded', 'ECONNABORTED', {
+      headers: new AxiosHeaders(),
+    });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -224,6 +230,35 @@ describe('TmdbService', () => {
         params: { language: 'ko-KR' },
       });
     });
+
+    it('타임아웃이면 한 번 재시도 후 성공해야 한다', async () => {
+      const mockData = {
+        id: 17419,
+        name: 'Bryan Cranston',
+        profile_path: '/profile.jpg',
+        biography: 'An actor.',
+        birthday: '1956-03-07',
+        place_of_birth: 'Hollywood, California, USA',
+        known_for_department: 'Acting',
+      };
+      mockHttpService.get
+        .mockReturnValueOnce(throwError(() => makeTimeoutError()))
+        .mockReturnValueOnce(of(makeAxiosResponse(mockData)));
+
+      const result = await service.getPersonDetail(17419);
+
+      expect(result).toEqual(mockData);
+      expect(mockHttpService.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('타임아웃이 반복되면 GatewayTimeoutException을 던져야 한다', async () => {
+      mockHttpService.get.mockReturnValue(throwError(() => makeTimeoutError()));
+
+      await expect(service.getPersonDetail(17419)).rejects.toThrow(
+        GatewayTimeoutException,
+      );
+      expect(mockHttpService.get).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('getPersonCredits', () => {
@@ -255,6 +290,28 @@ describe('TmdbService', () => {
         '/person/17419/combined_credits',
         { params: { language: 'ko-KR' } },
       );
+    });
+
+    it('크레딧 호출도 타임아웃이면 한 번 재시도해야 한다', async () => {
+      const mockData = {
+        cast: [
+          {
+            id: 1396,
+            media_type: 'tv',
+            name: 'Breaking Bad',
+            character: 'Walter White',
+          },
+        ],
+        crew: [],
+      };
+      mockHttpService.get
+        .mockReturnValueOnce(throwError(() => makeTimeoutError()))
+        .mockReturnValueOnce(of(makeAxiosResponse(mockData)));
+
+      const result = await service.getPersonCredits(17419);
+
+      expect(result).toEqual(mockData);
+      expect(mockHttpService.get).toHaveBeenCalledTimes(2);
     });
   });
 

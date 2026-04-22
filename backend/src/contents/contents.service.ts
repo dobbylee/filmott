@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  GatewayTimeoutException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
 import { In, Repository } from 'typeorm';
@@ -242,12 +247,22 @@ export class ContentsService {
       return cached.data;
     }
 
-    const data = await this.tmdbService.getPersonDetail(personId);
-    this.personDetailCache.set(personId, {
-      data,
-      expiresAt: Date.now() + PERSON_CACHE_TTL_MS,
-    });
-    return data;
+    try {
+      const data = await this.tmdbService.getPersonDetail(personId);
+      this.personDetailCache.set(personId, {
+        data,
+        expiresAt: Date.now() + PERSON_CACHE_TTL_MS,
+      });
+      return data;
+    } catch (error) {
+      if (cached && error instanceof GatewayTimeoutException) {
+        this.logger.warn(
+          `TMDB 인물 상세 타임아웃, stale cache 사용 (${personId})`,
+        );
+        return cached.data;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -262,11 +277,22 @@ export class ContentsService {
     if (cached && Date.now() < cached.expiresAt) {
       raw = cached.data;
     } else {
-      raw = await this.tmdbService.getPersonCredits(personId);
-      this.personCreditsCache.set(personId, {
-        data: raw,
-        expiresAt: Date.now() + PERSON_CACHE_TTL_MS,
-      });
+      try {
+        raw = await this.tmdbService.getPersonCredits(personId);
+        this.personCreditsCache.set(personId, {
+          data: raw,
+          expiresAt: Date.now() + PERSON_CACHE_TTL_MS,
+        });
+      } catch (error) {
+        if (cached && error instanceof GatewayTimeoutException) {
+          this.logger.warn(
+            `TMDB 인물 크레딧 타임아웃, stale cache 사용 (${personId})`,
+          );
+          raw = cached.data;
+        } else {
+          throw error;
+        }
+      }
     }
 
     const blockedIds = await this.getBlockedTmdbIds();

@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { GatewayTimeoutException, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { AxiosRequestConfig, isAxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 
 export interface TmdbSearchResult {
@@ -101,11 +102,59 @@ export interface TmdbPersonCreditsResult {
   crew: TmdbPersonCredit[];
 }
 
+const TMDB_TIMEOUT_RETRY_COUNT = 1;
+const TMDB_TIMEOUT_RETRY_DELAY_MS = 250;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 @Injectable()
 export class TmdbService {
   private readonly logger = new Logger(TmdbService.name);
 
   constructor(private readonly httpService: HttpService) {}
+
+  private isTimeoutError(error: unknown): boolean {
+    return isAxiosError(error) && error.code === 'ECONNABORTED';
+  }
+
+  private async getWithTimeoutRetry<T>(
+    path: string,
+    config: AxiosRequestConfig | undefined,
+    context: string,
+  ): Promise<T> {
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= TMDB_TIMEOUT_RETRY_COUNT; attempt += 1) {
+      try {
+        const { data } = await firstValueFrom(
+          this.httpService.get<T>(path, config),
+        );
+        return data;
+      } catch (error) {
+        lastError = error;
+
+        if (this.isTimeoutError(error) && attempt < TMDB_TIMEOUT_RETRY_COUNT) {
+          this.logger.warn(
+            `TMDB ${context} 타임아웃, ${TMDB_TIMEOUT_RETRY_DELAY_MS}ms 후 재시도`,
+          );
+          await sleep(TMDB_TIMEOUT_RETRY_DELAY_MS);
+          continue;
+        }
+
+        break;
+      }
+    }
+
+    if (this.isTimeoutError(lastError)) {
+      throw new GatewayTimeoutException(
+        `TMDB ${context} 응답 시간이 초과되었습니다.`,
+      );
+    }
+
+    throw lastError;
+  }
 
   async searchMulti(query: string, page = 1): Promise<TmdbSearchResult> {
     const { data } = await firstValueFrom(
@@ -205,24 +254,23 @@ export class TmdbService {
   }
 
   async getPersonDetail(personId: number): Promise<TmdbPersonDetail> {
-    const { data } = await firstValueFrom(
-      this.httpService.get<TmdbPersonDetail>(`/person/${personId}`, {
+    return this.getWithTimeoutRetry<TmdbPersonDetail>(
+      `/person/${personId}`,
+      {
         params: { language: 'ko-KR' },
-      }),
+      },
+      `person/${personId}`,
     );
-    return data;
   }
 
   async getPersonCredits(personId: number): Promise<TmdbPersonCreditsResult> {
-    const { data } = await firstValueFrom(
-      this.httpService.get<TmdbPersonCreditsResult>(
-        `/person/${personId}/combined_credits`,
-        {
-          params: { language: 'ko-KR' },
-        },
-      ),
+    return this.getWithTimeoutRetry<TmdbPersonCreditsResult>(
+      `/person/${personId}/combined_credits`,
+      {
+        params: { language: 'ko-KR' },
+      },
+      `person/${personId}/combined_credits`,
     );
-    return data;
   }
 
   async discoverByFilters(
