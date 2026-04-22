@@ -24,6 +24,7 @@ describe('RankingsService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     findOneBy: jest.fn(),
+    count: jest.fn(),
   };
 
   const mockKobisService = {
@@ -188,6 +189,57 @@ describe('RankingsService', () => {
 
       // targetDate should be YYYY-MM-DD format
       expect(result[0].targetDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+  });
+
+  describe('daily box office schedulers', () => {
+    it('자정 스케줄러가 fetchDailyBoxOffice를 호출해야 한다', async () => {
+      const fetchSpy = jest
+        .spyOn(service, 'fetchDailyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.scheduleDailyBoxOfficeMidnight();
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('정오 스케줄러가 fetchDailyBoxOffice를 호출해야 한다', async () => {
+      const fetchSpy = jest
+        .spyOn(service, 'fetchDailyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.scheduleDailyBoxOfficeNoon();
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('백필 스케줄러는 전일 데이터가 없을 때만 fetchDailyBoxOffice를 호출해야 한다', async () => {
+      mockRankingRepo.count.mockResolvedValue(0);
+      const fetchSpy = jest
+        .spyOn(service, 'fetchDailyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.backfillDailyBoxOfficeIfMissing();
+
+      expect(mockRankingRepo.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          source: 'kobis',
+          category: 'daily-box-office',
+          targetDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        }),
+      });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('백필 스케줄러는 전일 데이터가 이미 있으면 호출하지 않아야 한다', async () => {
+      mockRankingRepo.count.mockResolvedValue(10);
+      const fetchSpy = jest
+        .spyOn(service, 'fetchDailyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.backfillDailyBoxOfficeIfMissing();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 

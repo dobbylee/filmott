@@ -18,6 +18,8 @@ const TMDB_CALL_DELAY_MS = 250;
 @Injectable()
 export class RankingsService {
   private readonly logger = new Logger(RankingsService.name);
+  private static readonly DAILY_BOX_OFFICE_CATEGORY = 'daily-box-office';
+  private static readonly KOBIS_SOURCE = 'kobis';
 
   constructor(
     @InjectRepository(Ranking)
@@ -30,14 +32,64 @@ export class RankingsService {
   ) {}
 
   /**
-   * KOBIS 일별 박스오피스를 가져와 rankings에 저장
-   * 매일 00:05 + 12:00 실행 (전일자 데이터, KOBIS 보정 반영)
+   * KOBIS 일별 박스오피스 1차 수집
+   * 매일 00:05 실행 (전일자 데이터)
    */
   @Cron('5 0 * * *', {
     name: 'daily-box-office-midnight',
     timeZone: 'Asia/Seoul',
   })
-  @Cron('0 12 * * *', { name: 'daily-box-office-noon', timeZone: 'Asia/Seoul' })
+  async scheduleDailyBoxOfficeMidnight(): Promise<Ranking[]> {
+    return this.fetchDailyBoxOffice();
+  }
+
+  /**
+   * 자정 배치 누락/실패 시 보정
+   * 매일 01:00 실행, 전일자 데이터가 없을 때만 백필
+   */
+  @Cron('0 1 * * *', {
+    name: 'daily-box-office-backfill',
+    timeZone: 'Asia/Seoul',
+  })
+  async backfillDailyBoxOfficeIfMissing(): Promise<Ranking[] | void> {
+    const targetDate = this.getYesterdayTargetDate();
+    const existingCount = await this.rankingRepo.count({
+      where: {
+        source: RankingsService.KOBIS_SOURCE,
+        category: RankingsService.DAILY_BOX_OFFICE_CATEGORY,
+        targetDate,
+      },
+    });
+
+    if (existingCount > 0) {
+      this.logger.log(
+        `Daily box office already exists for ${targetDate}, skipping backfill`,
+      );
+      return;
+    }
+
+    this.logger.warn(
+      `Daily box office missing for ${targetDate}, running backfill`,
+    );
+    return this.fetchDailyBoxOffice();
+  }
+
+  /**
+   * KOBIS 일별 박스오피스 2차 보정
+   * 매일 12:00 실행 (같은 targetDate 재수집/업서트)
+   */
+  @Cron('0 12 * * *', {
+    name: 'daily-box-office-noon',
+    timeZone: 'Asia/Seoul',
+  })
+  async scheduleDailyBoxOfficeNoon(): Promise<Ranking[]> {
+    return this.fetchDailyBoxOffice();
+  }
+
+  /**
+   * KOBIS 일별 박스오피스를 가져와 rankings에 저장
+   * 수동 실행 및 스케줄러 공용
+   */
   async fetchDailyBoxOffice(): Promise<Ranking[]> {
     const yesterday = this.getYesterdayDate();
     const targetDate = this.formatDateWithDashes(yesterday);
@@ -455,6 +507,10 @@ export class RankingsService {
     return date
       .toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
       .replace(/-/g, '');
+  }
+
+  private getYesterdayTargetDate(): string {
+    return this.formatDateWithDashes(this.getYesterdayDate());
   }
 
   private getTodayDate(): string {
