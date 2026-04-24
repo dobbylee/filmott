@@ -1,21 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+const WARMUP_RETRY_DELAY_MS = 500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 @Injectable()
 export class RevalidateService {
   private readonly logger = new Logger(RevalidateService.name);
   private readonly revalidateSecret: string;
-
-  private readonly frontendUrl: string;
+  private readonly frontendInternalUrl: string;
+  private readonly frontendWarmupUrl: string;
 
   constructor(private readonly configService: ConfigService) {
     this.revalidateSecret = this.configService.get<string>(
       'REVALIDATE_SECRET',
       '',
     );
-    this.frontendUrl =
-      this.configService.get<string>('FRONTEND_INTERNAL_URL') ??
-      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
+    const frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
+    this.frontendInternalUrl =
+      this.configService.get<string>('FRONTEND_INTERNAL_URL') ?? frontendUrl;
+    this.frontendWarmupUrl =
+      this.configService.get<string>('FRONTEND_WARMUP_URL') ?? frontendUrl;
   }
 
   private shouldWarmPath(path: string): boolean {
@@ -26,17 +37,27 @@ export class RevalidateService {
     if (!this.shouldWarmPath(path)) return;
 
     try {
-      const response = await fetch(`${this.frontendUrl}${path}`, {
-        method: 'GET',
-        cache: 'no-store',
-        headers: {
-          'x-filmott-cache-warmup': '1',
-        },
-      });
+      const url = `${this.frontendWarmupUrl}${path}`;
 
-      if (!response.ok) {
-        this.logger.warn(`캐시 워밍 실패 (${path}): HTTP ${response.status}`);
-        return;
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        if (attempt > 1) {
+          await sleep(WARMUP_RETRY_DELAY_MS);
+        }
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'x-filmott-cache-warmup': '1',
+          },
+          redirect: 'follow',
+        });
+
+        if (!response.ok) {
+          this.logger.warn(`캐시 워밍 실패 (${path}): HTTP ${response.status}`);
+          return;
+        }
+
+        await response.arrayBuffer();
       }
 
       this.logger.log(`캐시 워밍 완료 (${path})`);
@@ -48,7 +69,7 @@ export class RevalidateService {
   async revalidatePath(path: string = '/'): Promise<void> {
     if (!this.revalidateSecret) return;
     try {
-      const url = `${this.frontendUrl}/internal/revalidate`;
+      const url = `${this.frontendInternalUrl}/internal/revalidate`;
       const response = await fetch(url, {
         method: 'POST',
         headers: {
