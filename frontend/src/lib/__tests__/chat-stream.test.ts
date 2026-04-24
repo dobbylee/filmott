@@ -53,7 +53,12 @@ describe('sendChatMessage', () => {
   });
 
   it('recommendations 이벤트를 올바르게 파싱한다', async () => {
-    const recs = [{ tmdbId: 123, contentType: 'movie', title: '기생충', reason: '좋은 영화' }];
+    const recs = [{
+      tmdbId: 123,
+      contentType: 'movie',
+      title: '기생충',
+      posterUrl: null,
+    }];
     const sseData = `event: recommendations\ndata: ${JSON.stringify({ recommendations: recs })}\n\nevent: done\ndata: {}\n\n`;
 
     vi.spyOn(global, 'fetch').mockResolvedValueOnce(createMockResponse([sseData]));
@@ -161,6 +166,24 @@ describe('sendChatMessage', () => {
         },
         body: JSON.stringify({ content: '테스트 메시지', history }),
         credentials: 'include',
+      }),
+    );
+  });
+
+  it('AbortSignal을 fetch 요청에 전달한다', async () => {
+    const fetchSpy = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(createMockResponse(['event: done\ndata: {}\n\n']));
+    const controller = new AbortController();
+
+    await sendChatMessage('테스트', [], callbacks, {
+      signal: controller.signal,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/chat/messages'),
+      expect.objectContaining({
+        signal: controller.signal,
       }),
     );
   });

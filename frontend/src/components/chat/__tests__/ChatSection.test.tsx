@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ChatSection from '@/components/chat/ChatSection';
-import type { ChatHistoryMessage, ChatStreamCallbacks } from '@/lib/chat-stream';
+import type {
+  ChatHistoryMessage,
+  ChatRequestOptions,
+  ChatStreamCallbacks,
+} from '@/lib/chat-stream';
 
 let mockAuthUser: { id: number; nickname: string } | null = null;
 
@@ -91,7 +95,10 @@ describe('ChatSection', () => {
           onDone: expect.any(Function),
           onError: expect.any(Function),
         }),
-        { isAuthenticated: false },
+        expect.objectContaining({
+          isAuthenticated: false,
+          signal: expect.any(AbortSignal),
+        }),
       );
     });
   });
@@ -122,7 +129,10 @@ describe('ChatSection', () => {
         '밤에 혼자 볼 스릴러 영화 추천해줘',
         expect.any(Array),
         expect.any(Object),
-        { isAuthenticated: false },
+        expect.objectContaining({
+          isAuthenticated: false,
+          signal: expect.any(AbortSignal),
+        }),
       );
     });
   });
@@ -142,7 +152,10 @@ describe('ChatSection', () => {
         '로그인 추천',
         [],
         expect.any(Object),
-        { isAuthenticated: true },
+        expect.objectContaining({
+          isAuthenticated: true,
+          signal: expect.any(AbortSignal),
+        }),
       );
     });
   });
@@ -185,7 +198,7 @@ describe('ChatSection', () => {
 
   it('50개 초과 메시지는 최근 50개만 유지한다', async () => {
     const manyMessages = Array.from({ length: 60 }, (_, i) => ({
-      id: i,
+      id: i + 1,
       role: i % 2 === 0 ? 'user' : 'assistant',
       content: `메시지 ${i}`,
       recommendations: null,
@@ -227,6 +240,46 @@ describe('ChatSection', () => {
     });
 
     expect(localStorageMock.removeItem).toHaveBeenCalledWith('filmott_chat_messages');
+  });
+
+  it('"새 대화" 클릭 시 진행 중인 요청을 중단하고 늦은 콜백을 무시한다', async () => {
+    let streamCallbacks: ChatStreamCallbacks | null = null;
+    let requestOptions: ChatRequestOptions | null = null;
+
+    mockSendChatMessage.mockImplementationOnce(
+      (
+        _content: string,
+        _history: ChatHistoryMessage[],
+        callbacks: ChatStreamCallbacks,
+        options: ChatRequestOptions,
+      ) => {
+        streamCallbacks = callbacks;
+        requestOptions = options;
+        return new Promise(() => {});
+      },
+    );
+
+    render(<ChatSection />);
+
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '진행 중인 요청' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(screen.getByText('새 대화')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('새 대화'));
+
+    expect(requestOptions?.signal?.aborted).toBe(true);
+
+    act(() => {
+      streamCallbacks?.onText('늦은 응답');
+      streamCallbacks?.onDone();
+    });
+
+    expect(screen.queryByText('늦은 응답')).not.toBeInTheDocument();
+    expect(screen.getByText('오늘 뭐 볼까?')).toBeInTheDocument();
   });
 
   it('대화가 없을 때는 "새 대화" 버튼이 표시되지 않는다', () => {
@@ -308,6 +361,21 @@ describe('ChatSection', () => {
     resolveStream!();
 
     await waitFor(() => {
+      expect(textarea).not.toBeDisabled();
+    });
+  });
+
+  it('done 없이 빈 스트림이 종료되면 로딩을 끝내고 에러를 표시한다', async () => {
+    mockSendChatMessage.mockResolvedValueOnce(undefined);
+
+    render(<ChatSection />);
+
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '빈 응답 테스트' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(screen.getByText('응답을 받지 못했습니다. 다시 시도해주세요.')).toBeInTheDocument();
       expect(textarea).not.toBeDisabled();
     });
   });

@@ -10,7 +10,7 @@ export interface ChatRecommendation {
   tmdbId: number;
   contentType: 'movie' | 'tv';
   title: string;
-  reason: string;
+  reason?: string;
 }
 
 export interface ChatRecommendationWithPoster extends ChatRecommendation {

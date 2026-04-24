@@ -1,4 +1,5 @@
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
+import { isChatRecommendationArray, isRecord } from '@/lib/chat-guards';
 import type { ChatRecommendationWithPoster } from '@/types/chat';
 
 export interface ChatStreamCallbacks {
@@ -13,16 +14,18 @@ export interface ChatHistoryMessage {
   content: string;
 }
 
-interface ChatRequestOptions {
+export interface ChatRequestOptions {
   isAuthenticated?: boolean;
+  signal?: AbortSignal;
 }
 
-async function refreshAccessToken(): Promise<boolean> {
+async function refreshAccessToken(signal?: AbortSignal): Promise<boolean> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   try {
     const res = await fetch(`${apiUrl}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
+      signal,
     });
     return res.ok;
   } catch {
@@ -30,12 +33,13 @@ async function refreshAccessToken(): Promise<boolean> {
   }
 }
 
-async function clearServerSession(): Promise<void> {
+async function clearServerSession(signal?: AbortSignal): Promise<void> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   try {
     await fetch(`${apiUrl}/auth/logout`, {
       method: 'POST',
       credentials: 'include',
+      signal,
     });
   } catch {
     // 쿠키 정리 실패는 무시하고 원래 에러 처리 흐름을 따른다.
@@ -46,6 +50,7 @@ async function fetchWithAuth(
   url: string,
   body: string,
   isAuthenticated: boolean,
+  signal?: AbortSignal,
 ): Promise<Response> {
   const requestInit: RequestInit = {
     method: 'POST',
@@ -54,23 +59,76 @@ async function fetchWithAuth(
     },
     body,
     credentials: 'include',
+    signal,
   };
 
   const response = await fetch(url, requestInit);
 
   if (response.status === 401) {
-    const refreshed = await refreshAccessToken();
+    const refreshed = await refreshAccessToken(signal);
     if (refreshed) {
       return fetch(url, requestInit);
     }
 
     if (!isAuthenticated) {
-      await clearServerSession();
+      await clearServerSession(signal);
       return fetch(url, requestInit);
     }
   }
 
   return response;
+}
+
+function handleSseData(
+  event: string,
+  rawData: string,
+  callbacks: ChatStreamCallbacks,
+) {
+  try {
+    const data: unknown = JSON.parse(rawData);
+
+    switch (event) {
+      case 'text':
+        if (isRecord(data) && typeof data.content === 'string') {
+          callbacks.onText(data.content);
+        }
+        break;
+      case 'recommendations':
+        if (
+          isRecord(data) &&
+          isChatRecommendationArray(data.recommendations)
+        ) {
+          callbacks.onRecommendations(data.recommendations);
+        }
+        break;
+      case 'done':
+        callbacks.onDone();
+        break;
+      case 'error':
+        if (isRecord(data) && typeof data.message === 'string') {
+          callbacks.onError(data.message);
+        }
+        break;
+    }
+  } catch {
+    // JSON 파싱 실패 무시
+  }
+}
+
+function handleSseLine(
+  line: string,
+  currentEvent: string,
+  callbacks: ChatStreamCallbacks,
+): string {
+  if (line.startsWith('event: ')) {
+    return line.slice(7);
+  }
+
+  if (line.startsWith('data: ')) {
+    handleSseData(currentEvent, line.slice(6), callbacks);
+  }
+
+  return currentEvent;
 }
 
 export async function sendChatMessage(
@@ -86,6 +144,7 @@ export async function sendChatMessage(
     `${apiUrl}/chat/messages`,
     JSON.stringify({ content, history }),
     isAuthenticated,
+    options.signal,
   );
 
   if (!response.ok) {
@@ -127,29 +186,7 @@ export async function sendChatMessage(
     buffer = lines.pop() || '';
 
     for (const line of lines) {
-      if (line.startsWith('event: ')) {
-        currentEvent = line.slice(7);
-      } else if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6));
-          switch (currentEvent) {
-            case 'text':
-              callbacks.onText(data.content);
-              break;
-            case 'recommendations':
-              callbacks.onRecommendations(data.recommendations);
-              break;
-            case 'done':
-              callbacks.onDone();
-              break;
-            case 'error':
-              callbacks.onError(data.message);
-              break;
-          }
-        } catch {
-          // JSON 파싱 실패 무시
-        }
-      }
+      currentEvent = handleSseLine(line, currentEvent, callbacks);
     }
   }
 
@@ -157,29 +194,7 @@ export async function sendChatMessage(
   if (buffer.trim()) {
     const remainingLines = buffer.split('\n');
     for (const line of remainingLines) {
-      if (line.startsWith('event: ')) {
-        currentEvent = line.slice(7);
-      } else if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6));
-          switch (currentEvent) {
-            case 'text':
-              callbacks.onText(data.content);
-              break;
-            case 'recommendations':
-              callbacks.onRecommendations(data.recommendations);
-              break;
-            case 'done':
-              callbacks.onDone();
-              break;
-            case 'error':
-              callbacks.onError(data.message);
-              break;
-          }
-        } catch {
-          // JSON 파싱 실패 무시
-        }
-      }
+      currentEvent = handleSseLine(line, currentEvent, callbacks);
     }
   }
 }

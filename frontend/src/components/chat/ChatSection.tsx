@@ -5,6 +5,7 @@ import { Sparkles, MessageSquare, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { sendChatMessage } from '@/lib/chat-stream';
 import type { ChatHistoryMessage } from '@/lib/chat-stream';
+import { isChatMessageData } from '@/lib/chat-guards';
 import ChatMessageBubble from './ChatMessageBubble';
 import ChatInput from './ChatInput';
 import StreamingText from './StreamingText';
@@ -27,6 +28,13 @@ function getHighestMessageId(messages: ChatMessageData[]): number {
   return messages.reduce((maxId, message) => Math.max(maxId, message.id), 0);
 }
 
+function hasAssistantResponse(
+  text: string,
+  recommendations: ChatRecommendationWithPoster[] | null,
+): boolean {
+  return text.length > 0 || (recommendations?.length ?? 0) > 0;
+}
+
 export default function ChatSection() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
@@ -43,12 +51,14 @@ export default function ChatSection() {
   // onDone 이중 호출 방지 플래그
   const isDoneCalledRef = useRef(false);
   const nextMessageIdRef = useRef(1);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const activeRequestIdRef = useRef(0);
 
-  const getNextMessageId = () => {
+  const getNextMessageId = useCallback(() => {
     const nextId = nextMessageIdRef.current;
     nextMessageIdRef.current += 1;
     return nextId;
-  };
+  }, []);
 
   useEffect(() => {
     streamingTextRef.current = streamingText;
@@ -57,6 +67,55 @@ export default function ChatSection() {
   useEffect(() => {
     streamingRecsRef.current = streamingRecs;
   }, [streamingRecs]);
+
+  const isActiveRequest = useCallback((requestId: number) => {
+    return activeRequestIdRef.current === requestId;
+  }, []);
+
+  const clearStreamingState = useCallback((requestId: number) => {
+    if (!isActiveRequest(requestId)) return;
+
+    abortControllerRef.current = null;
+    setIsStreaming(false);
+    setStreamingText('');
+    setStreamingRecs(null);
+    streamingTextRef.current = '';
+    streamingRecsRef.current = null;
+  }, [isActiveRequest]);
+
+  const appendAssistantMessage = useCallback(() => {
+    const cleanedText = streamingTextRef.current;
+    const recommendations = streamingRecsRef.current;
+
+    if (!hasAssistantResponse(cleanedText, recommendations)) {
+      return false;
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: getNextMessageId(),
+        role: 'assistant',
+        content: cleanedText,
+        recommendations,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    return true;
+  }, [getNextMessageId]);
+
+  const abortActiveRequest = useCallback(() => {
+    activeRequestIdRef.current += 1;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      abortActiveRequest();
+    };
+  }, [abortActiveRequest]);
 
   const scrollToBottom = useCallback(() => {
     const container = messagesContainerRef.current;
@@ -79,20 +138,12 @@ export default function ChatSection() {
 
       try {
         const parsed: unknown = JSON.parse(saved);
-        if (
-          Array.isArray(parsed) &&
-          parsed.every(
-            (item) =>
-              typeof item === 'object' &&
-              item !== null &&
-              'role' in item &&
-              'content' in item &&
-              (item.role === 'user' || item.role === 'assistant') &&
-              typeof item.content === 'string',
-          )
-        ) {
+        const validMessages = Array.isArray(parsed) && parsed.every(isChatMessageData)
+          ? parsed
+          : null;
+
+        if (validMessages) {
           // 최근 50개만 로드
-          const validMessages = parsed as ChatMessageData[];
           if (validMessages.length > MAX_STORED_MESSAGES) {
             const trimmed = validMessages.slice(-MAX_STORED_MESSAGES);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
@@ -132,6 +183,7 @@ export default function ChatSection() {
   }, [messages]);
 
   const handleNewChat = () => {
+    abortActiveRequest();
     setMessages([]);
     setStreamingText('');
     setStreamingRecs(null);
@@ -144,6 +196,12 @@ export default function ChatSection() {
   const handleSend = async (content: string) => {
     trackEvent('chat_message_sent', { message_count: messages.length + 1 });
     setError(null);
+    abortControllerRef.current?.abort();
+
+    const abortController = new AbortController();
+    const requestId = activeRequestIdRef.current + 1;
+    activeRequestIdRef.current = requestId;
+    abortControllerRef.current = abortController;
 
     // 대화 이력 구성 (최근 20개만 전송, role + content만 추출)
     const history: ChatHistoryMessage[] = messages.slice(-MAX_HISTORY_MESSAGES).map((msg) => ({
@@ -170,76 +228,52 @@ export default function ChatSection() {
     try {
       await sendChatMessage(content, history, {
         onText: (text) => {
+          if (!isActiveRequest(requestId)) return;
           streamingTextRef.current += text;
           setStreamingText((prev) => prev + text);
         },
         onRecommendations: (recs) => {
+          if (!isActiveRequest(requestId)) return;
           streamingRecsRef.current = recs;
           setStreamingRecs(recs);
         },
         onDone: () => {
+          if (!isActiveRequest(requestId)) return;
           isDoneCalledRef.current = true;
-          const cleanedText = streamingTextRef.current;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: getNextMessageId(),
-              role: 'assistant',
-              content: cleanedText,
-              recommendations: streamingRecsRef.current,
-              createdAt: new Date().toISOString(),
-            },
-          ]);
-          setIsStreaming(false);
-          setStreamingText('');
-          setStreamingRecs(null);
+          appendAssistantMessage();
+          clearStreamingState(requestId);
         },
         onError: (message) => {
+          if (!isActiveRequest(requestId)) return;
           isDoneCalledRef.current = true;
           setError(message);
-          setIsStreaming(false);
-          setStreamingText('');
-          setStreamingRecs(null);
+          clearStreamingState(requestId);
         },
-      }, { isAuthenticated: Boolean(user) });
+      }, { isAuthenticated: Boolean(user), signal: abortController.signal });
+
+      if (!isActiveRequest(requestId)) return;
 
       // onDone이 호출되지 않은 경우 (연결 끊김 등) 받은 텍스트 보존
-      if (!isDoneCalledRef.current && streamingTextRef.current) {
-        const cleanedText = streamingTextRef.current;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: getNextMessageId(),
-            role: 'assistant',
-            content: cleanedText,
-            recommendations: streamingRecsRef.current,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-        setIsStreaming(false);
-        setStreamingText('');
-        setStreamingRecs(null);
+      if (!isDoneCalledRef.current) {
+        const appended = appendAssistantMessage();
+        if (!appended) {
+          setError('응답을 받지 못했습니다. 다시 시도해주세요.');
+        }
+        clearStreamingState(requestId);
       }
     } catch {
+      if (!isActiveRequest(requestId) || abortController.signal.aborted) return;
+
       // 에러 시에도 받은 텍스트가 있으면 보존
-      if (!isDoneCalledRef.current && streamingTextRef.current) {
-        const cleanedText = streamingTextRef.current;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: getNextMessageId(),
-            role: 'assistant',
-            content: cleanedText,
-            recommendations: streamingRecsRef.current,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
+      if (
+        !isDoneCalledRef.current &&
+        hasAssistantResponse(streamingTextRef.current, streamingRecsRef.current)
+      ) {
+        appendAssistantMessage();
       } else if (!isDoneCalledRef.current) {
         setError('메시지 전송 중 오류가 발생했습니다.');
       }
-      setIsStreaming(false);
-      setStreamingText('');
-      setStreamingRecs(null);
+      clearStreamingState(requestId);
     }
   };
 
