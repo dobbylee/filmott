@@ -37,6 +37,10 @@ import {
 } from './structured-chat-response';
 
 const OPENAI_CHAT_TIMEOUT_MS = 30_000;
+const SSE_TEXT_CHUNK_SIZE = 8;
+const SSE_TEXT_CHUNK_DELAY_MS = 28;
+const SSE_TEXT_SENTENCE_DELAY_MS = 60;
+const SSE_TEXT_PARAGRAPH_DELAY_MS = 110;
 
 interface RawFavoriteRow {
   title: string;
@@ -333,7 +337,11 @@ export class ChatService {
     }
 
     const renderedText = renderStructuredChatResponse(parsed);
-    emit('text', { content: renderedText });
+    await this.emitTextChunks(renderedText, emit, signal);
+
+    if (signal?.aborted) {
+      return;
+    }
 
     const { matched, unmatched } = matchStructuredRecommendationsToCandidates(
       parsed.recommendations,
@@ -350,6 +358,43 @@ export class ChatService {
     }
 
     emit('done', {});
+  }
+
+  private async emitTextChunks(
+    text: string,
+    emit: SseEmitter,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    for (let index = 0; index < text.length; index += SSE_TEXT_CHUNK_SIZE) {
+      if (signal?.aborted) return;
+
+      const chunk = text.slice(index, index + SSE_TEXT_CHUNK_SIZE);
+      emit('text', {
+        content: chunk,
+      });
+
+      if (index + SSE_TEXT_CHUNK_SIZE < text.length) {
+        await this.sleep(this.getTextChunkDelay(chunk));
+      }
+    }
+  }
+
+  private getTextChunkDelay(chunk: string): number {
+    if (/\n\s*$/.test(chunk)) {
+      return SSE_TEXT_PARAGRAPH_DELAY_MS;
+    }
+
+    if (/[.!?。！？요다]\s*$/.test(chunk)) {
+      return SSE_TEXT_SENTENCE_DELAY_MS;
+    }
+
+    return SSE_TEXT_CHUNK_DELAY_MS;
+  }
+
+  private sleep(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => {
+      setTimeout(resolve, milliseconds);
+    });
   }
 
   private async cacheUnmatchedTitles(

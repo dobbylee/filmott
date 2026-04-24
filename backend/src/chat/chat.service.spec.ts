@@ -349,10 +349,13 @@ describe('ChatService', () => {
 
       // text 이벤트 확인
       const textEvents = emittedEvents.filter((e) => e.event === 'text');
-      expect(textEvents.length).toBeGreaterThan(0);
+      expect(textEvents.length).toBeGreaterThan(1);
       expect((textEvents[0].data as { content: string }).content).toContain(
         '좋은 영화',
       );
+      expect(
+        textEvents.map((e) => (e.data as { content: string }).content).join(''),
+      ).toContain('**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.');
 
       // recommendations 이벤트 확인 (후보 매칭 성공 시)
       const recEvents = emittedEvents.filter(
