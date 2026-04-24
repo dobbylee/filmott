@@ -12,6 +12,10 @@ export interface ChatStreamCallbacks {
 export interface ChatHistoryMessage {
   role: 'user' | 'assistant';
   content: string;
+  recommendations?: Pick<
+    ChatRecommendationWithPoster,
+    'tmdbId' | 'contentType' | 'title'
+  >[];
 }
 
 export interface ChatRequestOptions {

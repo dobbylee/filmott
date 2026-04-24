@@ -203,11 +203,18 @@ export default function ChatSection() {
     activeRequestIdRef.current = requestId;
     abortControllerRef.current = abortController;
 
-    // 대화 이력 구성 (최근 20개만 전송, role + content만 추출)
-    const history: ChatHistoryMessage[] = messages.slice(-MAX_HISTORY_MESSAGES).map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    // 대화 이력 구성 (최근 20개만 전송, 추천 메타데이터는 중복 방지용)
+    const history: ChatHistoryMessage[] = messages
+      .slice(-MAX_HISTORY_MESSAGES)
+      .map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+        recommendations: msg.recommendations?.map((recommendation) => ({
+          tmdbId: recommendation.tmdbId,
+          contentType: recommendation.contentType,
+          title: recommendation.title,
+        })),
+      }));
 
     // 낙관적 UI: 사용자 메시지 추가
     const userMessage: ChatMessageData = {

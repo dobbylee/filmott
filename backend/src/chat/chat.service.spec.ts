@@ -13,6 +13,7 @@ import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
 import { UserPreference } from './user-preference';
+import type { StructuredChatResponse } from './structured-chat-response';
 
 // extractUserPreference mock
 const mockExtractUserPreference = jest.fn<UserPreference, []>();
@@ -85,6 +86,26 @@ describe('ChatService', () => {
     get: jest.fn().mockReturnValue('test-openai-key'),
   };
 
+  const defaultStructuredResponse: StructuredChatResponse = {
+    intro: '추천해 드릴게요.',
+    recommendations: [],
+    outro: '다른 분위기나 장르도 말해주세요.',
+  };
+
+  const mockStructuredResponse = (
+    response: StructuredChatResponse = defaultStructuredResponse,
+  ) => {
+    mockStreamCreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify(response),
+          },
+        },
+      ],
+    });
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -103,6 +124,7 @@ describe('ChatService', () => {
     }).compile();
 
     service = module.get<ChatService>(ChatService);
+    mockStructuredResponse();
   });
 
   afterEach(() => {
@@ -283,7 +305,7 @@ describe('ChatService', () => {
       mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference });
     };
 
-    it('볼드 제목이 후보와 매칭되면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
+    it('구조화 추천이 후보와 매칭되면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
       setupEmptyUserContext();
 
       const candidates: SimilarContent[] = [
@@ -304,28 +326,18 @@ describe('ChatService', () => {
       ];
       mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
 
-      // OpenAI 스트리밍 mock: 볼드 제목을 포함한 텍스트만
-      const chunks = [
-        {
-          choices: [{ delta: { content: '좋은 영화를 추천해 드릴게요!\n\n' } }],
-        },
-        {
-          choices: [
-            {
-              delta: {
-                content: '**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.',
-              },
-            },
-          ],
-        },
-      ];
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          for (const chunk of chunks) {
-            yield chunk;
-          }
-        },
+      mockStructuredResponse({
+        intro: '좋은 영화를 추천해 드릴게요!',
+        recommendations: [
+          {
+            tmdbId: 496243,
+            contentType: 'movie',
+            title: '기생충',
+            englishTitle: 'Parasite',
+            reason: '봉준호 감독의 걸작입니다.',
+          },
+        ],
+        outro: '다른 분위기도 말해주세요.',
       });
 
       const emittedEvents: { event: string; data: unknown }[] = [];
@@ -357,20 +369,13 @@ describe('ChatService', () => {
       expect(doneEvents).toHaveLength(1);
     });
 
-    it('function call 없이 텍스트만 있으면 recommendations 이벤트를 emit하지 않아야 한다', async () => {
+    it('구조화 응답에 추천작이 없으면 recommendations 이벤트를 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
-
-      const chunks = [
-        { choices: [{ delta: { content: '네, 어떤 장르를 좋아하시나요?' } }] },
-      ];
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          for (const chunk of chunks) {
-            yield chunk;
-          }
-        },
+      mockStructuredResponse({
+        intro: '네, 어떤 장르를 좋아하시나요?',
+        recommendations: [],
+        outro: '원하는 분위기를 알려주시면 더 정확히 추천해 드릴게요.',
       });
 
       const emittedEvents: { event: string; data: unknown }[] = [];
@@ -389,15 +394,79 @@ describe('ChatService', () => {
       expect(doneEvents).toHaveLength(1);
     });
 
+    it('굵은 글씨 키워드가 텍스트에 있어도 구조화 추천 배열에 없으면 카드로 만들지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([
+        {
+          contentId: 1,
+          tmdbId: 123,
+          contentType: 'movie',
+          title: '청춘',
+          posterUrl: '/youth.jpg',
+          genres: [{ id: 18, name: '드라마' }],
+          voteAverage: 7.5,
+          description: '청춘 영화',
+          similarity: 0.8,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+      ]);
+      mockStructuredResponse({
+        intro: '**청춘** 키워드 중심으로 골라봤어요.',
+        recommendations: [],
+        outro: '원하는 분위기를 더 알려주세요.',
+      });
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '청춘 영화 추천해줘', [], emit);
+
+      const textEvents = emittedEvents.filter((e) => e.event === 'text');
+      expect((textEvents[0].data as { content: string }).content).toContain(
+        '**청춘**',
+      );
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
+      expect(recEvents).toHaveLength(0);
+    });
+
+    it('이전 추천작은 history의 recommendations 메타데이터를 우선 사용해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+
+      await service.sendMessageStream(
+        1,
+        '다른 작품 추천해줘',
+        [
+          {
+            role: 'assistant',
+            content: '**청춘** 키워드로 골라봤어요.',
+            recommendations: [
+              {
+                tmdbId: 496243,
+                contentType: 'movie',
+                title: '기생충',
+              },
+            ],
+          },
+        ],
+        jest.fn(),
+      );
+
+      const createParams = mockStreamCreate.mock.calls[0][0];
+      const systemMessage = createParams.messages[0];
+      expect(systemMessage.content).toContain('이미 추천한 작품: 기생충');
+      expect(systemMessage.content).not.toContain('이미 추천한 작품: 청춘');
+    });
+
     it('content_metadata가 비어있으면 임베딩 검색을 스킵해야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(false);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
-        },
-      });
 
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
@@ -439,33 +508,27 @@ describe('ChatService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('OpenAI 스트리밍 호출에 30초 timeout 옵션이 전달되어야 한다', async () => {
+    it('OpenAI 구조화 응답 호출에 30초 timeout 옵션이 전달되어야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
-        },
-      });
-
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
-      expect(mockStreamCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ stream: true }),
-        expect.objectContaining({ timeout: 30_000 }),
+      const createParams = mockStreamCreate.mock.calls[0][0];
+      expect(createParams).toEqual(
+        expect.objectContaining({
+          response_format: expect.objectContaining({ type: 'json_schema' }),
+        }),
+      );
+      expect(createParams).not.toHaveProperty('stream');
+      expect(mockStreamCreate.mock.calls[0][1]).toEqual(
+        expect.objectContaining({ timeout: 30_000, signal: undefined }),
       );
     });
 
     it('대화 이력(history)을 포함하여 OpenAI에 전달해야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '안녕하세요!' } }] };
-        },
-      });
 
       const history = [
         { role: 'user' as const, content: '이전 질문' },
@@ -502,12 +565,6 @@ describe('ChatService', () => {
       );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '넷플릭스 추천!' } }] };
-        },
-      });
-
       await service.sendMessageStream(
         1,
         '넷플릭스에서 볼만한 영화',
@@ -537,12 +594,6 @@ describe('ChatService', () => {
         '재미있는 영화',
       );
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
-        },
-      });
 
       await service.sendMessageStream(
         1,
@@ -575,12 +626,6 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue(intentResult);
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('감독 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
 
       await service.sendMessageStream(
         1,
@@ -622,12 +667,6 @@ describe('ChatService', () => {
       );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
-
       await service.sendMessageStream(
         1,
         '넷플릭스에서 봉준호 감독의 한국 사회 풍자 영화',
@@ -663,12 +702,6 @@ describe('ChatService', () => {
       setupEmptyUserContext();
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(false);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
-        },
-      });
-
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
       expect(mockIntentAnalyzerService.analyzeIntent).not.toHaveBeenCalled();
@@ -686,12 +719,6 @@ describe('ChatService', () => {
         '90년대 이전 영화',
       );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
 
       await service.sendMessageStream(1, '90년대 이전 영화', [], jest.fn());
 
@@ -719,12 +746,6 @@ describe('ChatService', () => {
         '무서운 영화',
       );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '공포 영화 추천!' } }] };
-        },
-      });
 
       await service.sendMessageStream(
         1,
@@ -764,12 +785,6 @@ describe('ChatService', () => {
         '잔잔한 영화',
       );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
-        },
-      });
 
       await service.sendMessageStream(
         1,
@@ -813,12 +828,6 @@ describe('ChatService', () => {
       );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
-
       await service.sendMessageStream(
         1,
         '디즈니플러스 미국 히어로 영화',
@@ -855,12 +864,6 @@ describe('ChatService', () => {
       );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
-
       await service.sendMessageStream(1, '티빙에서 볼만한 영화', [], jest.fn());
 
       const calledFilters =
@@ -887,12 +890,6 @@ describe('ChatService', () => {
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('추천 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
 
       await service.sendMessageStream(
         1,
@@ -930,12 +927,6 @@ describe('ChatService', () => {
       );
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
-
       await service.sendMessageStream(
         1,
         '미국 액션 SF 영화 추천해줘',
@@ -971,12 +962,6 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('뭐 볼까');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
-
       await service.sendMessageStream(1, '뭐 볼까', [], jest.fn());
 
       const calledFilters =
@@ -991,12 +976,6 @@ describe('ChatService', () => {
     it('extractUserPreference가 올바른 인자로 호출되어야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
-
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천해 드릴게요.' } }] };
-        },
-      });
 
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
@@ -1029,12 +1008,6 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('영화 추천');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
-
       await service.sendMessageStream(1, '영화 추천해줘', [], jest.fn());
 
       const calledFilters =
@@ -1061,12 +1034,6 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('공포 영화');
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
-      });
-
       await service.sendMessageStream(1, '공포 영화 추천해줘', [], jest.fn());
 
       const calledFilters =
@@ -1074,178 +1041,6 @@ describe('ChatService', () => {
       // '공포'는 명시적 요청 장르이므로 excludeGenres에서 제거
       expect(calledFilters.genres).toEqual(['공포']);
       expect(calledFilters.excludeGenres).toEqual(['스릴러']);
-    });
-  });
-
-  describe('extractTitlesFromText', () => {
-    it('볼드 제목을 올바르게 추출해야 한다', () => {
-      const text =
-        '**기생충 (Parasite)** — 봉준호 감독 걸작.\n**인셉션 (Inception)** — 꿈 속의 꿈.';
-      const result = service.extractTitlesFromText(text);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].korean).toBe('기생충');
-      expect(result[0].english).toBe('Parasite');
-      expect(result[1].korean).toBe('인셉션');
-      expect(result[1].english).toBe('Inception');
-    });
-
-    it('영어 원제 없는 볼드 제목도 추출해야 한다', () => {
-      const text = '**기생충** — 감동적인 영화입니다.';
-      const result = service.extractTitlesFromText(text);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].korean).toBe('기생충');
-      expect(result[0].english).toBeNull();
-    });
-
-    it('최대 5개까지만 추출해야 한다', () => {
-      const text =
-        '**작품1** **작품2** **작품3** **작품4** **작품5** **작품6**';
-      const result = service.extractTitlesFromText(text);
-
-      expect(result).toHaveLength(5);
-    });
-
-    it('중복 제목은 한 번만 추출해야 한다', () => {
-      const text = '**기생충 (Parasite)** 설명.\n**기생충** 다시 언급.';
-      const result = service.extractTitlesFromText(text);
-
-      expect(result).toHaveLength(1);
-    });
-
-    it('볼드 제목이 없으면 빈 배열을 반환해야 한다', () => {
-      const result = service.extractTitlesFromText('일반 텍스트입니다.');
-      expect(result).toEqual([]);
-    });
-
-    it('3자 미만의 볼드 텍스트는 무시해야 한다', () => {
-      const text =
-        '**AB** 이것은 제목이 아닙니다. **기생충** 이것은 제목입니다.';
-      const result = service.extractTitlesFromText(text);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].korean).toBe('기생충');
-    });
-  });
-
-  describe('matchTitlesToCandidates', () => {
-    const candidates: SimilarContent[] = [
-      {
-        contentId: 1,
-        tmdbId: 496243,
-        contentType: 'movie',
-        title: '기생충',
-        posterUrl: '/poster.jpg',
-        genres: [{ id: 18, name: '드라마' }],
-        voteAverage: 8.6,
-        description: '어두운 스릴러',
-        similarity: 0.95,
-        director: '봉준호',
-        originCountry: 'KR',
-        overview: null,
-      },
-      {
-        contentId: 2,
-        tmdbId: 27205,
-        contentType: 'movie',
-        title: 'Inception',
-        posterUrl: '/inception.jpg',
-        genres: [{ id: 28, name: '액션' }],
-        voteAverage: 8.8,
-        description: '꿈의 세계',
-        similarity: 0.92,
-        director: '크리스토퍼 놀란',
-        originCountry: 'US',
-        overview: null,
-      },
-    ];
-
-    it('한국어 제목으로 후보를 정확 매칭해야 한다', () => {
-      const titles = [{ korean: '기생충', english: 'Parasite' }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(
-        titles,
-        candidates,
-      );
-
-      expect(matched).toHaveLength(1);
-      expect(matched[0].tmdbId).toBe(496243);
-      expect(matched[0].title).toBe('기생충');
-      expect(matched[0].posterUrl).toBe('/poster.jpg');
-      expect(unmatched).toHaveLength(0);
-    });
-
-    it('영어 원제로 후보를 정확 매칭해야 한다', () => {
-      const titles = [{ korean: '인셉션', english: 'Inception' }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(
-        titles,
-        candidates,
-      );
-
-      expect(matched).toHaveLength(1);
-      expect(matched[0].tmdbId).toBe(27205);
-      expect(unmatched).toHaveLength(0);
-    });
-
-    it('포함 관계로 부분 매칭해야 한다', () => {
-      const candidatesWithSeason: SimilarContent[] = [
-        {
-          contentId: 3,
-          tmdbId: 12345,
-          contentType: 'tv',
-          title: '오징어 게임: 시즌 2',
-          posterUrl: '/squid2.jpg',
-          genres: [],
-          voteAverage: 8.0,
-          description: '설명',
-          similarity: 0.88,
-          director: null,
-          originCountry: 'KR',
-          overview: null,
-        },
-      ];
-      const titles = [{ korean: '오징어 게임', english: null }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(
-        titles,
-        candidatesWithSeason,
-      );
-
-      expect(matched).toHaveLength(1);
-      expect(matched[0].tmdbId).toBe(12345);
-      expect(unmatched).toHaveLength(0);
-    });
-
-    it('매칭 실패 시 unmatched에 포함해야 한다', () => {
-      const titles = [{ korean: '존재하지 않는 영화', english: null }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(
-        titles,
-        candidates,
-      );
-
-      expect(matched).toHaveLength(0);
-      expect(unmatched).toHaveLength(1);
-      expect(unmatched[0].korean).toBe('존재하지 않는 영화');
-    });
-
-    it('빈 titles이면 matched/unmatched 모두 빈 배열이어야 한다', () => {
-      const { matched, unmatched } = service.matchTitlesToCandidates(
-        [],
-        candidates,
-      );
-
-      expect(matched).toEqual([]);
-      expect(unmatched).toEqual([]);
-    });
-
-    it('빈 candidates이면 모두 unmatched가 되어야 한다', () => {
-      const titles = [{ korean: '기생충', english: null }];
-      const { matched, unmatched } = service.matchTitlesToCandidates(
-        titles,
-        [],
-      );
-
-      expect(matched).toHaveLength(0);
-      expect(unmatched).toHaveLength(1);
     });
   });
 
@@ -1274,11 +1069,6 @@ describe('ChatService', () => {
         hasData: false,
         excludeGenres: [],
         excludePersonNames: [],
-      });
-      mockStreamCreate.mockResolvedValue({
-        [Symbol.asyncIterator]: async function* () {
-          yield { choices: [{ delta: { content: '추천합니다.' } }] };
-        },
       });
     };
 

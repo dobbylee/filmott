@@ -7,8 +7,22 @@ import {
   MinLength,
   ValidateNested,
   ArrayMaxSize,
+  IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class ChatHistoryRecommendationDto {
+  @IsInt()
+  tmdbId!: number;
+
+  @IsString()
+  @IsIn(['movie', 'tv'])
+  contentType!: 'movie' | 'tv';
+
+  @IsString()
+  @MaxLength(120)
+  title!: string;
+}
 
 export class ChatHistoryMessageDto {
   @IsString()
@@ -18,6 +32,13 @@ export class ChatHistoryMessageDto {
   @IsString()
   @MaxLength(2000)
   content!: string;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ChatHistoryRecommendationDto)
+  @ArrayMaxSize(5)
+  recommendations?: ChatHistoryRecommendationDto[];
 }
 
 export class SendMessageDto {

@@ -421,6 +421,65 @@ describe('ChatSection', () => {
     });
   });
 
+  it('이전 어시스턴트 추천 메타데이터를 history에 포함한다', async () => {
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        callbacks.onText('추천 응답');
+        callbacks.onRecommendations([
+          {
+            tmdbId: 496243,
+            contentType: 'movie',
+            title: '기생충',
+            posterUrl: '/poster.jpg',
+            reason: '사회 풍자가 강렬해요.',
+          },
+        ]);
+        callbacks.onDone();
+        return Promise.resolve();
+      },
+    );
+
+    render(<ChatSection />);
+
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '첫 번째 질문' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(mockSendChatMessage).toHaveBeenCalledTimes(1);
+    });
+
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        callbacks.onDone();
+        return Promise.resolve();
+      },
+    );
+
+    fireEvent.change(textarea, { target: { value: '두 번째 질문' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(mockSendChatMessage).toHaveBeenCalledTimes(2);
+    });
+
+    const history = mockSendChatMessage.mock.calls[1][1] as ChatHistoryMessage[];
+    expect(history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'assistant',
+          recommendations: [
+            {
+              tmdbId: 496243,
+              contentType: 'movie',
+              title: '기생충',
+            },
+          ],
+        }),
+      ]),
+    );
+  });
+
   it('id="chat-section" 속성이 부여된다', () => {
     const { container } = render(<ChatSection />);
     expect(container.querySelector('#chat-section')).toBeInTheDocument();

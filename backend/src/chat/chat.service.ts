@@ -28,15 +28,15 @@ import {
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
+import {
+  CHAT_RESPONSE_FORMAT,
+  extractPreviouslyRecommendedTitles,
+  matchStructuredRecommendationsToCandidates,
+  parseStructuredChatResponse,
+  renderStructuredChatResponse,
+} from './structured-chat-response';
 
-const OPENAI_STREAM_TIMEOUT_MS = 30_000;
-
-export interface ChatRecommendation {
-  tmdbId: number;
-  contentType: 'movie' | 'tv';
-  title: string;
-  posterUrl: string | null;
-}
+const OPENAI_CHAT_TIMEOUT_MS = 30_000;
 
 interface RawFavoriteRow {
   title: string;
@@ -276,12 +276,9 @@ export class ChatService {
     }
 
     // 8. 이전 대화에서 추천한 작품 제목 추출
-    const previouslyRecommended = (history || [])
-      .filter((msg) => msg.role === 'assistant')
-      .flatMap((msg) => {
-        const matches = msg.content.match(/\*\*(.+?)\*\*/g);
-        return matches ? matches.map((m) => m.replace(/\*\*/g, '')) : [];
-      });
+    const previouslyRecommended = extractPreviouslyRecommendedTitles(
+      history || [],
+    );
 
     // 9. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
     const systemPrompt = buildSystemPrompt(
@@ -302,132 +299,57 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 11. GPT 스트리밍 호출 (function calling 없이 텍스트만)
-    const stream = await this.openai.chat.completions.create(
+    // 11. GPT 구조화 응답 호출
+    const response = await this.openai.chat.completions.create(
       {
         model: CHAT_MODEL,
         reasoning_effort: 'low',
         max_completion_tokens: 4096,
-        stream: true,
+        response_format: CHAT_RESPONSE_FORMAT,
         messages: [{ role: 'system', content: systemPrompt }, ...messages],
       },
-      { timeout: OPENAI_STREAM_TIMEOUT_MS },
+      { timeout: OPENAI_CHAT_TIMEOUT_MS, signal },
     );
 
-    let fullText = '';
-
-    // 12. 스트리밍 이벤트 처리
-    try {
-      for await (const chunk of stream) {
-        if (signal?.aborted) {
-          stream.controller.abort();
-          return;
-        }
-
-        const delta = chunk.choices[0]?.delta?.content;
-        if (delta) {
-          fullText += delta;
-          emit('text', { content: delta });
-        }
-      }
-    } catch (error) {
-      if (signal?.aborted) return;
-      throw error;
+    if (signal?.aborted) {
+      return;
     }
 
-    // 13. 볼드 제목 추출 → 후보 내 매칭(카드) + 후보 외(비동기 캐싱만)
-    const titles = this.extractTitlesFromText(fullText);
-    if (titles.length > 0) {
-      const { matched, unmatched } = this.matchTitlesToCandidates(
-        titles,
-        similarContents,
-      );
+    const rawContent = response.choices[0]?.message?.content?.trim();
+    if (!rawContent) {
+      throw new BadRequestException('AI 응답을 생성하지 못했습니다.');
+    }
 
-      if (matched.length > 0) {
-        emit('recommendations', { recommendations: matched });
-      }
+    let rawParsed: unknown;
+    try {
+      rawParsed = JSON.parse(rawContent) as unknown;
+    } catch {
+      throw new BadRequestException('AI 응답 형식이 올바르지 않습니다.');
+    }
 
-      // 후보 외 작품은 비동기로 TMDB 검색 + 캐싱 (카드 미표시, await 안 함)
-      if (unmatched.length > 0) {
-        this.cacheUnmatchedTitles(unmatched).catch(() => {});
-      }
+    const parsed = parseStructuredChatResponse(rawParsed);
+    if (!parsed) {
+      throw new BadRequestException('AI 응답 형식이 올바르지 않습니다.');
+    }
+
+    const renderedText = renderStructuredChatResponse(parsed);
+    emit('text', { content: renderedText });
+
+    const { matched, unmatched } = matchStructuredRecommendationsToCandidates(
+      parsed.recommendations,
+      similarContents,
+    );
+
+    if (matched.length > 0) {
+      emit('recommendations', { recommendations: matched });
+    }
+
+    // 후보 외 작품은 비동기로 TMDB 검색 + 캐싱 (카드 미표시, await 안 함)
+    if (unmatched.length > 0) {
+      this.cacheUnmatchedTitles(unmatched).catch(() => {});
     }
 
     emit('done', {});
-  }
-
-  extractTitlesFromText(
-    text: string,
-  ): { korean: string; english: string | null }[] {
-    // **한국어 제목 (영어 원제)** 또는 **제목** 패턴에서 추출
-    const boldPattern = /\*\*(.+?)\*\*/g;
-    const results: { korean: string; english: string | null }[] = [];
-    const seen = new Set<string>();
-    let match: RegExpExecArray | null;
-
-    while ((match = boldPattern.exec(text)) !== null) {
-      const raw = match[1].trim();
-      if (raw.length < 3 || raw.length > 100) continue;
-
-      // "한국어 제목 (English Title)" 패턴 분리
-      const parenMatch = raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-      const korean = parenMatch ? parenMatch[1].trim() : raw;
-      const english = parenMatch ? parenMatch[2].trim() : null;
-
-      if (!seen.has(korean)) {
-        seen.add(korean);
-        results.push({ korean, english });
-      }
-    }
-
-    return results.slice(0, 5);
-  }
-
-  matchTitlesToCandidates(
-    titles: { korean: string; english: string | null }[],
-    candidates: SimilarContent[],
-  ): {
-    matched: ChatRecommendation[];
-    unmatched: { korean: string; english: string | null }[];
-  } {
-    const matched: ChatRecommendation[] = [];
-    const unmatched: { korean: string; english: string | null }[] = [];
-
-    for (const title of titles) {
-      const korean = title.korean.toLowerCase();
-      const english = title.english?.toLowerCase();
-
-      // 1차: 정확 일치
-      let candidate = candidates.find((c) => {
-        const cTitle = c.title.toLowerCase();
-        return cTitle === korean || (english && cTitle === english);
-      });
-
-      // 2차: 포함 관계 (예: "오징어 게임" ↔ "오징어 게임: 시즌 2")
-      if (!candidate) {
-        candidate = candidates.find((c) => {
-          const cTitle = c.title.toLowerCase();
-          return (
-            cTitle.includes(korean) ||
-            korean.includes(cTitle) ||
-            (english && (cTitle.includes(english) || english.includes(cTitle)))
-          );
-        });
-      }
-
-      if (candidate) {
-        matched.push({
-          tmdbId: candidate.tmdbId,
-          contentType: candidate.contentType as 'movie' | 'tv',
-          title: candidate.title,
-          posterUrl: candidate.posterUrl,
-        });
-      } else {
-        unmatched.push(title);
-      }
-    }
-
-    return { matched, unmatched };
   }
 
   private async cacheUnmatchedTitles(
