@@ -1,8 +1,15 @@
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
+
+const ALLOWED_TAGS = new Set(['rankings']);
 
 function isAllowedPath(path: string): boolean {
   return path === '/' || path === '/contents' || path.startsWith('/contents/');
+}
+
+function getAllowedTags(tags: unknown): string[] {
+  if (!Array.isArray(tags)) return [];
+  return tags.filter((tag): tag is string => typeof tag === 'string' && ALLOWED_TAGS.has(tag));
 }
 
 export async function POST(request: NextRequest) {
@@ -15,15 +22,28 @@ export async function POST(request: NextRequest) {
   }
 
   let path = '/';
+  let tags: string[] = [];
   try {
-    const body: { path?: string } = await request.json();
-    if (body.path && isAllowedPath(body.path)) {
+    const body = (await request.json()) as unknown;
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      'path' in body &&
+      typeof body.path === 'string' &&
+      isAllowedPath(body.path)
+    ) {
       path = body.path;
+    }
+    if (typeof body === 'object' && body !== null && 'tags' in body) {
+      tags = getAllowedTags(body.tags);
     }
   } catch {
     // body 파싱 실패 시 기본값 '/' 사용
   }
 
+  for (const tag of tags) {
+    revalidateTag(tag, { expire: 0 });
+  }
   revalidatePath(path);
-  return NextResponse.json({ revalidated: true, path });
+  return NextResponse.json({ revalidated: true, path, tags });
 }

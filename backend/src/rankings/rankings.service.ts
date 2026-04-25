@@ -14,6 +14,7 @@ import { TMDB_IMAGE_BASE } from '../common/constants';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const TMDB_CALL_DELAY_MS = 250;
+const RANKINGS_REVALIDATE_TAGS = ['rankings'];
 
 @Injectable()
 export class RankingsService {
@@ -155,7 +156,10 @@ export class RankingsService {
         this.cacheMetadataInBackground(contentIds);
       }
 
-      await this.revalidateService.revalidatePath('/');
+      await this.revalidateService.revalidatePath(
+        '/',
+        RANKINGS_REVALIDATE_TAGS,
+      );
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error('Failed to fetch daily box office', error);
@@ -234,7 +238,10 @@ export class RankingsService {
         this.cacheMetadataInBackground(contentIds);
       }
 
-      await this.revalidateService.revalidatePath('/');
+      await this.revalidateService.revalidatePath(
+        '/',
+        RANKINGS_REVALIDATE_TAGS,
+      );
       return rankingsToUpsert;
     } catch (error) {
       this.logger.error('Failed to fetch weekly box office', error);
@@ -269,7 +276,7 @@ export class RankingsService {
       }
     }
 
-    await this.revalidateService.revalidatePath('/');
+    await this.revalidateService.revalidatePath('/', RANKINGS_REVALIDATE_TAGS);
   }
 
   /** revalidation은 호출자 책임 — fetchAllTrending()에서 일괄 처리 */
@@ -400,7 +407,7 @@ export class RankingsService {
     }
     ranking.posterUrl = posterUrl;
     const saved = await this.rankingRepo.save(ranking);
-    await this.revalidateService.revalidatePath('/');
+    await this.revalidateService.revalidatePath('/', RANKINGS_REVALIDATE_TAGS);
     return saved;
   }
 

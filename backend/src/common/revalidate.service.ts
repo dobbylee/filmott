@@ -66,17 +66,21 @@ export class RevalidateService {
     }
   }
 
-  async revalidatePath(path: string = '/'): Promise<void> {
+  async revalidatePath(path: string = '/', tags: string[] = []): Promise<void> {
     if (!this.revalidateSecret) return;
     try {
       const url = `${this.frontendInternalUrl}/internal/revalidate`;
+      const body: { path: string; tags?: string[] } = { path };
+      if (tags.length > 0) {
+        body.tags = tags;
+      }
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.revalidateSecret}`,
         },
-        body: JSON.stringify({ path }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) {
         this.logger.warn(`캐시 갱신 실패 (${path}): HTTP ${response.status}`);

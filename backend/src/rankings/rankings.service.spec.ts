@@ -132,7 +132,9 @@ describe('RankingsService', () => {
         'targetDate',
       ]);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/', [
+        'rankings',
+      ]);
     });
 
     it('TMDB 매칭 실패 시에도 랭킹을 저장해야 한다', async () => {
@@ -595,7 +597,9 @@ describe('RankingsService', () => {
       // fetchAllTrending은 fetchTrending을 2회 호출하지만, revalidate는 1회만
       expect(mockTmdbService.getTrending).toHaveBeenCalledTimes(2);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/', [
+        'rankings',
+      ]);
     });
 
     it('fetchTrending 단독 호출 시 revalidatePath를 호출하지 않아야 한다', async () => {
@@ -645,7 +649,9 @@ describe('RankingsService', () => {
       await service.fetchAllTrending();
 
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/', [
+        'rankings',
+      ]);
     });
 
     it('일부 카테고리 fetchTrending이 실패하면 Sentry.captureException을 호출해야 한다', async () => {
@@ -802,7 +808,9 @@ describe('RankingsService', () => {
         55,
       ]);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/', [
+        'rankings',
+      ]);
     });
   });
 

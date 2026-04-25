@@ -141,6 +141,22 @@ describe('RevalidateService', () => {
       );
     });
 
+    it('캐시 태그를 함께 전달할 수 있어야 한다', async () => {
+      const fetchSpy = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(makeResponse());
+
+      await service.revalidatePath('/', ['rankings']);
+
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
+        'http://frontend:3000/internal/revalidate',
+        expect.objectContaining({
+          body: JSON.stringify({ path: '/', tags: ['rankings'] }),
+        }),
+      );
+    });
+
     it('워밍 대상이 아닌 path는 revalidate만 호출해야 한다', async () => {
       const fetchSpy = jest
         .spyOn(global, 'fetch')

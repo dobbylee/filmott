@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockRevalidatePath = vi.fn();
+const mockRevalidateTag = vi.fn();
 
 vi.mock('next/cache', () => ({
   revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
+  revalidateTag: (...args: unknown[]) => mockRevalidateTag(...args),
 }));
 
 vi.mock('next/server', () => ({
@@ -68,7 +70,7 @@ describe('revalidate route', () => {
     const res = await POST(req);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ revalidated: true, path: '/' });
+    expect(res.body).toEqual({ revalidated: true, path: '/', tags: [] });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/');
   });
 
@@ -81,7 +83,7 @@ describe('revalidate route', () => {
     const res = await POST(req);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ revalidated: true, path: '/contents' });
+    expect(res.body).toEqual({ revalidated: true, path: '/contents', tags: [] });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/contents');
   });
 
@@ -97,8 +99,27 @@ describe('revalidate route', () => {
     expect(res.body).toEqual({
       revalidated: true,
       path: '/contents/movie/550',
+      tags: [],
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/contents/movie/550');
+  });
+
+  it('허용된 태그를 함께 revalidate해야 한다', async () => {
+    const req = createRequest({
+      authorization: 'Bearer test-secret',
+      body: { path: '/', tags: ['rankings', 'admin'] },
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      revalidated: true,
+      path: '/',
+      tags: ['rankings'],
+    });
+    expect(mockRevalidateTag).toHaveBeenCalledWith('rankings', { expire: 0 });
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/');
   });
 
   it('허용되지 않은 경로는 기본값 /로 fallback해야 한다', async () => {
@@ -110,7 +131,7 @@ describe('revalidate route', () => {
     const res = await POST(req);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ revalidated: true, path: '/' });
+    expect(res.body).toEqual({ revalidated: true, path: '/', tags: [] });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/');
   });
 

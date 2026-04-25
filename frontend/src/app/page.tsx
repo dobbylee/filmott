@@ -10,11 +10,15 @@ import SectionError from '@/components/common/SectionError';
 /* ---- Data Fetchers ---- */
 
 async function fetchBoxOffice(category: 'daily-box-office' | 'weekly-box-office'): Promise<RankingItem[]> {
-  return fetchApi<RankingItem[]>(`/rankings?source=kobis&category=${category}&limit=10`, { next: { revalidate: 21600 } });
+  return fetchApi<RankingItem[]>(`/rankings?source=kobis&category=${category}&limit=10`, {
+    next: { revalidate: 21600, tags: ['rankings'] },
+  });
 }
 
 async function fetchTrending(category: 'trending-all-day' | 'trending-all-week'): Promise<RankingItem[]> {
-  return fetchApi<RankingItem[]>(`/rankings?source=tmdb&category=${category}&limit=20`, { next: { revalidate: 21600 } });
+  return fetchApi<RankingItem[]>(`/rankings?source=tmdb&category=${category}&limit=20`, {
+    next: { revalidate: 21600, tags: ['rankings'] },
+  });
 }
 
 async function fetchRecentReviews(): Promise<Review[]> {
