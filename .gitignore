@@ -91,6 +91,7 @@ mcp/dist/
 mcp/node_modules/
 
 # Frontend
+.npm-cache/
 frontend/.npm-cache/
 frontend/.next/
 frontend/node_modules/
