@@ -111,7 +111,7 @@ async function ReviewsSection({ contentId }: { contentId: number }) {
   return (
     <div className="mx-auto w-full max-w-3xl">
       <div className="mb-4 flex items-center gap-4 pl-3">
-        <h2 id="reviews" className="text-lg font-bold">리뷰</h2>
+        <h2 className="text-lg font-bold">리뷰</h2>
         <div className="flex items-center gap-1.5">
           <Star className={`h-5 w-5 ${stats.averageRating != null ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
           <span className="text-lg font-semibold">{stats.averageRating ?? 0}</span>
@@ -338,7 +338,7 @@ export default async function ContentDetailPage({
         )}
 
         {/* 하단: 리뷰 목록 */}
-        <section>
+        <section id="reviews" className="scroll-mt-24">
           <Suspense
             fallback={
               <div className="text-sm text-muted-foreground">
