@@ -8,7 +8,6 @@ describe('RevalidateService', () => {
       ok: options.ok ?? true,
       status: options.status ?? 200,
       json: async () => ({}),
-      arrayBuffer: async () => new ArrayBuffer(0),
     }) as Response;
 
   afterEach(() => {
@@ -91,24 +90,7 @@ describe('RevalidateService', () => {
           body: JSON.stringify({ path: '/' }),
         }),
       );
-      expect(fetchSpy).toHaveBeenNthCalledWith(
-        2,
-        'https://filmott.kr/',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            'x-filmott-cache-warmup': '1',
-          }),
-          redirect: 'follow',
-        }),
-      );
-      expect(fetchSpy).toHaveBeenNthCalledWith(
-        3,
-        'https://filmott.kr/',
-        expect.objectContaining({
-          method: 'GET',
-        }),
-      );
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
     it('커스텀 path를 전달할 수 있어야 한다', async () => {
@@ -125,20 +107,7 @@ describe('RevalidateService', () => {
           body: JSON.stringify({ path: '/contents/123' }),
         }),
       );
-      expect(fetchSpy).toHaveBeenNthCalledWith(
-        2,
-        'https://filmott.kr/contents/123',
-        expect.objectContaining({
-          method: 'GET',
-        }),
-      );
-      expect(fetchSpy).toHaveBeenNthCalledWith(
-        3,
-        'https://filmott.kr/contents/123',
-        expect.objectContaining({
-          method: 'GET',
-        }),
-      );
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
     it('캐시 태그를 함께 전달할 수 있어야 한다', async () => {
@@ -157,16 +126,6 @@ describe('RevalidateService', () => {
       );
     });
 
-    it('워밍 대상이 아닌 path는 revalidate만 호출해야 한다', async () => {
-      const fetchSpy = jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValue(makeResponse());
-
-      await service.revalidatePath('/person/17419');
-
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-    });
-
     it('fetch 실패 시 에러를 throw하지 않고 warn 로깅해야 한다', async () => {
       jest.spyOn(global, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
 
@@ -179,16 +138,6 @@ describe('RevalidateService', () => {
         .mockResolvedValue(makeResponse({ ok: false, status: 500 }));
 
       await expect(service.revalidatePath('/')).resolves.not.toThrow();
-    });
-
-    it('워밍 fetch 실패 시에도 에러를 throw하지 않아야 한다', async () => {
-      const fetchSpy = jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValueOnce(makeResponse())
-        .mockRejectedValueOnce(new Error('warmup failed'));
-
-      await expect(service.revalidatePath('/')).resolves.not.toThrow();
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
   });
 });
