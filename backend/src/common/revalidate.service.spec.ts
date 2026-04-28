@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { RevalidateService } from './revalidate.service';
@@ -16,8 +17,10 @@ describe('RevalidateService', () => {
 
   describe('secret 미설정 시', () => {
     let service: RevalidateService;
+    let warnSpy: jest.SpyInstance;
 
     beforeEach(async () => {
+      warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           RevalidateService,
@@ -31,6 +34,12 @@ describe('RevalidateService', () => {
       }).compile();
 
       service = module.get<RevalidateService>(RevalidateService);
+    });
+
+    it('secret 누락 경고를 남겨야 한다', () => {
+      expect(warnSpy).toHaveBeenCalledWith(
+        'REVALIDATE_SECRET이 없어 ISR 캐시 갱신을 건너뜁니다.',
+      );
     });
 
     it('fetch를 호출하지 않고 즉시 반환해야 한다', async () => {

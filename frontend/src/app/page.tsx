@@ -22,7 +22,9 @@ async function fetchTrending(category: 'trending-all-day' | 'trending-all-week')
 }
 
 async function fetchRecentReviews(): Promise<Review[]> {
-  return fetchApi<Review[]>('/reviews/recent?limit=10', { next: { revalidate: 21600 } });
+  return fetchApi<Review[]>('/reviews/recent?limit=10', {
+    next: { revalidate: 21600, tags: ['recent-reviews'] },
+  });
 }
 
 /* ---- Sections ---- */

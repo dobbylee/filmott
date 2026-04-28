@@ -16,6 +16,8 @@ import { WatchlistService } from '../watchlist/watchlist.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { RevalidateService } from '../common/revalidate.service';
 
+const RECENT_REVIEWS_REVALIDATE_TAGS = ['recent-reviews'];
+
 @Injectable()
 export class ReviewsService {
   constructor(
@@ -62,7 +64,7 @@ export class ReviewsService {
       return createdReview;
     });
 
-    void this.revalidateService.revalidatePath('/');
+    await this.revalidateRecentReviews();
     return saved;
   }
 
@@ -103,12 +105,12 @@ export class ReviewsService {
         await manager.delete(ReviewLike, { reviewId: review.id });
         return manager.save(review);
       });
-      void this.revalidateService.revalidatePath('/');
+      await this.revalidateRecentReviews();
       return result;
     }
 
     const result = await this.reviewRepo.save(review);
-    void this.revalidateService.revalidatePath('/');
+    await this.revalidateRecentReviews();
     return result;
   }
 
@@ -129,7 +131,14 @@ export class ReviewsService {
     }
 
     await this.reviewRepo.remove(review);
-    void this.revalidateService.revalidatePath('/');
+    await this.revalidateRecentReviews();
+  }
+
+  private async revalidateRecentReviews(): Promise<void> {
+    await this.revalidateService.revalidatePath(
+      '/',
+      RECENT_REVIEWS_REVALIDATE_TAGS,
+    );
   }
 
   async findMyReview(

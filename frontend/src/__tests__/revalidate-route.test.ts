@@ -107,7 +107,7 @@ describe('revalidate route', () => {
   it('허용된 태그를 함께 revalidate해야 한다', async () => {
     const req = createRequest({
       authorization: 'Bearer test-secret',
-      body: { path: '/', tags: ['rankings', 'admin'] },
+      body: { path: '/', tags: ['rankings', 'recent-reviews', 'admin'] },
     });
 
     const res = await POST(req);
@@ -116,9 +116,12 @@ describe('revalidate route', () => {
     expect(res.body).toEqual({
       revalidated: true,
       path: '/',
-      tags: ['rankings'],
+      tags: ['rankings', 'recent-reviews'],
     });
     expect(mockRevalidateTag).toHaveBeenCalledWith('rankings', { expire: 0 });
+    expect(mockRevalidateTag).toHaveBeenCalledWith('recent-reviews', {
+      expire: 0,
+    });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/');
   });
 

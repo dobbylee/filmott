@@ -1,7 +1,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 
-const ALLOWED_TAGS = new Set(['rankings']);
+const ALLOWED_TAGS = new Set(['rankings', 'recent-reviews']);
 
 function isAllowedPath(path: string): boolean {
   return path === '/' || path === '/contents' || path.startsWith('/contents/');

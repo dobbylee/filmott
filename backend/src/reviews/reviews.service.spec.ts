@@ -16,6 +16,7 @@ import { RevalidateService } from '../common/revalidate.service';
 
 describe('ReviewsService', () => {
   let service: ReviewsService;
+  const recentReviewsTags = ['recent-reviews'];
 
   const mockReviewRepo = {
     findOne: jest.fn(),
@@ -110,7 +111,10 @@ describe('ReviewsService', () => {
       expect(
         mockWatchlistService.addToWatchlistByContentIdWithManager,
       ).toHaveBeenCalledWith(mockManager, 1, 1, 'watched', undefined);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
     });
 
     it('별점만으로 리뷰를 생성해야 한다', async () => {
@@ -127,7 +131,10 @@ describe('ReviewsService', () => {
 
       const result = await service.create(1, dto);
       expect(result.id).toBe(2);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
     });
 
     it('DTO를 통해 코멘트만으로 리뷰를 생성해야 한다 - rating은 파이프 레벨에서 검증', async () => {
@@ -248,7 +255,10 @@ describe('ReviewsService', () => {
       expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), {
         reviewId: 1,
       });
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
     });
 
     it('코멘트만 변경 시에도 좋아요를 초기화해야 한다', async () => {
@@ -340,7 +350,10 @@ describe('ReviewsService', () => {
       expect(result.rating).toBe(7);
       expect(result.likesCount).toBe(10);
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
     });
 
     it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
@@ -390,7 +403,10 @@ describe('ReviewsService', () => {
       await service.delete(1, 1);
 
       expect(mockReviewRepo.remove).toHaveBeenCalledWith(review);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
     });
 
     it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
@@ -413,7 +429,10 @@ describe('ReviewsService', () => {
       await service.delete(1, 1, UserRole.ADMIN);
 
       expect(mockReviewRepo.remove).toHaveBeenCalledWith(review);
-      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/');
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
     });
 
     it('USER 역할의 비소유자에게 ForbiddenException을 던져야 한다', async () => {

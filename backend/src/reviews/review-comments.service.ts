@@ -9,6 +9,9 @@ import { ReviewComment } from './review-comment.entity';
 import { Review } from './review.entity';
 import { CreateReviewCommentDto } from './dto/create-review-comment.dto';
 import { UserRole } from '../users/enums/user-role.enum';
+import { RevalidateService } from '../common/revalidate.service';
+
+const RECENT_REVIEWS_REVALIDATE_TAGS = ['recent-reviews'];
 
 @Injectable()
 export class ReviewCommentsService {
@@ -17,6 +20,7 @@ export class ReviewCommentsService {
     private readonly commentRepo: Repository<ReviewComment>,
     @InjectRepository(Review)
     private readonly reviewRepo: Repository<Review>,
+    private readonly revalidateService: RevalidateService,
   ) {}
 
   async create(
@@ -37,7 +41,9 @@ export class ReviewCommentsService {
       content: dto.content,
     });
 
-    return this.commentRepo.save(comment);
+    const saved = await this.commentRepo.save(comment);
+    await this.revalidateRecentReviews();
+    return saved;
   }
 
   async delete(
@@ -57,6 +63,14 @@ export class ReviewCommentsService {
     }
 
     await this.commentRepo.remove(comment);
+    await this.revalidateRecentReviews();
+  }
+
+  private async revalidateRecentReviews(): Promise<void> {
+    await this.revalidateService.revalidatePath(
+      '/',
+      RECENT_REVIEWS_REVALIDATE_TAGS,
+    );
   }
 
   async findByReview(reviewId: number, page = 1) {

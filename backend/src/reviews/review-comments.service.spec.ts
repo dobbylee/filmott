@@ -5,9 +5,11 @@ import { ReviewCommentsService } from './review-comments.service';
 import { ReviewComment } from './review-comment.entity';
 import { Review } from './review.entity';
 import { UserRole } from '../users/enums/user-role.enum';
+import { RevalidateService } from '../common/revalidate.service';
 
 describe('ReviewCommentsService', () => {
   let service: ReviewCommentsService;
+  const recentReviewsTags = ['recent-reviews'];
 
   const mockQb = {
     leftJoin: jest.fn(),
@@ -32,6 +34,10 @@ describe('ReviewCommentsService', () => {
     findOne: jest.fn(),
   };
 
+  const mockRevalidateService = {
+    revalidatePath: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -41,6 +47,7 @@ describe('ReviewCommentsService', () => {
           useValue: mockCommentRepo,
         },
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
+        { provide: RevalidateService, useValue: mockRevalidateService },
       ],
     }).compile();
 
@@ -71,6 +78,10 @@ describe('ReviewCommentsService', () => {
         reviewId: 1,
         content: 'Nice review!',
       });
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
     });
 
     it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
@@ -91,6 +102,10 @@ describe('ReviewCommentsService', () => {
       await service.delete(1, 1);
 
       expect(mockCommentRepo.remove).toHaveBeenCalledWith(comment);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
     });
 
     it('댓글을 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
@@ -113,6 +128,10 @@ describe('ReviewCommentsService', () => {
       await service.delete(1, 1, UserRole.ADMIN);
 
       expect(mockCommentRepo.remove).toHaveBeenCalledWith(comment);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
     });
 
     it('USER 역할의 비소유자에게 ForbiddenException을 던져야 한다', async () => {

@@ -18,6 +18,10 @@ export class RevalidateService {
     );
     this.frontendInternalUrl =
       this.configService.get<string>('FRONTEND_INTERNAL_URL') ?? frontendUrl;
+
+    if (!this.revalidateSecret) {
+      this.logger.warn('REVALIDATE_SECRET이 없어 ISR 캐시 갱신을 건너뜁니다.');
+    }
   }
 
   async revalidatePath(path: string = '/', tags: string[] = []): Promise<void> {
