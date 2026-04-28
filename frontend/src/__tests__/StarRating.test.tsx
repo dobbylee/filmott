@@ -28,9 +28,10 @@ describe('StarRating', () => {
     expect(screen.getByText('7점')).toBeInTheDocument();
   });
 
-  it('값이 0일 때 미선택 상태를 표시한다', () => {
+  it('값이 0일 때 0점을 표시한다', () => {
     render(<StarRating value={0} onChange={vi.fn()} />);
-    expect(screen.getAllByText('선택 안 함').length).toBeGreaterThan(0);
+    expect(screen.getByText('0점')).toBeInTheDocument();
+    expect(screen.queryByText('선택 안 함')).not.toBeInTheDocument();
   });
 
   it('aria-valuetext로 현재 선택 상태를 제공한다', () => {
@@ -41,11 +42,11 @@ describe('StarRating', () => {
     );
   });
 
-  it('미선택 상태의 aria-valuetext를 제공한다', () => {
+  it('0점 상태의 aria-valuetext를 제공한다', () => {
     render(<StarRating value={0} onChange={vi.fn()} />);
     expect(screen.getByRole('slider', { name: '별점 선택' })).toHaveAttribute(
       'aria-valuetext',
-      '미선택',
+      '0점',
     );
   });
 });

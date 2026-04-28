@@ -13,16 +13,14 @@ export default function StarRating({ value, onChange, max = 10 }: StarRatingProp
     const nextValue = Math.min(Math.max(e.currentTarget.valueAsNumber, 0), max);
     onChange(nextValue);
   };
-  const ratingText = value > 0 ? `${value}점` : '선택 안 함';
+  const ratingText = `${value}점`;
+  const marks = Array.from({ length: max + 1 }, (_, index) => index);
 
   return (
     <div className="rounded-lg border border-input bg-background px-3 py-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Star className={`h-4 w-4 ${value > 0 ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/50'}`} />
-          <span>0</span>
-        </div>
-        <span className="text-sm font-semibold text-foreground">{ratingText}</span>
+      <div className="mb-2 flex items-center gap-1.5 text-sm">
+        <Star className={`h-4 w-4 ${value > 0 ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/50'}`} />
+        <span className="font-semibold text-foreground">{ratingText}</span>
       </div>
       <input
         type="range"
@@ -32,12 +30,18 @@ export default function StarRating({ value, onChange, max = 10 }: StarRatingProp
         value={value}
         onChange={handleChange}
         aria-label="별점 선택"
-        aria-valuetext={value > 0 ? `${value}점` : '미선택'}
+        aria-valuetext={ratingText}
         className="h-2 w-full cursor-pointer accent-fuchsia-600"
       />
-      <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-        <span>선택 안 함</span>
-        <span>{max}점</span>
+      <div className="mt-2 grid grid-cols-11 text-center text-[10px] text-muted-foreground">
+        {marks.map((mark) => (
+          <span
+            key={mark}
+            className={mark === value ? 'font-semibold text-foreground' : ''}
+          >
+            {mark}
+          </span>
+        ))}
       </div>
     </div>
   );
