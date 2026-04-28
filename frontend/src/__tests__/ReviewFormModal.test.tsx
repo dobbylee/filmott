@@ -138,6 +138,35 @@ describe('ReviewFormModal', () => {
     });
   });
 
+  it('수정 시 기존 코멘트를 비우면 빈 문자열로 PATCH API를 호출해야 한다', async () => {
+    mockPatch.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    render(
+      <ReviewFormModal
+        {...defaultProps}
+        existingReview={{
+          id: 10,
+          userId: 1,
+          contentId: 1,
+          rating: 5,
+          comment: '기존 리뷰',
+          likesCount: 0,
+          createdAt: '2024-12-25T12:00:00Z',
+          updatedAt: '2024-12-25T12:00:00Z',
+        }}
+      />,
+    );
+
+    await user.clear(screen.getByPlaceholderText('작품에 대한 한마디를 남겨보세요.'));
+    await user.click(screen.getByText('수정'));
+
+    expect(mockPatch).toHaveBeenCalledWith('/reviews/10', {
+      rating: 5,
+      comment: '',
+    });
+  });
+
   it('성공 후 onClose와 onMutate를 호출해야 한다', async () => {
     mockPost.mockResolvedValue({ data: {} });
     const user = userEvent.setup();

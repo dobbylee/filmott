@@ -63,7 +63,7 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
       if (isEditing) {
         await api.patch(`/reviews/${existingReview.id}`, {
           rating,
-          comment: comment || undefined,
+          comment,
         });
       } else {
         await api.post('/reviews', {
