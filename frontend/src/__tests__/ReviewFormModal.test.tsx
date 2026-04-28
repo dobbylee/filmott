@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReviewFormModal from '@/components/review/ReviewFormModal';
 
@@ -35,6 +35,12 @@ describe('ReviewFormModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  function changeRating(value: number) {
+    fireEvent.change(screen.getByRole('slider', { name: '별점 선택' }), {
+      target: { value: String(value) },
+    });
+  }
 
   it('신규 작성 모드에서 "리뷰 작성" 제목을 표시해야 한다', () => {
     render(<ReviewFormModal {...defaultProps} />);
@@ -79,7 +85,7 @@ describe('ReviewFormModal', () => {
     await user.click(screen.getByText('작성'));
     expect(screen.getByText('별점을 선택해주세요.')).toBeInTheDocument();
 
-    await user.click(screen.getByLabelText('5점'));
+    changeRating(5);
     expect(screen.queryByText('별점을 선택해주세요.')).not.toBeInTheDocument();
   });
 
@@ -89,7 +95,7 @@ describe('ReviewFormModal', () => {
 
     render(<ReviewFormModal {...defaultProps} />);
 
-    await user.click(screen.getByLabelText('7점'));
+    changeRating(7);
     await user.type(
       screen.getByPlaceholderText('작품에 대한 한마디를 남겨보세요.'),
       '멋진 영화!',
@@ -123,7 +129,7 @@ describe('ReviewFormModal', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('8점'));
+    changeRating(8);
     await user.click(screen.getByText('수정'));
 
     expect(mockPatch).toHaveBeenCalledWith('/reviews/10', {
@@ -138,7 +144,7 @@ describe('ReviewFormModal', () => {
 
     render(<ReviewFormModal {...defaultProps} />);
 
-    await user.click(screen.getByLabelText('6점'));
+    changeRating(6);
     await user.click(screen.getByText('작성'));
 
     expect(defaultProps.onMutate).toHaveBeenCalled();
@@ -178,9 +184,7 @@ describe('ReviewFormModal', () => {
     expect(screen.queryByText(/초기화/)).not.toBeInTheDocument();
   });
 
-  it('rating 변경 시 좋아요가 있으면 경고 메시지를 표시해야 한다', async () => {
-    const user = userEvent.setup();
-
+  it('rating 변경 시 좋아요가 있으면 경고 메시지를 표시해야 한다', () => {
     render(
       <ReviewFormModal
         {...defaultProps}
@@ -198,7 +202,7 @@ describe('ReviewFormModal', () => {
     );
 
     // rating을 5에서 8로 변경
-    await user.click(screen.getByLabelText('8점'));
+    changeRating(8);
 
     expect(screen.getByText(/초기화/)).toBeInTheDocument();
     expect(screen.getByText(/3개/)).toBeInTheDocument();
@@ -252,9 +256,7 @@ describe('ReviewFormModal', () => {
     expect(screen.queryByText(/초기화/)).not.toBeInTheDocument();
   });
 
-  it('좋아요가 0이면 rating 변경해도 경고를 표시하지 않아야 한다', async () => {
-    const user = userEvent.setup();
-
+  it('좋아요가 0이면 rating 변경해도 경고를 표시하지 않아야 한다', () => {
     render(
       <ReviewFormModal
         {...defaultProps}
@@ -271,7 +273,7 @@ describe('ReviewFormModal', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('9점'));
+    changeRating(9);
 
     expect(screen.queryByText(/초기화/)).not.toBeInTheDocument();
   });
@@ -282,7 +284,7 @@ describe('ReviewFormModal', () => {
 
     render(<ReviewFormModal {...defaultProps} />);
 
-    await user.click(screen.getByLabelText('8점'));
+    changeRating(8);
     await user.click(screen.getByText('작성'));
 
     expect(mockTrackEvent).toHaveBeenCalledWith('review_created', { content_id: 1 });
@@ -294,7 +296,7 @@ describe('ReviewFormModal', () => {
 
     render(<ReviewFormModal {...defaultProps} />);
 
-    await user.click(screen.getByLabelText('6점'));
+    changeRating(6);
     await user.click(screen.getByText('작성'));
 
     expect(mockTrackEvent).not.toHaveBeenCalled();
@@ -320,7 +322,7 @@ describe('ReviewFormModal', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('9점'));
+    changeRating(9);
     await user.click(screen.getByText('수정'));
 
     expect(mockTrackEvent).not.toHaveBeenCalled();
@@ -332,7 +334,7 @@ describe('ReviewFormModal', () => {
 
     render(<ReviewFormModal {...defaultProps} />);
 
-    await user.click(screen.getByLabelText('7점'));
+    changeRating(7);
     await user.click(screen.getByText('작성'));
 
     expect(mockPost).toHaveBeenCalledWith('/reviews', {
