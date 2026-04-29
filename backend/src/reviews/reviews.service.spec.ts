@@ -638,6 +638,7 @@ describe('ReviewsService', () => {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoin: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
@@ -657,6 +658,10 @@ describe('ReviewsService', () => {
         'content',
       );
       expectSafeUserSelect(mockQb.addSelect);
+      expect(mockQb.loadRelationCountAndMap).toHaveBeenCalledWith(
+        'review.commentsCount',
+        'review.comments',
+      );
       expect(mockReviewRepo.findAndCount).not.toHaveBeenCalled();
     });
   });

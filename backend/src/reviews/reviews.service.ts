@@ -207,6 +207,7 @@ export class ReviewsService {
       .leftJoinAndSelect('review.content', 'content')
       .leftJoin('review.user', 'user')
       .addSelect(REVIEW_USER_SELECT)
+      .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .where('review.userId = :userId', { userId })
       .orderBy('review.createdAt', 'DESC')
       .skip(skip)
