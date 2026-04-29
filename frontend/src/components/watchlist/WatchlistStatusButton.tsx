@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import ReviewFormModal from '@/components/review/ReviewFormModal';
 import { trackEvent } from '@/lib/ga';
 import type { WatchlistStatus, WatchlistStatusResponse } from '@/types/watchlist';
+import type { Review } from '@/types/review';
 
 const WATCHLIST_UPDATED_EVENT = 'watchlist-updated';
 
@@ -17,11 +18,19 @@ interface WatchlistStatusButtonProps {
   contentType: 'movie' | 'tv';
 }
 
+function isReview(value: unknown): value is Review {
+  if (typeof value !== 'object' || value === null) return false;
+  const review = value as Partial<Review>;
+  return typeof review.id === 'number' && typeof review.contentId === 'number';
+}
+
 export default function WatchlistStatusButton({ contentId, tmdbId, contentType }: WatchlistStatusButtonProps) {
   const { user, openAuthModal } = useAuth();
   const router = useRouter();
   const [status, setStatus] = useState<WatchlistStatus | null>(null);
   const [watchlistId, setWatchlistId] = useState<number | null>(null);
+  const [watchedAt, setWatchedAt] = useState<string | null>(null);
+  const [reviewForModal, setReviewForModal] = useState<Review | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +51,7 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
         );
         setStatus(res.data.status);
         setWatchlistId(res.data.watchlistId);
+        setWatchedAt(res.data.watchedAt ?? null);
       } catch {
         // ignore
       }
@@ -59,6 +69,7 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
       ).then((res) => {
         setStatus(res.data.status);
         setWatchlistId(res.data.watchlistId);
+        setWatchedAt(res.data.watchedAt ?? null);
       }).catch(() => {});
     };
     window.addEventListener(WATCHLIST_UPDATED_EVENT, handleUpdate);
@@ -97,6 +108,7 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
       trackEvent('watchlist_added', { status: newStatus, content_type: contentType });
       setStatus(newStatus);
       setWatchlistId(res.data.id);
+      setWatchedAt(res.data.watchedAt ?? null);
       router.refresh();
     } catch {
       // ignore
@@ -113,6 +125,7 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
       await api.delete(`/watchlist/${watchlistId}`);
       setStatus(null);
       setWatchlistId(null);
+      setWatchedAt(null);
       router.refresh();
     } catch {
       // ignore
@@ -124,9 +137,18 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
 
   const handleWantToWatch = () => addToWatchlist('want_to_watch');
 
-  const handleWatchedClick = () => {
+  const handleWatchedClick = async () => {
     setShowDropdown(false);
-    setShowReviewModal(true);
+    setIsLoading(true);
+    try {
+      const res = await api.get<unknown>(`/reviews/my?contentId=${contentId}`);
+      setReviewForModal(isReview(res.data) ? res.data : null);
+    } catch {
+      setReviewForModal(null);
+    } finally {
+      setIsLoading(false);
+      setShowReviewModal(true);
+    }
   };
 
   // Button appearance by status
@@ -243,8 +265,13 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
       {showReviewModal && (
         <ReviewFormModal
           contentId={contentId}
+          existingReview={reviewForModal}
+          initialWatchedAt={watchedAt}
           forceWatchedAtInput
-          onClose={() => setShowReviewModal(false)}
+          onClose={() => {
+            setShowReviewModal(false);
+            setReviewForModal(null);
+          }}
         />
       )}
     </div>

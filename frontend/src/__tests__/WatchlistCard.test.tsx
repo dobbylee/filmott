@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WatchlistCard from '@/components/watchlist/WatchlistCard';
 import type { WatchlistItem } from '@/types/watchlist';
@@ -219,6 +219,25 @@ describe('WatchlistCard', () => {
 
       expect(screen.getByText('리뷰 수정')).toBeInTheDocument();
       expect(screen.getByDisplayValue('2026-03-10')).toBeInTheDocument();
+    });
+
+    it('좋아요 후 수정 모달을 열면 최신 좋아요 수로 초기화 경고를 표시해야 한다', async () => {
+      const user = userEvent.setup();
+      render(<WatchlistCard item={watchedItemWithReview} />);
+
+      const likeButton = screen.getByRole('button', { name: '좋아요' });
+      await user.click(likeButton);
+
+      await waitFor(() => {
+        expect(likeButton).toHaveTextContent('1');
+      });
+
+      await user.click(screen.getByTitle('감상 기록 수정'));
+      fireEvent.change(screen.getByRole('slider', { name: '별점 선택' }), {
+        target: { value: '8' },
+      });
+
+      expect(screen.getByText(/좋아요\(1개\) 초기화/)).toBeInTheDocument();
     });
   });
 

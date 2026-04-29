@@ -33,7 +33,13 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
     : null;
   const [showComments, setShowComments] = useState(false);
   const [commentsCount, setCommentsCount] = useState(review?.commentsCount ?? 0);
+  const [localLikesCount, setLocalLikesCount] = useState<number | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const currentLikesCount = localLikesCount ?? review?.likesCount ?? 0;
+
+  const reviewForModal = reviewWithUser
+    ? { ...reviewWithUser, likesCount: currentLikesCount }
+    : reviewWithUser;
 
   return (
     <>
@@ -128,9 +134,10 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
                 {review && (
                   <LikeButton
                     reviewId={review.id}
-                    initialCount={review.likesCount}
+                    initialCount={currentLikesCount}
                     initialLiked={initialLiked}
                     size="md"
+                    onChange={(_liked, count) => setLocalLikesCount(count)}
                   />
                 )}
                 <span className="mt-auto text-xs text-white/30">
@@ -156,11 +163,14 @@ export default function WatchlistCard({ item, initialLiked = false, onMutate }: 
       {showReviewForm && (
         <ReviewFormModal
           contentId={item.contentId}
-          existingReview={reviewWithUser}
+          existingReview={reviewForModal}
           initialWatchedAt={watchedAt}
           forceWatchedAtInput
           onClose={() => setShowReviewForm(false)}
-          onMutate={onMutate}
+          onMutate={() => {
+            setLocalLikesCount(null);
+            onMutate?.();
+          }}
         />
       )}
     </>

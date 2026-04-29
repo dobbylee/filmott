@@ -179,9 +179,64 @@ describe('WatchlistStatusButton', () => {
     const watchedOptions = screen.getAllByText('감상한 작품');
     await user.click(watchedOptions[watchedOptions.length - 1]);
 
-    expect(screen.getByText('감상 날짜')).toBeInTheDocument();
-    expect(screen.getByText('별점')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('감상 날짜')).toBeInTheDocument();
+      expect(screen.getByText('별점')).toBeInTheDocument();
+    });
     expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('기존 리뷰가 있으면 감상한 작품 재기록 시 리뷰 수정 모달을 열어야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/watchlist/me/status')) {
+        return Promise.resolve({ data: { status: null, watchlistId: null } });
+      }
+      if (url.startsWith('/reviews/my')) {
+        return Promise.resolve({
+          data: {
+            id: 77,
+            userId: 1,
+            contentId: 11,
+            rating: 8,
+            comment: '기존 리뷰',
+            likesCount: 2,
+            createdAt: '2026-03-01T00:00:00Z',
+            updatedAt: '2026-03-01T00:00:00Z',
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+    mockPatch.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton contentId={11} tmdbId={123} contentType="movie" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('기록하기'));
+    const watchedOptions = screen.getAllByText('감상한 작품');
+    await user.click(watchedOptions[watchedOptions.length - 1]);
+
+    await waitFor(() => {
+      expect(screen.getByText('리뷰 수정')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('수정'));
+
+    await waitFor(() => {
+      expect(mockPatch).toHaveBeenCalledWith(
+        '/reviews/77',
+        expect.objectContaining({
+          rating: 8,
+          comment: '기존 리뷰',
+        }),
+      );
+    });
+    expect(mockPost).not.toHaveBeenCalledWith('/reviews', expect.anything());
   });
 
   it('watched 상태에서 "제거" 클릭 시 DELETE API를 호출해야 한다', async () => {

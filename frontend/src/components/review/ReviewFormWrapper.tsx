@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import ReviewForm from './ReviewForm';
 import type { Review } from '@/types/review';
 
+const WATCHLIST_UPDATED_EVENT = 'watchlist-updated';
+
 interface ReviewFormWrapperProps {
   contentId: number;
 }
@@ -68,6 +70,16 @@ export default function ReviewFormWrapper({ contentId }: ReviewFormWrapperProps)
   const handleMutate = () => {
     setRefreshKey((k) => k + 1);
   };
+
+  useEffect(() => {
+    if (!user) return;
+    const handleUpdate = () => {
+      setRefreshKey((k) => k + 1);
+    };
+
+    window.addEventListener(WATCHLIST_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(WATCHLIST_UPDATED_EVENT, handleUpdate);
+  }, [user]);
 
   const existingReview = !user
     ? null
