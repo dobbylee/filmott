@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { summarizeExternalApiError } from '../common/external-api-error.util';
 
 export interface KobisBoxOfficeItem {
   rank: string;
@@ -45,7 +46,11 @@ export class KobisService {
     } catch (error) {
       this.logger.error(
         `Failed to fetch daily box office for ${targetDt}`,
-        error,
+        summarizeExternalApiError(
+          'KOBIS',
+          error,
+          '/boxoffice/searchDailyBoxOfficeList.json',
+        ),
       );
       throw error;
     }
@@ -72,7 +77,11 @@ export class KobisService {
     } catch (error) {
       this.logger.error(
         `Failed to fetch weekly box office for ${targetDt}`,
-        error,
+        summarizeExternalApiError(
+          'KOBIS',
+          error,
+          '/boxoffice/searchWeeklyBoxOfficeList.json',
+        ),
       );
       throw error;
     }

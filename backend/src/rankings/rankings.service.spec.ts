@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nestjs';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { RankingsService } from './rankings.service';
 import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
@@ -424,7 +425,43 @@ describe('RankingsService', () => {
 
       await expect(service.fetchDailyBoxOffice()).rejects.toThrow();
 
-      expect(Sentry.captureException).toHaveBeenCalledWith(error);
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'KOBIS',
+          message: 'KOBIS API error',
+        }),
+      );
+    });
+
+    it('KOBIS Axios 실패를 Sentry에 보낼 때 민감정보를 제외해야 한다', async () => {
+      const error = new AxiosError(
+        'Request failed with status code 403',
+        'ERR_BAD_REQUEST',
+        {
+          headers: new AxiosHeaders({
+            Authorization: 'Bearer kobis-auth-token',
+          }),
+          url: '/boxoffice/searchDailyBoxOfficeList.json?key=kobis-query-key',
+          params: { key: 'kobis-param-key', targetDt: '20260429' },
+        },
+      );
+      mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
+
+      await expect(service.fetchDailyBoxOffice()).rejects.toThrow();
+
+      const payload = JSON.stringify(
+        (Sentry.captureException as jest.Mock).mock.calls,
+      );
+      expect(payload).not.toContain('kobis-auth-token');
+      expect(payload).not.toContain('kobis-query-key');
+      expect(payload).not.toContain('kobis-param-key');
+      expect(payload).not.toContain('Authorization');
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'KOBIS',
+          endpointPath: '/boxoffice/searchDailyBoxOfficeList.json',
+        }),
+      );
     });
   });
 
@@ -446,7 +483,12 @@ describe('RankingsService', () => {
 
       await expect(service.fetchWeeklyBoxOffice()).rejects.toThrow();
 
-      expect(Sentry.captureException).toHaveBeenCalledWith(error);
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'KOBIS',
+          message: 'KOBIS Weekly API error',
+        }),
+      );
     });
   });
 
@@ -677,7 +719,12 @@ describe('RankingsService', () => {
 
       await service.fetchAllTrending();
 
-      expect(Sentry.captureException).toHaveBeenCalledWith(trendingError);
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'TMDB',
+          message: 'TMDB 일시 장애',
+        }),
+      );
     });
   });
 
@@ -918,7 +965,12 @@ describe('RankingsService', () => {
 
       await service.fetchKoreanTvDiscover();
 
-      expect(Sentry.captureException).toHaveBeenCalledWith(error);
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'TMDB',
+          message: 'TMDB Discover error',
+        }),
+      );
     });
 
     it('수집 결과가 0건이면 metadata 캐싱을 호출하지 않아야 한다', async () => {

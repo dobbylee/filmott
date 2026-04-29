@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
+import { Logger } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { KobisService } from './kobis.service';
-import { AxiosResponse, AxiosHeaders } from 'axios';
+import { AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
 
 describe('KobisService', () => {
   let service: KobisService;
@@ -26,6 +27,7 @@ describe('KobisService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('getDailyBoxOffice', () => {
@@ -96,6 +98,39 @@ describe('KobisService', () => {
 
       await expect(service.getDailyBoxOffice('20260309')).rejects.toThrow(
         'API Error',
+      );
+    });
+
+    it('API 실패 로그에 key와 Authorization을 포함하지 않아야 한다', async () => {
+      const loggerSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      const error = new AxiosError(
+        'Request failed with status code 401',
+        '401',
+        {
+          headers: new AxiosHeaders({
+            Authorization: 'Bearer kobis-auth-token',
+          }),
+          url: '/boxoffice/searchDailyBoxOfficeList.json?key=kobis-query-key',
+          params: { key: 'kobis-param-key', targetDt: '20260309' },
+        },
+      );
+      mockHttpService.get.mockReturnValue(throwError(() => error));
+
+      await expect(service.getDailyBoxOffice('20260309')).rejects.toThrow();
+
+      const payload = JSON.stringify(loggerSpy.mock.calls);
+      expect(payload).not.toContain('kobis-auth-token');
+      expect(payload).not.toContain('kobis-query-key');
+      expect(payload).not.toContain('kobis-param-key');
+      expect(payload).not.toContain('Authorization');
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Failed to fetch daily box office for 20260309',
+        expect.objectContaining({
+          service: 'KOBIS',
+          endpointPath: '/boxoffice/searchDailyBoxOfficeList.json',
+        }),
       );
     });
   });

@@ -11,6 +11,7 @@ import { EmbeddingService } from '../chat/embedding.service';
 import { RevalidateService } from '../common/revalidate.service';
 import { Content } from '../contents/content.entity';
 import { TMDB_IMAGE_BASE } from '../common/constants';
+import { summarizeExternalApiError } from '../common/external-api-error.util';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const TMDB_CALL_DELAY_MS = 250;
@@ -162,8 +163,9 @@ export class RankingsService {
       );
       return rankingsToUpsert;
     } catch (error) {
-      this.logger.error('Failed to fetch daily box office', error);
-      Sentry.captureException(error);
+      const errorSummary = summarizeExternalApiError('KOBIS', error);
+      this.logger.error('Failed to fetch daily box office', errorSummary);
+      Sentry.captureException(errorSummary);
       throw error;
     }
   }
@@ -244,8 +246,9 @@ export class RankingsService {
       );
       return rankingsToUpsert;
     } catch (error) {
-      this.logger.error('Failed to fetch weekly box office', error);
-      Sentry.captureException(error);
+      const errorSummary = summarizeExternalApiError('KOBIS', error);
+      this.logger.error('Failed to fetch weekly box office', errorSummary);
+      Sentry.captureException(errorSummary);
       throw error;
     }
   }
@@ -268,11 +271,12 @@ export class RankingsService {
       try {
         await this.fetchTrending(type, timeWindow);
       } catch (error) {
+        const errorSummary = summarizeExternalApiError('TMDB', error);
         this.logger.error(
           `Failed to fetch trending-${type}-${timeWindow}`,
-          error,
+          errorSummary,
         );
-        Sentry.captureException(error);
+        Sentry.captureException(errorSummary);
       }
     }
 
@@ -361,7 +365,10 @@ export class RankingsService {
 
       return rankingsToUpsert;
     } catch (error) {
-      this.logger.error(`Failed to fetch trending: ${category}`, error);
+      this.logger.error(
+        `Failed to fetch trending: ${category}`,
+        summarizeExternalApiError('TMDB', error),
+      );
       throw error;
     }
   }
@@ -484,7 +491,10 @@ export class RankingsService {
 
       return { id: content.id, posterUrl: content.posterUrl };
     } catch (error) {
-      this.logger.warn(`TMDB matching failed for: ${movieNm}`, error);
+      this.logger.warn(
+        `TMDB matching failed for: ${movieNm}`,
+        summarizeExternalApiError('TMDB', error),
+      );
       return null;
     }
   }
@@ -596,8 +606,9 @@ export class RankingsService {
         this.cacheMetadataInBackground(contentIds);
       }
     } catch (error) {
-      this.logger.error('Failed to fetch Korean TV Discover', error);
-      Sentry.captureException(error);
+      const errorSummary = summarizeExternalApiError('TMDB', error);
+      this.logger.error('Failed to fetch Korean TV Discover', errorSummary);
+      Sentry.captureException(errorSummary);
     }
   }
 
