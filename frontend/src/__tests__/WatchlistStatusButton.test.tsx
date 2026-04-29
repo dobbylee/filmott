@@ -10,7 +10,7 @@ vi.mock('@/lib/ga', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
 const mockOpenAuthModal = vi.fn();
@@ -44,7 +44,7 @@ describe('WatchlistStatusButton', () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('기록하기')).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe('WatchlistStatusButton', () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: 'want_to_watch', watchlistId: 1 } });
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('감상할 작품')).toBeInTheDocument();
@@ -66,7 +66,7 @@ describe('WatchlistStatusButton', () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: 'watched', watchlistId: 1 } });
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('감상한 작품')).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe('WatchlistStatusButton', () => {
     mockUser = null;
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await user.click(screen.getByText('기록하기'));
     expect(mockOpenAuthModal).toHaveBeenCalled();
@@ -88,7 +88,7 @@ describe('WatchlistStatusButton', () => {
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('기록하기')).toBeInTheDocument();
@@ -108,7 +108,7 @@ describe('WatchlistStatusButton', () => {
     mockGet.mockResolvedValue({ data: { status: 'want_to_watch', watchlistId: 1 } });
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('감상할 작품')).toBeInTheDocument();
@@ -127,7 +127,7 @@ describe('WatchlistStatusButton', () => {
     mockGet.mockResolvedValue({ data: { status: 'watched', watchlistId: 1 } });
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('감상한 작품')).toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('WatchlistStatusButton', () => {
     mockPost.mockResolvedValue({ data: { id: 10 } });
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('기록하기')).toBeInTheDocument();
@@ -164,13 +164,33 @@ describe('WatchlistStatusButton', () => {
     });
   });
 
+  it('미등록 상태에서 "감상한 작품" 클릭 시 리뷰 작성 모달을 열어야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton contentId={11} tmdbId={123} contentType="movie" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('기록하기')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('기록하기'));
+    const watchedOptions = screen.getAllByText('감상한 작품');
+    await user.click(watchedOptions[watchedOptions.length - 1]);
+
+    expect(screen.getByText('감상 날짜')).toBeInTheDocument();
+    expect(screen.getByText('별점')).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
   it('watched 상태에서 "제거" 클릭 시 DELETE API를 호출해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: 'watched', watchlistId: 5 } });
     mockDelete.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('감상한 작품')).toBeInTheDocument();
@@ -190,7 +210,7 @@ describe('WatchlistStatusButton', () => {
     mockDelete.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={456} contentType="tv" />);
+    render(<WatchlistStatusButton contentId={2} tmdbId={456} contentType="tv" />);
 
     await waitFor(() => {
       expect(screen.getByText('감상할 작품')).toBeInTheDocument();
@@ -210,7 +230,7 @@ describe('WatchlistStatusButton', () => {
     mockDelete.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('감상한 작품')).toBeInTheDocument();
@@ -228,7 +248,7 @@ describe('WatchlistStatusButton', () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
 
-    render(<WatchlistStatusButton tmdbId={999} contentType="tv" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={999} contentType="tv" />);
 
     await waitFor(() => {
       expect(mockGet).toHaveBeenCalledWith('/watchlist/me/status?tmdbId=999&contentType=tv');
@@ -238,7 +258,7 @@ describe('WatchlistStatusButton', () => {
   it('비로그인 상태에서는 상태 조회 API를 호출하지 않아야 한다', () => {
     mockUser = null;
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     expect(mockGet).not.toHaveBeenCalled();
   });
@@ -249,7 +269,7 @@ describe('WatchlistStatusButton', () => {
     mockPost.mockResolvedValue({ data: { id: 10 } });
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('기록하기')).toBeInTheDocument();
@@ -273,7 +293,7 @@ describe('WatchlistStatusButton', () => {
     mockPost.mockRejectedValue(new Error('서버 오류'));
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={123} contentType="movie" />);
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
       expect(screen.getByText('기록하기')).toBeInTheDocument();
@@ -296,7 +316,7 @@ describe('WatchlistStatusButton', () => {
     mockPost.mockResolvedValue({ data: { id: 20 } });
     const user = userEvent.setup();
 
-    render(<WatchlistStatusButton tmdbId={456} contentType="tv" />);
+    render(<WatchlistStatusButton contentId={2} tmdbId={456} contentType="tv" />);
 
     await waitFor(() => {
       expect(screen.getByText('기록하기')).toBeInTheDocument();

@@ -14,12 +14,20 @@ import type { Review } from '@/types/review';
 interface ReviewFormProps {
   contentId: number;
   existingReview?: Review | null;
+  initialWatchedAt?: string | null;
   initialLiked?: boolean;
   onMutate?: () => void;
   refreshKey?: number;
 }
 
-export default function ReviewForm({ contentId, existingReview, initialLiked = false, onMutate, refreshKey = 0 }: ReviewFormProps) {
+export default function ReviewForm({
+  contentId,
+  existingReview,
+  initialWatchedAt,
+  initialLiked = false,
+  onMutate,
+  refreshKey = 0,
+}: ReviewFormProps) {
   const { user, isLoading: authLoading, openAuthModal } = useAuth();
   const router = useRouter();
   const [showFormModal, setShowFormModal] = useState(false);
@@ -180,6 +188,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
           <ReviewFormModal
             contentId={contentId}
             existingReview={{ ...existingReview, likesCount: currentLikesCount }}
+            initialWatchedAt={initialWatchedAt}
             onClose={() => setShowFormModal(false)}
             onMutate={onMutate}
           />
@@ -214,6 +223,7 @@ export default function ReviewForm({ contentId, existingReview, initialLiked = f
       {showFormModal && (
         <ReviewFormModal
           contentId={contentId}
+          initialWatchedAt={initialWatchedAt}
           onClose={() => setShowFormModal(false)}
           onMutate={onMutate}
         />

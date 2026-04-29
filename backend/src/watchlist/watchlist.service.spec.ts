@@ -420,11 +420,16 @@ describe('WatchlistService', () => {
 
   describe('getWatchlistStatus', () => {
     it('항목이 존재하면 상태를 반환해야 한다', async () => {
-      mockWatchlistRepo.findOne.mockResolvedValue({ id: 1, status: 'watched' });
+      const watchedAt = new Date('2026-03-10T00:00:00Z');
+      mockWatchlistRepo.findOne.mockResolvedValue({
+        id: 1,
+        status: 'watched',
+        watchedAt,
+      });
 
       const result = await service.getWatchlistStatus(1, 1);
 
-      expect(result).toEqual({ status: 'watched', watchlistId: 1 });
+      expect(result).toEqual({ status: 'watched', watchlistId: 1, watchedAt });
     });
 
     it('항목이 존재하지 않으면 null을 반환해야 한다', async () => {
@@ -432,23 +437,32 @@ describe('WatchlistService', () => {
 
       const result = await service.getWatchlistStatus(1, 999);
 
-      expect(result).toEqual({ status: null, watchlistId: null });
+      expect(result).toEqual({
+        status: null,
+        watchlistId: null,
+        watchedAt: null,
+      });
     });
   });
 
   describe('getWatchlistStatusByTmdbId', () => {
     it('tmdbId로 찾은 경우 상태를 반환해야 한다', async () => {
+      const watchedAt = new Date('2026-03-11T00:00:00Z');
       const mockQb = {
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue({ id: 1, status: 'want_to_watch' }),
+        getOne: jest.fn().mockResolvedValue({
+          id: 1,
+          status: 'watched',
+          watchedAt,
+        }),
       };
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       const result = await service.getWatchlistStatusByTmdbId(1, 550, 'movie');
 
-      expect(result).toEqual({ status: 'want_to_watch', watchlistId: 1 });
+      expect(result).toEqual({ status: 'watched', watchlistId: 1, watchedAt });
     });
 
     it('워치리스트에 콘텐츠가 없으면 null을 반환해야 한다', async () => {
@@ -462,7 +476,11 @@ describe('WatchlistService', () => {
 
       const result = await service.getWatchlistStatusByTmdbId(1, 999, 'movie');
 
-      expect(result).toEqual({ status: null, watchlistId: null });
+      expect(result).toEqual({
+        status: null,
+        watchlistId: null,
+        watchedAt: null,
+      });
     });
   });
 

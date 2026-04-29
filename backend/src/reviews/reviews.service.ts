@@ -57,7 +57,7 @@ export class ReviewsService {
         where: { userId, contentId: dto.contentId },
       });
 
-      if (watchlistEntry?.status !== 'watched') {
+      if (watchlistEntry?.status !== 'watched' || dto.watchedAt !== undefined) {
         await this.watchlistService.addToWatchlistByContentIdWithManager(
           manager,
           userId,

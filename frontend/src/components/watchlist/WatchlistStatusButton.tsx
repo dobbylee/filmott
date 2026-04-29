@@ -5,24 +5,25 @@ import { useRouter } from 'next/navigation';
 import { Plus, Eye, Bookmark, ChevronDown, Trash2, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
-import WatchedDateModal from './WatchedDateModal';
+import ReviewFormModal from '@/components/review/ReviewFormModal';
 import { trackEvent } from '@/lib/ga';
 import type { WatchlistStatus, WatchlistStatusResponse } from '@/types/watchlist';
 
 const WATCHLIST_UPDATED_EVENT = 'watchlist-updated';
 
 interface WatchlistStatusButtonProps {
+  contentId: number;
   tmdbId: number;
   contentType: 'movie' | 'tv';
 }
 
-export default function WatchlistStatusButton({ tmdbId, contentType }: WatchlistStatusButtonProps) {
+export default function WatchlistStatusButton({ contentId, tmdbId, contentType }: WatchlistStatusButtonProps) {
   const { user, openAuthModal } = useAuth();
   const router = useRouter();
   const [status, setStatus] = useState<WatchlistStatus | null>(null);
   const [watchlistId, setWatchlistId] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showDateModal, setShowDateModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -102,25 +103,6 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
     } finally {
       setIsLoading(false);
       setShowDropdown(false);
-      setShowDateModal(false);
-    }
-  };
-
-  const updateToWatched = async (watchedAt: string) => {
-    if (!watchlistId) return;
-    setIsLoading(true);
-    try {
-      await api.patch(`/watchlist/${watchlistId}`, {
-        status: 'watched',
-        watchedAt,
-      });
-      setStatus('watched');
-      router.refresh();
-    } catch {
-      // ignore
-    } finally {
-      setIsLoading(false);
-      setShowDateModal(false);
     }
   };
 
@@ -144,21 +126,7 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
 
   const handleWatchedClick = () => {
     setShowDropdown(false);
-    if (status === 'want_to_watch') {
-      // Switching from want_to_watch to watched
-      setShowDateModal(true);
-    } else {
-      // Adding as watched directly
-      setShowDateModal(true);
-    }
-  };
-
-  const handleDateConfirm = (date: string) => {
-    if (status === 'want_to_watch' && watchlistId) {
-      updateToWatched(date);
-    } else {
-      addToWatchlist('watched', date);
-    }
+    setShowReviewModal(true);
   };
 
   // Button appearance by status
@@ -272,10 +240,11 @@ export default function WatchlistStatusButton({ tmdbId, contentType }: Watchlist
         </div>
       )}
 
-      {showDateModal && (
-        <WatchedDateModal
-          onConfirm={handleDateConfirm}
-          onCancel={() => setShowDateModal(false)}
+      {showReviewModal && (
+        <ReviewFormModal
+          contentId={contentId}
+          forceWatchedAtInput
+          onClose={() => setShowReviewModal(false)}
         />
       )}
     </div>

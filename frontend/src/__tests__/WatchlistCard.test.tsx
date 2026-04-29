@@ -193,7 +193,32 @@ describe('WatchlistCard', () => {
         expect(screen.getAllByText('리뷰 작성').length).toBeGreaterThan(0);
         // 별점 레이블
         expect(screen.getByText('별점')).toBeInTheDocument();
+        expect(screen.getByText('감상 날짜')).toBeInTheDocument();
       });
+
+      expect(screen.getByDisplayValue('2026-03-15')).toBeInTheDocument();
+    });
+
+    it('날짜 영역 클릭 시 같은 리뷰 작성 모달을 열고 watchedAt을 기본값으로 사용한다', async () => {
+      const user = userEvent.setup();
+      render(<WatchlistCard item={watchedItemWithoutReview} />);
+
+      await user.click(screen.getByTitle('감상 기록 수정'));
+
+      expect(screen.getByText('별점')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('2026-03-15')).toBeInTheDocument();
+    });
+  });
+
+  describe('리뷰가 있는 감상 기록 수정', () => {
+    it('날짜 영역 클릭 시 리뷰 수정 모달을 열고 watchedAt을 기본값으로 사용한다', async () => {
+      const user = userEvent.setup();
+      render(<WatchlistCard item={watchedItemWithReview} />);
+
+      await user.click(screen.getByTitle('감상 기록 수정'));
+
+      expect(screen.getByText('리뷰 수정')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('2026-03-10')).toBeInTheDocument();
     });
   });
 

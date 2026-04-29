@@ -321,6 +321,7 @@ export class WatchlistService {
     return {
       status: item?.status ?? null,
       watchlistId: item?.id ?? null,
+      watchedAt: item?.watchedAt ?? null,
     };
   }
 
@@ -343,6 +344,7 @@ export class WatchlistService {
     return {
       status: item?.status ?? null,
       watchlistId: item?.id ?? null,
+      watchedAt: item?.watchedAt ?? null,
     };
   }
 

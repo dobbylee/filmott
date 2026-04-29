@@ -13,6 +13,7 @@ export interface Review {
   contentId: number;
   rating?: number;
   comment?: string;
+  watchedAt?: string | null;
   likesCount: number;
   commentsCount?: number;
   createdAt: string;

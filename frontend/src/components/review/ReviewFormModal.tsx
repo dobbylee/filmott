@@ -13,30 +13,61 @@ import { trackEvent } from '@/lib/ga';
 interface ReviewFormModalProps {
   contentId: number;
   existingReview?: Review | null;
+  initialWatchedAt?: string | null;
+  forceWatchedAtInput?: boolean;
   onClose: () => void;
   onMutate?: () => void;
 }
 
-export default function ReviewFormModal({ contentId, existingReview, onClose, onMutate }: ReviewFormModalProps) {
+function getTodayDateInputValue(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function toDateInputValue(date: string | null | undefined): string {
+  if (!date) return getTodayDateInputValue();
+  const dateMatch = date.match(/^\d{4}-\d{2}-\d{2}/);
+  if (dateMatch) return dateMatch[0];
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return getTodayDateInputValue();
+  return parsed.toISOString().split('T')[0];
+}
+
+export default function ReviewFormModal({
+  contentId,
+  existingReview,
+  initialWatchedAt,
+  forceWatchedAtInput = false,
+  onClose,
+  onMutate,
+}: ReviewFormModalProps) {
   const router = useRouter();
   const isEditing = existingReview != null;
   const [rating, setRating] = useState(existingReview?.rating ?? 0);
   const [comment, setComment] = useState(existingReview?.comment ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [watchedAt, setWatchedAt] = useState(new Date().toISOString().split('T')[0]);
-  const [needsDate, setNeedsDate] = useState(false);
+  const initialWatchedAtValue = initialWatchedAt ?? existingReview?.watchedAt;
+  const hasProvidedWatchedAt = initialWatchedAt != null || existingReview?.watchedAt != null;
+  const [watchedAt, setWatchedAt] = useState(() => toDateInputValue(initialWatchedAtValue));
+  const showWatchedAtInput = true;
   const modalRef = useFocusTrap<HTMLDivElement>();
 
-  // 감상한 작품 미등록 시 날짜 입력 표시
   useEffect(() => {
-    if (isEditing) return;
+    setWatchedAt(toDateInputValue(initialWatchedAtValue));
+  }, [initialWatchedAtValue]);
+
+  // 기존 watched 기록이 있으면 감상일을 기본값으로 사용한다.
+  useEffect(() => {
+    if (forceWatchedAtInput || hasProvidedWatchedAt) return;
     api.get<WatchlistStatusResponse>(`/watchlist/me/status?contentId=${contentId}`)
       .then((res) => {
-        setNeedsDate(res.data.status !== 'watched');
+        if (res.data.watchedAt) {
+          setWatchedAt(toDateInputValue(res.data.watchedAt));
+        }
       })
-      .catch(() => setNeedsDate(true));
-  }, [contentId, isEditing]);
+      .catch(() => {});
+  }, [contentId, forceWatchedAtInput, hasProvidedWatchedAt]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -64,13 +95,14 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
         await api.patch(`/reviews/${existingReview.id}`, {
           rating,
           comment,
+          watchedAt,
         });
       } else {
         await api.post('/reviews', {
           contentId,
           rating,
           comment: comment || undefined,
-          ...(needsDate ? { watchedAt } : {}),
+          ...(showWatchedAtInput ? { watchedAt } : {}),
         });
       }
       if (!isEditing) {
@@ -106,13 +138,13 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
         </h2>
 
         <form onSubmit={handleSubmit}>
-          {needsDate && (
+          {showWatchedAtInput && (
             <div className="mb-4">
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">감상 날짜</label>
               <input
                 type="date"
                 value={watchedAt}
-                max={new Date().toISOString().split('T')[0]}
+                max={getTodayDateInputValue()}
                 onChange={(e) => setWatchedAt(e.target.value)}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary [color-scheme:dark]"
               />

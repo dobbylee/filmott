@@ -195,6 +195,38 @@ describe('ReviewsService', () => {
       ).not.toHaveBeenCalled();
     });
 
+    it('이미 감상한 경우에도 watchedAt이 주어지면 워치리스트 날짜를 갱신해야 한다', async () => {
+      const dto = {
+        contentId: 1,
+        rating: 8,
+        watchedAt: '2026-03-15T00:00:00Z',
+      };
+      const created = { id: 7, userId: 1, ...dto, likesCount: 0 };
+      const mockManager = createManager({
+        createdReview: created as Review,
+        existingWatchlist: { status: 'watched' },
+      });
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
+      );
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue(
+        {},
+      );
+
+      await service.create(1, dto);
+
+      expect(
+        mockWatchlistService.addToWatchlistByContentIdWithManager,
+      ).toHaveBeenCalledWith(
+        mockManager,
+        1,
+        1,
+        'watched',
+        '2026-03-15T00:00:00Z',
+      );
+    });
+
     it('리뷰 생성 시 want_to_watch를 watched로 전환해야 한다', async () => {
       const dto = { contentId: 1, rating: 9 };
       const created = { id: 5, userId: 1, ...dto, likesCount: 0 };

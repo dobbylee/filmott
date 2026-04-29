@@ -109,12 +109,16 @@ export class WatchlistController {
   ) {
     if (contentIdStr) {
       const contentId = parseInt(contentIdStr, 10);
-      if (isNaN(contentId)) return { status: null, watchlistId: null };
+      if (isNaN(contentId)) {
+        return { status: null, watchlistId: null, watchedAt: null };
+      }
       return this.watchlistService.getWatchlistStatus(user.id, contentId);
     }
     if (tmdbIdStr) {
       const tmdbId = parseInt(tmdbIdStr, 10);
-      if (isNaN(tmdbId)) return { status: null, watchlistId: null };
+      if (isNaN(tmdbId)) {
+        return { status: null, watchlistId: null, watchedAt: null };
+      }
       const ct = contentType === 'tv' ? 'tv' : 'movie';
       return this.watchlistService.getWatchlistStatusByTmdbId(
         user.id,
@@ -122,6 +126,6 @@ export class WatchlistController {
         ct,
       );
     }
-    return { status: null, watchlistId: null };
+    return { status: null, watchlistId: null, watchedAt: null };
   }
 }

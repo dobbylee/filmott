@@ -304,6 +304,7 @@ export default async function ContentDetailPage({
               {/* 기록하기 버튼 */}
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <WatchlistStatusButton
+                  contentId={content.id}
                   tmdbId={Number(tmdbId)}
                   contentType={type as 'movie' | 'tv'}
                 />

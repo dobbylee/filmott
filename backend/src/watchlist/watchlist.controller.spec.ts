@@ -200,7 +200,11 @@ describe('WatchlistController', () => {
     it('파라미터가 없으면 null을 반환해야 한다', async () => {
       const result = await controller.getWatchlistStatus(user);
 
-      expect(result).toEqual({ status: null, watchlistId: null });
+      expect(result).toEqual({
+        status: null,
+        watchlistId: null,
+        watchedAt: null,
+      });
     });
 
     it('contentType이 tv이면 tv를 사용해야 한다', async () => {

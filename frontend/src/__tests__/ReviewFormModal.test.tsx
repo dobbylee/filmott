@@ -34,12 +34,32 @@ describe('ReviewFormModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGet.mockResolvedValue({
+      data: {
+        status: 'watched',
+        watchlistId: 1,
+      },
+    });
+    mockPost.mockResolvedValue({ data: {} });
+    mockPatch.mockResolvedValue({ data: {} });
   });
 
   function changeRating(value: number) {
     fireEvent.change(screen.getByRole('slider', { name: '별점 선택' }), {
       target: { value: String(value) },
     });
+  }
+
+  function getDateInput(): HTMLInputElement {
+    const field = screen.getByText('감상 날짜').parentElement?.querySelector('input');
+    if (!(field instanceof HTMLInputElement)) {
+      throw new Error('감상 날짜 입력 필드를 찾을 수 없습니다.');
+    }
+    return field;
+  }
+
+  function getTodayDateValue(): string {
+    return new Date().toISOString().split('T')[0];
   }
 
   it('신규 작성 모드에서 "리뷰 작성" 제목을 표시해야 한다', () => {
@@ -101,7 +121,6 @@ describe('ReviewFormModal', () => {
   });
 
   it('신규 작성 시 POST API를 호출해야 한다', async () => {
-    mockPost.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
     render(<ReviewFormModal {...defaultProps} />);
@@ -117,11 +136,11 @@ describe('ReviewFormModal', () => {
       contentId: 1,
       rating: 7,
       comment: '멋진 영화!',
+      watchedAt: getTodayDateValue(),
     });
   });
 
   it('수정 시 PATCH API를 호출해야 한다', async () => {
-    mockPatch.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
     render(
@@ -146,11 +165,11 @@ describe('ReviewFormModal', () => {
     expect(mockPatch).toHaveBeenCalledWith('/reviews/10', {
       rating: 8,
       comment: '기존 리뷰',
+      watchedAt: getTodayDateValue(),
     });
   });
 
   it('수정 시 기존 코멘트를 비우면 빈 문자열로 PATCH API를 호출해야 한다', async () => {
-    mockPatch.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
     render(
@@ -175,11 +194,11 @@ describe('ReviewFormModal', () => {
     expect(mockPatch).toHaveBeenCalledWith('/reviews/10', {
       rating: 5,
       comment: '',
+      watchedAt: getTodayDateValue(),
     });
   });
 
   it('성공 후 onClose와 onMutate를 호출해야 한다', async () => {
-    mockPost.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
     render(<ReviewFormModal {...defaultProps} />);
@@ -318,8 +337,48 @@ describe('ReviewFormModal', () => {
     expect(screen.queryByText(/초기화/)).not.toBeInTheDocument();
   });
 
+  it('initialWatchedAt이 있으면 신규 작성 날짜 기본값으로 사용하고 POST에 포함해야 한다', async () => {
+    const user = userEvent.setup();
+
+    render(<ReviewFormModal {...defaultProps} initialWatchedAt="2026-03-15T00:00:00Z" />);
+
+    expect(getDateInput()).toHaveValue('2026-03-15');
+
+    changeRating(7);
+    await user.click(screen.getByText('작성'));
+
+    expect(mockPost).toHaveBeenCalledWith('/reviews', {
+      contentId: 1,
+      rating: 7,
+      comment: undefined,
+      watchedAt: '2026-03-15',
+    });
+  });
+
+  it('수정에서 날짜만 변경하면 좋아요 초기화 경고를 표시하지 않아야 한다', () => {
+    render(
+      <ReviewFormModal
+        {...defaultProps}
+        existingReview={{
+          id: 10,
+          userId: 1,
+          contentId: 1,
+          rating: 5,
+          comment: '기존 리뷰',
+          likesCount: 3,
+          createdAt: '2024-12-25T12:00:00Z',
+          updatedAt: '2024-12-25T12:00:00Z',
+        }}
+        initialWatchedAt="2026-03-10T00:00:00Z"
+      />,
+    );
+
+    fireEvent.change(getDateInput(), { target: { value: '2026-03-11' } });
+
+    expect(screen.queryByText(/초기화/)).not.toBeInTheDocument();
+  });
+
   it('신규 작성 성공 시 review_created 이벤트를 content_id와 함께 호출해야 한다', async () => {
-    mockPost.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
     render(<ReviewFormModal {...defaultProps} />);
@@ -343,7 +402,6 @@ describe('ReviewFormModal', () => {
   });
 
   it('수정(patch) 시 review_created 이벤트를 호출하지 않아야 한다', async () => {
-    mockPatch.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
     render(
@@ -369,7 +427,6 @@ describe('ReviewFormModal', () => {
   });
 
   it('코멘트가 비어있으면 undefined로 전달해야 한다', async () => {
-    mockPost.mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
     render(<ReviewFormModal {...defaultProps} />);
@@ -381,6 +438,7 @@ describe('ReviewFormModal', () => {
       contentId: 1,
       rating: 7,
       comment: undefined,
+      watchedAt: getTodayDateValue(),
     });
   });
 });

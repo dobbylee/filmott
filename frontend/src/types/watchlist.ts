@@ -23,6 +23,7 @@ export interface WatchlistCounts {
 export interface WatchlistStatusResponse {
   status: WatchlistStatus | null;
   watchlistId: number | null;
+  watchedAt?: string | null;
 }
 
 export interface WatchlistPage {
