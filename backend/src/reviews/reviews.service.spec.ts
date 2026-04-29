@@ -17,6 +17,30 @@ import { RevalidateService } from '../common/revalidate.service';
 describe('ReviewsService', () => {
   let service: ReviewsService;
   const recentReviewsTags = ['recent-reviews'];
+  const safeUserSelect = [
+    'user.id',
+    'user.nickname',
+    'user.profileImage',
+    'user.status',
+  ];
+  const sensitiveUserSelect = [
+    'user.email',
+    'user.provider',
+    'user.providerId',
+    'user.role',
+    'user.subscribedOtts',
+    'user.password',
+  ];
+  const expectSafeUserSelect = (addSelect: jest.Mock) => {
+    const selectedColumns = addSelect.mock.calls.flatMap(
+      ([columns]: [string[]]) => columns,
+    );
+
+    expect(selectedColumns).toEqual(expect.arrayContaining(safeUserSelect));
+    expect(selectedColumns).toEqual(
+      expect.not.arrayContaining(sensitiveUserSelect),
+    );
+  };
 
   const mockReviewRepo = {
     findOne: jest.fn(),
@@ -466,6 +490,7 @@ describe('ReviewsService', () => {
       const result = await service.findMyReview(1, 5);
 
       expect(result).toEqual(review);
+      expectSafeUserSelect(mockQb.addSelect);
       expect(mockQb.where).toHaveBeenCalledWith('review.userId = :userId', {
         userId: 1,
       });
@@ -583,6 +608,7 @@ describe('ReviewsService', () => {
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
+      expectSafeUserSelect(mockQb.addSelect);
     });
 
     it('좋아요순 정렬 옵션으로 호출해도 정상 동작해야 한다', async () => {
@@ -608,15 +634,30 @@ describe('ReviewsService', () => {
 
   describe('findByUser', () => {
     it('사용자에 대한 페이지네이션된 리뷰를 반환해야 한다', async () => {
-      mockReviewRepo.findAndCount.mockResolvedValue([
-        [{ id: 1, userId: 1, contentId: 1 }],
-        1,
-      ]);
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest
+          .fn()
+          .mockResolvedValue([[{ id: 1, userId: 1, contentId: 1 }], 1]),
+      };
+      mockReviewRepo.createQueryBuilder.mockReturnValue(mockQb);
 
       const result = await service.findByUser(1, 1);
 
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
+      expect(mockQb.leftJoinAndSelect).toHaveBeenCalledWith(
+        'review.content',
+        'content',
+      );
+      expectSafeUserSelect(mockQb.addSelect);
+      expect(mockReviewRepo.findAndCount).not.toHaveBeenCalled();
     });
   });
 
@@ -645,6 +686,7 @@ describe('ReviewsService', () => {
       const result = await service.getRecentReviews(5);
 
       expect(result).toHaveLength(1);
+      expectSafeUserSelect(mockQb.addSelect);
       expect(mockQb.where).toHaveBeenCalledWith('content.adult IS NOT TRUE');
       expect(mockQb.take).toHaveBeenCalledWith(5);
     });

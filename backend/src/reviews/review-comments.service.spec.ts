@@ -10,6 +10,20 @@ import { RevalidateService } from '../common/revalidate.service';
 describe('ReviewCommentsService', () => {
   let service: ReviewCommentsService;
   const recentReviewsTags = ['recent-reviews'];
+  const safeUserSelect = [
+    'user.id',
+    'user.nickname',
+    'user.profileImage',
+    'user.status',
+  ];
+  const sensitiveUserSelect = [
+    'user.email',
+    'user.provider',
+    'user.providerId',
+    'user.role',
+    'user.subscribedOtts',
+    'user.password',
+  ];
 
   const mockQb = {
     leftJoin: jest.fn(),
@@ -175,24 +189,36 @@ describe('ReviewCommentsService', () => {
       expect(result.totalPages).toBe(1);
     });
 
-    it('사용자 정보를 정제하고 password 필드를 제거해야 한다', async () => {
+    it('댓글 작성자 기본 정보를 포함해야 한다', async () => {
       const comments = [
         {
           id: 1,
           reviewId: 1,
           userId: 1,
           content: 'Comment 1',
-          user: { id: 1, nickname: 'user1', password: 'hashed' },
+          user: { id: 1, nickname: 'user1' },
         },
       ];
       mockQb.getManyAndCount.mockResolvedValue([comments, 1]);
 
       const result = await service.findByReview(1, 1);
 
-      // createQueryBuilder는 DB에서 addSelect로 필드를 제어하므로
-      // 서비스가 반환한 데이터를 그대로 반환함
       expect(result.data[0].user).toBeDefined();
       expect(result.data[0].user.nickname).toBe('user1');
+    });
+
+    it('댓글 작성자 정보는 허용된 컬럼만 선택해야 한다', async () => {
+      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findByReview(1, 1);
+
+      const selectedColumns = mockQb.addSelect.mock.calls.flatMap(
+        ([columns]: [string[]]) => columns,
+      );
+      expect(selectedColumns).toEqual(expect.arrayContaining(safeUserSelect));
+      expect(selectedColumns).toEqual(
+        expect.not.arrayContaining(sensitiveUserSelect),
+      );
     });
 
     it('user 관계가 없는 댓글을 처리해야 한다', async () => {

@@ -17,6 +17,12 @@ import { Watchlist } from '../watchlist/watchlist.entity';
 import { RevalidateService } from '../common/revalidate.service';
 
 const RECENT_REVIEWS_REVALIDATE_TAGS = ['recent-reviews'];
+const REVIEW_USER_SELECT = [
+  'user.id',
+  'user.nickname',
+  'user.profileImage',
+  'user.status',
+];
 
 @Injectable()
 export class ReviewsService {
@@ -148,12 +154,7 @@ export class ReviewsService {
     const review = await this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
-      .addSelect([
-        'user.id',
-        'user.nickname',
-        'user.profileImage',
-        'user.status',
-      ])
+      .addSelect(REVIEW_USER_SELECT)
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .where('review.userId = :userId', { userId })
       .andWhere('review.contentId = :contentId', { contentId })
@@ -172,12 +173,7 @@ export class ReviewsService {
     const qb = this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
-      .addSelect([
-        'user.id',
-        'user.nickname',
-        'user.profileImage',
-        'user.status',
-      ])
+      .addSelect(REVIEW_USER_SELECT)
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')
       .where('review.contentId = :contentId', { contentId })
       .skip(skip)
@@ -206,13 +202,16 @@ export class ReviewsService {
     const take = Math.min(limit, 20);
     const skip = (page - 1) * take;
 
-    const [reviews, total] = await this.reviewRepo.findAndCount({
-      where: { userId },
-      relations: ['content', 'user'],
-      order: { createdAt: 'DESC' },
-      skip,
-      take,
-    });
+    const [reviews, total] = await this.reviewRepo
+      .createQueryBuilder('review')
+      .leftJoinAndSelect('review.content', 'content')
+      .leftJoin('review.user', 'user')
+      .addSelect(REVIEW_USER_SELECT)
+      .where('review.userId = :userId', { userId })
+      .orderBy('review.createdAt', 'DESC')
+      .skip(skip)
+      .take(take)
+      .getManyAndCount();
 
     return {
       data: reviews,
@@ -227,12 +226,7 @@ export class ReviewsService {
     return this.reviewRepo
       .createQueryBuilder('review')
       .leftJoin('review.user', 'user')
-      .addSelect([
-        'user.id',
-        'user.nickname',
-        'user.profileImage',
-        'user.status',
-      ])
+      .addSelect(REVIEW_USER_SELECT)
       .leftJoinAndSelect('review.content', 'content')
       .where('content.adult IS NOT TRUE')
       .loadRelationCountAndMap('review.commentsCount', 'review.comments')

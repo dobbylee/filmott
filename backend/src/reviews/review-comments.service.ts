@@ -83,7 +83,6 @@ export class ReviewCommentsService {
       .addSelect([
         'user.id',
         'user.nickname',
-        'user.email',
         'user.profileImage',
         'user.status',
       ])

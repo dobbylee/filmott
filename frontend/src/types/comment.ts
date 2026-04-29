@@ -6,6 +6,7 @@ export interface Comment {
   user?: {
     id: number;
     nickname: string;
+    profileImage?: string | null;
     status?: string;
   };
 }

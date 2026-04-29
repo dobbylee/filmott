@@ -1,5 +1,11 @@
-import { User } from './auth';
 import { ContentItem } from './content';
+
+export interface ReviewUser {
+  id: number;
+  nickname: string;
+  profileImage?: string | null;
+  status?: string;
+}
 
 export interface Review {
   id: number;
@@ -11,7 +17,7 @@ export interface Review {
   commentsCount?: number;
   createdAt: string;
   updatedAt: string;
-  user?: User;
+  user?: ReviewUser;
   content?: ContentItem;
 }
 
