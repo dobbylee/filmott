@@ -100,16 +100,33 @@ export class ReviewsService {
       dto.rating !== undefined && dto.rating !== review.rating;
     const commentChanged =
       dto.comment !== undefined && dto.comment !== review.comment;
+    const reviewContentChanged = ratingChanged || commentChanged;
+    const watchedAtProvided = dto.watchedAt !== undefined;
 
     if (dto.rating !== undefined) review.rating = dto.rating;
     if (dto.comment !== undefined) review.comment = dto.comment;
 
-    // rating 또는 comment가 변경된 경우 likes_count 리셋 + 좋아요 데이터 삭제 (트랜잭션)
-    if (ratingChanged || commentChanged) {
+    if (reviewContentChanged || watchedAtProvided) {
       const result = await this.dataSource.transaction(async (manager) => {
-        review.likesCount = 0;
-        await manager.delete(ReviewLike, { reviewId: review.id });
-        return manager.save(review);
+        let savedReview = review;
+
+        if (reviewContentChanged) {
+          review.likesCount = 0;
+          await manager.delete(ReviewLike, { reviewId: review.id });
+          savedReview = await manager.save(review);
+        }
+
+        if (watchedAtProvided) {
+          await this.watchlistService.addToWatchlistByContentIdWithManager(
+            manager,
+            userId,
+            review.contentId,
+            'watched',
+            dto.watchedAt,
+          );
+        }
+
+        return savedReview;
       });
       await this.revalidateRecentReviews();
       return result;

@@ -2,6 +2,7 @@ import {
   IsOptional,
   IsInt,
   IsString,
+  IsDateString,
   Min,
   Max,
   MaxLength,
@@ -18,4 +19,8 @@ export class UpdateReviewDto {
   @IsString()
   @MaxLength(500)
   comment?: string;
+
+  @IsOptional()
+  @IsDateString()
+  watchedAt?: string;
 }

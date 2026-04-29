@@ -380,6 +380,130 @@ describe('ReviewsService', () => {
       );
     });
 
+    it('watchedAt만 변경하면 워치리스트 날짜를 갱신하고 좋아요를 유지해야 한다', async () => {
+      const watchedAt = '2026-04-20T00:00:00.000Z';
+      const review = {
+        id: 1,
+        userId: 1,
+        contentId: 5,
+        rating: 7,
+        comment: 'Good',
+
+        likesCount: 10,
+      };
+      mockReviewRepo.findOne.mockResolvedValue({ ...review });
+
+      const mockManager = {
+        delete: jest.fn(),
+        save: jest.fn(),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
+      );
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue(
+        {},
+      );
+
+      const result = await service.update(1, 1, { watchedAt });
+
+      expect(result.likesCount).toBe(10);
+      expect(mockManager.delete).not.toHaveBeenCalled();
+      expect(mockManager.save).not.toHaveBeenCalled();
+      expect(mockReviewRepo.save).not.toHaveBeenCalled();
+      expect(
+        mockWatchlistService.addToWatchlistByContentIdWithManager,
+      ).toHaveBeenCalledWith(mockManager, 1, 5, 'watched', watchedAt);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
+        '/',
+        recentReviewsTags,
+      );
+    });
+
+    it('rating과 코멘트가 동일하고 watchedAt만 변경되면 좋아요를 유지해야 한다', async () => {
+      const watchedAt = '2026-04-21T00:00:00.000Z';
+      const review = {
+        id: 1,
+        userId: 1,
+        contentId: 5,
+        rating: 7,
+        comment: 'Good',
+
+        likesCount: 10,
+      };
+      mockReviewRepo.findOne.mockResolvedValue({ ...review });
+
+      const mockManager = {
+        delete: jest.fn(),
+        save: jest.fn(),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
+      );
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue(
+        {},
+      );
+
+      const result = await service.update(1, 1, {
+        rating: 7,
+        comment: 'Good',
+        watchedAt,
+      });
+
+      expect(result.likesCount).toBe(10);
+      expect(mockManager.delete).not.toHaveBeenCalled();
+      expect(mockManager.save).not.toHaveBeenCalled();
+      expect(
+        mockWatchlistService.addToWatchlistByContentIdWithManager,
+      ).toHaveBeenCalledWith(mockManager, 1, 5, 'watched', watchedAt);
+    });
+
+    it('리뷰 내용과 watchedAt을 함께 변경하면 좋아요 초기화와 워치리스트 갱신을 같은 트랜잭션에서 처리해야 한다', async () => {
+      const watchedAt = '2026-04-22T00:00:00.000Z';
+      const review = {
+        id: 1,
+        userId: 1,
+        contentId: 5,
+        rating: 7,
+        comment: 'Good',
+
+        likesCount: 10,
+      };
+      mockReviewRepo.findOne.mockResolvedValue({ ...review });
+
+      const mockManager = {
+        delete: jest.fn().mockResolvedValue({ affected: 10 }),
+        save: jest
+          .fn()
+          .mockImplementation((r: Partial<Review>) => Promise.resolve(r)),
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: EntityManager) => Promise<unknown>) =>
+          cb(mockManager as unknown as EntityManager),
+      );
+      mockWatchlistService.addToWatchlistByContentIdWithManager.mockResolvedValue(
+        {},
+      );
+
+      const result = await service.update(1, 1, {
+        rating: 9,
+        watchedAt,
+      });
+
+      expect(result.rating).toBe(9);
+      expect(result.likesCount).toBe(0);
+      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), {
+        reviewId: 1,
+      });
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1, rating: 9, likesCount: 0 }),
+      );
+      expect(
+        mockWatchlistService.addToWatchlistByContentIdWithManager,
+      ).toHaveBeenCalledWith(mockManager, 1, 5, 'watched', watchedAt);
+    });
+
     it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
       mockReviewRepo.findOne.mockResolvedValue(null);
 
