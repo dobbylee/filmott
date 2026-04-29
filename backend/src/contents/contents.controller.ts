@@ -10,6 +10,7 @@ import {
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ContentsService } from './contents.service';
 import { SearchContentsDto } from './dto/search-contents.dto';
 import { DiscoverContentsDto } from './dto/discover-contents.dto';
@@ -90,6 +91,8 @@ export class ContentsController {
   }
 
   @Get(':type/:tmdbId')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60000, limit: 60 } })
   async getDetail(
     @Param('type') type: string,
     @Param('tmdbId', ParseIntPipe) tmdbId: number,

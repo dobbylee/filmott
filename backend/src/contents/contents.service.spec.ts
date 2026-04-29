@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { GatewayTimeoutException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  GatewayTimeoutException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { Content } from './content.entity';
 import { TmdbService } from '../tmdb/tmdb.service';
@@ -189,6 +193,24 @@ describe('ContentsService', () => {
   });
 
   describe('getContentDetail', () => {
+    it('tmdbId가 양수가 아니면 TMDB 호출 전에 BadRequestException을 던져야 한다', async () => {
+      await expect(service.getContentDetail(0, 'movie')).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mockContentRepo.findOne).not.toHaveBeenCalled();
+      expect(mockTmdbService.getDetails).not.toHaveBeenCalled();
+    });
+
+    it('tmdbId가 허용 범위를 넘으면 TMDB 호출 전에 BadRequestException을 던져야 한다', async () => {
+      await expect(
+        service.getContentDetail(20_000_001, 'movie'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockContentRepo.findOne).not.toHaveBeenCalled();
+      expect(mockTmdbService.getDetails).not.toHaveBeenCalled();
+    });
+
     it('캐시 미스 시 TMDB에서 가져와 DB에 저장하고 추가 정보를 포함해야 한다', async () => {
       const tmdbData = {
         id: 456,
@@ -362,6 +384,20 @@ describe('ContentsService', () => {
       await expect(service.getContentDetail(999, 'movie')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('최근 존재하지 않는 것으로 확인한 콘텐츠는 짧은 시간 동안 TMDB를 재호출하지 않아야 한다', async () => {
+      mockContentRepo.findOne.mockResolvedValue(null);
+      mockTmdbService.getDetails.mockRejectedValueOnce(new Error('not found'));
+
+      await expect(service.getContentDetail(404404, 'movie')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.getContentDetail(404404, 'movie')).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(mockTmdbService.getDetails).toHaveBeenCalledTimes(1);
     });
   });
 

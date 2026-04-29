@@ -1,5 +1,6 @@
 import {
   GatewayTimeoutException,
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -23,6 +24,8 @@ import { RevalidateService } from '../common/revalidate.service';
 
 const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000; // 5분
 const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72시간
+const NEGATIVE_DETAIL_CACHE_TTL_MS = 5 * 60 * 1000; // 5분
+const MAX_TMDB_ID = 20_000_000;
 
 interface CacheEntry<T> {
   data: T;
@@ -42,6 +45,7 @@ export class ContentsService {
     number,
     CacheEntry<{ cast: TmdbPersonCredit[]; crew: TmdbPersonCredit[] }>
   >();
+  private readonly missingDetailCache = new Map<string, number>();
 
   constructor(
     @InjectRepository(Content)
@@ -131,6 +135,8 @@ export class ContentsService {
    * 캐시 미스(신규 콘텐츠)인 경우만 동기 호출
    */
   async getContentDetail(tmdbId: number, type: 'movie' | 'tv') {
+    this.assertValidTmdbId(tmdbId);
+
     // DB에서 기존 캐시 확인
     const cached = await this.contentRepo.findOne({
       where: { tmdbId, contentType: type },
@@ -158,6 +164,7 @@ export class ContentsService {
     }
 
     // 캐시 미스(신규 콘텐츠): 동기 호출
+    this.throwIfRecentlyMissing(tmdbId, type);
     return this.fetchAndSave(tmdbId, type);
   }
 
@@ -180,12 +187,14 @@ export class ContentsService {
     try {
       tmdbData = await this.tmdbService.getDetails(tmdbId, type);
     } catch {
+      this.rememberMissingDetail(tmdbId, type);
       throw new NotFoundException(
         `콘텐츠를 찾을 수 없습니다: ${type}/${tmdbId}`,
       );
     }
 
     if (!tmdbData || !tmdbData.id) {
+      this.rememberMissingDetail(tmdbId, type);
       throw new NotFoundException(
         `콘텐츠를 찾을 수 없습니다: ${type}/${tmdbId}`,
       );
@@ -204,6 +213,37 @@ export class ContentsService {
       watchProviders,
       credits,
     };
+  }
+
+  private assertValidTmdbId(tmdbId: number): void {
+    if (!Number.isInteger(tmdbId) || tmdbId <= 0 || tmdbId > MAX_TMDB_ID) {
+      throw new BadRequestException('유효하지 않은 TMDB ID입니다.');
+    }
+  }
+
+  private getDetailCacheKey(tmdbId: number, type: 'movie' | 'tv'): string {
+    return `${type}:${tmdbId}`;
+  }
+
+  private throwIfRecentlyMissing(tmdbId: number, type: 'movie' | 'tv'): void {
+    const key = this.getDetailCacheKey(tmdbId, type);
+    const expiresAt = this.missingDetailCache.get(key);
+    if (!expiresAt) return;
+
+    if (Date.now() < expiresAt) {
+      throw new NotFoundException(
+        `콘텐츠를 찾을 수 없습니다: ${type}/${tmdbId}`,
+      );
+    }
+
+    this.missingDetailCache.delete(key);
+  }
+
+  private rememberMissingDetail(tmdbId: number, type: 'movie' | 'tv'): void {
+    this.missingDetailCache.set(
+      this.getDetailCacheKey(tmdbId, type),
+      Date.now() + NEGATIVE_DETAIL_CACHE_TTL_MS,
+    );
   }
 
   /**
