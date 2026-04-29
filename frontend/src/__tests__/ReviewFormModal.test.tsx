@@ -50,6 +50,17 @@ describe('ReviewFormModal', () => {
     expect(screen.getByPlaceholderText('작품에 대한 한마디를 남겨보세요.')).toBeInTheDocument();
   });
 
+  it('시청기록이 없으면 감상 날짜를 별점보다 먼저 표시해야 한다', async () => {
+    mockGet.mockResolvedValueOnce({ data: { status: null, watchlistId: null } });
+
+    render(<ReviewFormModal {...defaultProps} />);
+
+    await screen.findByText('감상 날짜');
+
+    const form = screen.getByText('작성').closest('form');
+    expect(form?.textContent).toMatch(/감상 날짜.*별점.*코멘트/s);
+  });
+
   it('수정 모드에서 "리뷰 수정" 제목을 표시해야 한다', () => {
     render(
       <ReviewFormModal

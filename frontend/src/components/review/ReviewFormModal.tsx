@@ -106,14 +106,6 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
         </h2>
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">별점</label>
-            <StarRating value={rating} onChange={(v) => { setRating(v); if (error) setError(''); }} />
-            {error && rating === 0 && (
-              <p className="mt-1.5 text-xs text-destructive">{error}</p>
-            )}
-          </div>
-
           {needsDate && (
             <div className="mb-4">
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">감상 날짜</label>
@@ -126,6 +118,14 @@ export default function ReviewFormModal({ contentId, existingReview, onClose, on
               />
             </div>
           )}
+
+          <div className="mb-4">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">별점</label>
+            <StarRating value={rating} onChange={(v) => { setRating(v); if (error) setError(''); }} />
+            {error && rating === 0 && (
+              <p className="mt-1.5 text-xs text-destructive">{error}</p>
+            )}
+          </div>
 
           <div className="mb-4">
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
