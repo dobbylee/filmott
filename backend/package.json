@@ -8,7 +8,6 @@
   "scripts": {
     "build": "nest build",
     "seed:admin": "ts-node src/seed-admin.ts",
-    "cache:embeddings": "ts-node src/chat/recache-metadata.command.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
