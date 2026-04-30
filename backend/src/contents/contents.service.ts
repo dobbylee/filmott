@@ -142,7 +142,7 @@ export class ContentsService {
       where: { tmdbId, contentType: type },
     });
 
-    if (cached && cached.watchProviders !== null && cached.credits !== null) {
+    if (cached && cached.credits !== null) {
       const age = Date.now() - new Date(cached.updatedAt).getTime();
 
       if (age < CONTENT_DETAIL_TTL_MS) {
@@ -164,8 +164,21 @@ export class ContentsService {
     }
 
     // 캐시 미스(신규 콘텐츠): 동기 호출
-    this.throwIfRecentlyMissing(tmdbId, type);
-    return this.fetchAndSave(tmdbId, type);
+    if (!cached) {
+      this.throwIfRecentlyMissing(tmdbId, type);
+    }
+
+    try {
+      return await this.fetchAndSave(tmdbId, type, !cached);
+    } catch (error) {
+      if (cached) {
+        this.logger.warn(
+          `상세 보강 실패, 기존 콘텐츠 반환 (${type}:${tmdbId}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return this.toDetailResponse(cached);
+      }
+      throw error;
+    }
   }
 
   private refreshInBackground(tmdbId: number, type: 'movie' | 'tv'): void {
@@ -173,7 +186,7 @@ export class ContentsService {
     if (this.refreshingIds.has(key)) return;
     this.refreshingIds.add(key);
 
-    this.fetchAndSave(tmdbId, type)
+    this.fetchAndSave(tmdbId, type, false)
       .catch((error) => {
         this.logger.warn(
           `백그라운드 갱신 실패 (${key}): ${error instanceof Error ? error.message : String(error)}`,
@@ -182,19 +195,27 @@ export class ContentsService {
       .finally(() => this.refreshingIds.delete(key));
   }
 
-  private async fetchAndSave(tmdbId: number, type: 'movie' | 'tv') {
+  private async fetchAndSave(
+    tmdbId: number,
+    type: 'movie' | 'tv',
+    rememberMissing: boolean,
+  ) {
     let tmdbData;
     try {
       tmdbData = await this.tmdbService.getDetails(tmdbId, type);
     } catch {
-      this.rememberMissingDetail(tmdbId, type);
+      if (rememberMissing) {
+        this.rememberMissingDetail(tmdbId, type);
+      }
       throw new NotFoundException(
         `콘텐츠를 찾을 수 없습니다: ${type}/${tmdbId}`,
       );
     }
 
     if (!tmdbData || !tmdbData.id) {
-      this.rememberMissingDetail(tmdbId, type);
+      if (rememberMissing) {
+        this.rememberMissingDetail(tmdbId, type);
+      }
       throw new NotFoundException(
         `콘텐츠를 찾을 수 없습니다: ${type}/${tmdbId}`,
       );
@@ -208,6 +229,14 @@ export class ContentsService {
     content.credits = credits;
     await this.contentRepo.save(content);
 
+    return this.toDetailResponse(content, watchProviders, credits);
+  }
+
+  private toDetailResponse(
+    content: Content,
+    watchProviders = content.watchProviders ?? null,
+    credits = content.credits ?? [],
+  ) {
     return {
       ...content,
       watchProviders,

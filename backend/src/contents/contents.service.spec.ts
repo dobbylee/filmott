@@ -341,7 +341,26 @@ describe('ContentsService', () => {
       expect(mockTmdbService.getDetails).toHaveBeenCalledWith(789, 'movie');
     });
 
-    it('캐시에 watchProviders가 null이면 TMDB를 재호출해야 한다', async () => {
+    it('watchProviders가 null이어도 credits가 있으면 상세 캐시로 반환해야 한다', async () => {
+      const cachedContent = {
+        id: 4,
+        tmdbId: 100,
+        contentType: 'movie',
+        title: 'No Korean Provider',
+        updatedAt: new Date(),
+        watchProviders: null,
+        credits: [],
+      };
+      mockContentRepo.findOne.mockResolvedValue(cachedContent);
+
+      const result = await service.getContentDetail(100, 'movie');
+
+      expect(mockTmdbService.getDetails).not.toHaveBeenCalled();
+      expect(result.watchProviders).toBeNull();
+      expect(result.credits).toEqual([]);
+    });
+
+    it('credits가 null인 기존 콘텐츠는 TMDB 상세 보강을 시도해야 한다', async () => {
       const partialCache = {
         id: 4,
         tmdbId: 100,
@@ -375,6 +394,26 @@ describe('ContentsService', () => {
       await service.getContentDetail(100, 'movie');
 
       expect(mockTmdbService.getDetails).toHaveBeenCalledWith(100, 'movie');
+    });
+
+    it('기존 콘텐츠 상세 보강이 실패하면 404 대신 DB 콘텐츠를 반환해야 한다', async () => {
+      const partialCache = {
+        id: 4,
+        tmdbId: 100,
+        contentType: 'movie',
+        title: 'Partial Cache',
+        updatedAt: new Date(),
+        watchProviders: null,
+        credits: null,
+      };
+      mockContentRepo.findOne.mockResolvedValueOnce(partialCache);
+      mockTmdbService.getDetails.mockRejectedValue(new Error('TMDB timeout'));
+
+      const result = await service.getContentDetail(100, 'movie');
+
+      expect(result.title).toBe('Partial Cache');
+      expect(result.watchProviders).toBeNull();
+      expect(result.credits).toEqual([]);
     });
 
     it('TMDB가 데이터를 반환하지 않으면 NotFoundException을 던져야 한다', async () => {
