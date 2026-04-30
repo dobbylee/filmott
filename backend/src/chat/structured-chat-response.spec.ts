@@ -2,8 +2,9 @@ import type { SimilarContent } from './embedding.service';
 import {
   extractPreviouslyRecommendedTitles,
   matchStructuredRecommendationsToCandidates,
-  parseStructuredChatResponse,
-  renderStructuredChatResponse,
+  parseRecommendationTrailer,
+  RECOMMENDATIONS_TRAILER_CLOSE,
+  RECOMMENDATIONS_TRAILER_OPEN,
 } from './structured-chat-response';
 
 describe('structured-chat-response', () => {
@@ -38,91 +39,32 @@ describe('structured-chat-response', () => {
     },
   ];
 
-  it('구조화 응답을 검증하고 정리해야 한다', () => {
-    const result = parseStructuredChatResponse({
-      intro: ' 추천해 드릴게요. ',
-      recommendations: [
-        {
-          tmdbId: 496243,
-          contentType: 'movie',
-          title: ' 기생충 ',
-          englishTitle: ' Parasite ',
-          reason: '사회 풍자가 강렬해요.',
-        },
-      ],
-      outro: ' 더 원하면 말해주세요. ',
-    });
+  it('추천 trailer를 파싱해야 한다', () => {
+    const result = parseRecommendationTrailer(`좋은 영화를 추천해 드릴게요.
 
-    expect(result).toEqual({
-      intro: '추천해 드릴게요.',
-      recommendations: [
-        {
-          tmdbId: 496243,
-          contentType: 'movie',
-          title: '기생충',
-          englishTitle: 'Parasite',
-          reason: '사회 풍자가 강렬해요.',
-        },
-      ],
-      outro: '더 원하면 말해주세요.',
-    });
+${RECOMMENDATIONS_TRAILER_OPEN}
+[{"tmdbId":496243,"contentType":"movie"},{"tmdbId":1396,"contentType":"tv"}]
+${RECOMMENDATIONS_TRAILER_CLOSE}`);
+
+    expect(result).toEqual([
+      { tmdbId: 496243, contentType: 'movie' },
+      { tmdbId: 1396, contentType: 'tv' },
+    ]);
   });
 
-  it('추천 항목 형식이 깨지면 null을 반환해야 한다', () => {
-    const result = parseStructuredChatResponse({
-      intro: '추천해 드릴게요.',
-      recommendations: [
-        {
-          tmdbId: '496243',
-          contentType: 'movie',
-          title: '기생충',
-          englishTitle: 'Parasite',
-          reason: '사회 풍자가 강렬해요.',
-        },
-      ],
-      outro: '더 원하면 말해주세요.',
-    });
+  it('추천 trailer 형식이 깨지면 빈 배열을 반환해야 한다', () => {
+    const result = parseRecommendationTrailer(`${RECOMMENDATIONS_TRAILER_OPEN}
+[{"tmdbId":"496243","contentType":"movie"}]
+${RECOMMENDATIONS_TRAILER_CLOSE}`);
 
-    expect(result).toBeNull();
-  });
-
-  it('구조화 응답을 표시용 Markdown으로 렌더링해야 한다', () => {
-    const text = renderStructuredChatResponse({
-      intro: '오늘 볼 만한 작품이에요.',
-      recommendations: [
-        {
-          tmdbId: 496243,
-          contentType: 'movie',
-          title: '기생충',
-          englishTitle: 'Parasite',
-          reason: '긴장감과 풍자가 선명해요.',
-        },
-      ],
-      outro: '다른 분위기도 말해주세요.',
-    });
-
-    expect(text).toContain('오늘 볼 만한 작품이에요.');
-    expect(text).toContain('**기생충 (Parasite)** — 긴장감과 풍자가 선명해요.');
-    expect(text).toContain('다른 분위기도 말해주세요.');
+    expect(result).toEqual([]);
   });
 
   it('tmdbId와 contentType이 일치하는 후보만 카드 추천으로 매칭해야 한다', () => {
-    const { matched, unmatched } = matchStructuredRecommendationsToCandidates(
+    const matched = matchStructuredRecommendationsToCandidates(
       [
-        {
-          tmdbId: 496243,
-          contentType: 'movie',
-          title: '기생충',
-          englishTitle: 'Parasite',
-          reason: '사회 풍자가 강렬해요.',
-        },
-        {
-          tmdbId: 999999,
-          contentType: 'movie',
-          title: '후보 밖 작품',
-          englishTitle: null,
-          reason: '분위기가 잘 맞아요.',
-        },
+        { tmdbId: 496243, contentType: 'movie' },
+        { tmdbId: 999999, contentType: 'movie' },
       ],
       candidates,
     );
@@ -133,28 +75,17 @@ describe('structured-chat-response', () => {
         contentType: 'movie',
         title: '기생충',
         posterUrl: '/poster.jpg',
-        reason: '사회 풍자가 강렬해요.',
       },
     ]);
-    expect(unmatched).toEqual([{ korean: '후보 밖 작품', english: null }]);
   });
 
-  it('제목이 후보와 같아도 tmdbId/contentType이 없으면 카드로 매칭하지 않아야 한다', () => {
-    const { matched, unmatched } = matchStructuredRecommendationsToCandidates(
-      [
-        {
-          tmdbId: null,
-          contentType: null,
-          title: '기생충',
-          englishTitle: 'Parasite',
-          reason: '사회 풍자가 강렬해요.',
-        },
-      ],
+  it('tmdbId와 contentType이 일치하지 않으면 카드로 매칭하지 않아야 한다', () => {
+    const matched = matchStructuredRecommendationsToCandidates(
+      [{ tmdbId: 496243, contentType: 'tv' }],
       candidates,
     );
 
     expect(matched).toEqual([]);
-    expect(unmatched).toEqual([{ korean: '기생충', english: 'Parasite' }]);
   });
 
   it('굵은 글씨 키워드는 이전 추천작 fallback에서 제외해야 한다', () => {

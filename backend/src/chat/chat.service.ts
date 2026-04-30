@@ -29,18 +29,15 @@ import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 import {
-  CHAT_RESPONSE_FORMAT,
-  extractPreviouslyRecommendedTitles,
+  RECOMMENDATIONS_TRAILER_CLOSE,
+  RECOMMENDATIONS_TRAILER_OPEN,
   matchStructuredRecommendationsToCandidates,
-  parseStructuredChatResponse,
-  renderStructuredChatResponse,
+  parseRecommendationTrailer,
+  extractPreviouslyRecommendedTitles,
 } from './structured-chat-response';
 
 const OPENAI_CHAT_TIMEOUT_MS = 30_000;
-const SSE_TEXT_CHUNK_SIZE = 8;
-const SSE_TEXT_CHUNK_DELAY_MS = 28;
-const SSE_TEXT_SENTENCE_DELAY_MS = 60;
-const SSE_TEXT_PARAGRAPH_DELAY_MS = 110;
+const TRAILER_DETECTION_TAIL_LENGTH = RECOMMENDATIONS_TRAILER_OPEN.length - 1;
 
 interface RawFavoriteRow {
   title: string;
@@ -303,13 +300,13 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 11. GPT 구조화 응답 호출
-    const response = await this.openai.chat.completions.create(
+    // 11. GPT 스트리밍 응답 호출
+    const stream = await this.openai.chat.completions.create(
       {
         model: CHAT_MODEL,
         reasoning_effort: 'low',
         max_completion_tokens: 4096,
-        response_format: CHAT_RESPONSE_FORMAT,
+        stream: true,
         messages: [{ role: 'system', content: systemPrompt }, ...messages],
       },
       { timeout: OPENAI_CHAT_TIMEOUT_MS, signal },
@@ -319,32 +316,14 @@ export class ChatService {
       return;
     }
 
-    const rawContent = response.choices[0]?.message?.content?.trim();
-    if (!rawContent) {
-      throw new BadRequestException('AI 응답을 생성하지 못했습니다.');
-    }
-
-    let rawParsed: unknown;
-    try {
-      rawParsed = JSON.parse(rawContent) as unknown;
-    } catch {
-      throw new BadRequestException('AI 응답 형식이 올바르지 않습니다.');
-    }
-
-    const parsed = parseStructuredChatResponse(rawParsed);
-    if (!parsed) {
-      throw new BadRequestException('AI 응답 형식이 올바르지 않습니다.');
-    }
-
-    const renderedText = renderStructuredChatResponse(parsed);
-    await this.emitTextChunks(renderedText, emit, signal);
+    const trailerText = await this.emitStreamingText(stream, emit, signal);
 
     if (signal?.aborted) {
       return;
     }
 
-    const { matched, unmatched } = matchStructuredRecommendationsToCandidates(
-      parsed.recommendations,
+    const matched = matchStructuredRecommendationsToCandidates(
+      parseRecommendationTrailer(trailerText),
       similarContents,
     );
 
@@ -352,88 +331,81 @@ export class ChatService {
       emit('recommendations', { recommendations: matched });
     }
 
-    // 후보 외 작품은 비동기로 TMDB 검색 + 캐싱 (카드 미표시, await 안 함)
-    if (unmatched.length > 0) {
-      this.cacheUnmatchedTitles(unmatched).catch(() => {});
-    }
-
     emit('done', {});
   }
 
-  private async emitTextChunks(
-    text: string,
+  private async emitStreamingText(
+    stream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>,
     emit: SseEmitter,
     signal?: AbortSignal,
-  ): Promise<void> {
-    for (let index = 0; index < text.length; index += SSE_TEXT_CHUNK_SIZE) {
-      if (signal?.aborted) return;
+  ): Promise<string> {
+    let pendingText = '';
+    let trailerText = '';
+    let isCollectingTrailer = false;
+    let hasEmittedText = false;
 
-      const chunk = text.slice(index, index + SSE_TEXT_CHUNK_SIZE);
-      emit('text', {
-        content: chunk,
-      });
+    for await (const chunk of stream) {
+      if (signal?.aborted) return trailerText;
 
-      if (index + SSE_TEXT_CHUNK_SIZE < text.length) {
-        await this.sleep(this.getTextChunkDelay(chunk));
+      const content = chunk.choices[0]?.delta?.content;
+      if (!content) continue;
+
+      if (isCollectingTrailer) {
+        trailerText += content;
+        continue;
       }
-    }
-  }
 
-  private getTextChunkDelay(chunk: string): number {
-    if (/\n\s*$/.test(chunk)) {
-      return SSE_TEXT_PARAGRAPH_DELAY_MS;
-    }
-
-    if (/[.!?。！？요다]\s*$/.test(chunk)) {
-      return SSE_TEXT_SENTENCE_DELAY_MS;
-    }
-
-    return SSE_TEXT_CHUNK_DELAY_MS;
-  }
-
-  private sleep(milliseconds: number): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(resolve, milliseconds);
-    });
-  }
-
-  private async cacheUnmatchedTitles(
-    titles: { korean: string; english: string | null }[],
-  ): Promise<void> {
-    for (const title of titles) {
-      try {
-        const searchQuery = title.english || title.korean;
-        const [movieResult, tvResult] = await Promise.all([
-          this.contentsService
-            .searchContents(searchQuery, 'movie', 1)
-            .catch(() => null),
-          this.contentsService
-            .searchContents(searchQuery, 'tv', 1)
-            .catch(() => null),
-        ]);
-
-        const firstMatch =
-          (movieResult?.results?.[0]
-            ? { id: movieResult.results[0].id, type: 'movie' as const }
-            : null) ??
-          (tvResult?.results?.[0]
-            ? { id: tvResult.results[0].id, type: 'tv' as const }
-            : null);
-
-        if (firstMatch) {
-          const content = await this.contentsService.findOrFetchByTmdbId(
-            firstMatch.id,
-            firstMatch.type,
+      const combined = pendingText + content;
+      const trailerStartIndex = combined.indexOf(RECOMMENDATIONS_TRAILER_OPEN);
+      if (trailerStartIndex >= 0) {
+        const visibleText = combined.slice(0, trailerStartIndex);
+        this.emitTextIfNotEmpty(visibleText, emit);
+        hasEmittedText = hasEmittedText || visibleText.length > 0;
+        trailerText =
+          RECOMMENDATIONS_TRAILER_OPEN +
+          combined.slice(
+            trailerStartIndex + RECOMMENDATIONS_TRAILER_OPEN.length,
           );
-          this.embeddingService
-            .cacheContentMetadata(content.id)
-            .catch(() => {});
-        }
-      } catch (error) {
-        this.logger.warn(
-          `unmatched 제목 캐싱 실패 ("${title.korean}"): ${error instanceof Error ? error.message : String(error)}`,
+        pendingText = '';
+        isCollectingTrailer = true;
+        continue;
+      }
+
+      if (combined.length <= TRAILER_DETECTION_TAIL_LENGTH) {
+        pendingText = combined;
+        continue;
+      }
+
+      const emitLength = combined.length - TRAILER_DETECTION_TAIL_LENGTH;
+      const visibleText = combined.slice(0, emitLength);
+      pendingText = combined.slice(emitLength);
+      this.emitTextIfNotEmpty(visibleText, emit);
+      hasEmittedText = hasEmittedText || visibleText.length > 0;
+    }
+
+    if (!isCollectingTrailer) {
+      this.emitTextIfNotEmpty(pendingText, emit);
+      hasEmittedText = hasEmittedText || pendingText.length > 0;
+    } else {
+      const closeIndex = trailerText.indexOf(RECOMMENDATIONS_TRAILER_CLOSE);
+      if (closeIndex >= 0) {
+        trailerText = trailerText.slice(
+          0,
+          closeIndex + RECOMMENDATIONS_TRAILER_CLOSE.length,
         );
       }
+    }
+
+    if (!hasEmittedText && !signal?.aborted) {
+      throw new BadRequestException('AI 응답을 생성하지 못했습니다.');
+    }
+
+    return trailerText;
+  }
+
+  private emitTextIfNotEmpty(text: string, emit: SseEmitter): void {
+    if (text.length > 0) {
+      emit('text', { content: text });
     }
   }
 

@@ -201,15 +201,18 @@ ${candidatesSection}
 - 추천과 무관한 질문은 영화/시리즈 대화로 유도.
 
 ## 응답 형식 (반드시 준수)
-JSON Schema에 맞는 JSON만 반환하세요. Markdown 문장을 직접 작성하지 마세요.
+사용자에게 보여줄 Markdown 본문을 먼저 작성하세요. 작품 제목은 굵게 표시하고, 각 작품마다 추천 이유를 본문에 자연스럽게 포함하세요.
 
-- intro: 상황에 맞는 짧은 도입 문장입니다. Markdown 강조 문법을 쓰지 마세요.
-- recommendations: 실제 추천작 배열입니다. 포스터 카드는 이 배열만 기준으로 생성됩니다.
-- recommendations[].tmdbId/contentType: 후보 목록에서 고른 작품이면 반드시 후보의 [ID:tmdbId|contentType] 값을 그대로 넣으세요. 본인 지식으로 보충한 작품이면 둘 다 null로 둡니다.
-- recommendations[].title: 한국어 제목 또는 서비스에 표시할 대표 제목입니다.
-- recommendations[].englishTitle: 영어 원제를 알면 넣고, 모르면 null입니다.
-- recommendations[].reason: 추천 이유 1~2문장입니다. 제목을 반복하지 말고 이유만 작성하세요.
-- outro: 추가 요청을 유도하는 짧은 마무리 문장입니다.
+본문이 끝난 뒤 마지막에 아래 trailer를 정확히 한 번만 추가하세요. trailer는 포스터 카드 생성을 위한 내부 데이터입니다.
 
-후보 목록에 있는 작품을 추천하면서 tmdbId/contentType을 null로 두지 마세요. recommendations 배열에 없는 작품은 추천한 것으로 간주되지 않습니다.`;
+<filmott_recommendations>
+[{"tmdbId":496243,"contentType":"movie"},{"tmdbId":1396,"contentType":"tv"}]
+</filmott_recommendations>
+
+trailer 규칙:
+- 후보 목록에서 고른 작품만 trailer에 넣으세요.
+- tmdbId와 contentType은 후보의 [ID:tmdbId|contentType] 값을 그대로 사용하세요.
+- 본인 지식으로 보충한 작품은 본문에는 추천할 수 있지만 trailer에는 넣지 마세요.
+- trailer에는 JSON 배열만 넣고, title/reason/설명 문구를 넣지 마세요.
+- trailer 뒤에는 아무 문장도 쓰지 마세요.`;
 }

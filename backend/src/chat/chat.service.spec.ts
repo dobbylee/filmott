@@ -13,7 +13,10 @@ import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
 import { Content } from '../contents/content.entity';
 import { UserPreference } from './user-preference';
-import type { StructuredChatResponse } from './structured-chat-response';
+import {
+  RECOMMENDATIONS_TRAILER_CLOSE,
+  RECOMMENDATIONS_TRAILER_OPEN,
+} from './structured-chat-response';
 
 // extractUserPreference mock
 const mockExtractUserPreference = jest.fn<UserPreference, []>();
@@ -86,24 +89,20 @@ describe('ChatService', () => {
     get: jest.fn().mockReturnValue('test-openai-key'),
   };
 
-  const defaultStructuredResponse: StructuredChatResponse = {
-    intro: '추천해 드릴게요.',
-    recommendations: [],
-    outro: '다른 분위기나 장르도 말해주세요.',
-  };
-
-  const mockStructuredResponse = (
-    response: StructuredChatResponse = defaultStructuredResponse,
-  ) => {
-    mockStreamCreate.mockResolvedValue({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify(response),
+  async function* createChatStream(chunks: string[]) {
+    for (const content of chunks) {
+      yield {
+        choices: [
+          {
+            delta: { content },
           },
-        },
-      ],
-    });
+        ],
+      };
+    }
+  }
+
+  const mockStreamingResponse = (chunks: string[]) => {
+    mockStreamCreate.mockResolvedValue(createChatStream(chunks));
   };
 
   beforeEach(async () => {
@@ -124,7 +123,9 @@ describe('ChatService', () => {
     }).compile();
 
     service = module.get<ChatService>(ChatService);
-    mockStructuredResponse();
+    mockStreamingResponse([
+      '추천해 드릴게요.\n\n다른 분위기나 장르도 말해주세요.',
+    ]);
   });
 
   afterEach(() => {
@@ -305,7 +306,7 @@ describe('ChatService', () => {
       mockExtractUserPreference.mockReturnValue({ ...defaultEmptyPreference });
     };
 
-    it('구조화 추천이 후보와 매칭되면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
+    it('스트리밍 추천 ID가 후보와 매칭되면 text/recommendations/done 이벤트를 순서대로 emit해야 한다', async () => {
       setupEmptyUserContext();
 
       const candidates: SimilarContent[] = [
@@ -326,19 +327,13 @@ describe('ChatService', () => {
       ];
       mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
 
-      mockStructuredResponse({
-        intro: '좋은 영화를 추천해 드릴게요!',
-        recommendations: [
-          {
-            tmdbId: 496243,
-            contentType: 'movie',
-            title: '기생충',
-            englishTitle: 'Parasite',
-            reason: '봉준호 감독의 걸작입니다.',
-          },
-        ],
-        outro: '다른 분위기도 말해주세요.',
-      });
+      mockStreamingResponse([
+        '좋은 영화를 추천해 드릴게요!\n\n',
+        '**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.',
+        `\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n`,
+        '[{"tmdbId":496243,"contentType":"movie"}]',
+        `\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ]);
 
       const emittedEvents: { event: string; data: unknown }[] = [];
       const emit = (event: string, data: unknown) => {
@@ -349,13 +344,13 @@ describe('ChatService', () => {
 
       // text 이벤트 확인
       const textEvents = emittedEvents.filter((e) => e.event === 'text');
-      expect(textEvents.length).toBeGreaterThan(1);
-      expect((textEvents[0].data as { content: string }).content).toContain(
-        '좋은 영화',
-      );
+      expect(textEvents.length).toBeGreaterThan(0);
       expect(
         textEvents.map((e) => (e.data as { content: string }).content).join(''),
       ).toContain('**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.');
+      expect(
+        textEvents.map((e) => (e.data as { content: string }).content).join(''),
+      ).not.toContain(RECOMMENDATIONS_TRAILER_OPEN);
 
       // recommendations 이벤트 확인 (후보 매칭 성공 시)
       const recEvents = emittedEvents.filter(
@@ -372,14 +367,13 @@ describe('ChatService', () => {
       expect(doneEvents).toHaveLength(1);
     });
 
-    it('구조화 응답에 추천작이 없으면 recommendations 이벤트를 emit하지 않아야 한다', async () => {
+    it('추천 trailer에 추천작이 없으면 recommendations 이벤트를 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
-      mockStructuredResponse({
-        intro: '네, 어떤 장르를 좋아하시나요?',
-        recommendations: [],
-        outro: '원하는 분위기를 알려주시면 더 정확히 추천해 드릴게요.',
-      });
+      mockStreamingResponse([
+        '네, 어떤 장르를 좋아하시나요?\n\n원하는 분위기를 알려주시면 더 정확히 추천해 드릴게요.',
+        `\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n[]\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ]);
 
       const emittedEvents: { event: string; data: unknown }[] = [];
       const emit = (event: string, data: unknown) => {
@@ -397,7 +391,32 @@ describe('ChatService', () => {
       expect(doneEvents).toHaveLength(1);
     });
 
-    it('굵은 글씨 키워드가 텍스트에 있어도 구조화 추천 배열에 없으면 카드로 만들지 않아야 한다', async () => {
+    it('추천 trailer 태그가 chunk 경계에 걸려도 텍스트로 노출하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockStreamingResponse([
+        '추천 본문입니다.\n\n',
+        '<filmott',
+        '_recommendations>\n[]\n',
+        RECOMMENDATIONS_TRAILER_CLOSE,
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '추천해줘', [], emit);
+
+      const text = emittedEvents
+        .filter((e) => e.event === 'text')
+        .map((e) => (e.data as { content: string }).content)
+        .join('');
+      expect(text).toBe('추천 본문입니다.\n\n');
+      expect(text).not.toContain('filmott_recommendations');
+    });
+
+    it('굵은 글씨 키워드가 텍스트에 있어도 추천 trailer에 없으면 카드로 만들지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([
         {
@@ -415,11 +434,10 @@ describe('ChatService', () => {
           overview: null,
         },
       ]);
-      mockStructuredResponse({
-        intro: '**청춘** 키워드 중심으로 골라봤어요.',
-        recommendations: [],
-        outro: '원하는 분위기를 더 알려주세요.',
-      });
+      mockStreamingResponse([
+        '**청춘** 키워드 중심으로 골라봤어요.\n\n원하는 분위기를 더 알려주세요.',
+        `\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n[]\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ]);
 
       const emittedEvents: { event: string; data: unknown }[] = [];
       const emit = (event: string, data: unknown) => {
@@ -429,9 +447,9 @@ describe('ChatService', () => {
       await service.sendMessageStream(1, '청춘 영화 추천해줘', [], emit);
 
       const textEvents = emittedEvents.filter((e) => e.event === 'text');
-      expect((textEvents[0].data as { content: string }).content).toContain(
-        '**청춘**',
-      );
+      expect(
+        textEvents.map((e) => (e.data as { content: string }).content).join(''),
+      ).toContain('**청춘**');
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
@@ -511,7 +529,7 @@ describe('ChatService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('OpenAI 구조화 응답 호출에 30초 timeout 옵션이 전달되어야 한다', async () => {
+    it('OpenAI 스트리밍 응답 호출에 30초 timeout 옵션이 전달되어야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
 
@@ -520,10 +538,10 @@ describe('ChatService', () => {
       const createParams = mockStreamCreate.mock.calls[0][0];
       expect(createParams).toEqual(
         expect.objectContaining({
-          response_format: expect.objectContaining({ type: 'json_schema' }),
+          stream: true,
         }),
       );
-      expect(createParams).not.toHaveProperty('stream');
+      expect(createParams).not.toHaveProperty('response_format');
       expect(mockStreamCreate.mock.calls[0][1]).toEqual(
         expect.objectContaining({ timeout: 30_000, signal: undefined }),
       );
