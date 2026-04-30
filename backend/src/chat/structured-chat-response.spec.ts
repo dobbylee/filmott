@@ -2,7 +2,6 @@ import type { SimilarContent } from './embedding.service';
 import {
   extractPreviouslyRecommendedTitles,
   matchStructuredRecommendationsToCandidates,
-  parseVisibleChatContent,
   parseRecommendationTrailer,
   RECOMMENDATIONS_TRAILER_CLOSE,
   RECOMMENDATIONS_TRAILER_OPEN,
@@ -87,21 +86,6 @@ ${RECOMMENDATIONS_TRAILER_CLOSE}`);
     );
 
     expect(matched).toEqual([]);
-  });
-
-  it('표시 텍스트를 intro/items/outro로 분리해야 한다', () => {
-    const result = parseVisibleChatContent(
-      '오늘 볼 만한 작품이에요.\n**기생충** - 사회 풍자가 선명해요.\n**인셉션** - 꿈을 다루는 SF예요.\n더 가벼운 쪽으로도 골라드릴까요?',
-    );
-
-    expect(result).toEqual({
-      intro: '오늘 볼 만한 작품이에요.',
-      items: [
-        { title: '기생충', description: '사회 풍자가 선명해요.' },
-        { title: '인셉션', description: '꿈을 다루는 SF예요.' },
-      ],
-      outro: '더 가벼운 쪽으로도 골라드릴까요?',
-    });
   });
 
   it('굵은 글씨 키워드는 이전 추천작 fallback에서 제외해야 한다', () => {

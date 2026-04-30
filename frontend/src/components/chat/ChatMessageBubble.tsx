@@ -2,7 +2,6 @@
 
 import ReactMarkdown from 'react-markdown';
 import RecommendationCards from './RecommendationCards';
-import StructuredChatContent from './StructuredChatContent';
 import type { ChatMessageData } from '@/types/chat';
 
 interface ChatMessageBubbleProps {
@@ -25,8 +24,6 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
           <p className="text-sm leading-relaxed text-white/90 whitespace-pre-wrap">
             {message.content}
           </p>
-        ) : message.structuredContent ? (
-          <StructuredChatContent content={message.structuredContent} />
         ) : (
           <div className="text-sm leading-relaxed text-white/90 prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-white">
             <ReactMarkdown>{message.content}</ReactMarkdown>

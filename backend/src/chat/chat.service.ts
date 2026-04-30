@@ -33,7 +33,6 @@ import {
   RECOMMENDATIONS_TRAILER_OPEN,
   matchStructuredRecommendationsToCandidates,
   parseRecommendationTrailer,
-  parseVisibleChatContent,
   extractPreviouslyRecommendedTitles,
 } from './structured-chat-response';
 
@@ -317,21 +316,16 @@ export class ChatService {
       return;
     }
 
-    const streamResult = await this.emitStreamingText(stream, emit, signal);
+    const trailerText = await this.emitStreamingText(stream, emit, signal);
 
     if (signal?.aborted) {
       return;
     }
 
     const matched = matchStructuredRecommendationsToCandidates(
-      parseRecommendationTrailer(streamResult.trailerText),
+      parseRecommendationTrailer(trailerText),
       similarContents,
     );
-
-    const structuredContent = parseVisibleChatContent(streamResult.visibleText);
-    if (structuredContent.items.length > 0) {
-      emit('structured', structuredContent);
-    }
 
     if (matched.length > 0) {
       emit('recommendations', { recommendations: matched });
@@ -344,15 +338,14 @@ export class ChatService {
     stream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>,
     emit: SseEmitter,
     signal?: AbortSignal,
-  ): Promise<{ trailerText: string; visibleText: string }> {
+  ): Promise<string> {
     let pendingText = '';
     let trailerText = '';
-    let visibleText = '';
     let isCollectingTrailer = false;
     let hasEmittedText = false;
 
     for await (const chunk of stream) {
-      if (signal?.aborted) return { trailerText, visibleText };
+      if (signal?.aborted) return trailerText;
 
       const content = chunk.choices[0]?.delta?.content;
       if (!content) continue;
@@ -365,10 +358,9 @@ export class ChatService {
       const combined = pendingText + content;
       const trailerStartIndex = combined.indexOf(RECOMMENDATIONS_TRAILER_OPEN);
       if (trailerStartIndex >= 0) {
-        const visibleChunk = combined.slice(0, trailerStartIndex);
-        this.emitTextIfNotEmpty(visibleChunk, emit);
-        hasEmittedText = hasEmittedText || visibleChunk.length > 0;
-        visibleText += visibleChunk;
+        const visibleText = combined.slice(0, trailerStartIndex);
+        this.emitTextIfNotEmpty(visibleText, emit);
+        hasEmittedText = hasEmittedText || visibleText.length > 0;
         trailerText =
           RECOMMENDATIONS_TRAILER_OPEN +
           combined.slice(
@@ -385,17 +377,15 @@ export class ChatService {
       }
 
       const emitLength = combined.length - TRAILER_DETECTION_TAIL_LENGTH;
-      const visibleChunk = combined.slice(0, emitLength);
+      const visibleText = combined.slice(0, emitLength);
       pendingText = combined.slice(emitLength);
-      this.emitTextIfNotEmpty(visibleChunk, emit);
-      hasEmittedText = hasEmittedText || visibleChunk.length > 0;
-      visibleText += visibleChunk;
+      this.emitTextIfNotEmpty(visibleText, emit);
+      hasEmittedText = hasEmittedText || visibleText.length > 0;
     }
 
     if (!isCollectingTrailer) {
       this.emitTextIfNotEmpty(pendingText, emit);
       hasEmittedText = hasEmittedText || pendingText.length > 0;
-      visibleText += pendingText;
     } else {
       const closeIndex = trailerText.indexOf(RECOMMENDATIONS_TRAILER_CLOSE);
       if (closeIndex >= 0) {
@@ -410,7 +400,7 @@ export class ChatService {
       throw new BadRequestException('AI 응답을 생성하지 못했습니다.');
     }
 
-    return { trailerText, visibleText };
+    return trailerText;
   }
 
   private emitTextIfNotEmpty(text: string, emit: SseEmitter): void {

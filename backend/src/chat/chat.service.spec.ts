@@ -329,7 +329,7 @@ describe('ChatService', () => {
 
       mockStreamingResponse([
         '좋은 영화를 추천해 드릴게요!\n\n',
-        '**기생충** - 봉준호 감독의 걸작입니다.',
+        '**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.',
         `\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n`,
         '[{"tmdbId":496243,"contentType":"movie"}]',
         `\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
@@ -347,25 +347,10 @@ describe('ChatService', () => {
       expect(textEvents.length).toBeGreaterThan(0);
       expect(
         textEvents.map((e) => (e.data as { content: string }).content).join(''),
-      ).toContain('**기생충** - 봉준호 감독의 걸작입니다.');
+      ).toContain('**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.');
       expect(
         textEvents.map((e) => (e.data as { content: string }).content).join(''),
       ).not.toContain(RECOMMENDATIONS_TRAILER_OPEN);
-
-      const structuredEvents = emittedEvents.filter(
-        (e) => e.event === 'structured',
-      );
-      expect(structuredEvents).toHaveLength(1);
-      expect(structuredEvents[0].data).toEqual({
-        intro: '좋은 영화를 추천해 드릴게요!',
-        items: [
-          {
-            title: '기생충',
-            description: '봉준호 감독의 걸작입니다.',
-          },
-        ],
-        outro: '',
-      });
 
       // recommendations 이벤트 확인 (후보 매칭 성공 시)
       const recEvents = emittedEvents.filter(

@@ -10,11 +10,7 @@ import ChatMessageBubble from './ChatMessageBubble';
 import ChatInput from './ChatInput';
 import StreamingText from './StreamingText';
 import RecommendationCards from './RecommendationCards';
-import type {
-  ChatMessageData,
-  ChatRecommendationWithPoster,
-  ChatStructuredContent,
-} from '@/types/chat';
+import type { ChatMessageData, ChatRecommendationWithPoster } from '@/types/chat';
 import { trackEvent } from '@/lib/ga';
 
 const STORAGE_KEY = 'filmott_chat_messages';
@@ -51,9 +47,6 @@ export default function ChatSection() {
 
   // onDone 콜백에서 최신 streaming 상태를 참조하기 위한 ref
   const streamingTextRef = useRef('');
-  const structuredContentRef = useRef<ChatStructuredContent | undefined>(
-    undefined,
-  );
   const streamingRecsRef = useRef<ChatRecommendationWithPoster[] | null>(null);
   // onDone 이중 호출 방지 플래그
   const isDoneCalledRef = useRef(false);
@@ -87,7 +80,6 @@ export default function ChatSection() {
     setStreamingText('');
     setStreamingRecs(null);
     streamingTextRef.current = '';
-    structuredContentRef.current = undefined;
     streamingRecsRef.current = null;
   }, [isActiveRequest]);
 
@@ -105,7 +97,6 @@ export default function ChatSection() {
         id: getNextMessageId(),
         role: 'assistant',
         content: cleanedText,
-        structuredContent: structuredContentRef.current,
         recommendations,
         createdAt: new Date().toISOString(),
       },
@@ -198,7 +189,6 @@ export default function ChatSection() {
     setStreamingRecs(null);
     setError(null);
     setIsStreaming(false);
-    structuredContentRef.current = undefined;
     nextMessageIdRef.current = 1;
     localStorage.removeItem(STORAGE_KEY);
   };
@@ -239,7 +229,6 @@ export default function ChatSection() {
     setStreamingText('');
     setStreamingRecs(null);
     streamingTextRef.current = '';
-    structuredContentRef.current = undefined;
     streamingRecsRef.current = null;
     isDoneCalledRef.current = false;
 
@@ -249,10 +238,6 @@ export default function ChatSection() {
           if (!isActiveRequest(requestId)) return;
           streamingTextRef.current += text;
           setStreamingText((prev) => prev + text);
-        },
-        onStructuredContent: (content) => {
-          if (!isActiveRequest(requestId)) return;
-          structuredContentRef.current = content;
         },
         onRecommendations: (recs) => {
           if (!isActiveRequest(requestId)) return;

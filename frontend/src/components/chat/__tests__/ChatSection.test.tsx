@@ -91,7 +91,6 @@ describe('ChatSection', () => {
         [],
         expect.objectContaining({
           onText: expect.any(Function),
-          onStructuredContent: expect.any(Function),
           onRecommendations: expect.any(Function),
           onDone: expect.any(Function),
           onError: expect.any(Function),

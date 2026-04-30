@@ -32,7 +32,6 @@ describe('sendChatMessage', () => {
   beforeEach(() => {
     callbacks = {
       onText: vi.fn(),
-      onStructuredContent: vi.fn(),
       onRecommendations: vi.fn(),
       onDone: vi.fn(),
       onError: vi.fn(),
@@ -67,22 +66,6 @@ describe('sendChatMessage', () => {
     await sendChatMessage('추천해줘', [], callbacks);
 
     expect(callbacks.onRecommendations).toHaveBeenCalledWith(recs);
-    expect(callbacks.onDone).toHaveBeenCalledTimes(1);
-  });
-
-  it('structured 이벤트를 올바르게 파싱한다', async () => {
-    const structured = {
-      intro: '추천해드릴게요.',
-      items: [{ title: '기생충', description: '사회 풍자가 선명해요.' }],
-      outro: '더 밝은 쪽으로도 골라드릴까요?',
-    };
-    const sseData = `event: structured\ndata: ${JSON.stringify(structured)}\n\nevent: done\ndata: {}\n\n`;
-
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce(createMockResponse([sseData]));
-
-    await sendChatMessage('추천해줘', [], callbacks);
-
-    expect(callbacks.onStructuredContent).toHaveBeenCalledWith(structured);
     expect(callbacks.onDone).toHaveBeenCalledTimes(1);
   });
 
