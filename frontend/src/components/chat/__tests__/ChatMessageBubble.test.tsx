@@ -39,6 +39,19 @@ describe('ChatMessageBubble', () => {
     createdAt: '2026-03-19T12:00:02Z',
   };
 
+  const assistantMessageWithStructuredContent: ChatMessageData = {
+    id: 4,
+    role: 'assistant',
+    content: '오늘 볼 만한 작품이에요.\n**기생충** - 사회 풍자가 선명해요.',
+    structuredContent: {
+      intro: '오늘 볼 만한 작품이에요.',
+      items: [{ title: '기생충', description: '사회 풍자가 선명해요.' }],
+      outro: '더 밝은 쪽으로도 골라드릴까요?',
+    },
+    recommendations: null,
+    createdAt: '2026-03-19T12:00:03Z',
+  };
+
   it('사용자 메시지를 렌더링한다', () => {
     render(<ChatMessageBubble message={userMessage} />);
     expect(screen.getByText('비 오는 날 영화 추천해줘')).toBeInTheDocument();
@@ -65,6 +78,18 @@ describe('ChatMessageBubble', () => {
     render(<ChatMessageBubble message={assistantMessageWithRecs} />);
     expect(screen.getByTestId('recommendation-cards')).toBeInTheDocument();
     expect(screen.getByText('1개 추천')).toBeInTheDocument();
+  });
+
+  it('구조화된 어시스턴트 메시지를 작품별 블록으로 렌더링한다', () => {
+    const { container } = render(
+      <ChatMessageBubble message={assistantMessageWithStructuredContent} />,
+    );
+
+    expect(screen.getByText('오늘 볼 만한 작품이에요.')).toBeInTheDocument();
+    expect(screen.getByText('기생충')).toBeInTheDocument();
+    expect(screen.getByText('사회 풍자가 선명해요.')).toBeInTheDocument();
+    expect(screen.getByText('더 밝은 쪽으로도 골라드릴까요?')).toBeInTheDocument();
+    expect(container.querySelector('.border-l-2')).toBeInTheDocument();
   });
 
   it('추천이 없는 어시스턴트 메시지에서 RecommendationCards를 렌더링하지 않는다', () => {

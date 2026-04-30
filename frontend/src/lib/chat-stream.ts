@@ -1,9 +1,17 @@
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
-import { isChatRecommendationArray, isRecord } from '@/lib/chat-guards';
-import type { ChatRecommendationWithPoster } from '@/types/chat';
+import {
+  isChatRecommendationArray,
+  isChatStructuredContent,
+  isRecord,
+} from '@/lib/chat-guards';
+import type {
+  ChatRecommendationWithPoster,
+  ChatStructuredContent,
+} from '@/types/chat';
 
 export interface ChatStreamCallbacks {
   onText: (content: string) => void;
+  onStructuredContent: (content: ChatStructuredContent) => void;
   onRecommendations: (recs: ChatRecommendationWithPoster[]) => void;
   onDone: () => void;
   onError: (message: string) => void;
@@ -103,6 +111,11 @@ function handleSseData(
           isChatRecommendationArray(data.recommendations)
         ) {
           callbacks.onRecommendations(data.recommendations);
+        }
+        break;
+      case 'structured':
+        if (isChatStructuredContent(data)) {
+          callbacks.onStructuredContent(data);
         }
         break;
       case 'done':

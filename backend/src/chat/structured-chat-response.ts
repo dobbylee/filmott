@@ -16,6 +16,17 @@ export interface TrailerRecommendation {
   contentType: 'movie' | 'tv';
 }
 
+export interface StructuredChatItem {
+  title: string;
+  description: string;
+}
+
+export interface StructuredChatContent {
+  intro: string;
+  items: StructuredChatItem[];
+  outro: string;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -99,6 +110,51 @@ export function matchStructuredRecommendationsToCandidates(
   }
 
   return matched;
+}
+
+export function parseVisibleChatContent(text: string): StructuredChatContent {
+  const normalized = text.replace(/\r\n/g, '\n').trim();
+  const lines = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const items: StructuredChatItem[] = [];
+  const introLines: string[] = [];
+  const outroLines: string[] = [];
+  let hasSeenRecommendation = false;
+
+  for (const line of lines) {
+    const item = parseRecommendationLine(line);
+    if (item) {
+      hasSeenRecommendation = true;
+      items.push(item);
+      continue;
+    }
+
+    if (hasSeenRecommendation) {
+      outroLines.push(line);
+    } else {
+      introLines.push(line);
+    }
+  }
+
+  return {
+    intro: introLines.join('\n'),
+    items,
+    outro: outroLines.join('\n'),
+  };
+}
+
+function parseRecommendationLine(line: string): StructuredChatItem | null {
+  const match = line.match(/^\*\*(.+?)\*\*\s*-\s*(.+)$/);
+  if (!match) return null;
+
+  const title = match[1].trim();
+  const description = match[2].trim();
+  if (!title || !description) return null;
+
+  return { title, description };
 }
 
 function findCandidate(
