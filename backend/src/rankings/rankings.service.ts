@@ -172,9 +172,9 @@ export class RankingsService {
 
   /**
    * KOBIS 주간 박스오피스를 가져와 rankings에 저장
-   * 매주 월요일 오전 10시 실행 (전주 데이터)
+   * 매주 월요일 00:30 실행 (전주 데이터)
    */
-  @Cron('0 10 * * 1', { name: 'weekly-box-office', timeZone: 'Asia/Seoul' })
+  @Cron('30 0 * * 1', { name: 'weekly-box-office', timeZone: 'Asia/Seoul' })
   async fetchWeeklyBoxOffice(): Promise<Ranking[]> {
     const lastWeek = this.getLastWeekDate();
     const targetDate = this.formatDateWithDashes(lastWeek);

@@ -147,7 +147,7 @@ describe('EmbeddingService', () => {
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           model: CHAT_MODEL,
-          reasoning_effort: 'none',
+          reasoning_effort: 'low',
           max_completion_tokens: 2048,
         }),
         expect.objectContaining({ timeout: 10_000 }),
