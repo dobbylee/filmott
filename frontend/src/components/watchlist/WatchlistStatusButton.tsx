@@ -338,7 +338,7 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
       {showRemoveReviewConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/60" onClick={closeReviewRemovalConfirm} />
-          <div className="relative w-full max-w-sm rounded-xl border border-red-500/30 bg-card p-5 shadow-2xl">
+          <div className="relative w-full max-w-xs rounded-xl border border-red-500/30 bg-card p-5 shadow-2xl">
             <div className="flex items-start gap-3">
               <div className="rounded-full bg-red-500/10 p-2 text-red-400">
                 <AlertTriangle className="h-5 w-5" />
@@ -346,7 +346,8 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
               <div>
                 <h2 className="text-base font-bold text-white">리뷰도 함께 삭제돼요</h2>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  감상한 작품 기록을 제거하면 리뷰와 댓글도 함께 삭제됩니다.
+                  감상한 작품 기록을 삭제하면<br />
+                  리뷰와 댓글도 함께 삭제됩니다.
                 </p>
                 {confirmError && (
                   <p className="mt-3 text-sm text-destructive">{confirmError}</p>

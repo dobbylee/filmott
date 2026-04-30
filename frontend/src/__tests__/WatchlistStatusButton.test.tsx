@@ -296,7 +296,10 @@ describe('WatchlistStatusButton', () => {
     await waitFor(() => {
       expect(screen.getByText('리뷰도 함께 삭제돼요')).toBeInTheDocument();
     });
-    expect(screen.getByText('감상한 작품 기록을 제거하면 리뷰와 댓글도 함께 삭제됩니다.')).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => (
+      element?.tagName.toLowerCase() === 'p'
+        && element.textContent === '감상한 작품 기록을 삭제하면리뷰와 댓글도 함께 삭제됩니다.'
+    ))).toBeInTheDocument();
     expect(mockDelete).not.toHaveBeenCalled();
 
     await user.click(screen.getByText('제거'));
