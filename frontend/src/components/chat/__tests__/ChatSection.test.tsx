@@ -431,7 +431,6 @@ describe('ChatSection', () => {
             contentType: 'movie',
             title: '기생충',
             posterUrl: '/poster.jpg',
-            reason: '사회 풍자가 강렬해요.',
           },
         ]);
         callbacks.onDone();

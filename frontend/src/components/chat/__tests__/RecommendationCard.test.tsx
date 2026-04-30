@@ -42,7 +42,6 @@ describe('RecommendationCard', () => {
     tmdbId: 496243,
     contentType: 'movie',
     title: '기생충',
-    reason: '봉준호 감독의 명작입니다.',
     posterUrl: '/poster.jpg',
   };
 
@@ -57,9 +56,14 @@ describe('RecommendationCard', () => {
     expect(screen.getByText('기생충')).toBeInTheDocument();
   });
 
-  it('추천 이유를 렌더링한다', () => {
-    render(<RecommendationCard recommendation={recommendation} />);
-    expect(screen.getByText('봉준호 감독의 명작입니다.')).toBeInTheDocument();
+  it('추천 이유는 카드에 렌더링하지 않는다', () => {
+    const recommendationWithReason = {
+      ...recommendation,
+      reason: '봉준호 감독의 명작입니다.',
+    };
+
+    render(<RecommendationCard recommendation={recommendationWithReason} />);
+    expect(screen.queryByText('봉준호 감독의 명작입니다.')).not.toBeInTheDocument();
   });
 
   it('contentType 태그를 렌더링한다', () => {
@@ -116,10 +120,9 @@ describe('RecommendationCard', () => {
     expect(screen.getByText('포스터 없음')).toBeInTheDocument();
   });
 
-  it('reason이 비어있으면 추천 이유를 렌더링하지 않는다', () => {
-    render(<RecommendationCard recommendation={{ ...recommendation, reason: '' }} />);
+  it('추천 이유 영역을 렌더링하지 않는다', () => {
+    render(<RecommendationCard recommendation={recommendation} />);
     expect(screen.getByText('기생충')).toBeInTheDocument();
-    // reason 단락이 렌더링되지 않아야 함
     const paragraphs = document.querySelectorAll('.text-white\\/50');
     expect(paragraphs).toHaveLength(0);
   });

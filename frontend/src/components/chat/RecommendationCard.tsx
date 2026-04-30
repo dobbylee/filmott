@@ -18,7 +18,7 @@ export default function RecommendationCard({ recommendation }: RecommendationCar
   const [added, setAdded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { tmdbId, contentType, title, reason, posterUrl } = recommendation;
+  const { tmdbId, contentType, title, posterUrl } = recommendation;
   const href = `/contents/${contentType}/${tmdbId}`;
 
   const handleWantToWatch = async (e: React.MouseEvent) => {
@@ -98,13 +98,6 @@ export default function RecommendationCard({ recommendation }: RecommendationCar
       <p className="mt-2 text-xs font-semibold text-white truncate group-hover:text-fuchsia-300 transition-colors">
         {title}
       </p>
-
-      {/* 추천 이유 */}
-      {reason && (
-        <p className="mt-1 text-[11px] leading-snug text-white/50 line-clamp-2">
-          {reason}
-        </p>
-      )}
     </Link>
   );
 }

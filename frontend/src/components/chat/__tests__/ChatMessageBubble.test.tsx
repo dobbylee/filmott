@@ -34,7 +34,7 @@ describe('ChatMessageBubble', () => {
     role: 'assistant',
     content: '다음 작품들을 추천해드려요.',
     recommendations: [
-      { tmdbId: 496243, contentType: 'movie', title: '기생충', reason: '명작', posterUrl: null },
+      { tmdbId: 496243, contentType: 'movie', title: '기생충', posterUrl: null },
     ],
     createdAt: '2026-03-19T12:00:02Z',
   };
