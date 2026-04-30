@@ -259,6 +259,53 @@ describe('WatchlistStatusButton', () => {
     });
   });
 
+  it('watched 상태에서 리뷰가 있으면 제거 전 리뷰 삭제 확인을 표시해야 한다', async () => {
+    mockUser = { nickname: 'testuser' };
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/watchlist/me/status')) {
+        return Promise.resolve({ data: { status: 'watched', watchlistId: 5 } });
+      }
+      if (url.startsWith('/reviews/my')) {
+        return Promise.resolve({
+          data: {
+            id: 77,
+            userId: 1,
+            contentId: 1,
+            rating: 8,
+            comment: '기존 리뷰',
+            likesCount: 2,
+            createdAt: '2026-03-01T00:00:00Z',
+            updatedAt: '2026-03-01T00:00:00Z',
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+    mockDelete.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('감상한 작품')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('감상한 작품'));
+    await user.click(screen.getByText('제거'));
+
+    await waitFor(() => {
+      expect(screen.getByText('리뷰도 함께 삭제돼요')).toBeInTheDocument();
+    });
+    expect(screen.getByText('감상한 작품 기록을 제거하면 리뷰와 댓글도 함께 삭제됩니다.')).toBeInTheDocument();
+    expect(mockDelete).not.toHaveBeenCalled();
+
+    await user.click(screen.getByText('제거'));
+
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalledWith('/watchlist/5');
+    });
+  });
+
   it('want_to_watch 상태에서 "제거" 클릭 시 DELETE API를 호출해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: 'want_to_watch', watchlistId: 3 } });
@@ -281,8 +328,21 @@ describe('WatchlistStatusButton', () => {
 
   it('제거 후 상태가 미등록("기록하기")으로 변경되어야 한다', async () => {
     mockUser = { nickname: 'testuser' };
-    mockGet.mockResolvedValue({ data: { status: 'watched', watchlistId: 5 } });
-    mockDelete.mockResolvedValue({ data: {} });
+    let removed = false;
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/reviews/my')) {
+        return Promise.resolve({ data: null });
+      }
+      return Promise.resolve({
+        data: removed
+          ? { status: null, watchlistId: null }
+          : { status: 'watched', watchlistId: 5 },
+      });
+    });
+    mockDelete.mockImplementation(() => {
+      removed = true;
+      return Promise.resolve({ data: {} });
+    });
     const user = userEvent.setup();
 
     render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);

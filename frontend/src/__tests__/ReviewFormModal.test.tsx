@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReviewFormModal from '@/components/review/ReviewFormModal';
+import { getKoreaDateInputValue } from '@/utils/date';
 
 const mockRefresh = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -44,6 +45,10 @@ describe('ReviewFormModal', () => {
     mockPatch.mockResolvedValue({ data: {} });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   function changeRating(value: number) {
     fireEvent.change(screen.getByRole('slider', { name: '별점 선택' }), {
       target: { value: String(value) },
@@ -59,7 +64,7 @@ describe('ReviewFormModal', () => {
   }
 
   function getTodayDateValue(): string {
-    return new Date().toISOString().split('T')[0];
+    return getKoreaDateInputValue();
   }
 
   it('신규 작성 모드에서 "리뷰 작성" 제목을 표시해야 한다', () => {
@@ -79,6 +84,15 @@ describe('ReviewFormModal', () => {
 
     const form = screen.getByText('작성').closest('form');
     expect(form?.textContent).toMatch(/감상 날짜.*별점.*코멘트/s);
+  });
+
+  it('신규 작성 날짜 기본값은 한국 날짜 기준이어야 한다', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-29T15:30:00.000Z'));
+
+    render(<ReviewFormModal {...defaultProps} />);
+
+    expect(getDateInput()).toHaveValue('2026-04-30');
   });
 
   it('수정 모드에서 "리뷰 수정" 제목을 표시해야 한다', () => {

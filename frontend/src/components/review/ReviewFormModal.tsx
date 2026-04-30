@@ -9,6 +9,7 @@ import type { Review } from '@/types/review';
 import type { WatchlistStatusResponse } from '@/types/watchlist';
 import { useFocusTrap } from '@/utils/useFocusTrap';
 import { trackEvent } from '@/lib/ga';
+import { getKoreaDateInputValue } from '@/utils/date';
 
 interface ReviewFormModalProps {
   contentId: number;
@@ -20,7 +21,7 @@ interface ReviewFormModalProps {
 }
 
 function getTodayDateInputValue(): string {
-  return new Date().toISOString().split('T')[0];
+  return getKoreaDateInputValue();
 }
 
 function toDateInputValue(date: string | null | undefined): string {
@@ -30,7 +31,7 @@ function toDateInputValue(date: string | null | undefined): string {
 
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) return getTodayDateInputValue();
-  return parsed.toISOString().split('T')[0];
+  return getKoreaDateInputValue(parsed);
 }
 
 export default function ReviewFormModal({

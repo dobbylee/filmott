@@ -1,21 +1,29 @@
 import {
   Injectable,
+  BadRequestException,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Watchlist } from './watchlist.entity';
+import { Review } from '../reviews/review.entity';
 import { ContentsService } from '../contents/contents.service';
 import { AddToWatchlistDto } from './dto/add-to-watchlist.dto';
 import { UpdateWatchlistDto } from './dto/update-watchlist.dto';
+import { RevalidateService } from '../common/revalidate.service';
+
+const RECENT_REVIEWS_REVALIDATE_TAGS = ['recent-reviews'];
 
 @Injectable()
 export class WatchlistService {
   constructor(
     @InjectRepository(Watchlist)
     private readonly watchlistRepo: Repository<Watchlist>,
+    @InjectRepository(Review)
+    private readonly reviewRepo: Repository<Review>,
     private readonly contentsService: ContentsService,
+    private readonly revalidateService: RevalidateService,
   ) {}
 
   /**
@@ -30,6 +38,10 @@ export class WatchlistService {
       dto.tmdbId,
       dto.contentType,
     );
+
+    if (dto.status === 'want_to_watch') {
+      await this.assertNoReviewForWantToWatch(userId, content.id);
+    }
 
     // Check if already in watchlist
     const existing = await this.watchlistRepo.findOne({
@@ -155,7 +167,20 @@ export class WatchlistService {
       );
     }
 
-    await this.watchlistRepo.remove(item);
+    const deletedReviewsCount = await this.watchlistRepo.manager.transaction(
+      async (manager) => {
+        const reviewDeleteResult = await manager.delete(Review, {
+          userId,
+          contentId: item.contentId,
+        });
+        await manager.remove(Watchlist, item);
+        return reviewDeleteResult.affected ?? 0;
+      },
+    );
+
+    if (deletedReviewsCount > 0) {
+      await this.revalidateRecentReviews();
+    }
   }
 
   /**
@@ -355,6 +380,10 @@ export class WatchlistService {
     status: 'watched' | 'want_to_watch',
     watchedAt?: string,
   ): Promise<Watchlist> {
+    if (status === 'want_to_watch') {
+      await this.assertNoReviewForWantToWatch(userId, contentId);
+    }
+
     const existing = await repo.findOne({
       where: { userId, contentId },
     });
@@ -380,5 +409,28 @@ export class WatchlistService {
     });
 
     return repo.save(watchlist);
+  }
+
+  private async assertNoReviewForWantToWatch(
+    userId: number,
+    contentId: number,
+  ): Promise<void> {
+    const existingReview = await this.reviewRepo.findOne({
+      where: { userId, contentId },
+      select: ['id'],
+    });
+
+    if (existingReview) {
+      throw new BadRequestException(
+        '작성한 리뷰가 있는 작품은 감상할 작품으로 등록할 수 없습니다.',
+      );
+    }
+  }
+
+  private async revalidateRecentReviews(): Promise<void> {
+    await this.revalidateService.revalidatePath(
+      '/',
+      RECENT_REVIEWS_REVALIDATE_TAGS,
+    );
   }
 }

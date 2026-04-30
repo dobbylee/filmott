@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Eye, Bookmark, ChevronDown, Trash2, Check } from 'lucide-react';
+import { Plus, Eye, Bookmark, ChevronDown, Trash2, Check, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import ReviewFormModal from '@/components/review/ReviewFormModal';
@@ -31,6 +31,8 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
   const [watchlistId, setWatchlistId] = useState<number | null>(null);
   const [watchedAt, setWatchedAt] = useState<string | null>(null);
   const [reviewForModal, setReviewForModal] = useState<Review | null>(null);
+  const [showRemoveReviewConfirm, setShowRemoveReviewConfirm] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -96,37 +98,56 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
     setShowDropdown(!showDropdown);
   };
 
+  const fetchMyReview = async (): Promise<Review | null> => {
+    try {
+      const res = await api.get<unknown>(`/reviews/my?contentId=${contentId}`);
+      return isReview(res.data) ? res.data : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const saveToWatchlist = async (newStatus: WatchlistStatus, watchedAt?: string) => {
+    const res = await api.post('/watchlist', {
+      tmdbId,
+      contentType,
+      status: newStatus,
+      ...(watchedAt ? { watchedAt } : {}),
+    });
+    trackEvent('watchlist_added', { status: newStatus, content_type: contentType });
+    setStatus(newStatus);
+    setWatchlistId(res.data.id);
+    setWatchedAt(res.data.watchedAt ?? null);
+    window.dispatchEvent(new Event(WATCHLIST_UPDATED_EVENT));
+    router.refresh();
+  };
+
   const addToWatchlist = async (newStatus: WatchlistStatus, watchedAt?: string) => {
     setIsLoading(true);
     try {
-      const res = await api.post('/watchlist', {
-        tmdbId,
-        contentType,
-        status: newStatus,
-        ...(watchedAt ? { watchedAt } : {}),
-      });
-      trackEvent('watchlist_added', { status: newStatus, content_type: contentType });
-      setStatus(newStatus);
-      setWatchlistId(res.data.id);
-      setWatchedAt(res.data.watchedAt ?? null);
-      router.refresh();
+      await saveToWatchlist(newStatus, watchedAt);
     } catch {
       // ignore
     } finally {
       setIsLoading(false);
       setShowDropdown(false);
     }
+  };
+
+  const deleteWatchlist = async () => {
+    if (!watchlistId) return;
+    await api.delete(`/watchlist/${watchlistId}`);
+    setStatus(null);
+    setWatchlistId(null);
+    setWatchedAt(null);
+    window.dispatchEvent(new Event(WATCHLIST_UPDATED_EVENT));
+    router.refresh();
   };
 
   const removeFromWatchlist = async () => {
-    if (!watchlistId) return;
     setIsLoading(true);
     try {
-      await api.delete(`/watchlist/${watchlistId}`);
-      setStatus(null);
-      setWatchlistId(null);
-      setWatchedAt(null);
-      router.refresh();
+      await deleteWatchlist();
     } catch {
       // ignore
     } finally {
@@ -135,7 +156,46 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
     }
   };
 
-  const handleWantToWatch = () => addToWatchlist('want_to_watch');
+  const handleWantToWatch = async () => {
+    await addToWatchlist('want_to_watch');
+  };
+
+  const requestRemoveFromWatchlist = async () => {
+    if (!watchlistId) return;
+    setShowDropdown(false);
+    setIsLoading(true);
+    const review = await fetchMyReview();
+    setIsLoading(false);
+
+    if (review) {
+      setConfirmError('');
+      setShowRemoveReviewConfirm(true);
+      return;
+    }
+
+    await removeFromWatchlist();
+  };
+
+  const handleConfirmReviewRemoval = async () => {
+    if (!showRemoveReviewConfirm) return;
+    setIsLoading(true);
+    setConfirmError('');
+
+    try {
+      await deleteWatchlist();
+      setShowRemoveReviewConfirm(false);
+    } catch {
+      setConfirmError('처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const closeReviewRemovalConfirm = () => {
+    if (isLoading) return;
+    setShowRemoveReviewConfirm(false);
+    setConfirmError('');
+  };
 
   const handleWatchedClick = async () => {
     setShowDropdown(false);
@@ -241,7 +301,7 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
                 감상한 작품
               </button>
               <button
-                onClick={removeFromWatchlist}
+                onClick={requestRemoveFromWatchlist}
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
@@ -252,7 +312,7 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
 
           {status === 'watched' && (
             <button
-              onClick={removeFromWatchlist}
+              onClick={requestRemoveFromWatchlist}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
             >
               <Trash2 className="h-4 w-4" />
@@ -273,6 +333,48 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
             setReviewForModal(null);
           }}
         />
+      )}
+
+      {showRemoveReviewConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60" onClick={closeReviewRemovalConfirm} />
+          <div className="relative w-full max-w-sm rounded-xl border border-red-500/30 bg-card p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-red-500/10 p-2 text-red-400">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">리뷰도 함께 삭제돼요</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  감상한 작품 기록을 제거하면 리뷰와 댓글도 함께 삭제됩니다.
+                </p>
+                {confirmError && (
+                  <p className="mt-3 text-sm text-destructive">{confirmError}</p>
+                )}
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeReviewRemovalConfirm}
+                disabled={isLoading}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReviewRemoval}
+                disabled={isLoading}
+                className="rounded-lg border border-red-500/30 px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              >
+                {isLoading
+                  ? '처리 중...'
+                  : '제거'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

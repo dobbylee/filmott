@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useFocusTrap } from '@/utils/useFocusTrap';
+import { getKoreaDateInputValue } from '@/utils/date';
 
 interface WatchedDateModalProps {
   onConfirm: (date: string) => void;
@@ -10,7 +11,7 @@ interface WatchedDateModalProps {
 }
 
 export default function WatchedDateModal({ onConfirm, onCancel }: WatchedDateModalProps) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getKoreaDateInputValue();
   const [date, setDate] = useState(today);
   const modalRef = useFocusTrap<HTMLDivElement>();
 

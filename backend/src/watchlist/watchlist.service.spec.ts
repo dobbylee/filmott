@@ -1,9 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { WatchlistService } from './watchlist.service';
 import { Watchlist } from './watchlist.entity';
 import { ContentsService } from '../contents/contents.service';
+import { Review } from '../reviews/review.entity';
+import { RevalidateService } from '../common/revalidate.service';
 
 describe('WatchlistService', () => {
   let service: WatchlistService;
@@ -15,10 +21,26 @@ describe('WatchlistService', () => {
     remove: jest.fn(),
     count: jest.fn(),
     createQueryBuilder: jest.fn(),
+    manager: {
+      transaction: jest.fn(),
+    },
+  };
+
+  const mockReviewRepo = {
+    findOne: jest.fn(),
+  };
+
+  const mockManager = {
+    delete: jest.fn(),
+    remove: jest.fn(),
   };
 
   const mockContentsService = {
     findOrFetchByTmdbId: jest.fn(),
+  };
+
+  const mockRevalidateService = {
+    revalidatePath: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -26,11 +48,21 @@ describe('WatchlistService', () => {
       providers: [
         WatchlistService,
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
+        { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
         { provide: ContentsService, useValue: mockContentsService },
+        { provide: RevalidateService, useValue: mockRevalidateService },
       ],
     }).compile();
 
     service = module.get<WatchlistService>(WatchlistService);
+    mockWatchlistRepo.manager.transaction.mockImplementation(
+      async (callback: (manager: typeof mockManager) => Promise<unknown>) =>
+        callback(mockManager),
+    );
+    mockReviewRepo.findOne.mockResolvedValue(null);
+    mockManager.delete.mockResolvedValue({ affected: 0 });
+    mockManager.remove.mockResolvedValue(undefined);
+    mockRevalidateService.revalidatePath.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -71,6 +103,18 @@ describe('WatchlistService', () => {
         watchedAt: null,
       });
       expect(result).toEqual(created);
+    });
+
+    it('리뷰가 있는 작품은 감상할 작품으로 등록할 수 없어야 한다', async () => {
+      const content = { id: 1, tmdbId: 550, contentType: 'movie' };
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+      mockReviewRepo.findOne.mockResolvedValue({ id: 10 });
+
+      await expect(service.addToWatchlist(1, dto)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mockWatchlistRepo.save).not.toHaveBeenCalled();
     });
 
     it('status가 watched이면 watchedAt을 설정해야 한다', async () => {
@@ -287,13 +331,32 @@ describe('WatchlistService', () => {
 
   describe('removeFromWatchlist', () => {
     it('워치리스트 항목을 제거해야 한다', async () => {
-      const item = { id: 1, userId: 1 };
+      const item = { id: 1, userId: 1, contentId: 10 };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
-      mockWatchlistRepo.remove.mockResolvedValue(item);
 
       await service.removeFromWatchlist(1, 1);
 
-      expect(mockWatchlistRepo.remove).toHaveBeenCalledWith(item);
+      expect(mockManager.delete).toHaveBeenCalledWith(Review, {
+        userId: 1,
+        contentId: 10,
+      });
+      expect(mockManager.remove).toHaveBeenCalledWith(Watchlist, item);
+    });
+
+    it('연결된 리뷰가 있으면 함께 제거하고 최근 리뷰 캐시를 갱신해야 한다', async () => {
+      const item = { id: 1, userId: 1, contentId: 10 };
+      mockWatchlistRepo.findOne.mockResolvedValue(item);
+      mockManager.delete.mockResolvedValue({ affected: 1 });
+
+      await service.removeFromWatchlist(1, 1);
+
+      expect(mockManager.delete).toHaveBeenCalledWith(Review, {
+        userId: 1,
+        contentId: 10,
+      });
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/', [
+        'recent-reviews',
+      ]);
     });
 
     it('항목을 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
