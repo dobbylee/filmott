@@ -21,6 +21,8 @@ describe('WatchlistController', () => {
   const user = { id: 1, nickname: 'test', role: 'USER' };
 
   beforeEach(async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-29T15:30:00.000Z'));
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WatchlistController],
       providers: [
@@ -33,6 +35,7 @@ describe('WatchlistController', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
   });
 
   describe('GET /watchlist/me', () => {
@@ -110,7 +113,7 @@ describe('WatchlistController', () => {
 
   describe('GET /watchlist/me/watched', () => {
     it('기본적으로 현재 연도의 감상 항목을 반환해야 한다', async () => {
-      const currentYear = new Date().getFullYear();
+      const currentYear = 2026;
       const response = { year: currentYear, totalCount: 3, months: [] };
       mockWatchlistService.getWatchedByYear.mockResolvedValue(response);
 
@@ -135,7 +138,7 @@ describe('WatchlistController', () => {
     });
 
     it('유효하지 않은 연도 문자열에 대해 현재 연도로 폴백해야 한다', async () => {
-      const currentYear = new Date().getFullYear();
+      const currentYear = 2026;
       const response = { year: currentYear, totalCount: 0, months: [] };
       mockWatchlistService.getWatchedByYear.mockResolvedValue(response);
 
@@ -148,7 +151,7 @@ describe('WatchlistController', () => {
     });
 
     it('범위를 벗어난 연도에 대해 현재 연도로 폴백해야 한다', async () => {
-      const currentYear = new Date().getFullYear();
+      const currentYear = 2026;
       mockWatchlistService.getWatchedByYear.mockResolvedValue({
         year: currentYear,
         totalCount: 0,

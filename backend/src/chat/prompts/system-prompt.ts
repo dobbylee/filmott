@@ -1,4 +1,5 @@
 import { OttProvider } from '../../common/ott-providers';
+import { getKoreaDateString } from '../../common/date.util';
 import { SimilarContent } from '../embedding.service';
 import { ParsedIntent } from '../intent-analyzer';
 
@@ -165,7 +166,7 @@ export function buildSystemPrompt(
       ? `\n## 검색 필터 맥락\n${filterDescriptions.join('\n')}\n아래 후보 목록은 이 조건이 반영된 결과입니다. 필터 조건에 맞는 작품을 우선 추천하세요.\n`
       : '';
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getKoreaDateString();
 
   return `당신은 filmott의 AI 영화 큐레이터입니다. 한국어로 친근하되 반드시 존댓말(해요체)로 대화합니다. 대화가 이어져도 절대 반말로 전환하지 마세요.
 오늘 날짜: ${today}. "최신", "요즘", "올해" 등의 표현은 이 날짜를 기준으로 판단하세요.

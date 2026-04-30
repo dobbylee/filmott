@@ -16,6 +16,7 @@ import { UpdateWatchlistDto } from './dto/update-watchlist.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/decorators/current-user.decorator';
+import { getKoreaDateString } from '../common/date.util';
 
 @Controller('watchlist')
 @UseGuards(JwtAuthGuard)
@@ -84,7 +85,7 @@ export class WatchlistController {
     @CurrentUser() user: JwtPayload,
     @Query('year') yearStr?: string,
   ) {
-    const currentYear = new Date().getFullYear();
+    const currentYear = Number(getKoreaDateString().slice(0, 4));
     let year = currentYear;
     if (yearStr) {
       const parsed = parseInt(yearStr, 10);

@@ -11,6 +11,7 @@ import YearFilter from '@/components/watchlist/YearFilter';
 import MonthSection from '@/components/watchlist/MonthSection';
 import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { WatchlistStatus, WantToWatchResponse, WatchedByYearResponse, WatchedYearsResponse } from '@/types/watchlist';
+import { getKoreaDateInputValue } from '@/utils/date';
 
 function WatchlistListContent() {
   const router = useRouter();
@@ -69,7 +70,7 @@ function WatchlistListContent() {
       setWatchedYears(res.data.years);
 
       // Determine selected year
-      const currentYear = new Date().getFullYear();
+      const currentYear = Number(getKoreaDateInputValue().slice(0, 4));
       const yearFromParam = yearParam ? parseInt(yearParam, 10) : null;
 
       if (yearFromParam && res.data.years.includes(yearFromParam)) {

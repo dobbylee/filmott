@@ -37,8 +37,8 @@ export class Watchlist {
   @Column({ length: 20, default: 'want_to_watch' })
   status!: 'want_to_watch' | 'watched';
 
-  @Column({ name: 'watched_at', type: 'timestamptz', nullable: true })
-  watchedAt!: Date | null;
+  @Column({ name: 'watched_at', type: 'date', nullable: true })
+  watchedAt!: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

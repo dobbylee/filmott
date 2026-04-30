@@ -11,6 +11,7 @@ import ReviewFormModal from '@/components/review/ReviewFormModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { TMDB_IMAGE_BASE } from '@/types/content';
 import type { WatchlistItem } from '@/types/watchlist';
+import { getKoreaDateInputValue } from '@/utils/date';
 
 interface WatchlistCardProps {
   item: WatchlistItem;
@@ -20,7 +21,10 @@ interface WatchlistCardProps {
 
 function getDay(dateStr: string | null): string {
   if (!dateStr) return '';
-  return String(new Date(dateStr).getDate());
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+    ? dateStr
+    : getKoreaDateInputValue(new Date(dateStr));
+  return String(Number(dateOnly.slice(8, 10)));
 }
 
 export default function WatchlistCard({ item, initialLiked = false, onMutate }: WatchlistCardProps) {

@@ -26,8 +26,7 @@ function getTodayDateInputValue(): string {
 
 function toDateInputValue(date: string | null | undefined): string {
   if (!date) return getTodayDateInputValue();
-  const dateMatch = date.match(/^\d{4}-\d{2}-\d{2}/);
-  if (dateMatch) return dateMatch[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
 
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) return getTodayDateInputValue();

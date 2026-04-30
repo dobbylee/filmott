@@ -44,6 +44,8 @@ describe('WatchlistService', () => {
   };
 
   beforeEach(async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-29T15:30:00.000Z'));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WatchlistService,
@@ -67,6 +69,7 @@ describe('WatchlistService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
   });
 
   describe('addToWatchlist', () => {
@@ -132,7 +135,7 @@ describe('WatchlistService', () => {
         userId: 1,
         contentId: 1,
         status: 'watched',
-        watchedAt: new Date('2026-03-10T00:00:00Z'),
+        watchedAt: '2026-03-10',
       };
       mockWatchlistRepo.create.mockReturnValue(created);
       mockWatchlistRepo.save.mockResolvedValue(created);
@@ -142,7 +145,7 @@ describe('WatchlistService', () => {
       expect(mockWatchlistRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'watched',
-          watchedAt: new Date('2026-03-10T00:00:00Z'),
+          watchedAt: '2026-03-10',
         }),
       );
       expect(result.status).toBe('watched');
@@ -168,7 +171,7 @@ describe('WatchlistService', () => {
       const result = await service.addToWatchlist(1, watchedDto);
 
       expect(result.status).toBe('watched');
-      expect(result.watchedAt).toBeInstanceOf(Date);
+      expect(result.watchedAt).toBe('2026-04-30');
       expect(mockWatchlistRepo.create).not.toHaveBeenCalled();
     });
 
@@ -196,7 +199,7 @@ describe('WatchlistService', () => {
       const result = await service.addToWatchlist(1, watchedDto);
 
       expect(result.status).toBe('watched');
-      expect(result.watchedAt).toEqual(new Date('2026-01-15T00:00:00Z'));
+      expect(result.watchedAt).toBe('2026-01-15');
     });
 
     it('기존 항목을 want_to_watch로 업데이트하면 watchedAt이 null이어야 한다', async () => {
@@ -208,7 +211,7 @@ describe('WatchlistService', () => {
         userId: 1,
         contentId: 1,
         status: 'watched',
-        watchedAt: new Date(),
+        watchedAt: '2026-01-01',
       };
       mockWatchlistRepo.findOne.mockResolvedValue(existing);
       mockWatchlistRepo.save.mockImplementation((item: any) =>
@@ -237,7 +240,7 @@ describe('WatchlistService', () => {
       const result = await service.updateStatus(1, 1, { status: 'watched' });
 
       expect(result.status).toBe('watched');
-      expect(result.watchedAt).toBeInstanceOf(Date);
+      expect(result.watchedAt).toBe('2026-04-30');
     });
 
     it('want_to_watch로 변경 시 watchedAt을 null로 설정해야 한다', async () => {
@@ -245,7 +248,7 @@ describe('WatchlistService', () => {
         id: 1,
         userId: 1,
         status: 'watched',
-        watchedAt: new Date(),
+        watchedAt: '2026-01-01',
       };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
@@ -263,7 +266,7 @@ describe('WatchlistService', () => {
         id: 1,
         userId: 1,
         status: 'watched',
-        watchedAt: new Date('2026-01-01'),
+        watchedAt: '2026-01-01',
       };
       mockWatchlistRepo.findOne.mockResolvedValue(item);
       mockWatchlistRepo.save.mockImplementation((i: any) => Promise.resolve(i));
@@ -272,7 +275,7 @@ describe('WatchlistService', () => {
         watchedAt: '2026-03-10T00:00:00Z',
       });
 
-      expect(result.watchedAt).toEqual(new Date('2026-03-10T00:00:00Z'));
+      expect(result.watchedAt).toBe('2026-03-10');
     });
 
     it('항목을 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
@@ -307,7 +310,7 @@ describe('WatchlistService', () => {
       });
 
       expect(result.status).toBe('watched');
-      expect(result.watchedAt).toEqual(new Date('2026-06-15T00:00:00Z'));
+      expect(result.watchedAt).toBe('2026-06-15');
     });
 
     it('status 없이 watchedAt만 주어지고 want_to_watch 상태이면 변경하지 않아야 한다', async () => {
@@ -740,21 +743,21 @@ describe('WatchlistService', () => {
         {
           id: 1,
           status: 'watched',
-          watchedAt: new Date('2026-03-15'),
+          watchedAt: '2026-03-15',
           updatedAt: new Date('2026-03-15'),
           content: { id: 1, title: 'Movie A' },
         },
         {
           id: 2,
           status: 'watched',
-          watchedAt: new Date('2026-03-05'),
+          watchedAt: '2026-03-05',
           updatedAt: new Date('2026-03-05'),
           content: { id: 2, title: 'Movie B' },
         },
         {
           id: 3,
           status: 'watched',
-          watchedAt: new Date('2026-01-20'),
+          watchedAt: '2026-01-20',
           updatedAt: new Date('2026-01-20'),
           content: { id: 3, title: 'Movie C' },
         },
@@ -847,12 +850,12 @@ describe('WatchlistService', () => {
       await service.getWatchedByYear(1, 2025);
 
       expect(mockQb.andWhere).toHaveBeenCalledWith(
-        'COALESCE(w.watchedAt, w.updatedAt) >= :startDate',
-        { startDate: new Date(2025, 0, 1) },
+        "COALESCE(w.watchedAt, (w.updatedAt AT TIME ZONE 'Asia/Seoul')::date) >= :startDate",
+        { startDate: '2025-01-01' },
       );
       expect(mockQb.andWhere).toHaveBeenCalledWith(
-        'COALESCE(w.watchedAt, w.updatedAt) < :endDate',
-        { endDate: new Date(2026, 0, 1) },
+        "COALESCE(w.watchedAt, (w.updatedAt AT TIME ZONE 'Asia/Seoul')::date) < :endDate",
+        { endDate: '2026-01-01' },
       );
     });
   });
@@ -865,7 +868,7 @@ describe('WatchlistService', () => {
         userId: 1,
         contentId: 5,
         status: 'watched',
-        watchedAt: expect.any(Date),
+        watchedAt: '2026-04-30',
       };
       mockWatchlistRepo.create.mockReturnValue(created);
       mockWatchlistRepo.save.mockResolvedValue(created);
@@ -923,7 +926,7 @@ describe('WatchlistService', () => {
       const result = await service.addToWatchlistByContentId(1, 5, 'watched');
 
       expect(result.status).toBe('watched');
-      expect(result.watchedAt).toBeInstanceOf(Date);
+      expect(result.watchedAt).toBe('2026-04-30');
       expect(mockWatchlistRepo.create).not.toHaveBeenCalled();
     });
 
@@ -933,7 +936,7 @@ describe('WatchlistService', () => {
         userId: 1,
         contentId: 5,
         status: 'watched',
-        watchedAt: new Date(),
+        watchedAt: '2026-01-01',
       };
       mockWatchlistRepo.findOne.mockResolvedValue(existing);
       mockWatchlistRepo.save.mockImplementation((item: any) =>
@@ -977,13 +980,13 @@ describe('WatchlistService', () => {
         userId: 1,
         contentId: 7,
         status: 'watched',
-        watchedAt: new Date('2026-04-01T00:00:00Z'),
+        watchedAt: '2026-04-01',
       });
       expect(result).toEqual({
         userId: 1,
         contentId: 7,
         status: 'watched',
-        watchedAt: new Date('2026-04-01T00:00:00Z'),
+        watchedAt: '2026-04-01',
       });
     });
 

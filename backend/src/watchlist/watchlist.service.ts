@@ -12,8 +12,14 @@ import { ContentsService } from '../contents/contents.service';
 import { AddToWatchlistDto } from './dto/add-to-watchlist.dto';
 import { UpdateWatchlistDto } from './dto/update-watchlist.dto';
 import { RevalidateService } from '../common/revalidate.service';
+import {
+  getKoreaDateString,
+  normalizeKoreaDateInput,
+} from '../common/date.util';
 
 const RECENT_REVIEWS_REVALIDATE_TAGS = ['recent-reviews'];
+const WATCHED_EFFECTIVE_DATE_SQL =
+  "COALESCE(w.watchedAt, (w.updatedAt AT TIME ZONE 'Asia/Seoul')::date)";
 
 @Injectable()
 export class WatchlistService {
@@ -53,9 +59,7 @@ export class WatchlistService {
       existing.status = dto.status;
       existing.watchedAt =
         dto.status === 'watched'
-          ? dto.watchedAt
-            ? new Date(dto.watchedAt)
-            : new Date()
+          ? normalizeKoreaDateInput(dto.watchedAt)
           : null;
       return this.watchlistRepo.save(existing);
     }
@@ -67,9 +71,7 @@ export class WatchlistService {
       status: dto.status,
       watchedAt:
         dto.status === 'watched'
-          ? dto.watchedAt
-            ? new Date(dto.watchedAt)
-            : new Date()
+          ? normalizeKoreaDateInput(dto.watchedAt)
           : null,
     });
 
@@ -135,12 +137,12 @@ export class WatchlistService {
     if (dto.status) {
       item.status = dto.status;
       if (dto.status === 'watched') {
-        item.watchedAt = dto.watchedAt ? new Date(dto.watchedAt) : new Date();
+        item.watchedAt = normalizeKoreaDateInput(dto.watchedAt);
       } else {
         item.watchedAt = null;
       }
     } else if (dto.watchedAt && item.status === 'watched') {
-      item.watchedAt = new Date(dto.watchedAt);
+      item.watchedAt = normalizeKoreaDateInput(dto.watchedAt);
     }
 
     return this.watchlistRepo.save(item);
@@ -263,7 +265,7 @@ export class WatchlistService {
     const result = await this.watchlistRepo
       .createQueryBuilder('w')
       .select(
-        'DISTINCT EXTRACT(YEAR FROM COALESCE(w.watchedAt, w.updatedAt))',
+        `DISTINCT EXTRACT(YEAR FROM ${WATCHED_EFFECTIVE_DATE_SQL})`,
         'year',
       )
       .where('w.userId = :userId', { userId })
@@ -279,8 +281,8 @@ export class WatchlistService {
    * Get watched items grouped by month for a specific year
    */
   async getWatchedByYear(userId: number, year: number) {
-    const startDate = new Date(year, 0, 1); // Jan 1
-    const endDate = new Date(year + 1, 0, 1); // Jan 1 next year
+    const startDate = `${year}-01-01`;
+    const endDate = `${year + 1}-01-01`;
 
     const qb = this.watchlistRepo
       .createQueryBuilder('w')
@@ -293,26 +295,23 @@ export class WatchlistService {
       )
       .where('w.userId = :userId', { userId })
       .andWhere('w.status = :status', { status: 'watched' })
-      .andWhere('COALESCE(w.watchedAt, w.updatedAt) >= :startDate', {
+      .andWhere(`${WATCHED_EFFECTIVE_DATE_SQL} >= :startDate`, {
         startDate,
       })
-      .andWhere('COALESCE(w.watchedAt, w.updatedAt) < :endDate', { endDate });
+      .andWhere(`${WATCHED_EFFECTIVE_DATE_SQL} < :endDate`, { endDate });
 
     qb.loadRelationCountAndMap('review.commentsCount', 'review.comments');
 
-    qb.orderBy('COALESCE(w.watchedAt, w.updatedAt)', 'DESC').addOrderBy(
-      'w.id',
-      'DESC',
-    );
+    qb.orderBy(WATCHED_EFFECTIVE_DATE_SQL, 'DESC').addOrderBy('w.id', 'DESC');
 
     const items = await qb.getMany();
 
     // Group by month in JS
     const monthMap = new Map<number, typeof items>();
     for (const item of items) {
-      const effectiveDate = item.watchedAt ?? item.updatedAt;
-      const d = new Date(effectiveDate);
-      const month = d.getMonth() + 1; // 1~12
+      const effectiveDate =
+        item.watchedAt ?? getKoreaDateString(item.updatedAt);
+      const month = Number(effectiveDate.slice(5, 7)); // 1~12
       if (!monthMap.has(month)) {
         monthMap.set(month, []);
       }
@@ -389,11 +388,7 @@ export class WatchlistService {
     });
 
     const resolvedDate =
-      status === 'watched'
-        ? watchedAt
-          ? new Date(watchedAt)
-          : new Date()
-        : null;
+      status === 'watched' ? normalizeKoreaDateInput(watchedAt) : null;
 
     if (existing) {
       existing.status = status;

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { CHAT_MODEL } from './chat.constants';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
+import { getKoreaDateString } from '../common/date.util';
 
 const OPENAI_INTENT_TIMEOUT_MS = 10_000;
 
@@ -31,12 +32,12 @@ const EMPTY_INTENT: ParsedIntent = {
 };
 
 function buildIntentSystemPrompt(): string {
-  const now = new Date();
-  const year = now.getFullYear();
+  const today = getKoreaDateString();
+  const year = Number(today.slice(0, 4));
   const oneYearAgo = `${year - 1}-01-01`;
   const thisYear = `${year}-01-01`;
 
-  return `오늘 날짜: ${now.toISOString().split('T')[0]}
+  return `오늘 날짜: ${today}
 
 사용자 메시지에서 영화/시리즈 추천에 필요한 조건을 JSON으로 추출하세요.
 - ottProviderNames: OTT 플랫폼 (Netflix, Tving, wavve, Watcha, Disney Plus, Coupang Play). 없으면 빈 배열.

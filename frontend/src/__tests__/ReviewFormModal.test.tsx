@@ -369,6 +369,12 @@ describe('ReviewFormModal', () => {
     });
   });
 
+  it('ISO watchedAt은 한국 날짜 기준으로 변환해 표시해야 한다', () => {
+    render(<ReviewFormModal {...defaultProps} initialWatchedAt="2026-04-29T15:00:00.000Z" />);
+
+    expect(getDateInput()).toHaveValue('2026-04-30');
+  });
+
   it('수정에서 날짜만 변경하면 좋아요 초기화 경고를 표시하지 않아야 한다', () => {
     render(
       <ReviewFormModal
