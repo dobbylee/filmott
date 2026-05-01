@@ -13,6 +13,7 @@ import type { ContentDetail, WatchProviderData } from '@/types/content';
 import type { ReviewsResponse, ContentStats } from '@/types/review';
 import ErrorWithRetry from '@/components/common/ErrorWithRetry';
 import WatchProviders from '@/components/content/WatchProviders';
+import { serializeJsonLd } from '@/lib/json-ld';
 
 interface ContentDetailPageProps {
   params: Promise<{
@@ -175,7 +176,7 @@ export default async function ContentDetailPage({
     <div className="-mt-20">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <ContentDetailTracker tmdbId={tmdbId} title={content.title} contentType={type} />
       {/* 상단: 백드롭 + 포스터 + 기본 정보 */}
