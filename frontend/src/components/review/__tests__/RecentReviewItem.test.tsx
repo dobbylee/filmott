@@ -3,13 +3,6 @@ import { render, screen } from '@testing-library/react';
 import RecentReviewItem from '@/components/review/RecentReviewItem';
 import type { Review } from '@/types/review';
 
-// TimeAgo is a client component; stub it for SSR-compatible test
-vi.mock('@/components/common/TimeAgo', () => ({
-  default: ({ date, className }: { date: string; className?: string }) => (
-    <span className={className} data-testid="time-ago">{date}</span>
-  ),
-}));
-
 // next/image stub
 vi.mock('next/image', () => ({
   default: ({ fill, sizes, unoptimized, ...props }: Record<string, unknown>) => (

@@ -2,7 +2,6 @@ import Link from 'next/link';
 import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
 import { Star } from 'lucide-react';
 import CommentIcon from '@/components/icons/CommentIcon';
-import TimeAgo from '@/components/common/TimeAgo';
 import type { Review } from '@/types/review';
 import type { ContentItem } from '@/types/content';
 import { TMDB_IMAGE_BASE } from '@/types/content';
@@ -36,8 +35,8 @@ export default function RecentReviewItem({ review }: { review: Review }) {
         </div>
       )}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* 유저 + 별점 + 시간 */}
-        <div className="mt-2 flex items-center justify-between">
+        {/* 유저 + 별점 + 댓글 */}
+        <div className="mt-2 flex items-center">
           <div className="flex items-center gap-1.5">
             <UserAvatar user={review.user} size="sm" linkToProfile={!isInactiveUser(review.user)} userId={review.userId} />
             {isInactiveUser(review.user) ? (
@@ -60,7 +59,6 @@ export default function RecentReviewItem({ review }: { review: Review }) {
               <span className="text-xs font-semibold text-muted-foreground">{review.commentsCount ?? 0}</span>
             </Link>
           </div>
-          <TimeAgo date={review.createdAt} className="text-xs text-white/40 flex-shrink-0 ml-2" />
         </div>
 
         {/* 코멘트 */}

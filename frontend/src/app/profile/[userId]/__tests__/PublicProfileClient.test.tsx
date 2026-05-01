@@ -30,13 +30,6 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-// TimeAgo mock
-vi.mock('@/components/common/TimeAgo', () => ({
-  default: ({ date, className }: { date: string; className?: string }) => (
-    <span className={className} data-testid="time-ago">{date}</span>
-  ),
-}));
-
 const baseProfile: PublicProfile = {
   id: 1,
   nickname: 'TestUser',
