@@ -16,11 +16,14 @@ export function createMockAuth(overrides: MockAuthOverrides = {}) {
     user: overrides.user ?? null,
     token: overrides.token ?? null,
     isLoading: overrides.isLoading ?? false,
+    isLoggingOut: false,
+    logoutError: null,
     logout: vi.fn(),
     handleAuthSuccess: vi.fn(),
     updateUser: vi.fn(),
     openAuthModal: overrides.openAuthModal ?? vi.fn(),
     closeAuthModal: vi.fn(),
+    clearLogoutError: vi.fn(),
     authModal: { isOpen: false },
   };
 }

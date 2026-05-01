@@ -59,11 +59,14 @@ function AuthConsumer() {
     user,
     token,
     isLoading,
+    isLoggingOut,
+    logoutError,
     authModal,
     handleAuthSuccess,
     logout,
     openAuthModal,
     closeAuthModal,
+    clearLogoutError,
   } = useAuth();
 
   return (
@@ -71,11 +74,14 @@ function AuthConsumer() {
       <div data-testid="user">{user ? user.nickname : 'null'}</div>
       <div data-testid="token">{token ?? 'null'}</div>
       <div data-testid="isLoading">{isLoading ? 'true' : 'false'}</div>
+      <div data-testid="isLoggingOut">{isLoggingOut ? 'true' : 'false'}</div>
+      <div data-testid="logoutError">{logoutError ?? 'null'}</div>
       <div data-testid="modalOpen">{authModal.isOpen ? 'true' : 'false'}</div>
       <button onClick={() => handleAuthSuccess(mockAuthResponse)}>handleAuthSuccess</button>
       <button onClick={logout}>logout</button>
       <button onClick={() => openAuthModal()}>openModal</button>
       <button onClick={closeAuthModal}>closeModal</button>
+      <button onClick={clearLogoutError}>clearLogoutError</button>
     </div>
   );
 }
@@ -223,7 +229,7 @@ describe('AuthContext', () => {
       expect(localStorageMock.removeItem).toHaveBeenCalledWith('user');
     });
 
-    it('서버 로그아웃 실패해도 클라이언트 로그아웃이 진행되어야 한다', async () => {
+    it('서버 로그아웃 실패 시 user를 유지하고 실패 상태를 표시해야 한다', async () => {
       const user = userEvent.setup();
       mockRefreshGet.mockResolvedValueOnce({ data: mockUser });
 
@@ -243,10 +249,45 @@ describe('AuthContext', () => {
       await user.click(screen.getByRole('button', { name: 'logout' }));
 
       await waitFor(() => {
-        expect(screen.getByTestId('user')).toHaveTextContent('null');
+        expect(screen.getByTestId('logoutError')).toHaveTextContent(
+          '로그아웃에 실패했습니다.',
+        );
       });
 
+      expect(screen.getByTestId('user')).toHaveTextContent('testuser');
       expect(screen.getByTestId('token')).toHaveTextContent('null');
+    });
+
+    it('로그아웃 실패 후 재시도에 성공하면 user와 실패 상태를 초기화해야 한다', async () => {
+      const user = userEvent.setup();
+      mockRefreshGet.mockResolvedValueOnce({ data: mockUser });
+
+      render(
+        <AuthProvider>
+          <AuthConsumer />
+        </AuthProvider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('user')).toHaveTextContent('testuser');
+      });
+
+      mockRefreshPost
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({});
+
+      await user.click(screen.getByRole('button', { name: 'logout' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('logoutError')).toHaveTextContent(
+          '로그아웃에 실패했습니다.',
+        );
+      });
+
+      await user.click(screen.getByRole('button', { name: 'logout' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('user')).toHaveTextContent('null');
+      });
+      expect(screen.getByTestId('logoutError')).toHaveTextContent('null');
     });
   });
 

@@ -18,12 +18,15 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  isLoggingOut: boolean;
+  logoutError: string | null;
   handleAuthSuccess: (data: AuthResponse) => void;
-  logout: () => void;
+  logout: () => Promise<boolean>;
   updateUser: (user: User) => void;
   authModal: { isOpen: boolean };
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  clearLogoutError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,12 +37,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authModal, setAuthModal] = useState<{ isOpen: boolean }>({
     isOpen: false,
   });
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   // 401 응답 시 모달 열기
   useEffect(() => {
     const handleAuthRequired = () => {
       clearLegacyAuthStorage();
       setUser(null);
+      setLogoutError(null);
       setAuthModal({ isOpen: true });
     };
     window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
@@ -98,14 +104,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleAuthSuccess = useCallback((response: AuthResponse) => {
     setUser(response.user);
+    setLogoutError(null);
     setAuthModal({ isOpen: false });
   }, []);
 
-  const logout = useCallback(() => {
-    refreshApi.post('/auth/logout').catch(() => {});
-    setUser(null);
-    clearLegacyAuthStorage();
-    setAuthModal({ isOpen: false });
+  const logout = useCallback(async (): Promise<boolean> => {
+    setIsLoggingOut(true);
+    setLogoutError(null);
+    try {
+      await refreshApi.post('/auth/logout');
+      setUser(null);
+      clearLegacyAuthStorage();
+      setAuthModal({ isOpen: false });
+      return true;
+    } catch {
+      setLogoutError(
+        '로그아웃에 실패했습니다. 네트워크 상태를 확인하고 다시 시도해주세요.',
+      );
+      return false;
+    } finally {
+      setIsLoggingOut(false);
+    }
   }, []);
 
   const updateUser = useCallback((updatedUser: User) => {
@@ -120,18 +139,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthModal({ isOpen: false });
   }, []);
 
+  const clearLogoutError = useCallback(() => {
+    setLogoutError(null);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         token: null,
         isLoading,
+        isLoggingOut,
+        logoutError,
         handleAuthSuccess,
         logout,
         updateUser,
         authModal,
         openAuthModal,
         closeAuthModal,
+        clearLogoutError,
       }}
     >
       {children}

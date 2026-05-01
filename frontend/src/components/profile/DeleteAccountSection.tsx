@@ -15,8 +15,10 @@ export default function DeleteAccountSection() {
   const handleDelete = async () => {
     try {
       await api.delete('/users/me');
-      logout();
-      router.push('/');
+      const loggedOut = await logout();
+      if (loggedOut) {
+        router.push('/');
+      }
     } catch (err) {
       setError(getErrorMessage(err));
     }

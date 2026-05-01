@@ -12,7 +12,15 @@ import DeleteAccountSection from '@/components/profile/DeleteAccountSection';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isLoading, updateUser, logout, openAuthModal } = useAuth();
+  const {
+    user,
+    isLoading,
+    isLoggingOut,
+    logoutError,
+    updateUser,
+    logout,
+    openAuthModal,
+  } = useAuth();
   useEffect(() => {
     if (!isLoading && !user) {
       openAuthModal();
@@ -20,9 +28,11 @@ export default function ProfilePage() {
     }
   }, [user, isLoading, router, openAuthModal]);
 
-  const handleLogout = () => {
-    logout();
-    router.push('/');
+  const handleLogout = async () => {
+    const loggedOut = await logout();
+    if (loggedOut) {
+      router.push('/');
+    }
   };
 
   if (isLoading || !user) {
@@ -60,11 +70,17 @@ export default function ProfilePage() {
       <div className="mt-8 mb-8">
         <button
           onClick={handleLogout}
+          disabled={isLoggingOut}
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white transition-all"
         >
           <LogOut className="h-4 w-4" />
-          로그아웃
+          {isLoggingOut ? '로그아웃 중...' : '로그아웃'}
         </button>
+        {logoutError && (
+          <p className="mt-2 text-center text-sm text-red-400">
+            {logoutError}
+          </p>
+        )}
       </div>
 
       {/* 회원 탈퇴 */}
