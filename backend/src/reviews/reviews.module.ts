@@ -8,12 +8,14 @@ import { ReviewCommentsService } from './review-comments.service';
 import { ReviewsController } from './reviews.controller';
 import { WatchlistModule } from '../watchlist/watchlist.module';
 import { CommonModule } from '../common/common.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Review, ReviewLike, ReviewComment]),
     WatchlistModule,
     CommonModule,
+    UsersModule,
   ],
   controllers: [ReviewsController],
   providers: [ReviewsService, ReviewCommentsService],

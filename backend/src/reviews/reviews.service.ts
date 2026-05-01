@@ -12,6 +12,8 @@ import { ReviewLike } from './review-like.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { UserRole } from '../users/enums/user-role.enum';
+import { UserStatus } from '../users/enums/user-status.enum';
+import { UsersService } from '../users/users.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { RevalidateService } from '../common/revalidate.service';
@@ -34,6 +36,7 @@ export class ReviewsService {
     private readonly dataSource: DataSource,
     private readonly watchlistService: WatchlistService,
     private readonly revalidateService: RevalidateService,
+    private readonly usersService: UsersService,
   ) {}
 
   async create(userId: number, dto: CreateReviewDto): Promise<Review> {
@@ -216,6 +219,16 @@ export class ReviewsService {
   }
 
   async findByUser(userId: number, page = 1, limit = 20) {
+    const user = await this.usersService.findByIdWithStatus(userId);
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      return {
+        data: [],
+        total: 0,
+        page,
+        totalPages: 0,
+      };
+    }
+
     const take = Math.min(limit, 20);
     const skip = (page - 1) * take;
 

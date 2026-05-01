@@ -11,6 +11,8 @@ import { ReviewsService } from './reviews.service';
 import { Review } from './review.entity';
 import { ReviewLike } from './review-like.entity';
 import { UserRole } from '../users/enums/user-role.enum';
+import { UserStatus } from '../users/enums/user-status.enum';
+import { UsersService } from '../users/users.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { RevalidateService } from '../common/revalidate.service';
 
@@ -71,6 +73,10 @@ describe('ReviewsService', () => {
     revalidatePath: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockUsersService = {
+    findByIdWithStatus: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -83,10 +89,19 @@ describe('ReviewsService', () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: WatchlistService, useValue: mockWatchlistService },
         { provide: RevalidateService, useValue: mockRevalidateService },
+        { provide: UsersService, useValue: mockUsersService },
       ],
     }).compile();
 
     service = module.get<ReviewsService>(ReviewsService);
+    mockUsersService.findByIdWithStatus.mockResolvedValue({
+      id: 1,
+      nickname: 'test',
+      status: UserStatus.ACTIVE,
+      role: UserRole.USER,
+      profileImage: null,
+      subscribedOtts: [],
+    });
   });
 
   afterEach(() => {
@@ -807,6 +822,7 @@ describe('ReviewsService', () => {
 
       const result = await service.findByUser(1, 1);
 
+      expect(mockUsersService.findByIdWithStatus).toHaveBeenCalledWith(1);
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
       expect(mockQb.leftJoinAndSelect).toHaveBeenCalledWith(
@@ -819,6 +835,41 @@ describe('ReviewsService', () => {
         'review.comments',
       );
       expect(mockReviewRepo.findAndCount).not.toHaveBeenCalled();
+    });
+
+    it('정지된 사용자의 공개 리뷰 목록은 빈 결과를 반환해야 한다', async () => {
+      mockUsersService.findByIdWithStatus.mockResolvedValue({
+        id: 1,
+        nickname: 'blocked',
+        status: UserStatus.SUSPENDED,
+        role: UserRole.USER,
+        profileImage: null,
+        subscribedOtts: [],
+      });
+
+      const result = await service.findByUser(1, 1, 10);
+
+      expect(result).toEqual({
+        data: [],
+        total: 0,
+        page: 1,
+        totalPages: 0,
+      });
+      expect(mockReviewRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('탈퇴했거나 존재하지 않는 사용자의 공개 리뷰 목록은 빈 결과를 반환해야 한다', async () => {
+      mockUsersService.findByIdWithStatus.mockResolvedValue(null);
+
+      const result = await service.findByUser(99, 2, 10);
+
+      expect(result).toEqual({
+        data: [],
+        total: 0,
+        page: 2,
+        totalPages: 0,
+      });
+      expect(mockReviewRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
   });
 
