@@ -981,83 +981,94 @@ describe('ReviewsService', () => {
   });
 
   describe('toggleLike', () => {
-    it('좋아요하지 않은 상태에서 좋아요를 추가해야 한다', async () => {
-      mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 0 });
-      mockReviewLikeRepo.findOne.mockResolvedValue(null);
-
-      const mockManager = {
-        save: jest.fn(),
-        remove: jest.fn(),
-        findOne: jest.fn().mockResolvedValue({ id: 1, likesCount: 1 }),
-        createQueryBuilder: jest.fn().mockReturnValue({
-          update: jest.fn().mockReturnThis(),
-          set: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({}),
-        }),
+    const createToggleManager = ({
+      review = { id: 1, likesCount: 0 },
+      existingLike = null,
+      updatedReview = { id: 1, likesCount: 1 },
+    }: {
+      review?: Partial<Review> | null;
+      existingLike?: Partial<ReviewLike> | null;
+      updatedReview?: Partial<Review> | null;
+    }) => {
+      const updateBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({}),
       };
+      const manager = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce(review)
+          .mockResolvedValueOnce(existingLike)
+          .mockResolvedValueOnce(updatedReview),
+        create: jest.fn().mockReturnValue({ reviewId: 1, userId: 1 }),
+        save: jest.fn().mockResolvedValue({}),
+        remove: jest.fn().mockResolvedValue({}),
+        createQueryBuilder: jest.fn().mockReturnValue(updateBuilder),
+      };
+
       mockDataSource.transaction.mockImplementation(
         (cb: (manager: EntityManager) => Promise<unknown>) =>
-          cb(mockManager as unknown as EntityManager),
+          cb(manager as unknown as EntityManager),
       );
-      mockReviewLikeRepo.create.mockReturnValue({ reviewId: 1, userId: 1 });
+
+      return { manager, updateBuilder };
+    };
+
+    it('좋아요하지 않은 상태에서 좋아요를 추가해야 한다', async () => {
+      const { manager, updateBuilder } = createToggleManager({
+        existingLike: null,
+        updatedReview: { id: 1, likesCount: 1 },
+      });
 
       const result = await service.toggleLike(1, 1);
 
       expect(result.liked).toBe(true);
       expect(result.likesCount).toBe(1);
-    });
-
-    it('이미 좋아요한 상태에서 좋아요를 제거해야 한다', async () => {
-      mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 1 });
-      mockReviewLikeRepo.findOne.mockResolvedValue({
-        id: 1,
+      expect(manager.findOne).toHaveBeenNthCalledWith(1, Review, {
+        where: { id: 1 },
+        lock: { mode: 'pessimistic_write' },
+      });
+      expect(manager.findOne).toHaveBeenNthCalledWith(2, ReviewLike, {
+        where: { reviewId: 1, userId: 1 },
+      });
+      expect(manager.create).toHaveBeenCalledWith(ReviewLike, {
         reviewId: 1,
         userId: 1,
       });
-
-      const mockManager = {
-        save: jest.fn(),
-        remove: jest.fn(),
-        findOne: jest.fn().mockResolvedValue({ id: 1, likesCount: 0 }),
-        createQueryBuilder: jest.fn().mockReturnValue({
-          update: jest.fn().mockReturnThis(),
-          set: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({}),
-        }),
+      expect(manager.save).toHaveBeenCalledWith({ reviewId: 1, userId: 1 });
+      expect(updateBuilder.set).toHaveBeenCalled();
+      const setArg = updateBuilder.set.mock.calls[0][0] as {
+        likesCount: () => string;
       };
-      mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) =>
-          cb(mockManager as unknown as EntityManager),
-      );
+      expect(setArg.likesCount()).toBe('likes_count + 1');
+    });
+
+    it('이미 좋아요한 상태에서 좋아요를 제거해야 한다', async () => {
+      const existingLike = { id: 1, reviewId: 1, userId: 1 };
+      const { manager, updateBuilder } = createToggleManager({
+        review: { id: 1, likesCount: 1 },
+        existingLike,
+        updatedReview: { id: 1, likesCount: 0 },
+      });
 
       const result = await service.toggleLike(1, 1);
 
       expect(result.liked).toBe(false);
       expect(result.likesCount).toBe(0);
+      expect(manager.remove).toHaveBeenCalledWith(existingLike);
+      const setArg = updateBuilder.set.mock.calls[0][0] as {
+        likesCount: () => string;
+      };
+      expect(setArg.likesCount()).toBe('GREATEST(likes_count - 1, 0)');
     });
 
     it('좋아요 추가 후 수정된 리뷰가 null이면 likesCount 0을 반환해야 한다', async () => {
-      mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 0 });
-      mockReviewLikeRepo.findOne.mockResolvedValue(null);
-
-      const mockManager = {
-        save: jest.fn(),
-        remove: jest.fn(),
-        findOne: jest.fn().mockResolvedValue(null),
-        createQueryBuilder: jest.fn().mockReturnValue({
-          update: jest.fn().mockReturnThis(),
-          set: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({}),
-        }),
-      };
-      mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) =>
-          cb(mockManager as unknown as EntityManager),
-      );
-      mockReviewLikeRepo.create.mockReturnValue({ reviewId: 1, userId: 1 });
+      createToggleManager({
+        existingLike: null,
+        updatedReview: null,
+      });
 
       const result = await service.toggleLike(1, 1);
 
@@ -1066,28 +1077,11 @@ describe('ReviewsService', () => {
     });
 
     it('좋아요 제거 후 수정된 리뷰가 null이면 likesCount 0을 반환해야 한다', async () => {
-      mockReviewRepo.findOne.mockResolvedValue({ id: 1, likesCount: 1 });
-      mockReviewLikeRepo.findOne.mockResolvedValue({
-        id: 1,
-        reviewId: 1,
-        userId: 1,
+      createToggleManager({
+        review: { id: 1, likesCount: 1 },
+        existingLike: { id: 1, reviewId: 1, userId: 1 },
+        updatedReview: null,
       });
-
-      const mockManager = {
-        save: jest.fn(),
-        remove: jest.fn(),
-        findOne: jest.fn().mockResolvedValue(null),
-        createQueryBuilder: jest.fn().mockReturnValue({
-          update: jest.fn().mockReturnThis(),
-          set: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({}),
-        }),
-      };
-      mockDataSource.transaction.mockImplementation(
-        (cb: (manager: EntityManager) => Promise<unknown>) =>
-          cb(mockManager as unknown as EntityManager),
-      );
 
       const result = await service.toggleLike(1, 1);
 
@@ -1096,11 +1090,12 @@ describe('ReviewsService', () => {
     });
 
     it('리뷰를 찾을 수 없으면 NotFoundException을 던져야 한다', async () => {
-      mockReviewRepo.findOne.mockResolvedValue(null);
+      const { manager } = createToggleManager({ review: null });
 
       await expect(service.toggleLike(1, 999)).rejects.toThrow(
         NotFoundException,
       );
+      expect(manager.createQueryBuilder).not.toHaveBeenCalled();
     });
   });
 });

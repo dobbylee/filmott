@@ -315,24 +315,25 @@ export class ReviewsService {
     userId: number,
     reviewId: number,
   ): Promise<{ liked: boolean; likesCount: number }> {
-    const review = await this.reviewRepo.findOne({
-      where: { id: reviewId },
-    });
-    if (!review) {
-      throw new NotFoundException('리뷰를 찾을 수 없습니다.');
-    }
-
-    const existing = await this.reviewLikeRepo.findOne({
-      where: { reviewId, userId },
-    });
-
     return this.dataSource.transaction(async (manager) => {
+      const review = await manager.findOne(Review, {
+        where: { id: reviewId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!review) {
+        throw new NotFoundException('리뷰를 찾을 수 없습니다.');
+      }
+
+      const existing = await manager.findOne(ReviewLike, {
+        where: { reviewId, userId },
+      });
+
       if (existing) {
         await manager.remove(existing);
         await manager
           .createQueryBuilder()
           .update(Review)
-          .set({ likesCount: () => 'likes_count - 1' })
+          .set({ likesCount: () => 'GREATEST(likes_count - 1, 0)' })
           .where('id = :id', { id: reviewId })
           .execute();
 
@@ -341,7 +342,7 @@ export class ReviewsService {
         });
         return { liked: false, likesCount: updated?.likesCount ?? 0 };
       } else {
-        const like = this.reviewLikeRepo.create({ reviewId, userId });
+        const like = manager.create(ReviewLike, { reviewId, userId });
         await manager.save(like);
         await manager
           .createQueryBuilder()
