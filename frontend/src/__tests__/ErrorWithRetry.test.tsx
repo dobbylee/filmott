@@ -35,4 +35,19 @@ describe('ErrorWithRetry', () => {
     screen.getByText('다시 시도').click();
     expect(reloadMock).toHaveBeenCalledTimes(1);
   });
+
+  it('retry handler가 있으면 페이지 리로드 대신 handler를 호출한다', () => {
+    const onRetry = vi.fn();
+    const reloadMock = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { reload: reloadMock },
+      writable: true,
+    });
+
+    render(<ErrorWithRetry message="에러" onRetry={onRetry} />);
+    screen.getByText('다시 시도').click();
+
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(reloadMock).not.toHaveBeenCalled();
+  });
 });

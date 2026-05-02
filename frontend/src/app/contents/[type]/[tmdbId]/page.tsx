@@ -133,13 +133,7 @@ export default async function ContentDetailPage({
   params,
 }: ContentDetailPageProps) {
   const { type, tmdbId } = await params;
-
-  let content: ContentDetail;
-  try {
-    content = await fetchContentDetail(type, tmdbId);
-  } catch {
-    return <ErrorWithRetry message="작품 정보를 불러올 수 없습니다." />;
-  }
+  const content = await fetchContentDetail(type, tmdbId);
 
   const genres = Array.isArray(content.genres)
     ? content.genres

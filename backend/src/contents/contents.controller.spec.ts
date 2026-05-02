@@ -4,7 +4,6 @@ import { ContentsController } from './contents.controller';
 import { ContentsService } from './contents.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 describe('ContentsController', () => {
   let controller: ContentsController;
@@ -23,7 +22,6 @@ describe('ContentsController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [ContentsController],
       providers: [{ provide: ContentsService, useValue: mockContentsService }],
     }).compile();
@@ -146,13 +144,12 @@ describe('ContentsController', () => {
       );
     });
 
-    it('공개 상세 조회에 ThrottlerGuard가 적용되어 있어야 한다', () => {
+    it('공개 상세 조회에는 ThrottlerGuard를 적용하지 않아야 한다', () => {
       const guards = Reflect.getMetadata(
         '__guards__',
         ContentsController.prototype.getDetail,
       );
-      expect(guards).toBeDefined();
-      expect(guards).toContainEqual(ThrottlerGuard);
+      expect(guards).toBeUndefined();
     });
   });
 
