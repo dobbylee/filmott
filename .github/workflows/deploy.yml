@@ -46,8 +46,10 @@ jobs:
                 node -e "fetch('http://localhost:3000/internal/revalidate', {
                   method: 'POST',
                   headers: { 'Authorization': 'Bearer $REVAL_SECRET', 'Content-Type': 'application/json' },
-                  body: JSON.stringify({path:'/'})
+                  body: JSON.stringify({path:'/', tags:['rankings','recent-reviews']})
                 }).then(r => r.text()).then(console.log).catch(console.error)"
               echo "ISR cache revalidated"
+              docker compose -f docker-compose.prod.yml exec -T frontend \
+                node -e "fetch('http://localhost:3000/', { cache: 'no-store' }).then(r => console.log('Frontend / warmed:', r.status)).catch(console.error)"
             fi
             docker image prune -f

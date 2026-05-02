@@ -373,6 +373,15 @@ export class RankingsService {
     }
   }
 
+  async refreshTrending(
+    type: 'movie' | 'tv' | 'all',
+    timeWindow: 'day' | 'week',
+  ): Promise<Ranking[]> {
+    const rankings = await this.fetchTrending(type, timeWindow);
+    await this.revalidateService.revalidatePath('/', RANKINGS_REVALIDATE_TAGS);
+    return rankings;
+  }
+
   /**
    * 최신 랭킹 조회 (content 정보 join)
    */

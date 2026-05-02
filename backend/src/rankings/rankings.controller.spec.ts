@@ -17,6 +17,7 @@ describe('RankingsController', () => {
     fetchDailyBoxOffice: jest.fn(),
     fetchWeeklyBoxOffice: jest.fn(),
     fetchTrending: jest.fn(),
+    refreshTrending: jest.fn(),
     updatePosterUrl: jest.fn(),
     getUnmatchedRankings: jest.fn(),
   };
@@ -80,12 +81,12 @@ describe('RankingsController', () => {
       expect(mockRankingsService.fetchDailyBoxOffice).toHaveBeenCalled();
     });
 
-    it('트렌딩 카테고리에 대해 fetchTrending을 호출해야 한다', async () => {
-      mockRankingsService.fetchTrending.mockResolvedValue([]);
+    it('트렌딩 카테고리에 대해 refreshTrending을 호출해야 한다', async () => {
+      mockRankingsService.refreshTrending.mockResolvedValue([]);
 
       await controller.refresh('trending-all-day');
 
-      expect(mockRankingsService.fetchTrending).toHaveBeenCalledWith(
+      expect(mockRankingsService.refreshTrending).toHaveBeenCalledWith(
         'all',
         'day',
       );
@@ -103,12 +104,12 @@ describe('RankingsController', () => {
       );
     });
 
-    it('all 타입과 week 윈도우로 fetchTrending을 호출해야 한다', async () => {
-      mockRankingsService.fetchTrending.mockResolvedValue([]);
+    it('all 타입과 week 윈도우로 refreshTrending을 호출해야 한다', async () => {
+      mockRankingsService.refreshTrending.mockResolvedValue([]);
 
       await controller.refresh('trending-all-week');
 
-      expect(mockRankingsService.fetchTrending).toHaveBeenCalledWith(
+      expect(mockRankingsService.refreshTrending).toHaveBeenCalledWith(
         'all',
         'week',
       );

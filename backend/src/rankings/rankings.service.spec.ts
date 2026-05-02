@@ -668,6 +668,34 @@ describe('RankingsService', () => {
       expect(mockRevalidateService.revalidatePath).not.toHaveBeenCalled();
     });
 
+    it('refreshTrending은 트렌딩 저장 후 rankings 태그를 revalidate해야 한다', async () => {
+      const trendingData = {
+        results: [
+          {
+            id: 100,
+            media_type: 'movie',
+            title: 'Movie',
+            poster_path: '/m.jpg',
+          },
+        ],
+      };
+
+      mockTmdbService.getTrending.mockResolvedValue(trendingData);
+      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      const result = await service.refreshTrending('all', 'day');
+
+      expect(result).toHaveLength(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/', [
+        'rankings',
+      ]);
+    });
+
     it('일부 카테고리 fetchTrending이 실패해도 revalidatePath를 1회 호출해야 한다', async () => {
       mockTmdbService.getTrending
         .mockResolvedValueOnce({

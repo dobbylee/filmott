@@ -90,9 +90,9 @@ export class RankingsController {
       case 'weekly-box-office':
         return this.rankingsService.fetchWeeklyBoxOffice();
       case 'trending-all-day':
-        return this.rankingsService.fetchTrending('all', 'day');
+        return this.rankingsService.refreshTrending('all', 'day');
       case 'trending-all-week':
-        return this.rankingsService.fetchTrending('all', 'week');
+        return this.rankingsService.refreshTrending('all', 'week');
       default:
         throw new BadRequestException(`Unknown category: ${category}`);
     }
