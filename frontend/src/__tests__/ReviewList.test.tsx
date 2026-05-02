@@ -33,7 +33,7 @@ describe('ReviewList', () => {
       likesCount: 3,
       createdAt: '2024-12-25T12:00:00Z',
       updatedAt: '2024-12-25T12:00:00Z',
-      user: { id: 10, nickname: '유저1', email: 'u1@test.com' },
+      user: { id: 10, nickname: '유저1' },
     },
     {
       id: 2,
@@ -45,7 +45,7 @@ describe('ReviewList', () => {
       likesCount: 1,
       createdAt: '2024-12-26T12:00:00Z',
       updatedAt: '2024-12-26T12:00:00Z',
-      user: { id: 20, nickname: '유저2', email: 'u2@test.com' },
+      user: { id: 20, nickname: '유저2' },
     },
   ];
 

@@ -26,7 +26,7 @@ const baseReview: Review = {
   likesCount: 5,
   createdAt: '2025-01-01T00:00:00Z',
   updatedAt: '2025-01-01T00:00:00Z',
-  user: { id: 10, nickname: 'Alice', email: 'alice@test.com', status: 'ACTIVE' },
+  user: { id: 10, nickname: 'Alice', status: 'ACTIVE' },
   content: {
     id: 100,
     tmdbId: 12345,
@@ -58,7 +58,7 @@ describe('RecentReviewItem', () => {
   it('탈퇴한 사용자 대체 텍스트를 렌더링한다', () => {
     const deletedReview: Review = {
       ...baseReview,
-      user: { id: 99, nickname: 'deleted', email: '', status: 'DELETED' },
+      user: { id: 99, nickname: 'deleted', status: 'DELETED' },
     };
     render(<RecentReviewItem review={deletedReview} />);
 

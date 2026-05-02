@@ -68,7 +68,7 @@ export async function requestIntegrationApp(
   app: INestApplication,
   method: IntegrationHttpMethod,
   path: string,
-  body?: unknown,
+  body?: Record<string, unknown>,
 ): Promise<IntegrationHttpResponse> {
   const expressApp = app.getHttpAdapter().getInstance() as {
     handle: (

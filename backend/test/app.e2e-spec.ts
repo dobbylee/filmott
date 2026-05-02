@@ -130,7 +130,7 @@ describe('HTTP boundary smoke (e2e)', () => {
   async function requestMemory(
     method: 'GET' | 'POST',
     path: string,
-    body?: unknown,
+    body?: Record<string, unknown>,
   ): Promise<MemoryResponse> {
     const expressApp = app.getHttpAdapter().getInstance() as {
       handle: (

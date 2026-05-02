@@ -243,8 +243,10 @@ describe('ChatSection', () => {
   });
 
   it('"새 대화" 클릭 시 진행 중인 요청을 중단하고 늦은 콜백을 무시한다', async () => {
-    let streamCallbacks: ChatStreamCallbacks | null = null;
-    let requestOptions: ChatRequestOptions | null = null;
+    const captured: {
+      streamCallbacks?: ChatStreamCallbacks;
+      requestOptions?: ChatRequestOptions;
+    } = {};
 
     mockSendChatMessage.mockImplementationOnce(
       (
@@ -253,8 +255,8 @@ describe('ChatSection', () => {
         callbacks: ChatStreamCallbacks,
         options: ChatRequestOptions,
       ) => {
-        streamCallbacks = callbacks;
-        requestOptions = options;
+        captured.streamCallbacks = callbacks;
+        captured.requestOptions = options;
         return new Promise(() => {});
       },
     );
@@ -271,11 +273,15 @@ describe('ChatSection', () => {
 
     fireEvent.click(screen.getByText('새 대화'));
 
-    expect(requestOptions?.signal?.aborted).toBe(true);
+    const abortSignal = captured.requestOptions?.signal;
+    if (!abortSignal) {
+      throw new Error('AbortSignal이 필요합니다.');
+    }
+    expect(abortSignal.aborted).toBe(true);
 
     act(() => {
-      streamCallbacks?.onText('늦은 응답');
-      streamCallbacks?.onDone();
+      captured.streamCallbacks?.onText('늦은 응답');
+      captured.streamCallbacks?.onDone();
     });
 
     expect(screen.queryByText('늦은 응답')).not.toBeInTheDocument();
@@ -283,7 +289,7 @@ describe('ChatSection', () => {
   });
 
   it('대화가 없을 때는 "새 대화" 버튼이 표시되지 않는다', () => {
-    localStorageMock.getItem.mockReturnValue(null);
+    localStorageMock.getItem.mockReturnValue('');
     render(<ChatSection />);
     expect(screen.queryByText('새 대화')).not.toBeInTheDocument();
   });

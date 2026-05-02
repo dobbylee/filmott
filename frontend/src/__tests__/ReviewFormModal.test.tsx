@@ -83,7 +83,7 @@ describe('ReviewFormModal', () => {
     await screen.findByText('감상 날짜');
 
     const form = screen.getByText('작성').closest('form');
-    expect(form?.textContent).toMatch(/감상 날짜.*별점.*코멘트/s);
+    expect(form?.textContent).toMatch(/감상 날짜[\s\S]*별점[\s\S]*코멘트/);
   });
 
   it('신규 작성 날짜 기본값은 한국 날짜 기준이어야 한다', () => {

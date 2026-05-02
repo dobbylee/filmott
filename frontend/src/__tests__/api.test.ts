@@ -1,6 +1,24 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import type { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+import type { MockInstance } from 'vitest';
+import type {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+  InternalAxiosRequestConfig,
+} from 'axios';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
+
+type RejectedHandler = NonNullable<
+  AxiosInstance['interceptors']['response']['handlers']
+>[number]['rejected'];
+
+function getRejectedHandler(api: AxiosInstance): NonNullable<RejectedHandler> {
+  const rejected = api.interceptors.response.handlers?.[0]?.rejected;
+  if (!rejected) {
+    throw new Error('response rejected handler가 필요합니다.');
+  }
+  return rejected;
+}
 
 describe('api 인스턴스', () => {
   beforeEach(() => {
@@ -39,7 +57,7 @@ describe('refreshApi 인스턴스', () => {
 });
 
 describe('api response 인터셉터 - cookie session refresh', () => {
-  let dispatchEventSpy: ReturnType<typeof vi.spyOn>;
+  let dispatchEventSpy: MockInstance<typeof window.dispatchEvent>;
 
   beforeEach(() => {
     localStorage.clear();
@@ -89,8 +107,9 @@ describe('api response 인터셉터 - cookie session refresh', () => {
     });
     api.defaults.adapter = adapterSpy;
 
-    const handler = api.interceptors.response.handlers[0];
-    const result = await handler.rejected!(createMockError(401, '/protected-endpoint'));
+    const result = await getRejectedHandler(api)(
+      createMockError(401, '/protected-endpoint'),
+    );
 
     expect(refreshPostSpy).toHaveBeenCalledWith('/auth/refresh');
     expect(adapterSpy).toHaveBeenCalledTimes(1);
@@ -110,9 +129,7 @@ describe('api response 인터셉터 - cookie session refresh', () => {
       .spyOn(refreshApi, 'post')
       .mockRejectedValueOnce(new Error('Refresh failed'));
 
-    const handler = api.interceptors.response.handlers[0];
-
-    await expect(handler.rejected!(createMockError(401, '/protected-endpoint'))).rejects.toThrow(
+    await expect(getRejectedHandler(api)(createMockError(401, '/protected-endpoint'))).rejects.toThrow(
       'Refresh failed',
     );
 
@@ -135,9 +152,7 @@ describe('api response 인터셉터 - cookie session refresh', () => {
       createMockError(401, '/auth/refresh'),
     );
 
-    const handler = api.interceptors.response.handlers[0];
-
-    await expect(handler.rejected!(createMockError(401, '/protected-endpoint'))).rejects.toBeDefined();
+    await expect(getRejectedHandler(api)(createMockError(401, '/protected-endpoint'))).rejects.toBeDefined();
 
     const authEvent = dispatchEventSpy.mock.calls.find(
       (call) => (call[0] as CustomEvent).type === AUTH_REQUIRED_EVENT,
@@ -154,9 +169,7 @@ describe('api response 인터셉터 - cookie session refresh', () => {
     localStorage.setItem('refresh_token', 'bad-refresh-token');
 
     const refreshPostSpy = vi.spyOn(refreshApi, 'post');
-    const handler = api.interceptors.response.handlers[0];
-
-    await expect(handler.rejected!(createMockError(401, '/auth/refresh'))).rejects.toBeDefined();
+    await expect(getRejectedHandler(api)(createMockError(401, '/auth/refresh'))).rejects.toBeDefined();
 
     expect(refreshPostSpy).not.toHaveBeenCalled();
     expect(localStorage.getItem('access_token')).toBeNull();
@@ -175,9 +188,7 @@ describe('api response 인터셉터 - cookie session refresh', () => {
     const { default: api, refreshApi } = await import('@/lib/api');
 
     const refreshPostSpy = vi.spyOn(refreshApi, 'post');
-    const handler = api.interceptors.response.handlers[0];
-
-    await expect(handler.rejected!(createMockError(401, '/some-endpoint', true))).rejects.toBeDefined();
+    await expect(getRejectedHandler(api)(createMockError(401, '/some-endpoint', true))).rejects.toBeDefined();
 
     expect(refreshPostSpy).not.toHaveBeenCalled();
 
@@ -187,9 +198,7 @@ describe('api response 인터셉터 - cookie session refresh', () => {
   it('401이 아닌 에러는 그대로 reject해야 한다', async () => {
     const { default: api } = await import('@/lib/api');
 
-    const handler = api.interceptors.response.handlers[0];
-
-    await expect(handler.rejected!(createMockError(500, '/some-endpoint'))).rejects.toBeDefined();
+    await expect(getRejectedHandler(api)(createMockError(500, '/some-endpoint'))).rejects.toBeDefined();
 
     const authEvent = dispatchEventSpy.mock.calls.find(
       (call) => (call[0] as CustomEvent).type === AUTH_REQUIRED_EVENT,

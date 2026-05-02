@@ -32,7 +32,6 @@ describe('ReviewCard', () => {
     user: {
       id: 10,
       nickname: '영화팬',
-      email: 'fan@test.com',
     },
   };
 

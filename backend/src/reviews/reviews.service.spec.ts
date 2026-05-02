@@ -218,7 +218,7 @@ describe('ReviewsService', () => {
       };
       const created = { id: 7, userId: 1, ...dto, likesCount: 0 };
       const mockManager = createManager({
-        createdReview: created as Review,
+        createdReview: created as unknown as Review,
         existingWatchlist: { status: 'watched' },
       });
       mockDataSource.transaction.mockImplementation(
