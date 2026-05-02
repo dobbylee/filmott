@@ -72,6 +72,7 @@ describeWithDb('content search integration', () => {
         title: `포함 콘텐츠 ${index + 1}`,
         tmdbId: 410000 + index,
         contentType: 'movie',
+        posterUrl: `/included-${index + 1}.jpg`,
         originCountry: 'KR',
         genres: [{ id: 18, name: '드라마' }],
         director: '포함 감독',
@@ -97,6 +98,7 @@ describeWithDb('content search integration', () => {
     const excludedByAdult = await fixtures.content({
       title: '성인 콘텐츠',
       tmdbId: 420001,
+      posterUrl: '/excluded-adult.jpg',
       originCountry: 'KR',
       genres: [{ id: 18, name: '드라마' }],
       watchProviders: netflixProviders,
@@ -106,6 +108,7 @@ describeWithDb('content search integration', () => {
       title: 'TV 콘텐츠',
       tmdbId: 420002,
       contentType: 'tv',
+      posterUrl: '/excluded-tv.jpg',
       originCountry: 'KR',
       genres: [{ id: 18, name: '드라마' }],
       watchProviders: netflixProviders,
@@ -113,6 +116,7 @@ describeWithDb('content search integration', () => {
     const excludedByCountry = await fixtures.content({
       title: '미국 콘텐츠',
       tmdbId: 420003,
+      posterUrl: '/excluded-country.jpg',
       originCountry: 'US',
       genres: [{ id: 18, name: '드라마' }],
       watchProviders: netflixProviders,
@@ -120,6 +124,7 @@ describeWithDb('content search integration', () => {
     const excludedByGenre = await fixtures.content({
       title: '공포 콘텐츠',
       tmdbId: 420004,
+      posterUrl: '/excluded-genre.jpg',
       originCountry: 'KR',
       genres: [{ id: 27, name: '공포' }],
       watchProviders: netflixProviders,
@@ -127,6 +132,7 @@ describeWithDb('content search integration', () => {
     const excludedByDirector = await fixtures.content({
       title: '제외 감독 콘텐츠',
       tmdbId: 420005,
+      posterUrl: '/excluded-director.jpg',
       originCountry: 'KR',
       genres: [{ id: 18, name: '드라마' }],
       director: '제외 감독',
@@ -135,6 +141,7 @@ describeWithDb('content search integration', () => {
     const excludedByTmdbId = await fixtures.content({
       title: 'TMDB 제외 콘텐츠',
       tmdbId: 420006,
+      posterUrl: '/excluded-tmdb.jpg',
       originCountry: 'KR',
       genres: [{ id: 18, name: '드라마' }],
       watchProviders: netflixProviders,
@@ -182,6 +189,7 @@ describeWithDb('content search integration', () => {
     const metadataContent = await fixtures.content({
       title: '메타데이터 작품',
       tmdbId: 430001,
+      posterUrl: '/metadata.jpg',
       originCountry: 'KR',
       voteCount: 1,
     });
@@ -193,6 +201,7 @@ describeWithDb('content search integration', () => {
     const kobisContent = await fixtures.content({
       title: 'KOBIS fallback 작품',
       tmdbId: 430002,
+      posterUrl: '/kobis.jpg',
       originCountry: 'US',
       overview: 'KOBIS fallback 줄거리',
       voteCount: 5000,
@@ -224,12 +233,14 @@ describeWithDb('content search integration', () => {
     const lowVoteContent = await fixtures.content({
       title: '낮은 인기도 작품',
       tmdbId: 440001,
+      posterUrl: '/low-vote.jpg',
       originCountry: 'KR',
       voteCount: 1,
     });
     const highVoteContent = await fixtures.content({
       title: '높은 인기도 작품',
       tmdbId: 440002,
+      posterUrl: '/high-vote.jpg',
       originCountry: 'KR',
       voteCount: 10000,
     });
