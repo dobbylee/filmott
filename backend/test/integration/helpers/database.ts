@@ -64,6 +64,14 @@ export function getIntegrationDatabaseConfig(): IntegrationDatabaseConfig {
   };
 }
 
+export function hasIntegrationDatabaseConfig(): boolean {
+  return Boolean(
+    process.env.TEST_DB_NAME &&
+    process.env.TEST_DB_USERNAME &&
+    process.env.TEST_DB_PASSWORD,
+  );
+}
+
 export function createIntegrationTypeOrmOptions(): TypeOrmModuleOptions {
   return {
     ...createIntegrationDataSourceOptions(),

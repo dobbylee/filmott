@@ -9,6 +9,9 @@ import { ConfigModule } from '@nestjs/config';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import cookieParser from 'cookie-parser';
+import { EventEmitter } from 'events';
+import { createRequest, createResponse } from 'node-mocks-http';
+import type { Request, Response } from 'express';
 import { createIntegrationTypeOrmOptions } from './database';
 
 interface IntegrationAppOptions {
@@ -17,6 +20,13 @@ interface IntegrationAppOptions {
   providers?: NonNullable<ModuleMetadata['providers']>;
   configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder;
 }
+
+export interface IntegrationHttpResponse {
+  status: number;
+  body: unknown;
+}
+
+export type IntegrationHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 export async function createIntegrationApp(
   options: IntegrationAppOptions = {},
@@ -52,4 +62,52 @@ export function configureIntegrationApp(app: INestApplication): void {
       transform: true,
     }),
   );
+}
+
+export async function requestIntegrationApp(
+  app: INestApplication,
+  method: IntegrationHttpMethod,
+  path: string,
+  body?: unknown,
+): Promise<IntegrationHttpResponse> {
+  const expressApp = app.getHttpAdapter().getInstance() as {
+    handle: (
+      req: Request,
+      res: Response,
+      next: (error?: unknown) => void,
+    ) => void;
+  };
+  const req = createRequest<Request>({
+    method,
+    url: path,
+    originalUrl: path,
+    body,
+    headers:
+      body === undefined ? undefined : { 'content-type': 'application/json' },
+  });
+  const res = createResponse<Response>({ eventEmitter: EventEmitter });
+
+  return new Promise((resolve, reject) => {
+    const resolveResponse = () => {
+      resolve({
+        status: res._getStatusCode(),
+        body: res._isJSON() ? res._getJSONData() : res._getData(),
+      });
+    };
+
+    res.once('end', resolveResponse);
+    expressApp.handle(req, res, (error?: unknown) => {
+      if (error) {
+        reject(
+          error instanceof Error
+            ? error
+            : new Error(
+                typeof error === 'string' ? error : 'HTTP adapter error',
+              ),
+        );
+      } else if (!res.headersSent) {
+        resolveResponse();
+      }
+    });
+  });
 }
