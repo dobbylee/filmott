@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import cookieParser from 'cookie-parser';
 import { EventEmitter } from 'events';
@@ -35,6 +36,7 @@ export async function createIntegrationApp(
     imports: [
       ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
       TypeOrmModule.forRoot(createIntegrationTypeOrmOptions()),
+      ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
       ...(options.imports ?? []),
     ],
     controllers: options.controllers ?? [],
