@@ -21,6 +21,53 @@ jobs:
         working-directory: backend
       - run: npm run check
         working-directory: backend
+      - run: npm run test:e2e
+        working-directory: backend
+
+  backend-integration:
+    runs-on: ubuntu-latest
+    needs: backend-check
+    env:
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_PORT: 5432
+      TEST_DB_USERNAME: filmott_test
+      TEST_DB_PASSWORD: filmott_test
+      TEST_DB_NAME: filmott_integration
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      - name: Build PostgreSQL image with pgvector
+        run: docker build -t filmott-postgres-test ./postgres
+      - name: Start PostgreSQL test container
+        run: |
+          docker run -d \
+            --name filmott-integration-postgres \
+            -e POSTGRES_USER="$TEST_DB_USERNAME" \
+            -e POSTGRES_PASSWORD="$TEST_DB_PASSWORD" \
+            -e POSTGRES_DB="$TEST_DB_NAME" \
+            -p "$TEST_DB_PORT:5432" \
+            filmott-postgres-test
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..30}; do
+            if docker exec filmott-integration-postgres pg_isready -U "$TEST_DB_USERNAME" -d "$TEST_DB_NAME"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs filmott-integration-postgres
+          exit 1
+      - run: npm ci
+        working-directory: backend
+      - run: npm run test:integration
+        working-directory: backend
+      - name: Stop PostgreSQL test container
+        if: always()
+        run: docker rm -f filmott-integration-postgres || true
 
   frontend-check:
     runs-on: ubuntu-latest
