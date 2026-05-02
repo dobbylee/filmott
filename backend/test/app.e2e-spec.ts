@@ -10,8 +10,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { IsString } from 'class-validator';
-import request from 'supertest';
-import { App } from 'supertest/types';
+import { EventEmitter } from 'events';
+import { createRequest, createResponse } from 'node-mocks-http';
+import type { Request, Response } from 'express';
 import { ContentsController } from '../src/contents/contents.controller';
 import { ContentsService } from '../src/contents/contents.service';
 import { Content } from '../src/contents/content.entity';
@@ -21,6 +22,11 @@ import { ReviewsController } from '../src/reviews/reviews.controller';
 import { ReviewsService } from '../src/reviews/reviews.service';
 import { ReviewCommentsService } from '../src/reviews/review-comments.service';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+
+interface MemoryResponse {
+  status: number;
+  body: unknown;
+}
 
 class ValidationProbeDto {
   @IsString()
@@ -35,8 +41,8 @@ class ValidationProbeController {
   }
 }
 
-describe('HTTP application boundaries (e2e)', () => {
-  let app: INestApplication<App>;
+describe('HTTP boundary smoke (e2e)', () => {
+  let app: INestApplication;
   const contentRepo = {
     findOne: jest.fn(),
     create: jest.fn(),
@@ -110,7 +116,7 @@ describe('HTTP application boundaries (e2e)', () => {
         transform: true,
       }),
     );
-    await app.listen(0, '127.0.0.1');
+    await app.init();
   });
 
   afterEach(() => {
@@ -121,44 +127,88 @@ describe('HTTP application boundaries (e2e)', () => {
     await app.close();
   });
 
-  it('전역 prefix /api 아래에서만 라우트를 제공해야 한다', async () => {
-    await request(app.getHttpServer())
-      .post('/validation-probe')
-      .send({
-        name: 'filmott',
-      })
-      .expect(404);
+  async function requestMemory(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+  ): Promise<MemoryResponse> {
+    const expressApp = app.getHttpAdapter().getInstance() as {
+      handle: (
+        req: Request,
+        res: Response,
+        next: (error?: unknown) => void,
+      ) => void;
+    };
+    const req = createRequest<Request>({
+      method,
+      url: path,
+      originalUrl: path,
+      body,
+      headers:
+        body === undefined ? undefined : { 'content-type': 'application/json' },
+    });
+    const res = createResponse<Response>({ eventEmitter: EventEmitter });
 
-    await request(app.getHttpServer())
-      .post('/api/validation-probe')
-      .send({
-        name: 'filmott',
-      })
-      .expect(201);
+    return new Promise((resolve, reject) => {
+      res.once('end', () => {
+        resolve({
+          status: res._getStatusCode(),
+          body: res._isJSON() ? res._getJSONData() : res._getData(),
+        });
+      });
+      expressApp.handle(req, res, (error?: unknown) => {
+        if (error) {
+          reject(
+            error instanceof Error
+              ? error
+              : new Error(
+                  typeof error === 'string' ? error : 'HTTP adapter error',
+                ),
+          );
+        } else if (!res.headersSent) {
+          resolve({
+            status: res._getStatusCode(),
+            body: res._isJSON() ? res._getJSONData() : res._getData(),
+          });
+        }
+      });
+    });
+  }
+
+  it('전역 prefix /api 아래에서만 라우트를 제공해야 한다', async () => {
+    const withoutPrefix = await requestMemory('POST', '/validation-probe', {
+      name: 'filmott',
+    });
+    expect(withoutPrefix.status).toBe(404);
+
+    const withPrefix = await requestMemory('POST', '/api/validation-probe', {
+      name: 'filmott',
+    });
+    expect(withPrefix.status).toBe(201);
   });
 
   it('ValidationPipe가 허용되지 않은 body 필드를 거부해야 한다', async () => {
-    await request(app.getHttpServer())
-      .post('/api/validation-probe')
-      .send({
-        name: 'filmott',
-        extra: 'blocked',
-      })
-      .expect(400);
+    const response = await requestMemory('POST', '/api/validation-probe', {
+      name: 'filmott',
+      extra: 'blocked',
+    });
+
+    expect(response.status).toBe(400);
   });
 
   it('인증이 필요한 리뷰 작성 API는 토큰이 없으면 401을 반환해야 한다', async () => {
-    await request(app.getHttpServer())
-      .post('/api/reviews')
-      .send({
-        contentId: 1,
-        rating: 8,
-      })
-      .expect(401);
+    const response = await requestMemory('POST', '/api/reviews', {
+      contentId: 1,
+      rating: 8,
+    });
+
+    expect(response.status).toBe(401);
   });
 
   it('비정상 TMDB ID는 외부 API 호출 전에 거부해야 한다', async () => {
-    await request(app.getHttpServer()).get('/api/contents/movie/0').expect(400);
+    const response = await requestMemory('GET', '/api/contents/movie/0');
+
+    expect(response.status).toBe(400);
 
     expect(tmdbService.getDetails).not.toHaveBeenCalled();
     expect(contentRepo.findOne).not.toHaveBeenCalled();
