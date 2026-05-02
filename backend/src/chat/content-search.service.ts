@@ -268,7 +268,7 @@ export class ContentSearchService {
 
     const popularityOnlyScore = `LEAST(LN(GREATEST(c.vote_count, 1) + 1) / 10.0, ${SCORE_WEIGHTS.POPULARITY_DEFAULT})`;
 
-    // Phase 2: CTE 제거 — content_metadata 기준 1순위 + KOBIS 2순위 UNION ALL
+    // Phase 2: CTE 제거 — content_metadata 기준 1순위 + KOBIS 2순위 + 캐시 콘텐츠 3순위
     const query = `
 SELECT * FROM (
   -- 1순위: content_metadata 기준 (임베딩 있는 9,633건)
@@ -285,6 +285,7 @@ SELECT * FROM (
    JOIN contents c ON c.id = cm.content_id
    WHERE c.tmdb_id != ALL($1::int[])
      AND (c.adult IS NOT TRUE)
+     AND c.poster_url IS NOT NULL
      AND (c.origin_country LIKE '%KR%' OR c.watch_providers IS NOT NULL
           OR EXISTS (SELECT 1 FROM rankings r WHERE r.content_id = c.id AND r.source = 'kobis'))
      ${dynamicConditions}
@@ -303,9 +304,29 @@ SELECT * FROM (
    WHERE r.source = 'kobis'
      AND c.tmdb_id != ALL($1::int[])
      AND (c.adult IS NOT TRUE)
+     AND c.poster_url IS NOT NULL
      AND NOT EXISTS (SELECT 1 FROM content_metadata cm2 WHERE cm2.content_id = c.id)
      ${dynamicConditions}
    ORDER BY c.vote_count DESC
+   LIMIT ${limitParam})
+
+  UNION ALL
+
+  -- 3순위: 상세 캐시에는 있지만 임베딩/KOBIS 랭킹에는 없는 콘텐츠
+  (SELECT c.id AS content_id, c.tmdb_id, c.content_type, c.title, c.poster_url,
+          c.genres, c.vote_average, c.vote_count, c.overview,
+          c.director, c.origin_country,
+          NULL::text AS description, 3 AS priority,
+          ${popularityOnlyScore} AS score
+   FROM contents c
+   WHERE c.tmdb_id != ALL($1::int[])
+     AND (c.adult IS NOT TRUE)
+     AND c.poster_url IS NOT NULL
+     AND (c.origin_country LIKE '%KR%' OR c.watch_providers IS NOT NULL)
+     AND NOT EXISTS (SELECT 1 FROM content_metadata cm3 WHERE cm3.content_id = c.id)
+     AND NOT EXISTS (SELECT 1 FROM rankings r3 WHERE r3.content_id = c.id AND r3.source = 'kobis')
+     ${dynamicConditions}
+   ORDER BY score DESC, c.vote_count DESC
    LIMIT ${limitParam})
 ) combined
 ORDER BY priority, score DESC

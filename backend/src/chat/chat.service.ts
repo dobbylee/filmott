@@ -31,6 +31,9 @@ import { ChatHistoryMessageDto } from './dto/send-message.dto';
 import {
   RECOMMENDATIONS_TRAILER_CLOSE,
   RECOMMENDATIONS_TRAILER_OPEN,
+  ResolvedChatRecommendation,
+  extractRecommendationLineTitles,
+  formatRecommendationVisibleLine,
   matchStructuredRecommendationsToCandidates,
   parseRecommendationTrailer,
   extractPreviouslyRecommendedTitles,
@@ -66,6 +69,18 @@ interface RawWatchedTmdbIdRow {
 }
 
 type SseEmitter = (event: string, data: unknown) => void;
+
+interface StreamedChatResponse {
+  visibleText: string;
+  trailerText: string;
+}
+
+interface SearchContentItem {
+  id: number;
+  title?: string;
+  name?: string;
+  poster_path?: string | null;
+}
 
 @Injectable()
 export class ChatService {
@@ -316,16 +331,26 @@ export class ChatService {
       return;
     }
 
-    const trailerText = await this.emitStreamingText(stream, emit, signal);
+    const streamedResponse = await this.emitStreamingText(stream, emit, signal);
 
     if (signal?.aborted) {
       return;
     }
 
-    const matched = matchStructuredRecommendationsToCandidates(
-      parseRecommendationTrailer(trailerText),
-      similarContents,
+    const trailerMatched = this.filterRecommendationsByContentType(
+      matchStructuredRecommendationsToCandidates(
+        parseRecommendationTrailer(streamedResponse.trailerText),
+        similarContents,
+      ),
+      intent.contentType,
     );
+    const fallbackMatched = await this.resolveVisibleTextRecommendations(
+      streamedResponse.visibleText,
+      similarContents,
+      intent.contentType,
+      trailerMatched,
+    );
+    const matched = [...trailerMatched, ...fallbackMatched].slice(0, 5);
 
     if (matched.length > 0) {
       emit('recommendations', { recommendations: matched });
@@ -338,14 +363,40 @@ export class ChatService {
     stream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>,
     emit: SseEmitter,
     signal?: AbortSignal,
-  ): Promise<string> {
+  ): Promise<StreamedChatResponse> {
     let pendingText = '';
     let trailerText = '';
+    let visibleTextBuffer = '';
+    let visibleLineBuffer = '';
     let isCollectingTrailer = false;
     let hasEmittedText = false;
 
+    const emitFormattedVisibleText = (text: string, flush = false): void => {
+      visibleLineBuffer += text;
+      const lines = visibleLineBuffer.split('\n');
+      visibleLineBuffer = flush ? '' : (lines.pop() ?? '');
+      const completedLines = flush ? lines : lines;
+
+      for (let i = 0; i < completedLines.length; i += 1) {
+        const isLastFlushedLine = flush && i === completedLines.length - 1;
+        const line = completedLines[i];
+        if (isLastFlushedLine && line === '') continue;
+
+        const formatted = formatRecommendationVisibleLine(line);
+        if (formatted === null) continue;
+        if (!hasEmittedText && formatted.trim().length === 0) continue;
+
+        const output = `${formatted}${isLastFlushedLine ? '' : '\n'}`;
+        visibleTextBuffer += output;
+        this.emitTextIfNotEmpty(output, emit);
+        hasEmittedText = hasEmittedText || formatted.length > 0;
+      }
+    };
+
     for await (const chunk of stream) {
-      if (signal?.aborted) return trailerText;
+      if (signal?.aborted) {
+        return { visibleText: visibleTextBuffer, trailerText };
+      }
 
       const content = chunk.choices[0]?.delta?.content;
       if (!content) continue;
@@ -359,8 +410,7 @@ export class ChatService {
       const trailerStartIndex = combined.indexOf(RECOMMENDATIONS_TRAILER_OPEN);
       if (trailerStartIndex >= 0) {
         const visibleText = combined.slice(0, trailerStartIndex);
-        this.emitTextIfNotEmpty(visibleText, emit);
-        hasEmittedText = hasEmittedText || visibleText.length > 0;
+        emitFormattedVisibleText(visibleText, true);
         trailerText =
           RECOMMENDATIONS_TRAILER_OPEN +
           combined.slice(
@@ -379,13 +429,11 @@ export class ChatService {
       const emitLength = combined.length - TRAILER_DETECTION_TAIL_LENGTH;
       const visibleText = combined.slice(0, emitLength);
       pendingText = combined.slice(emitLength);
-      this.emitTextIfNotEmpty(visibleText, emit);
-      hasEmittedText = hasEmittedText || visibleText.length > 0;
+      emitFormattedVisibleText(visibleText);
     }
 
     if (!isCollectingTrailer) {
-      this.emitTextIfNotEmpty(pendingText, emit);
-      hasEmittedText = hasEmittedText || pendingText.length > 0;
+      emitFormattedVisibleText(pendingText, true);
     } else {
       const closeIndex = trailerText.indexOf(RECOMMENDATIONS_TRAILER_CLOSE);
       if (closeIndex >= 0) {
@@ -400,13 +448,194 @@ export class ChatService {
       throw new BadRequestException('AI 응답을 생성하지 못했습니다.');
     }
 
-    return trailerText;
+    return { visibleText: visibleTextBuffer, trailerText };
   }
 
   private emitTextIfNotEmpty(text: string, emit: SseEmitter): void {
     if (text.length > 0) {
       emit('text', { content: text });
     }
+  }
+
+  private async resolveVisibleTextRecommendations(
+    visibleText: string,
+    candidates: SimilarContent[],
+    preferredContentType: 'movie' | 'tv' | null,
+    existing: ResolvedChatRecommendation[],
+  ): Promise<ResolvedChatRecommendation[]> {
+    if (existing.length > 0) return [];
+
+    const titles = extractRecommendationLineTitles(visibleText);
+    if (titles.length === 0) return [];
+
+    const usedKeys = new Set(
+      existing.map((item) => `${item.contentType}:${item.tmdbId}`),
+    );
+    const resolved: ResolvedChatRecommendation[] = [];
+
+    for (const rawTitle of titles) {
+      if (existing.length + resolved.length >= 5) break;
+      if (this.isAlreadyResolvedTitle(rawTitle, existing)) continue;
+
+      const candidate = this.findCandidateByTitle(
+        rawTitle,
+        candidates,
+        usedKeys,
+        preferredContentType,
+      );
+      if (candidate) {
+        usedKeys.add(`${candidate.contentType}:${candidate.tmdbId}`);
+        resolved.push(candidate);
+        continue;
+      }
+
+      const searched = await this.searchRecommendationByTitle(
+        rawTitle,
+        preferredContentType,
+        usedKeys,
+      );
+      if (searched) {
+        usedKeys.add(`${searched.contentType}:${searched.tmdbId}`);
+        resolved.push(searched);
+      }
+    }
+
+    return resolved;
+  }
+
+  private isAlreadyResolvedTitle(
+    title: string,
+    existing: ResolvedChatRecommendation[],
+  ): boolean {
+    const titleQueries = this.buildTitleSearchQueries(title).map((query) =>
+      this.normalizeTitleForMatch(query),
+    );
+
+    return existing.some((item) =>
+      titleQueries.includes(this.normalizeTitleForMatch(item.title)),
+    );
+  }
+
+  private findCandidateByTitle(
+    title: string,
+    candidates: SimilarContent[],
+    usedKeys: Set<string>,
+    preferredContentType: 'movie' | 'tv' | null,
+  ): ResolvedChatRecommendation | null {
+    const titleQueries = this.buildTitleSearchQueries(title);
+
+    for (const query of titleQueries) {
+      const normalizedQuery = this.normalizeTitleForMatch(query);
+      const candidate = candidates.find((item) => {
+        const contentType = this.parseContentType(item.contentType);
+        if (!contentType) return false;
+        if (preferredContentType && contentType !== preferredContentType) {
+          return false;
+        }
+        if (usedKeys.has(`${contentType}:${item.tmdbId}`)) return false;
+
+        const normalizedTitle = this.normalizeTitleForMatch(item.title);
+        return normalizedTitle === normalizedQuery;
+      });
+
+      const contentType = this.parseContentType(candidate?.contentType);
+      if (candidate && contentType) {
+        return {
+          tmdbId: candidate.tmdbId,
+          contentType,
+          title: candidate.title,
+          posterUrl: candidate.posterUrl,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  private async searchRecommendationByTitle(
+    title: string,
+    preferredContentType: 'movie' | 'tv' | null,
+    usedKeys: Set<string>,
+  ): Promise<ResolvedChatRecommendation | null> {
+    const types: Array<'movie' | 'tv'> = preferredContentType
+      ? [preferredContentType]
+      : ['movie', 'tv'];
+
+    for (const query of this.buildTitleSearchQueries(title)) {
+      for (const type of types) {
+        const result = await this.contentsService
+          .searchContents(query, type, 1)
+          .catch(() => null);
+        const item = this.pickSearchResult(query, result?.results ?? []);
+        if (!item?.poster_path) continue;
+
+        const key = `${type}:${item.id}`;
+        if (usedKeys.has(key)) continue;
+
+        return {
+          tmdbId: item.id,
+          contentType: type,
+          title: item.title ?? item.name ?? query,
+          posterUrl: item.poster_path,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  private pickSearchResult(
+    query: string,
+    items: SearchContentItem[],
+  ): SearchContentItem | null {
+    if (items.length === 0) return null;
+
+    const normalizedQuery = this.normalizeTitleForMatch(query);
+    return (
+      items.find((item) => {
+        const title = item.title ?? item.name ?? '';
+        return this.normalizeTitleForMatch(title) === normalizedQuery;
+      }) ?? null
+    );
+  }
+
+  private buildTitleSearchQueries(title: string): string[] {
+    const withoutParenthetical = title.replace(/\s*\([^)]*\)\s*$/g, '');
+    const queries = [
+      title,
+      withoutParenthetical,
+      title.replace(/\s*시즌(?:\s*\d+)?\s*$/g, ''),
+      withoutParenthetical.replace(/\s*시즌(?:\s*\d+)?\s*$/g, ''),
+      title.split(':')[0],
+    ]
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+
+    return [...new Set(queries)];
+  }
+
+  private normalizeTitleForMatch(title: string): string {
+    return title
+      .replace(/\s*\([^)]*\)\s*$/g, '')
+      .replace(/\s*시즌(?:\s*\d+)?\s*$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  private parseContentType(value: string | undefined): 'movie' | 'tv' | null {
+    if (value === 'movie' || value === 'tv') return value;
+    return null;
+  }
+
+  private filterRecommendationsByContentType(
+    recommendations: ResolvedChatRecommendation[],
+    preferredContentType: 'movie' | 'tv' | null,
+  ): ResolvedChatRecommendation[] {
+    if (!preferredContentType) return recommendations;
+    return recommendations.filter(
+      (recommendation) => recommendation.contentType === preferredContentType,
+    );
   }
 
   async buildUserContext(userId: number): Promise<UserContext> {

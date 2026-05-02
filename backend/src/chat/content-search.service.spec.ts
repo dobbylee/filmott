@@ -107,7 +107,7 @@ describe('ContentSearchService', () => {
       expect(query).toContain("r.source = 'kobis'");
     });
 
-    it('2단계 우선순위로 정렬되어야 한다', async () => {
+    it('3단계 우선순위로 정렬되어야 한다', async () => {
       const mixedRows = [
         {
           ...baseRow,
@@ -131,6 +131,14 @@ describe('ContentSearchService', () => {
           description: null,
           overview: '줄거리3',
         },
+        {
+          ...baseRow,
+          content_id: 4,
+          priority: 3,
+          score: 0,
+          description: null,
+          overview: '줄거리4',
+        },
       ];
       mockDataSource.query.mockResolvedValue(mixedRows);
 
@@ -139,16 +147,18 @@ describe('ContentSearchService', () => {
       });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      // UNION ALL로 2단계 분리 (1순위 content_metadata + 2순위 KOBIS)
+      // UNION ALL로 3단계 분리 (1순위 content_metadata + 2순위 KOBIS + 3순위 캐시 콘텐츠)
       const unionCount = (query.match(/UNION ALL/g) || []).length;
-      expect(unionCount).toBe(1);
+      expect(unionCount).toBe(2);
       // 우선순위 정렬
       expect(query).toContain('ORDER BY priority, score DESC');
       // 1순위: description 사용
       expect(result[0].description).toBe('설명1');
       // 2순위: overview fallback
       expect(result[2].description).toBe('줄거리3');
-      expect(result).toHaveLength(3);
+      // 3순위도 overview fallback
+      expect(result[3].description).toBe('줄거리4');
+      expect(result).toHaveLength(4);
     });
 
     it('OTT 필터가 적용되어야 한다', async () => {
@@ -573,6 +583,37 @@ describe('ContentSearchService', () => {
       // 2순위: FROM rankings r JOIN contents c
       expect(query).toContain('FROM rankings r');
       expect(query).toContain('JOIN contents c ON c.id = r.content_id');
+    });
+
+    it('3순위에서 임베딩과 KOBIS 랭킹이 없는 캐시 콘텐츠를 조회해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters('예능 추천', 20, [], {
+        contentType: 'tv',
+        genres: ['리얼리티', '토크'],
+      });
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      expect(query).toContain('FROM contents c');
+      expect(query).toContain(
+        'NOT EXISTS (SELECT 1 FROM content_metadata cm3 WHERE cm3.content_id = c.id)',
+      );
+      expect(query).toContain(
+        "NOT EXISTS (SELECT 1 FROM rankings r3 WHERE r3.content_id = c.id AND r3.source = 'kobis')",
+      );
+      expect(query).toContain('3 AS priority');
+    });
+
+    it('채팅 후보는 포스터가 있는 콘텐츠만 조회해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue(fiveRows);
+
+      await service.searchWithFilters('추천', 20, [], {});
+
+      const query = mockDataSource.query.mock.calls[0][0] as string;
+      const posterFilterCount = (
+        query.match(/c\.poster_url IS NOT NULL/g) || []
+      ).length;
+      expect(posterFilterCount).toBe(3);
     });
 
     it('precomputedEmbedding이 있으면 generateEmbedding을 호출하지 않아야 한다', async () => {

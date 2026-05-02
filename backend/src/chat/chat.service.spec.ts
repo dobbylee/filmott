@@ -347,7 +347,7 @@ describe('ChatService', () => {
       expect(textEvents.length).toBeGreaterThan(0);
       expect(
         textEvents.map((e) => (e.data as { content: string }).content).join(''),
-      ).toContain('**기생충 (Parasite)** — 봉준호 감독의 걸작입니다.');
+      ).toContain('**기생충** - 봉준호 감독의 걸작입니다.');
       expect(
         textEvents.map((e) => (e.data as { content: string }).content).join(''),
       ).not.toContain(RECOMMENDATIONS_TRAILER_OPEN);
@@ -389,6 +389,245 @@ describe('ChatService', () => {
 
       const doneEvents = emittedEvents.filter((e) => e.event === 'done');
       expect(doneEvents).toHaveLength(1);
+    });
+
+    it('스트리밍 본문의 깨진 추천 줄 불릿을 정규화해서 emit해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockContentsService.searchContents.mockResolvedValue({ results: [] });
+      mockStreamingResponse([
+        '**- 다멜리오 쇼 - 가족/일상 기반의 리얼리티라 몰입하기 좋아요.',
+        `\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n[]\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '리얼리티 예능 추천해줘', [], emit);
+
+      const text = emittedEvents
+        .filter((e) => e.event === 'text')
+        .map((e) => (e.data as { content: string }).content)
+        .join('');
+      expect(text).toContain(
+        '**다멜리오 쇼** - 가족/일상 기반의 리얼리티라 몰입하기 좋아요.',
+      );
+      expect(text).not.toContain('**- 다멜리오 쇼');
+    });
+
+    it('trailer가 없어도 본문 제목이 후보와 매칭되면 추천 카드를 emit해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([
+        {
+          contentId: 1,
+          tmdbId: 156400,
+          contentType: 'tv',
+          title: '피의 게임',
+          posterUrl: '/blood-game.jpg',
+          genres: [{ id: 10764, name: '리얼리티' }],
+          voteAverage: 8.1,
+          description: '두뇌 서바이벌 예능',
+          similarity: 0.8,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+      ]);
+      mockStreamingResponse([
+        '피의 게임\n말 한마디, 타이밍, 연합과 배신이 핵심입니다.',
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(
+        1,
+        '두뇌 서바이벌 예능 추천해줘',
+        [],
+        emit,
+      );
+
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
+      expect(recEvents).toHaveLength(1);
+      expect(
+        (recEvents[0].data as { recommendations: { title: string }[] })
+          .recommendations[0].title,
+      ).toBe('피의 게임');
+      expect(mockContentsService.searchContents).not.toHaveBeenCalled();
+    });
+
+    it('trailer와 후보 매칭이 없어도 본문 제목을 TMDB 검색으로 카드 복구해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        contentType: 'tv',
+        genres: ['리얼리티', '토크'],
+        confidence: 'high',
+      });
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockContentsService.searchContents.mockResolvedValue({
+        results: [
+          {
+            id: 156400,
+            name: '피의 게임',
+            poster_path: '/blood-game.jpg',
+          },
+        ],
+      });
+      mockStreamingResponse([
+        '피의 게임\n말 한마디, 타이밍, 연합과 배신이 핵심입니다.',
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit);
+
+      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
+        '피의 게임',
+        'tv',
+        1,
+      );
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
+      expect(recEvents).toHaveLength(1);
+      expect(recEvents[0].data).toEqual({
+        recommendations: [
+          {
+            tmdbId: 156400,
+            contentType: 'tv',
+            title: '피의 게임',
+            posterUrl: '/blood-game.jpg',
+          },
+        ],
+      });
+    });
+
+    it('trailer 매칭이 하나라도 있으면 본문 제목 fallback을 실행하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([
+        {
+          contentId: 1,
+          tmdbId: 156400,
+          contentType: 'tv',
+          title: '피의 게임',
+          posterUrl: '/blood-game.jpg',
+          genres: [{ id: 10764, name: '리얼리티' }],
+          voteAverage: 8.1,
+          description: '두뇌 서바이벌 예능',
+          similarity: 0.8,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+      ]);
+      mockStreamingResponse([
+        `피의 게임\n추천 이유입니다.\n\n다른 작품\n추천 이유입니다.\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n`,
+        '[{"tmdbId":156400,"contentType":"tv"}]',
+        `\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '두뇌 예능 추천해줘', [], emit);
+
+      expect(mockContentsService.searchContents).not.toHaveBeenCalled();
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
+      expect(recEvents).toHaveLength(1);
+    });
+
+    it('tv 의도에서는 trailer에 movie 후보가 들어와도 추천 카드로 emit하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        contentType: 'tv',
+        genres: ['리얼리티'],
+        confidence: 'high',
+      });
+      mockContentSearchService.searchWithFilters.mockResolvedValue([
+        {
+          contentId: 1,
+          tmdbId: 801,
+          contentType: 'movie',
+          title: '더 콜',
+          posterUrl: '/the-call.jpg',
+          genres: [{ id: 53, name: '스릴러' }],
+          voteAverage: 7.0,
+          description: '영화',
+          similarity: 0.5,
+          director: null,
+          originCountry: 'US',
+          overview: null,
+        },
+      ]);
+      mockStreamingResponse([
+        `더 콜 - 제한된 단서 안에서 다음 선택을 계산해야 해요.\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n`,
+        '[{"tmdbId":801,"contentType":"movie"}]',
+        `\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit);
+
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
+      expect(recEvents).toHaveLength(0);
+    });
+
+    it('본문 제목 fallback은 TMDB 검색 결과 제목이 정확히 맞을 때만 카드로 복구해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        contentType: 'tv',
+        genres: ['리얼리티'],
+        confidence: 'high',
+      });
+      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockContentsService.searchContents.mockResolvedValue({
+        results: [
+          {
+            id: 999,
+            name: '피의 게임 외전',
+            poster_path: '/wrong.jpg',
+          },
+        ],
+      });
+      mockStreamingResponse([
+        '피의 게임\n말 한마디, 타이밍, 연합과 배신이 핵심입니다.',
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit);
+
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
+      expect(recEvents).toHaveLength(0);
     });
 
     it('추천 trailer 태그가 chunk 경계에 걸려도 텍스트로 노출하지 않아야 한다', async () => {

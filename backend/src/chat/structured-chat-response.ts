@@ -118,6 +118,51 @@ function normalizeTitle(title: string): string {
   return title.trim().toLowerCase();
 }
 
+export function stripRecommendationTitleSuffix(title: string): string {
+  return title
+    .trim()
+    .replace(/^\d+[.)]\s+/, '')
+    .replace(/^[-*•]\s+/, '')
+    .replace(/^\*\*\s*/, '')
+    .replace(/^[-*•]\s+/, '')
+    .replace(/\s*\*\*$/, '')
+    .replace(/\s*\([^)]*\)\s*$/g, '')
+    .trim();
+}
+
+export function formatRecommendationVisibleLine(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed) return '';
+
+  if (
+    /추천(?:해요|합니다|드려요|할게요)$/.test(trimmed) &&
+    !/\s[—-]\s/.test(trimmed) &&
+    !trimmed.startsWith('**')
+  ) {
+    return null;
+  }
+
+  const recommendationMatch = trimmed.match(
+    /^(?:\d+[.)]\s*)?(?:\*\*)?(.+?)(?:\*\*)?\s[—-]\s(.+)$/,
+  );
+  if (recommendationMatch) {
+    const title = stripRecommendationTitleSuffix(recommendationMatch[1]);
+    const reason = recommendationMatch[2].trim();
+    return title && reason ? `**${title}** - ${reason}` : trimmed;
+  }
+
+  if (
+    trimmed.length <= 40 &&
+    !/[.!?。！？]$/.test(trimmed) &&
+    !/[요다까]$/.test(trimmed)
+  ) {
+    const title = stripRecommendationTitleSuffix(trimmed);
+    return title ? `**${title}**` : trimmed;
+  }
+
+  return line;
+}
+
 export function extractPreviouslyRecommendedTitles(
   history: ChatHistoryMessageDto[],
 ): string[] {
@@ -143,16 +188,42 @@ export function extractPreviouslyRecommendedTitles(
   return results;
 }
 
-function extractRecommendationLineTitles(text: string): string[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
+export function extractRecommendationLineTitles(text: string): string[] {
+  const rawLines = text.split('\n').map((line) => line.trim());
+  const normalizedLines = rawLines
+    .map((line) => formatRecommendationVisibleLine(line))
+    .filter((line): line is string => line !== null)
+    .map((line) => line.trim());
+
+  const lineTitles = normalizedLines
     .map((line) => line.match(/^\*\*(.+?)\*\*\s*[—-]\s+.+$/))
     .filter((match): match is RegExpMatchArray => match !== null)
-    .map((match) => {
-      const raw = match[1].trim();
-      const parenMatch = raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-      return parenMatch ? parenMatch[1].trim() : raw;
-    })
+    .map((match) => stripRecommendationTitleSuffix(match[1]))
     .filter((title) => title.length > 0);
+
+  const standaloneTitles = rawLines
+    .filter((line, index, lines) => {
+      if (!line) return false;
+      if (line.startsWith('#') || line.startsWith('-')) return false;
+      if (/^\d+[.)]\s+/.test(line)) return false;
+      if (line.includes(RECOMMENDATIONS_TRAILER_OPEN)) return false;
+      if (line.includes(RECOMMENDATIONS_TRAILER_CLOSE)) return false;
+      if (/[.!?。！？]$/.test(line)) return false;
+      if (/[요다까]$/.test(line)) return false;
+      if (/추천|원하시는|쪽일까요|끌리세요/.test(line)) return false;
+
+      const prev = lines[index - 1]?.trim() ?? '';
+      const next = lines[index + 1]?.trim() ?? '';
+      return !prev && !!next && line.length <= 40;
+    })
+    .map((line) => stripRecommendationTitleSuffix(line))
+    .filter((title) => title.length > 0);
+
+  const seen = new Set<string>();
+  return [...lineTitles, ...standaloneTitles].filter((title) => {
+    const key = normalizeTitle(title);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

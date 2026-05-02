@@ -281,6 +281,27 @@ describe('IntentAnalyzerService', () => {
       expect(result.genres).not.toContain('드라마');
     });
 
+    it('"예능 추천해줘" → contentType=tv + 리얼리티/토크 장르로 확장해야 한다', async () => {
+      mockIntent({ genres: [], contentType: null });
+
+      const result = await service.analyzeIntent('예능 추천해줘');
+
+      expect(result.contentType).toBe('tv');
+      expect(result.genres).toContain('리얼리티');
+      expect(result.genres).toContain('토크');
+      expect(result.confidence).toBe('high');
+    });
+
+    it('버라이어티 요청도 리얼리티/토크 장르로 확장해야 한다', async () => {
+      mockIntent({ genres: [], contentType: null });
+
+      const result = await service.analyzeIntent('버라이어티 추천해줘');
+
+      expect(result.contentType).toBe('tv');
+      expect(result.genres).toContain('리얼리티');
+      expect(result.genres).toContain('토크');
+    });
+
     it('movie 타입에서는 TV 전용 장르를 확장하지 않아야 한다', async () => {
       mockIntent({ contentType: 'movie', genres: ['액션'] });
 

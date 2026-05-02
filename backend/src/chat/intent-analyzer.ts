@@ -46,7 +46,7 @@ function buildIntentSystemPrompt(): string {
 - personNames: 감독/배우 이름. "기생충 감독" → "봉준호"처럼 작품으로 유추 가능하면 실제 이름으로. 없으면 빈 배열.
 - dateRange: 연도/연대/시기 조건. "최신"/"요즘"/"최근" → {"from":"${oneYearAgo}","to":null}, "90년대" → {"from":"1990-01-01","to":"1999-12-31"}, "올해" → {"from":"${thisYear}","to":null}. 없으면 null.
 - contentType: "영화"/"무비" → "movie", "드라마"/"시리즈"/"TV"/"예능" → "tv". 이 단어가 메시지에 직접 포함된 경우에만 설정. 장르명(스릴러, 코미디, 로맨스, 액션, 호러, 공포, SF, 판타지, 애니메이션 등)으로는 절대 contentType을 추론하지 마세요. 확실하지 않으면 null.
-- genres: 사용자가 언급한 장르명을 배열로 추출. 사용자 표현 그대로 반환 (예: "호러" → ["호러"], "느와르" → ["느와르"], "SF 스릴러" → ["SF", "스릴러"]). 장르 언급이 없으면 빈 배열.
+- genres: 사용자가 언급한 장르명을 배열로 추출. 사용자 표현 그대로 반환 (예: "호러" → ["호러"], "느와르" → ["느와르"], "SF 스릴러" → ["SF", "스릴러"], "예능" → ["예능"]). 장르 언급이 없으면 빈 배열.
 - referenceTitles: "X 같은", "X 비슷한", "X 느낌의" 등에서 참조 작품명 X를 배열로 추출. 단순 언급("X 봤어")은 포함하지 않고, "~같은/비슷한/느낌의" 맥락에서만 추출. 없으면 빈 배열.
 - confidence: "high" 또는 "low"
   - high: 구체적 필터(장르, OTT, 국가, 인물, 연대, 참조 작품 등)가 1개 이상 명시된 경우
@@ -180,6 +180,8 @@ const COUNTRY_NAMES: Record<string, string> = {
 const DATE_PATTERN =
   /(?:최신|요즘|올해|작년|재작년|신작|근작|최근|\d{4}년?(?:\s*대)?|\d{2}년대)/g;
 
+const ENTERTAINMENT_PATTERN = /(?:예능|버라이어티|리얼리티|토크쇼)/i;
+
 // 요청 표현 정규식 (독립적인 요청 표현만. "볼 만한", "볼 수 있는" 등 문맥 의존 표현 제외)
 const REQUEST_PATTERN =
   /(?:추천해\s*(?:줘|주세요|줄래|줄\s*수\s*있어)?|추천|알려\s*(?:줘|주세요)|보여\s*(?:줘|주세요)|찾아\s*(?:줘|주세요)|있을까\??|있나요\??|뭐\s*있어\??|어때\??)/g;
@@ -214,6 +216,11 @@ export const GENRE_ALIAS_MAP: Record<string, string[]> = {
   드라마: ['드라마'],
   애니메이션: ['애니메이션'],
   다큐멘터리: ['다큐멘터리'],
+  예능: ['리얼리티', '토크'],
+  버라이어티: ['리얼리티', '토크'],
+  리얼리티: ['리얼리티'],
+  토크쇼: ['토크'],
+  토크: ['토크'],
   범죄: ['범죄'],
   미스터리: ['미스터리'],
   전쟁: ['전쟁'],
@@ -282,6 +289,7 @@ export class IntentAnalyzerService {
         : userMessage;
       const hasMovieKeyword = /영화|무비/i.test(textToCheck);
       const hasTvKeyword = /드라마|시리즈|TV|예능/i.test(textToCheck);
+      const hasEntertainmentKeyword = ENTERTAINMENT_PATTERN.test(textToCheck);
       if (intent.contentType) {
         // LLM이 타입을 추출했지만 메시지에 키워드가 없으면 null로 강제
         if (!hasMovieKeyword && !hasTvKeyword) {
@@ -291,6 +299,11 @@ export class IntentAnalyzerService {
         // LLM이 타입을 놓쳤지만 메시지에 키워드가 있으면 보정
         if (hasMovieKeyword && !hasTvKeyword) intent.contentType = 'movie';
         if (hasTvKeyword && !hasMovieKeyword) intent.contentType = 'tv';
+      }
+
+      if (hasEntertainmentKeyword) {
+        intent.contentType = 'tv';
+        intent.genres = [...intent.genres, '예능'];
       }
 
       // "드라마"가 contentType=tv로 잡혔으면 genres에서 제거 (장르 Drama 필터 방지)
