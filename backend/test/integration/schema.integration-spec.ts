@@ -25,7 +25,9 @@ describeWithDb('schema integration', () => {
   });
 
   afterAll(async () => {
-    await dataSource.destroy();
+    if (dataSource?.isInitialized) {
+      await dataSource.destroy();
+    }
   });
 
   async function getColumn(

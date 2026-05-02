@@ -77,6 +77,7 @@ export function createIntegrationTypeOrmOptions(): TypeOrmModuleOptions {
     ...createIntegrationDataSourceOptions(),
     autoLoadEntities: false,
     migrationsRun: true,
+    retryAttempts: 0,
   };
 }
 

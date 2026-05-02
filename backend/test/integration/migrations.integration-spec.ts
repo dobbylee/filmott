@@ -21,7 +21,9 @@ describeWithDb('migrations integration', () => {
   });
 
   afterAll(async () => {
-    await dataSource.destroy();
+    if (dataSource?.isInitialized) {
+      await dataSource.destroy();
+    }
   });
 
   it('프로덕션 마이그레이션 적용 후 pending migration이 없어야 한다', async () => {

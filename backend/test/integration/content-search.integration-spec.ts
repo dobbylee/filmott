@@ -57,8 +57,10 @@ describeWithDb('content search integration', () => {
   });
 
   afterAll(async () => {
-    await moduleRef.close();
-    await dataSource.destroy();
+    await moduleRef?.close();
+    if (dataSource?.isInitialized) {
+      await dataSource.destroy();
+    }
   });
 
   it('필터와 제외 조건을 실제 SQL 결과에 반영해야 한다', async () => {

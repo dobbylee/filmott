@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { ReviewsModule } from '../../src/reviews/reviews.module';
 import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 import { RevalidateService } from '../../src/common/revalidate.service';
+import { R2StorageService } from '../../src/common/r2-storage.service';
 import type { JwtPayload } from '../../src/auth/decorators/current-user.decorator';
 import { Review } from '../../src/reviews/review.entity';
 import { ReviewLike } from '../../src/reviews/review-like.entity';
@@ -53,6 +54,11 @@ describeWithDb('reviews integration', () => {
     revalidatePath: jest.fn().mockResolvedValue(undefined),
     revalidatePaths: jest.fn().mockResolvedValue(undefined),
   };
+  const r2StorageService = {
+    getPublicUrl: jest.fn().mockReturnValue('https://static.test'),
+    upload: jest.fn().mockResolvedValue('https://static.test/profile.jpg'),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
   const authGuard: CanActivate = {
     canActivate: (context: ExecutionContext) => {
       const request = context.switchToHttp().getRequest<{ user: JwtPayload }>();
@@ -69,7 +75,9 @@ describeWithDb('reviews integration', () => {
           .overrideGuard(JwtAuthGuard)
           .useValue(authGuard)
           .overrideProvider(RevalidateService)
-          .useValue(revalidateService),
+          .useValue(revalidateService)
+          .overrideProvider(R2StorageService)
+          .useValue(r2StorageService),
     });
     dataSource = app.get(DataSource);
   });
@@ -80,7 +88,7 @@ describeWithDb('reviews integration', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('리뷰 작성 시 review를 저장하고 want_to_watch를 watched로 전환해야 한다', async () => {
