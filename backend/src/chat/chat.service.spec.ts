@@ -705,6 +705,61 @@ describe('ChatService', () => {
       expect(confirmedSection).not.toContain('더 지니어스');
     });
 
+    it('서버 확정 후보와 추천 카드는 최대 5개까지 emit해야 한다', async () => {
+      setupEmptyUserContext();
+      const candidates: SimilarContent[] = Array.from(
+        { length: 6 },
+        (_, index): SimilarContent => ({
+          contentId: index + 1,
+          tmdbId: 2000 + index,
+          contentType: 'movie',
+          title: `추천작${index + 1}`,
+          posterUrl: `/poster-${index + 1}.jpg`,
+          genres: [{ id: 18, name: '드라마' }],
+          voteAverage: 7.5,
+          description: '추천 후보',
+          similarity: 0.9 - index * 0.05,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        }),
+      );
+      mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
+      mockStreamingResponse([
+        '**추천작1** - 잘 맞아요.\n\n**추천작2** - 이어 보기 좋아요.\n\n**추천작3** - 취향에 맞아요.',
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '영화 추천해줘', [], emit);
+
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
+      expect(recEvents).toHaveLength(1);
+      expect(
+        (
+          recEvents[0].data as { recommendations: { title: string }[] }
+        ).recommendations.map((recommendation) => recommendation.title),
+      ).toEqual(['추천작1', '추천작2', '추천작3', '추천작4', '추천작5']);
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
+        1, 2, 3, 4, 5,
+      ]);
+
+      const systemMessage = mockStreamCreate.mock.calls[0][0].messages[0];
+      const confirmedSection = systemMessage.content.split('## 규칙')[0];
+      expect(systemMessage.content).toContain(
+        '확정 추천 작품 5개를 반드시 모두 추천',
+      );
+      expect(systemMessage.content).toContain('3개로 줄이지 마세요');
+      expect(confirmedSection).toContain('추천작3');
+      expect(confirmedSection).toContain('추천작5');
+      expect(confirmedSection).not.toContain('추천작6');
+    });
+
     it('본문 제목 fallback으로 후보 밖 TMDB 검색 결과를 카드로 복구하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);

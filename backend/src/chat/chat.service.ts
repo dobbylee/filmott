@@ -38,6 +38,7 @@ import {
 
 const OPENAI_CHAT_TIMEOUT_MS = 30_000;
 const TRAILER_DETECTION_TAIL_LENGTH = RECOMMENDATIONS_TRAILER_OPEN.length - 1;
+const CHAT_RECOMMENDATION_LIMIT = 5;
 
 interface RawFavoriteRow {
   title: string;
@@ -460,7 +461,7 @@ export class ChatService {
     );
 
     for (const candidate of candidates) {
-      if (selected.length >= 5) break;
+      if (selected.length >= CHAT_RECOMMENDATION_LIMIT) break;
 
       const contentType = this.parseContentType(candidate.contentType);
       if (!contentType) continue;

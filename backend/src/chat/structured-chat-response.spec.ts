@@ -182,4 +182,22 @@ ${RECOMMENDATIONS_TRAILER_CLOSE}`);
       ),
     ).toBeNull();
   });
+
+  it('추천 이유 끝의 플랫폼/톤 메타 괄호를 제거해야 한다', () => {
+    expect(
+      formatRecommendationVisibleLine(
+        '**로맨스는 별책부록** - 가볍게 웃다가 감정선이 깊어져요. (넷플릭스 가능)',
+      ),
+    ).toBe('**로맨스는 별책부록** - 가볍게 웃다가 감정선이 깊어져요.');
+    expect(
+      formatRecommendationVisibleLine(
+        '**런 온** - 말맛과 관계 변화가 산뜻하게 이어져요. (wavve/Watcha/TVING 가능)',
+      ),
+    ).toBe('**런 온** - 말맛과 관계 변화가 산뜻하게 이어져요.');
+    expect(
+      formatRecommendationVisibleLine(
+        '**사랑의 이해** - 현실적인 감정의 엇갈림이 좋아요. (코미디+사랑 이야기 톤)',
+      ),
+    ).toBe('**사랑의 이해** - 현실적인 감정의 엇갈림이 좋아요.');
+  });
 });

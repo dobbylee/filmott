@@ -155,6 +155,22 @@ export function stripRecommendationTitleSuffix(title: string): string {
     .trim();
 }
 
+function stripTrailingRecommendationMeta(reason: string): string {
+  let result = reason.trim();
+
+  while (true) {
+    const next = result
+      .replace(
+        /\s*\((?=[^)]*(?:가능|OTT|넷플릭스|Netflix|왓챠|Watcha|웨이브|wavve|티빙|TVING|디즈니|Disney|쿠팡|Coupang|Apple|Prime|WAVVE|톤|장르))[^)]*\)\s*$/i,
+        '',
+      )
+      .trim();
+
+    if (next === result) return result;
+    result = next;
+  }
+}
+
 export function formatRecommendationVisibleLine(line: string): string | null {
   const trimmed = line.trim();
   if (!trimmed) return '';
@@ -176,7 +192,7 @@ export function formatRecommendationVisibleLine(line: string): string | null {
   );
   if (recommendationMatch) {
     const title = stripRecommendationTitleSuffix(recommendationMatch[1]);
-    const reason = recommendationMatch[2].trim();
+    const reason = stripTrailingRecommendationMeta(recommendationMatch[2]);
     return title && reason ? `**${title}** - ${reason}` : trimmed;
   }
 

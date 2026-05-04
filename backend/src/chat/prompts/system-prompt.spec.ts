@@ -114,11 +114,16 @@ describe('buildSystemPrompt', () => {
 
     expect(prompt).toContain('## 확정 추천 작품');
     expect(prompt).toContain('서버가 검증한 최종 추천 후보');
+    expect(prompt).toContain('확정 추천 작품 전체를 같은 순서');
+    expect(prompt).toContain('확정 추천 작품 1개를 반드시 모두 추천');
+    expect(prompt).toContain('3개로 줄이지 마세요');
     expect(prompt).toContain('확정 후보');
     expect(prompt).not.toContain('검색 후보');
     expect(prompt).not.toContain('<filmott_recommendations>');
     expect(prompt).not.toContain('[{"tmdbId":2002,"contentType":"movie"}]');
     expect(prompt).toContain('JSON, ID 배열, 내부 데이터');
+    expect(prompt).toContain('괄호 단서로 붙이지 마세요');
+    expect(prompt).toContain('(넷플릭스 가능)');
   });
 
   it('확정 추천 후보가 없으면 후보 밖 작품을 만들지 않도록 안내해야 한다', () => {
@@ -137,8 +142,15 @@ describe('buildSystemPrompt', () => {
 
     expect(prompt).toContain('(확정 추천 후보가 없습니다)');
     expect(prompt).toContain('작품명을 새로 만들지 말고');
+    expect(prompt).toContain('작품 추천을 만들지 말고');
     expect(prompt).not.toContain('<filmott_recommendations>');
     expect(prompt).not.toContain('[]');
     expect(prompt).not.toContain('검색 후보');
+  });
+
+  it('확정 후보가 없을 때는 추천 기본 개수를 3~5개로 안내해야 한다', () => {
+    const prompt = buildSystemPrompt(emptyContext, [], [], [], emptyIntent);
+
+    expect(prompt).toContain('추천 요청 시 즉시 3~5개를 추천하세요');
   });
 });
