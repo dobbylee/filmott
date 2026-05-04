@@ -97,7 +97,19 @@ describe('ContentsService', () => {
         genres: [{ id: 28, name: 'Action' }],
         runtime: 120,
         credits: { cast: [] },
-        'watch/providers': { results: {} },
+        'watch/providers': {
+          results: {
+            KR: {
+              flatrate: [
+                {
+                  provider_id: 8,
+                  provider_name: 'Netflix',
+                  logo_path: '/netflix.jpg',
+                },
+              ],
+            },
+          },
+        },
       };
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
 
@@ -114,6 +126,20 @@ describe('ContentsService', () => {
           contentType: 'movie',
           title: 'New Movie',
           voteCount: 5000,
+        }),
+      );
+      expect(mockContentRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          watchProviders: {
+            flatrate: [
+              {
+                provider_id: 8,
+                provider_name: 'Netflix',
+                logo_path: '/netflix.jpg',
+              },
+            ],
+          },
+          credits: [],
         }),
       );
       expect(result).toEqual(savedContent);

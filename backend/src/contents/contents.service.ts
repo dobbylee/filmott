@@ -587,6 +587,8 @@ export class ContentsService {
     const content = this.contentRepo.create(
       this.mapTmdbToContent(tmdbData, type),
     );
+    content.watchProviders = tmdbData['watch/providers']?.results?.KR ?? null;
+    content.credits = tmdbData.credits?.cast?.slice(0, 20) ?? [];
     return this.contentRepo.save(content);
   }
 
