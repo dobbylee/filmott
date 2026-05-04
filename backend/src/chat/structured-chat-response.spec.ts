@@ -174,4 +174,12 @@ ${RECOMMENDATIONS_TRAILER_CLOSE}`);
 
     expect(result).toEqual(['다멜리오 쇼', '카다시안 패밀리']);
   });
+
+  it('태그 없이 노출된 추천 trailer JSON 라인은 숨겨야 한다', () => {
+    expect(
+      formatRecommendationVisibleLine(
+        '[{"tmdbId":225647,"contentType":"tv"},{"tmdbId":281016,"contentType":"tv"}]',
+      ),
+    ).toBeNull();
+  });
 });

@@ -32,10 +32,7 @@ import {
   RECOMMENDATIONS_TRAILER_CLOSE,
   RECOMMENDATIONS_TRAILER_OPEN,
   ResolvedChatRecommendation,
-  extractRecommendationLineTitles,
   formatRecommendationVisibleLine,
-  matchStructuredRecommendationsToCandidates,
-  parseRecommendationTrailer,
   extractPreviouslyRecommendedTitles,
 } from './structured-chat-response';
 
@@ -73,13 +70,6 @@ type SseEmitter = (event: string, data: unknown) => void;
 interface StreamedChatResponse {
   visibleText: string;
   trailerText: string;
-}
-
-interface SearchContentItem {
-  id: number;
-  title?: string;
-  name?: string;
-  poster_path?: string | null;
 }
 
 @Injectable()
@@ -296,7 +286,15 @@ export class ChatService {
       history || [],
     );
 
-    // 9. 시스템 프롬프트 구성 (검색 결과 + 필터 맥락 포함)
+    // 9. 서버에서 최종 추천 후보 확정
+    const confirmedRecommendationCandidates =
+      this.selectConfirmedRecommendationCandidates(
+        similarContents,
+        intent.contentType,
+        previouslyRecommended,
+      );
+
+    // 10. 시스템 프롬프트 구성 (확정 추천 후보 + 필터 맥락 포함)
     const systemPrompt = buildSystemPrompt(
       userContext,
       subscribedOtts,
@@ -304,9 +302,10 @@ export class ChatService {
       similarContents,
       intent,
       previouslyRecommended,
+      confirmedRecommendationCandidates,
     );
 
-    // 10. 대화 이력 구성
+    // 11. 대화 이력 구성
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       ...(history || []).map((msg) => ({
         role: msg.role,
@@ -315,7 +314,7 @@ export class ChatService {
       { role: 'user' as const, content },
     ];
 
-    // 11. GPT 스트리밍 응답 호출
+    // 12. GPT 스트리밍 응답 호출
     const stream = await this.openai.chat.completions.create(
       {
         model: CHAT_MODEL,
@@ -331,29 +330,21 @@ export class ChatService {
       return;
     }
 
-    const streamedResponse = await this.emitStreamingText(stream, emit, signal);
+    await this.emitStreamingText(stream, emit, signal);
 
     if (signal?.aborted) {
       return;
     }
 
-    const trailerMatched = this.filterRecommendationsByContentType(
-      matchStructuredRecommendationsToCandidates(
-        parseRecommendationTrailer(streamedResponse.trailerText),
-        similarContents,
-      ),
-      intent.contentType,
+    const matched = this.toResolvedRecommendations(
+      confirmedRecommendationCandidates,
     );
-    const fallbackMatched = await this.resolveVisibleTextRecommendations(
-      streamedResponse.visibleText,
-      similarContents,
-      intent.contentType,
-      trailerMatched,
-    );
-    const matched = [...trailerMatched, ...fallbackMatched].slice(0, 5);
 
     if (matched.length > 0) {
       emit('recommendations', { recommendations: matched });
+      this.cacheRecommendationMetadataInBackground(
+        confirmedRecommendationCandidates,
+      );
     }
 
     emit('done', {});
@@ -457,161 +448,78 @@ export class ChatService {
     }
   }
 
-  private async resolveVisibleTextRecommendations(
-    visibleText: string,
+  private selectConfirmedRecommendationCandidates(
     candidates: SimilarContent[],
     preferredContentType: 'movie' | 'tv' | null,
-    existing: ResolvedChatRecommendation[],
-  ): Promise<ResolvedChatRecommendation[]> {
-    if (existing.length > 0) return [];
-
-    const titles = extractRecommendationLineTitles(visibleText);
-    if (titles.length === 0) return [];
-
-    const usedKeys = new Set(
-      existing.map((item) => `${item.contentType}:${item.tmdbId}`),
+    previouslyRecommended: string[],
+  ): SimilarContent[] {
+    const selected: SimilarContent[] = [];
+    const usedKeys = new Set<string>();
+    const previousTitleKeys = new Set(
+      previouslyRecommended.map((title) => this.normalizeTitleForMatch(title)),
     );
-    const resolved: ResolvedChatRecommendation[] = [];
 
-    for (const rawTitle of titles) {
-      if (existing.length + resolved.length >= 5) break;
-      if (this.isAlreadyResolvedTitle(rawTitle, existing)) continue;
+    for (const candidate of candidates) {
+      if (selected.length >= 5) break;
 
-      const candidate = this.findCandidateByTitle(
-        rawTitle,
-        candidates,
-        usedKeys,
-        preferredContentType,
-      );
-      if (candidate) {
-        usedKeys.add(`${candidate.contentType}:${candidate.tmdbId}`);
-        resolved.push(candidate);
+      const contentType = this.parseContentType(candidate.contentType);
+      if (!contentType) continue;
+      if (preferredContentType && contentType !== preferredContentType) {
         continue;
       }
+      if (!candidate.posterUrl) continue;
 
-      const searched = await this.searchRecommendationByTitle(
-        rawTitle,
-        preferredContentType,
-        usedKeys,
-      );
-      if (searched) {
-        usedKeys.add(`${searched.contentType}:${searched.tmdbId}`);
-        resolved.push(searched);
-      }
+      const normalizedTitle = this.normalizeTitleForMatch(candidate.title);
+      if (previousTitleKeys.has(normalizedTitle)) continue;
+
+      const key = `${contentType}:${candidate.tmdbId}`;
+      if (usedKeys.has(key)) continue;
+
+      usedKeys.add(key);
+      selected.push(candidate);
     }
 
-    return resolved;
+    return selected;
   }
 
-  private isAlreadyResolvedTitle(
-    title: string,
-    existing: ResolvedChatRecommendation[],
-  ): boolean {
-    const titleQueries = this.buildTitleSearchQueries(title).map((query) =>
-      this.normalizeTitleForMatch(query),
-    );
-
-    return existing.some((item) =>
-      titleQueries.includes(this.normalizeTitleForMatch(item.title)),
-    );
-  }
-
-  private findCandidateByTitle(
-    title: string,
+  private toResolvedRecommendations(
     candidates: SimilarContent[],
-    usedKeys: Set<string>,
-    preferredContentType: 'movie' | 'tv' | null,
-  ): ResolvedChatRecommendation | null {
-    const titleQueries = this.buildTitleSearchQueries(title);
+  ): ResolvedChatRecommendation[] {
+    const recommendations: ResolvedChatRecommendation[] = [];
 
-    for (const query of titleQueries) {
-      const normalizedQuery = this.normalizeTitleForMatch(query);
-      const candidate = candidates.find((item) => {
-        const contentType = this.parseContentType(item.contentType);
-        if (!contentType) return false;
-        if (preferredContentType && contentType !== preferredContentType) {
-          return false;
-        }
-        if (usedKeys.has(`${contentType}:${item.tmdbId}`)) return false;
+    for (const candidate of candidates) {
+      const contentType = this.parseContentType(candidate.contentType);
+      if (!contentType || !candidate.posterUrl) continue;
 
-        const normalizedTitle = this.normalizeTitleForMatch(item.title);
-        return normalizedTitle === normalizedQuery;
+      recommendations.push({
+        tmdbId: candidate.tmdbId,
+        contentType,
+        title: candidate.title,
+        posterUrl: candidate.posterUrl,
       });
-
-      const contentType = this.parseContentType(candidate?.contentType);
-      if (candidate && contentType) {
-        return {
-          tmdbId: candidate.tmdbId,
-          contentType,
-          title: candidate.title,
-          posterUrl: candidate.posterUrl,
-        };
-      }
     }
 
-    return null;
+    return recommendations;
   }
 
-  private async searchRecommendationByTitle(
-    title: string,
-    preferredContentType: 'movie' | 'tv' | null,
-    usedKeys: Set<string>,
-  ): Promise<ResolvedChatRecommendation | null> {
-    const types: Array<'movie' | 'tv'> = preferredContentType
-      ? [preferredContentType]
-      : ['movie', 'tv'];
+  private cacheRecommendationMetadataInBackground(
+    candidates: SimilarContent[],
+  ): void {
+    const contentIds = [
+      ...new Set(
+        candidates
+          .map((candidate) => candidate.contentId)
+          .filter((contentId) => Number.isInteger(contentId)),
+      ),
+    ];
 
-    for (const query of this.buildTitleSearchQueries(title)) {
-      for (const type of types) {
-        const result = await this.contentsService
-          .searchContents(query, type, 1)
-          .catch(() => null);
-        const item = this.pickSearchResult(query, result?.results ?? []);
-        if (!item?.poster_path) continue;
+    if (contentIds.length === 0) return;
 
-        const key = `${type}:${item.id}`;
-        if (usedKeys.has(key)) continue;
-
-        return {
-          tmdbId: item.id,
-          contentType: type,
-          title: item.title ?? item.name ?? query,
-          posterUrl: item.poster_path,
-        };
-      }
-    }
-
-    return null;
-  }
-
-  private pickSearchResult(
-    query: string,
-    items: SearchContentItem[],
-  ): SearchContentItem | null {
-    if (items.length === 0) return null;
-
-    const normalizedQuery = this.normalizeTitleForMatch(query);
-    return (
-      items.find((item) => {
-        const title = item.title ?? item.name ?? '';
-        return this.normalizeTitleForMatch(title) === normalizedQuery;
-      }) ?? null
-    );
-  }
-
-  private buildTitleSearchQueries(title: string): string[] {
-    const withoutParenthetical = title.replace(/\s*\([^)]*\)\s*$/g, '');
-    const queries = [
-      title,
-      withoutParenthetical,
-      title.replace(/\s*시즌(?:\s*\d+)?\s*$/g, ''),
-      withoutParenthetical.replace(/\s*시즌(?:\s*\d+)?\s*$/g, ''),
-      title.split(':')[0],
-    ]
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
-
-    return [...new Set(queries)];
+    this.embeddingService.batchCacheByContentIds(contentIds).catch((error) => {
+      this.logger.warn(
+        `추천 후보 metadata 캐싱 실패: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
   }
 
   private normalizeTitleForMatch(title: string): string {
@@ -626,16 +534,6 @@ export class ChatService {
   private parseContentType(value: string | undefined): 'movie' | 'tv' | null {
     if (value === 'movie' || value === 'tv') return value;
     return null;
-  }
-
-  private filterRecommendationsByContentType(
-    recommendations: ResolvedChatRecommendation[],
-    preferredContentType: 'movie' | 'tv' | null,
-  ): ResolvedChatRecommendation[] {
-    if (!preferredContentType) return recommendations;
-    return recommendations.filter(
-      (recommendation) => recommendation.contentType === preferredContentType,
-    );
   }
 
   async buildUserContext(userId: number): Promise<UserContext> {

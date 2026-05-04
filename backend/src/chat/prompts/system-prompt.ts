@@ -41,6 +41,7 @@ export function buildSystemPrompt(
   candidates: SimilarContent[],
   intent?: ParsedIntent,
   previouslyRecommended: string[] = [],
+  confirmedCandidates?: SimilarContent[],
 ): string {
   const ottNames = subscribedOtts
     .map((id) => ottProviders.find((p) => p.id === id)?.name)
@@ -92,10 +93,14 @@ export function buildSystemPrompt(
   const sortedCandidates = [...candidates].sort(
     (a, b) => b.similarity - a.similarity,
   );
+  const hasConfirmedSelection = confirmedCandidates !== undefined;
+  const recommendationCandidates = hasConfirmedSelection
+    ? confirmedCandidates
+    : sortedCandidates;
 
   const candidatesSection =
-    sortedCandidates.length > 0
-      ? sortedCandidates
+    recommendationCandidates.length > 0
+      ? recommendationCandidates
           .map((c, i) => {
             const genreStr = (c.genres || []).map((g) => g.name).join(', ');
             const directorStr = c.director ? ` | 감독: ${c.director}` : '';
@@ -110,7 +115,21 @@ export function buildSystemPrompt(
             return `${i + 1}. [ID:${c.tmdbId}|${c.contentType}] ${c.title} (${c.voteAverage}점${similarityStr}) - 장르: ${genreStr}${directorStr}${countryStr}\n   ${descriptionText}`;
           })
           .join('\n')
-      : '(추천 후보가 없습니다)';
+      : hasConfirmedSelection
+        ? '(확정 추천 후보가 없습니다)'
+        : '(추천 후보가 없습니다)';
+
+  const candidateSectionTitle = hasConfirmedSelection
+    ? '## 확정 추천 작품'
+    : '## 추천 후보 작품';
+  const candidateSelectionGuide = hasConfirmedSelection
+    ? recommendationCandidates.length > 0
+      ? '아래 목록은 서버가 검증한 최종 추천 후보입니다. 본문과 trailer에는 아래 확정 추천 작품만 사용하세요. 후보가 3개 미만이어도 후보 밖 작품을 보충하지 마세요.'
+      : '서버가 검증한 확정 추천 후보가 없습니다. 작품명을 새로 만들지 말고 조건을 조금 더 좁혀 달라고 짧게 답하세요.'
+    : '아래 목록에 있는 작품에서만 선택하세요. 사용자 요청과 맞지 않는 후보는 제외하세요. 적합한 후보가 3개 미만이면 후보 수만큼만 추천하고, 본인 지식으로 후보 밖 작품을 보충하지 마세요.';
+  const recommendationCountRule = hasConfirmedSelection
+    ? '- 추천 요청 시 확정 추천 작품이 있으면 확정 후보 수만큼 바로 추천하세요. 확정 후보가 없으면 작품 추천을 만들지 말고 선호 기준을 물어보세요.'
+    : '- 추천 요청 시 즉시 3~5개를 추천하세요. 역질문하지 마세요.';
 
   // 필터 맥락 설명 구성
   const filterDescriptions: string[] = [];
@@ -183,12 +202,12 @@ export function buildSystemPrompt(
 
 ${ottSection}
 ${filterSection}
-## 추천 후보 작품
-아래 목록에 있는 작품에서만 선택하세요. 사용자 요청과 맞지 않는 후보는 제외하세요. 적합한 후보가 3개 미만이면 후보 수만큼만 추천하고, 본인 지식으로 후보 밖 작품을 보충하지 마세요.
+${candidateSectionTitle}
+${candidateSelectionGuide}
 ${candidatesSection}
 
 ## 규칙
-- 추천 요청 시 즉시 3~5개를 추천하세요. 역질문하지 마세요.
+${recommendationCountRule}
 - 대화 흐름에서 형성된 분위기/감성을 반드시 유지하세요. 예: 사용자가 "잔잔한 영화"로 시작했다면, 이후 요청에서도 잔잔한 분위기의 작품을 추천하세요. 후보 목록에 분위기가 맞지 않는 작품(예: 잔잔한 요청에 범죄/액션물)이 있으면 제외하세요.
 - 후보 작품 중 사용자의 요청 의도에 맞지 않는 작품은 과감히 제외하세요. 시대 배경, 분위기, 장르, 국가 등이 요청과 불일치하면 추천하지 마세요. 예: "현대극"을 요청했는데 과거 시대 배경 작품이 후보에 있다면 제외합니다.
 - 후보를 제외한 후 추천할 작품이 3개 미만이면, 후보 수만 추천하고 부족한 이유를 짧게 말한 뒤 선호 기준을 물어보세요. 본인 지식으로 후보 밖 작품을 보충하지 마세요.
@@ -206,16 +225,5 @@ ${candidatesSection}
 - 각 추천 줄 앞에 숫자, 하이픈, 불릿을 붙이지 마세요.
 - 굵게 표시한 작품 제목에는 부가정보, 시즌 설명, 장르 설명, 괄호 수식어를 넣지 마세요.
 - 작품 추천 끝에 대화와 연결된 간단한 질문을 덧붙여 대화를 이어가세요.
-- 본문이 끝난 뒤 마지막에 아래 trailer를 정확히 한 번만 추가하세요. trailer는 포스터 카드 생성을 위한 내부 데이터입니다.
-
-<filmott_recommendations>
-[{"tmdbId":496243,"contentType":"movie"},{"tmdbId":1396,"contentType":"tv"}]
-</filmott_recommendations>
-
-trailer 규칙:
-- 후보 목록에서 고른 작품만 trailer에 넣으세요.
-- tmdbId와 contentType은 후보의 [ID:tmdbId|contentType] 값을 그대로 사용하세요.
-- 본문과 trailer 모두 후보 목록에서 고른 작품만 포함하세요. 본인 지식으로 후보 밖 작품을 보충하지 마세요.
-- trailer에는 JSON 배열만 넣고, title/reason/설명 문구를 넣지 마세요.
-- trailer 뒤에는 아무 문장도 쓰지 마세요.`;
+- JSON, ID 배열, 내부 데이터, trailer, XML 태그를 출력하지 마세요.`;
 }

@@ -96,4 +96,49 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('유사도가 높은 작품을 우선 추천하되');
     expect(prompt).toContain('30% 미만');
   });
+
+  it('확정 추천 후보가 있으면 해당 후보만 본문에 사용하도록 안내해야 한다', () => {
+    const candidates = makeCandidates([
+      { title: '검색 후보', tmdbId: 2001, posterUrl: '/search.jpg' },
+      { title: '확정 후보', tmdbId: 2002, posterUrl: '/confirmed.jpg' },
+    ]);
+    const prompt = buildSystemPrompt(
+      emptyContext,
+      [],
+      [],
+      candidates,
+      emptyIntent,
+      [],
+      [candidates[1]],
+    );
+
+    expect(prompt).toContain('## 확정 추천 작품');
+    expect(prompt).toContain('서버가 검증한 최종 추천 후보');
+    expect(prompt).toContain('확정 후보');
+    expect(prompt).not.toContain('검색 후보');
+    expect(prompt).not.toContain('<filmott_recommendations>');
+    expect(prompt).not.toContain('[{"tmdbId":2002,"contentType":"movie"}]');
+    expect(prompt).toContain('JSON, ID 배열, 내부 데이터');
+  });
+
+  it('확정 추천 후보가 없으면 후보 밖 작품을 만들지 않도록 안내해야 한다', () => {
+    const candidates = makeCandidates([
+      { title: '검색 후보', tmdbId: 2001, posterUrl: '/search.jpg' },
+    ]);
+    const prompt = buildSystemPrompt(
+      emptyContext,
+      [],
+      [],
+      candidates,
+      emptyIntent,
+      [],
+      [],
+    );
+
+    expect(prompt).toContain('(확정 추천 후보가 없습니다)');
+    expect(prompt).toContain('작품명을 새로 만들지 말고');
+    expect(prompt).not.toContain('<filmott_recommendations>');
+    expect(prompt).not.toContain('[]');
+    expect(prompt).not.toContain('검색 후보');
+  });
 });

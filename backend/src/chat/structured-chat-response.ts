@@ -34,6 +34,31 @@ function parseContentType(value: unknown): 'movie' | 'tv' | undefined {
   return undefined;
 }
 
+function isRawRecommendationTrailerJson(text: string): boolean {
+  if (!text.startsWith('[') || !text.endsWith(']')) return false;
+  if (!text.includes('"tmdbId"') || !text.includes('"contentType"')) {
+    return false;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text) as unknown;
+  } catch {
+    return false;
+  }
+
+  return (
+    Array.isArray(parsed) &&
+    parsed.length > 0 &&
+    parsed.every(
+      (item) =>
+        isRecord(item) &&
+        parseTmdbId(item.tmdbId) !== undefined &&
+        parseContentType(item.contentType) !== undefined,
+    )
+  );
+}
+
 export function parseRecommendationTrailer(
   text: string,
 ): TrailerRecommendation[] {
@@ -133,6 +158,10 @@ export function stripRecommendationTitleSuffix(title: string): string {
 export function formatRecommendationVisibleLine(line: string): string | null {
   const trimmed = line.trim();
   if (!trimmed) return '';
+
+  if (isRawRecommendationTrailerJson(trimmed)) {
+    return null;
+  }
 
   if (
     /추천(?:해요|합니다|드려요|할게요)$/.test(trimmed) &&

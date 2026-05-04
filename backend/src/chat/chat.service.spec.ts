@@ -49,6 +49,9 @@ describe('ChatService', () => {
     hasAnyMetadata: jest.fn(),
     searchSimilar: jest.fn(),
     cacheContentMetadata: jest.fn().mockResolvedValue(undefined),
+    batchCacheByContentIds: jest
+      .fn()
+      .mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
   };
 
   const mockContentSearchService = {
@@ -462,7 +465,7 @@ describe('ChatService', () => {
       expect(mockContentsService.searchContents).not.toHaveBeenCalled();
     });
 
-    it('trailer와 후보 매칭이 없어도 본문 제목을 TMDB 검색으로 카드 복구해야 한다', async () => {
+    it('확정 후보가 없으면 본문 제목을 TMDB 검색으로 카드 복구하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
@@ -492,25 +495,11 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit);
 
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
-        '피의 게임',
-        'tv',
-        1,
-      );
+      expect(mockContentsService.searchContents).not.toHaveBeenCalled();
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
-      expect(recEvents).toHaveLength(1);
-      expect(recEvents[0].data).toEqual({
-        recommendations: [
-          {
-            tmdbId: 156400,
-            contentType: 'tv',
-            title: '피의 게임',
-            posterUrl: '/blood-game.jpg',
-          },
-        ],
-      });
+      expect(recEvents).toHaveLength(0);
     });
 
     it('trailer 매칭이 하나라도 있으면 본문 제목 fallback을 실행하지 않아야 한다', async () => {
@@ -594,7 +583,129 @@ describe('ChatService', () => {
       expect(recEvents).toHaveLength(0);
     });
 
-    it('본문 제목 fallback은 TMDB 검색 결과 제목이 정확히 맞을 때만 카드로 복구해야 한다', async () => {
+    it('서버 확정 후보는 contentType, 포스터, 이전 추천작 조건을 강제해야 한다', async () => {
+      setupEmptyUserContext();
+      mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+        ...emptyIntent,
+        contentType: 'tv',
+        genres: ['리얼리티'],
+        confidence: 'high',
+      });
+      mockContentSearchService.searchWithFilters.mockResolvedValue([
+        {
+          contentId: 1,
+          tmdbId: 801,
+          contentType: 'movie',
+          title: '더 콜',
+          posterUrl: '/the-call.jpg',
+          genres: [{ id: 53, name: '스릴러' }],
+          voteAverage: 7.0,
+          description: '영화',
+          similarity: 0.9,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+        {
+          contentId: 2,
+          tmdbId: 156400,
+          contentType: 'tv',
+          title: '피의 게임',
+          posterUrl: null,
+          genres: [{ id: 10764, name: '리얼리티' }],
+          voteAverage: 8.1,
+          description: '포스터 없는 예능',
+          similarity: 0.8,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+        {
+          contentId: 3,
+          tmdbId: 156401,
+          contentType: 'tv',
+          title: '더 지니어스',
+          posterUrl: '/genius.jpg',
+          genres: [{ id: 10764, name: '리얼리티' }],
+          voteAverage: 8.4,
+          description: '이전 추천 예능',
+          similarity: 0.7,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+        {
+          contentId: 4,
+          tmdbId: 156402,
+          contentType: 'tv',
+          title: '대탈출',
+          posterUrl: '/escape.jpg',
+          genres: [{ id: 10764, name: '리얼리티' }],
+          voteAverage: 8.6,
+          description: '확정 추천 예능',
+          similarity: 0.6,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+      ]);
+      mockStreamingResponse([
+        `**대탈출** - 퍼즐과 정보 해석이 좋아요.\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n`,
+        '[{"tmdbId":801,"contentType":"movie"}]',
+        `\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(
+        1,
+        '두뇌 서바이벌 예능 추천해줘',
+        [
+          {
+            role: 'assistant',
+            content: '**더 지니어스** - 이전 추천입니다.',
+            recommendations: [
+              {
+                tmdbId: 156401,
+                contentType: 'tv',
+                title: '더 지니어스',
+              },
+            ],
+          },
+        ],
+        emit,
+      );
+
+      const recEvents = emittedEvents.filter(
+        (e) => e.event === 'recommendations',
+      );
+      expect(recEvents).toHaveLength(1);
+      expect(recEvents[0].data).toEqual({
+        recommendations: [
+          {
+            tmdbId: 156402,
+            contentType: 'tv',
+            title: '대탈출',
+            posterUrl: '/escape.jpg',
+          },
+        ],
+      });
+      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
+        4,
+      ]);
+
+      const systemMessage = mockStreamCreate.mock.calls[0][0].messages[0];
+      const confirmedSection = systemMessage.content.split('## 규칙')[0];
+      expect(systemMessage.content).toContain('## 확정 추천 작품');
+      expect(confirmedSection).toContain('대탈출');
+      expect(confirmedSection).not.toContain('더 콜');
+      expect(confirmedSection).not.toContain('더 지니어스');
+    });
+
+    it('본문 제목 fallback으로 후보 밖 TMDB 검색 결과를 카드로 복구하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
@@ -624,6 +735,7 @@ describe('ChatService', () => {
 
       await service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit);
 
+      expect(mockContentsService.searchContents).not.toHaveBeenCalled();
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
@@ -655,7 +767,31 @@ describe('ChatService', () => {
       expect(text).not.toContain('filmott_recommendations');
     });
 
-    it('굵은 글씨 키워드가 텍스트에 있어도 추천 trailer에 없으면 카드로 만들지 않아야 한다', async () => {
+    it('추천 trailer JSON만 태그 없이 출력되어도 텍스트로 노출하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockStreamingResponse([
+        '추천 본문입니다.\n\n',
+        '[{"tmdbId":225647,"contentType":"tv"},{"tmdbId":281016,"contentType":"tv"}]',
+      ]);
+
+      const emittedEvents: { event: string; data: unknown }[] = [];
+      const emit = (event: string, data: unknown) => {
+        emittedEvents.push({ event, data });
+      };
+
+      await service.sendMessageStream(1, '예능 추천해줘', [], emit);
+
+      const text = emittedEvents
+        .filter((e) => e.event === 'text')
+        .map((e) => (e.data as { content: string }).content)
+        .join('');
+      expect(text).toBe('추천 본문입니다.\n\n');
+      expect(text).not.toContain('tmdbId');
+      expect(text).not.toContain('contentType');
+    });
+
+    it('확정 추천 후보가 있으면 trailer가 비어도 서버 후보를 카드로 emit해야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([
         {
@@ -692,7 +828,17 @@ describe('ChatService', () => {
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
-      expect(recEvents).toHaveLength(0);
+      expect(recEvents).toHaveLength(1);
+      expect(recEvents[0].data).toEqual({
+        recommendations: [
+          {
+            tmdbId: 123,
+            contentType: 'movie',
+            title: '청춘',
+            posterUrl: '/youth.jpg',
+          },
+        ],
+      });
     });
 
     it('이전 추천작은 history의 recommendations 메타데이터를 우선 사용해야 한다', async () => {
