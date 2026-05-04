@@ -819,7 +819,7 @@ describe('RankingsService', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('fetchTrending 완료 후 한국 제공자가 있는 항목만 metadata 캐싱을 호출해야 한다', async () => {
+    it('fetchTrending 완료 후 한국 구독형 OTT 제공자가 있는 항목만 metadata 캐싱을 호출해야 한다', async () => {
       const trendingData = {
         results: [
           {
@@ -829,6 +829,12 @@ describe('RankingsService', () => {
             poster_path: '/m.jpg',
           },
           { id: 200, media_type: 'tv', name: 'Show', poster_path: '/s.jpg' },
+          {
+            id: 300,
+            media_type: 'movie',
+            title: 'Rental Movie',
+            poster_path: '/r.jpg',
+          },
         ],
       };
 
@@ -846,7 +852,19 @@ describe('RankingsService', () => {
             ],
           },
         })
-        .mockResolvedValueOnce({ id: 20, watchProviders: null });
+        .mockResolvedValueOnce({ id: 20, watchProviders: null })
+        .mockResolvedValueOnce({
+          id: 30,
+          watchProviders: {
+            rent: [
+              {
+                provider_id: 2,
+                provider_name: 'Apple TV',
+                logo_path: '/apple.jpg',
+              },
+            ],
+          },
+        });
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
       }));
@@ -861,6 +879,7 @@ describe('RankingsService', () => {
         expect.arrayContaining([
           expect.objectContaining({ contentId: 10 }),
           expect.objectContaining({ contentId: 20 }),
+          expect.objectContaining({ contentId: 30 }),
         ]),
         ['source', 'category', 'rank', 'targetDate'],
       );
