@@ -85,6 +85,8 @@ dist-ssr
 
 # Claude Code agent settings
 .claude/
+AGENTS.md
+CLAUDE.md
 
 # MCP server build artifacts
 mcp/dist/
