@@ -819,7 +819,7 @@ describe('RankingsService', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('fetchTrending 완료 후 contentId가 있는 항목의 metadata 캐싱을 호출해야 한다', async () => {
+    it('fetchTrending 완료 후 한국 제공자가 있는 항목만 metadata 캐싱을 호출해야 한다', async () => {
       const trendingData = {
         results: [
           {
@@ -834,8 +834,19 @@ describe('RankingsService', () => {
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
       mockContentsService.findOrFetchByTmdbId
-        .mockResolvedValueOnce({ id: 10 })
-        .mockResolvedValueOnce({ id: 20 });
+        .mockResolvedValueOnce({
+          id: 10,
+          watchProviders: {
+            flatrate: [
+              {
+                provider_id: 8,
+                provider_name: 'Netflix',
+                logo_path: '/netflix.jpg',
+              },
+            ],
+          },
+        })
+        .mockResolvedValueOnce({ id: 20, watchProviders: null });
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
       }));
@@ -844,8 +855,15 @@ describe('RankingsService', () => {
       await service.fetchTrending('all', 'day');
 
       expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
-        10, 20,
+        10,
       ]);
+      expect(mockRankingRepo.upsert).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ contentId: 10 }),
+          expect.objectContaining({ contentId: 20 }),
+        ]),
+        ['source', 'category', 'rank', 'targetDate'],
+      );
     });
 
     it('fetchWeeklyBoxOffice 완료 후 contentId가 있는 항목의 metadata 캐싱을 호출해야 한다', async () => {

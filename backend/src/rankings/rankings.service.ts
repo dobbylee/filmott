@@ -356,9 +356,16 @@ export class RankingsService {
         `Saved ${rankingsToUpsert.length} trending rankings for ${category}`,
       );
 
-      const contentIds = rankingsToUpsert
-        .map((r) => r.contentId)
-        .filter((id): id is number => id !== undefined);
+      // TMDB trending은 글로벌 기준이라 한국에서 볼 수 없는 작품도 섞일 수 있다.
+      // 랭킹 저장은 유지하되, 채팅 metadata 증식은 KR watch provider가 있는 작품으로 제한한다.
+      const contentIds = cacheResults
+        .filter(
+          (result): result is PromiseFulfilledResult<Content> =>
+            result.status === 'fulfilled',
+        )
+        .map((result) => result.value)
+        .filter((content) => this.hasKoreanWatchProviders(content))
+        .map((content) => content.id);
       if (contentIds.length > 0) {
         this.cacheMetadataInBackground(contentIds);
       }
@@ -634,5 +641,14 @@ export class RankingsService {
           `Metadata 배치 캐싱 실패: ${error instanceof Error ? error.message : String(error)}`,
         );
       });
+  }
+
+  private hasKoreanWatchProviders(content: Content): boolean {
+    const providers = content.watchProviders;
+    return Boolean(
+      (providers?.flatrate?.length ?? 0) > 0 ||
+      (providers?.rent?.length ?? 0) > 0 ||
+      (providers?.buy?.length ?? 0) > 0,
+    );
   }
 }
