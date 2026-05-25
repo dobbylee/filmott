@@ -79,12 +79,25 @@ jobs:
               fi
             done
 
+            # 프론트엔드 readiness check (Next 서버가 3000 포트 listen할 때까지 대기)
+            for i in $(seq 1 24); do
+              if compose exec -T frontend \
+                node -e "fetch('http://127.0.0.1:3000/', { cache: 'no-store' }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+                echo "Frontend is healthy"
+                break
+              fi
+              if [ $i -eq 24 ]; then
+                echo "Frontend not responding"
+                exit 1
+              fi
+              sleep 5
+            done
+
             # ISR 캐시 revalidation (에러 페이지 캐시 방지)
             REVAL_SECRET=$(grep REVALIDATE_SECRET ~/filmott/.env | cut -d= -f2-)
             if [ -n "$REVAL_SECRET" ]; then
-              sleep 3
               compose exec -T frontend \
-                node -e "fetch('http://localhost:3000/internal/revalidate', {
+                node -e "fetch('http://127.0.0.1:3000/internal/revalidate', {
                   method: 'POST',
                   headers: { 'Authorization': 'Bearer $REVAL_SECRET', 'Content-Type': 'application/json' },
                   body: JSON.stringify({path:'/', tags:['rankings','recent-reviews']})
@@ -94,29 +107,55 @@ jobs:
                 }).then(console.log)"
               echo "ISR cache revalidated"
               compose exec -T frontend \
-                node -e "fetch('http://localhost:3000/', { cache: 'no-store' }).then(r => {
+                node -e "fetch('http://127.0.0.1:3000/', { cache: 'no-store' }).then(r => {
                   if (!r.ok) throw new Error('Frontend warm failed: ' + r.status);
                   console.log('Frontend / warmed:', r.status);
                 })"
             fi
 
-            for i in $(seq 1 12); do
-              status=$(curl -s -o /dev/null -w '%{http_code}' https://filmott.kr || true)
+            for i in $(seq 1 24); do
+              status=$(curl -sk --resolve filmott.kr:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://filmott.kr || true)
               if [ "$status" = "200" ]; then
-                echo "External health check passed"
+                echo "Origin health check passed"
                 break
               fi
               if [ $i -eq 12 ]; then
-                echo "External health check failed: ${status}"
+                echo "Origin is still not healthy, restarting nginx once..."
+                compose restart nginx
+              fi
+              if [ $i -eq 24 ]; then
+                echo "Origin health check failed: ${status}"
                 exit 1
               fi
               sleep 5
             done
 
-            www_status=$(curl -s -o /dev/null -w '%{http_code}' https://www.filmott.kr || true)
+            www_status=$(curl -sk --resolve www.filmott.kr:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://www.filmott.kr || true)
             if [ "$www_status" != "301" ]; then
               echo "www redirect check failed: ${www_status}"
               exit 1
             fi
 
             docker image prune -f
+      - name: Verify external site through Cloudflare
+        run: |
+          set -Eeuo pipefail
+
+          for i in $(seq 1 24); do
+            status=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' https://filmott.kr || true)
+            if [ "$status" = "200" ]; then
+              echo "External health check passed"
+              break
+            fi
+            if [ $i -eq 24 ]; then
+              echo "External health check failed: ${status}"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          www_status=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' https://www.filmott.kr || true)
+          if [ "$www_status" != "301" ]; then
+            echo "External www redirect check failed: ${www_status}"
+            exit 1
+          fi
