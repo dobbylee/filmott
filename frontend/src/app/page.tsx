@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import { fetchApi } from '@/lib/fetcher';
 import RankingCarousel from '@/components/ranking/RankingCarousel';
 import RecentReviewItem from '@/components/review/RecentReviewItem';
@@ -6,6 +7,12 @@ import ChatSection from '@/components/chat/ChatSection';
 import type { RankingItem } from '@/components/ranking/RankingCard';
 import type { Review } from '@/types/review';
 import SectionError from '@/components/common/SectionError';
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: '/',
+  },
+};
 
 /* ---- Data Fetchers ---- */
 
