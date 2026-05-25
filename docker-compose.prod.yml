@@ -30,6 +30,7 @@ services:
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN}
     environment:
       - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
       - REVALIDATE_SECRET=${REVALIDATE_SECRET}
     restart: always
 
