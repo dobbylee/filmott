@@ -3,6 +3,8 @@ import type { MetadataRoute } from 'next';
 const SITE_URL = 'https://filmott.kr';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
+export const dynamic = 'force-dynamic';
+
 interface SitemapContent {
   tmdbId: number;
   contentType: string;
@@ -39,7 +41,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let contentPages: MetadataRoute.Sitemap = [];
   try {
     const res = await fetch(`${API_BASE}/contents/sitemap`, {
-      next: { revalidate: 86400 },
+      cache: 'no-store',
     });
     if (res.ok) {
       const contents: SitemapContent[] = await res.json();
