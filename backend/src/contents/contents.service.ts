@@ -408,7 +408,7 @@ export class ContentsService {
       .select('c.tmdbId', 'tmdbId')
       .addSelect('c.contentType', 'contentType')
       .addSelect(
-        'COALESCE(MAX(rv.updated_at), c.release_date::timestamptz, c.created_at)',
+        'COALESCE(MAX(rv.updated_at), c.updated_at, c.created_at)',
         'lastModified',
       )
       .leftJoin('reviews', 'rv', 'rv.content_id = c.id')
@@ -436,7 +436,7 @@ export class ContentsService {
       )
       .addOrderBy('c.vote_count', 'DESC')
       .addOrderBy(
-        'COALESCE(MAX(rv.updated_at), c.release_date::timestamptz, c.created_at)',
+        'COALESCE(MAX(rv.updated_at), c.updated_at, c.created_at)',
         'DESC',
       )
       .limit(SITEMAP_CONTENT_LIMIT)

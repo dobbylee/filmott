@@ -1523,6 +1523,14 @@ describe('ContentsService', () => {
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'c.release_date IS NOT NULL',
       );
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalledWith(
+        'COALESCE(MAX(rv.updated_at), c.updated_at, c.created_at)',
+        'lastModified',
+      );
+      expect(mockQueryBuilder.addOrderBy).toHaveBeenCalledWith(
+        'COALESCE(MAX(rv.updated_at), c.updated_at, c.created_at)',
+        'DESC',
+      );
       expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10000);
       expect(result).toHaveLength(2);
       expect(result[0]).toHaveProperty('tmdbId', 123);
