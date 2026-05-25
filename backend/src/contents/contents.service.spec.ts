@@ -15,10 +15,16 @@ describe('ContentsService', () => {
 
   const mockQueryBuilder = {
     select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     getMany: jest.fn(),
+    getRawMany: jest.fn(),
   };
 
   const mockContentRepo = {
@@ -1485,32 +1491,52 @@ describe('ContentsService', () => {
   });
 
   describe('getSitemapContents', () => {
-    it('adult=true 콘텐츠를 제외하고 tmdbId, contentType, updatedAt을 반환해야 한다', async () => {
+    it('성인 콘텐츠를 제외하고 대표 콘텐츠 기준으로 tmdbId, contentType, lastModified를 반환해야 한다', async () => {
       const mockRows = [
         {
-          tmdbId: 123,
+          tmdbId: '123',
           contentType: 'movie',
-          updatedAt: new Date('2026-03-15'),
+          lastModified: new Date('2026-03-15'),
         },
-        { tmdbId: 456, contentType: 'tv', updatedAt: new Date('2026-03-14') },
+        {
+          tmdbId: '456',
+          contentType: 'tv',
+          lastModified: '2026-03-14T00:00:00.000Z',
+        },
       ];
-      mockQueryBuilder.getMany.mockResolvedValue(mockRows);
+      mockQueryBuilder.getRawMany.mockResolvedValue(mockRows);
 
       const result = await service.getSitemapContents();
 
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
         'c.adult IS NOT TRUE',
       );
-      expect(result).toEqual(mockRows);
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        "NULLIF(BTRIM(c.title), '') IS NOT NULL",
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        "NULLIF(BTRIM(c.overview), '') IS NOT NULL",
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'c.poster_url IS NOT NULL',
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'c.release_date IS NOT NULL',
+      );
+      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10000);
       expect(result).toHaveLength(2);
       expect(result[0]).toHaveProperty('tmdbId', 123);
       expect(result[0]).toHaveProperty('contentType', 'movie');
+      expect(result[0].lastModified).toEqual(new Date('2026-03-15'));
       expect(result[1]).toHaveProperty('tmdbId', 456);
       expect(result[1]).toHaveProperty('contentType', 'tv');
+      expect(result[1].lastModified).toEqual(
+        new Date('2026-03-14T00:00:00.000Z'),
+      );
     });
 
     it('콘텐츠가 없으면 빈 배열을 반환해야 한다', async () => {
-      mockQueryBuilder.getMany.mockResolvedValue([]);
+      mockQueryBuilder.getRawMany.mockResolvedValue([]);
 
       const result = await service.getSitemapContents();
 

@@ -6,7 +6,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 interface SitemapContent {
   tmdbId: number;
   contentType: string;
-  updatedAt: string;
+  lastModified?: string;
+  updatedAt?: string;
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -44,12 +45,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const contents: SitemapContent[] = await res.json();
       const maxContent = 50000 - staticPages.length;
 
-      contentPages = contents.slice(0, maxContent).map((c) => ({
-        url: `${SITE_URL}/contents/${c.contentType}/${c.tmdbId}`,
-        lastModified: new Date(c.updatedAt),
-        changeFrequency: 'weekly' as const,
-        priority: 0.7,
-      }));
+      contentPages = contents.slice(0, maxContent).map((c) => {
+        const modified = c.lastModified ?? c.updatedAt;
+
+        return {
+          url: `${SITE_URL}/contents/${c.contentType}/${c.tmdbId}`,
+          lastModified: modified ? new Date(modified) : undefined,
+          changeFrequency: 'weekly' as const,
+          priority: 0.7,
+        };
+      });
     }
   } catch {
     // sitemap 생성 실패 시 정적 페이지만 반환

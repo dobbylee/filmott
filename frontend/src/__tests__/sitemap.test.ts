@@ -39,8 +39,8 @@ describe('sitemap', () => {
 
   it('API에서 콘텐츠를 가져와 동적 페이지를 포함해야 한다', async () => {
     const mockContents = [
-      { tmdbId: 123, contentType: 'movie', updatedAt: '2026-03-15T00:00:00.000Z' },
-      { tmdbId: 456, contentType: 'tv', updatedAt: '2026-03-14T00:00:00.000Z' },
+      { tmdbId: 123, contentType: 'movie', lastModified: '2026-03-15T00:00:00.000Z' },
+      { tmdbId: 456, contentType: 'tv', lastModified: '2026-03-14T00:00:00.000Z' },
     ];
     mockFetch.mockResolvedValue({
       ok: true,
@@ -57,7 +57,7 @@ describe('sitemap', () => {
 
   it('동적 콘텐츠 페이지의 priority가 0.7이어야 한다', async () => {
     const mockContents = [
-      { tmdbId: 123, contentType: 'movie', updatedAt: '2026-03-15T00:00:00.000Z' },
+      { tmdbId: 123, contentType: 'movie', lastModified: '2026-03-15T00:00:00.000Z' },
     ];
     mockFetch.mockResolvedValue({
       ok: true,
@@ -69,6 +69,22 @@ describe('sitemap', () => {
     const contentPage = result.find((entry) => entry.url === 'https://filmott.kr/contents/movie/123');
     expect(contentPage?.priority).toBe(0.7);
     expect(contentPage?.changeFrequency).toBe('weekly');
+    expect(contentPage?.lastModified).toEqual(new Date('2026-03-15T00:00:00.000Z'));
+  });
+
+  it('배포 순서 호환을 위해 기존 updatedAt 응답도 lastModified로 사용해야 한다', async () => {
+    const mockContents = [
+      { tmdbId: 123, contentType: 'movie', updatedAt: '2026-03-13T00:00:00.000Z' },
+    ];
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => mockContents,
+    });
+
+    const result = await sitemap();
+
+    const contentPage = result.find((entry) => entry.url === 'https://filmott.kr/contents/movie/123');
+    expect(contentPage?.lastModified).toEqual(new Date('2026-03-13T00:00:00.000Z'));
   });
 
   it('API 호출 실패 시 정적 페이지만 반환해야 한다', async () => {

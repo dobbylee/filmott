@@ -26,10 +26,18 @@ const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000; // 5분
 const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72시간
 const NEGATIVE_DETAIL_CACHE_TTL_MS = 5 * 60 * 1000; // 5분
 const MAX_TMDB_ID = 20_000_000;
+const SITEMAP_CONTENT_LIMIT = 10_000;
+const SITEMAP_MIN_VOTE_COUNT = 100;
 
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
+}
+
+interface SitemapContentRow {
+  tmdbId: number | string;
+  contentType: string;
+  lastModified: Date | string;
 }
 
 @Injectable()
@@ -390,23 +398,54 @@ export class ContentsService {
   }
 
   /**
-   * 사이트맵용: 최신 업데이트 순으로 최대 50000개 반환
+   * 사이트맵용: 색인 가치가 높은 대표 콘텐츠를 안정적인 변경일과 함께 반환
    */
   async getSitemapContents(): Promise<
-    Array<{ tmdbId: number; contentType: string; updatedAt: Date }>
+    Array<{ tmdbId: number; contentType: string; lastModified: Date }>
   > {
     const rows = await this.contentRepo
       .createQueryBuilder('c')
-      .select(['c.tmdbId', 'c.contentType', 'c.updatedAt'])
+      .select('c.tmdbId', 'tmdbId')
+      .addSelect('c.contentType', 'contentType')
+      .addSelect(
+        'COALESCE(MAX(rv.updated_at), c.release_date::timestamptz, c.created_at)',
+        'lastModified',
+      )
+      .leftJoin('reviews', 'rv', 'rv.content_id = c.id')
+      .leftJoin('rankings', 'rk', 'rk.content_id = c.id')
       .where('c.adult IS NOT TRUE')
-      .orderBy('c.updatedAt', 'DESC')
-      .limit(50000)
-      .getMany();
+      .andWhere("NULLIF(BTRIM(c.title), '') IS NOT NULL")
+      .andWhere("NULLIF(BTRIM(c.overview), '') IS NOT NULL")
+      .andWhere('c.poster_url IS NOT NULL')
+      .andWhere('c.release_date IS NOT NULL')
+      .andWhere(
+        `(${[
+          'rv.id IS NOT NULL',
+          'rk.id IS NOT NULL',
+          'c.watch_providers IS NOT NULL',
+          'c.vote_count >= :minVoteCount',
+        ].join(' OR ')})`,
+        { minVoteCount: SITEMAP_MIN_VOTE_COUNT },
+      )
+      .groupBy('c.id')
+      .orderBy('COUNT(DISTINCT rv.id)', 'DESC')
+      .addOrderBy('COUNT(DISTINCT rk.id)', 'DESC')
+      .addOrderBy(
+        'CASE WHEN c.watch_providers IS NOT NULL THEN 1 ELSE 0 END',
+        'DESC',
+      )
+      .addOrderBy('c.vote_count', 'DESC')
+      .addOrderBy(
+        'COALESCE(MAX(rv.updated_at), c.release_date::timestamptz, c.created_at)',
+        'DESC',
+      )
+      .limit(SITEMAP_CONTENT_LIMIT)
+      .getRawMany<SitemapContentRow>();
 
     return rows.map((r) => ({
-      tmdbId: r.tmdbId,
+      tmdbId: Number(r.tmdbId),
       contentType: r.contentType,
-      updatedAt: r.updatedAt,
+      lastModified: new Date(r.lastModified),
     }));
   }
 
