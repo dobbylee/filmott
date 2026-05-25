@@ -18,38 +18,105 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -Eeuo pipefail
+
             cd ~/filmott
+
+            compose() {
+              docker compose --env-file .env -f docker-compose.prod.yml "$@"
+            }
+
+            print_diagnostics() {
+              echo "=== docker compose ps ==="
+              compose ps || true
+              echo "=== frontend/backend/nginx logs ==="
+              compose logs --tail=160 frontend backend nginx || true
+            }
+
+            trap 'echo "Deploy failed"; print_diagnostics' ERR
+
+            test -f .env
+            test -f backend/.env.production
+            for var in DB_NAME DB_USERNAME DB_PASSWORD REVALIDATE_SECRET; do
+              if ! grep -q "^${var}=" .env; then
+                echo "Missing ${var} in ~/filmott/.env"
+                exit 1
+              fi
+            done
+
             git fetch origin main
             git reset --hard origin/main
-            docker compose -f docker-compose.prod.yml build --no-cache frontend backend
-            docker compose -f docker-compose.prod.yml up -d frontend backend
+
+            compose config > /dev/null
+            compose build --no-cache frontend backend
+            compose up -d --remove-orphans frontend backend
+
+            for service in frontend backend; do
+              container_id=$(compose ps -q "$service")
+              if [ -z "$container_id" ]; then
+                echo "${service} container was not created"
+                exit 1
+              fi
+              if [ "$(docker inspect -f '{{.State.Running}}' "$container_id")" != "true" ]; then
+                echo "${service} container is not running"
+                exit 1
+              fi
+            done
+
             # nginx 재시작 (컨테이너 IP 변경 시 upstream resolve 갱신)
-            docker compose -f docker-compose.prod.yml restart nginx
-            # 백엔드 health check (최대 60초 대기, 실패 시 재시작)
+            compose restart nginx
+
+            # 백엔드 health check (최대 60초 대기)
             for i in $(seq 1 12); do
               sleep 5
-              if curl -sf http://backend:3001/api/ > /dev/null 2>&1 || docker exec filmott-backend-1 wget -q -O- http://localhost:3001/api/ > /dev/null 2>&1; then
+              if docker exec "$(compose ps -q backend)" wget -q -O- http://localhost:3001/api/ > /dev/null 2>&1; then
                 echo "Backend is healthy"
                 break
               fi
               if [ $i -eq 12 ]; then
-                echo "Backend not responding, restarting..."
-                docker compose -f docker-compose.prod.yml restart backend
-                docker compose -f docker-compose.prod.yml restart nginx
+                echo "Backend not responding"
+                exit 1
               fi
             done
+
             # ISR 캐시 revalidation (에러 페이지 캐시 방지)
             REVAL_SECRET=$(grep REVALIDATE_SECRET ~/filmott/.env | cut -d= -f2-)
             if [ -n "$REVAL_SECRET" ]; then
               sleep 3
-              docker compose -f docker-compose.prod.yml exec -T frontend \
+              compose exec -T frontend \
                 node -e "fetch('http://localhost:3000/internal/revalidate', {
                   method: 'POST',
                   headers: { 'Authorization': 'Bearer $REVAL_SECRET', 'Content-Type': 'application/json' },
                   body: JSON.stringify({path:'/', tags:['rankings','recent-reviews']})
-                }).then(r => r.text()).then(console.log).catch(console.error)"
+                }).then(r => {
+                  if (!r.ok) throw new Error('Revalidate failed: ' + r.status);
+                  return r.text();
+                }).then(console.log)"
               echo "ISR cache revalidated"
-              docker compose -f docker-compose.prod.yml exec -T frontend \
-                node -e "fetch('http://localhost:3000/', { cache: 'no-store' }).then(r => console.log('Frontend / warmed:', r.status)).catch(console.error)"
+              compose exec -T frontend \
+                node -e "fetch('http://localhost:3000/', { cache: 'no-store' }).then(r => {
+                  if (!r.ok) throw new Error('Frontend warm failed: ' + r.status);
+                  console.log('Frontend / warmed:', r.status);
+                })"
             fi
+
+            for i in $(seq 1 12); do
+              status=$(curl -s -o /dev/null -w '%{http_code}' https://filmott.kr || true)
+              if [ "$status" = "200" ]; then
+                echo "External health check passed"
+                break
+              fi
+              if [ $i -eq 12 ]; then
+                echo "External health check failed: ${status}"
+                exit 1
+              fi
+              sleep 5
+            done
+
+            www_status=$(curl -s -o /dev/null -w '%{http_code}' https://www.filmott.kr || true)
+            if [ "$www_status" != "301" ]; then
+              echo "www redirect check failed: ${www_status}"
+              exit 1
+            fi
+
             docker image prune -f
