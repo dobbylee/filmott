@@ -1,8 +1,9 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { Star, Clock, Calendar } from 'lucide-react';
 import TmdbImage, { replaceTmdbSize } from '@/components/common/TmdbImage';
-import { fetchApi } from '@/lib/fetcher';
+import { fetchApi, isApiError } from '@/lib/fetcher';
 import CastCarousel from '@/components/content/CastCarousel';
 import ReviewListClient from '@/components/review/ReviewListClient';
 import ReviewFormWrapper from '@/components/review/ReviewFormWrapper';
@@ -133,7 +134,17 @@ export default async function ContentDetailPage({
   params,
 }: ContentDetailPageProps) {
   const { type, tmdbId } = await params;
-  const content = await fetchContentDetail(type, tmdbId);
+  let content: ContentDetail;
+
+  try {
+    content = await fetchContentDetail(type, tmdbId);
+  } catch (error) {
+    if (isApiError(error) && error.status === 404) {
+      notFound();
+    }
+
+    throw error;
+  }
 
   const genres = Array.isArray(content.genres)
     ? content.genres
