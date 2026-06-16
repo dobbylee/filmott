@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 import { CHAT_MODEL } from './chat.constants';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 import { getKoreaDateString } from '../common/date.util';
+import { CHAT_INTENT_RESPONSE_FORMAT } from './intent-schema';
 
 const OPENAI_INTENT_TIMEOUT_MS = 10_000;
 
@@ -264,7 +265,7 @@ export class IntentAnalyzerService {
           model: CHAT_MODEL,
           reasoning_effort: 'low',
           max_completion_tokens: 1024,
-          response_format: { type: 'json_object' },
+          response_format: CHAT_INTENT_RESPONSE_FORMAT,
           messages: [
             { role: 'system', content: buildIntentSystemPrompt() },
             ...historyMessages,

@@ -7,6 +7,7 @@ import {
 } from './intent-analyzer';
 import { GENRE_NAME_MAP } from '../common/constants';
 import { CHAT_MODEL } from './chat.constants';
+import { CHAT_INTENT_RESPONSE_FORMAT } from './intent-schema';
 
 // OpenAI SDK mock
 const mockCreate = jest.fn();
@@ -71,9 +72,11 @@ describe('IntentAnalyzerService', () => {
         countries: [],
         excludeCountries: [],
         personNames: [],
+        referenceTitles: [],
         dateRange: null,
         contentType: null,
         genres: [],
+        confidence: 'low',
         ...overrides,
       }),
     );
@@ -119,7 +122,7 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
     });
 
-    it('CHAT_MODEL을 response_format json_object로 호출해야 한다', async () => {
+    it('CHAT_MODEL을 response_format json_schema로 호출해야 한다', async () => {
       mockIntent();
 
       await service.analyzeIntent('테스트');
@@ -129,7 +132,7 @@ describe('IntentAnalyzerService', () => {
           model: CHAT_MODEL,
           reasoning_effort: 'low',
           max_completion_tokens: 1024,
-          response_format: { type: 'json_object' },
+          response_format: CHAT_INTENT_RESPONSE_FORMAT,
           messages: [
             {
               role: 'system',
@@ -405,7 +408,7 @@ describe('IntentAnalyzerService', () => {
           model: CHAT_MODEL,
           reasoning_effort: 'low',
           max_completion_tokens: 1024,
-          response_format: { type: 'json_object' },
+          response_format: CHAT_INTENT_RESPONSE_FORMAT,
           messages: [
             {
               role: 'system',
