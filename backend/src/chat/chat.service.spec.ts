@@ -8,6 +8,9 @@ import { EmbeddingService, SimilarContent } from './embedding.service';
 import { ContentSearchService } from './content-search.service';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';
+import { ChatContextService } from './chat-context.service';
+import { RecommendationCandidateService } from './recommendation-candidate.service';
+import { ChatResponseStreamService } from './chat-response-stream.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
@@ -112,6 +115,9 @@ describe('ChatService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChatService,
+        ChatContextService,
+        RecommendationCandidateService,
+        ChatResponseStreamService,
         { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: ContentSearchService, useValue: mockContentSearchService },
         { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
@@ -940,6 +946,9 @@ describe('ChatService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           ChatService,
+          ChatContextService,
+          RecommendationCandidateService,
+          ChatResponseStreamService,
           { provide: EmbeddingService, useValue: mockEmbeddingService },
           { provide: ContentSearchService, useValue: mockContentSearchService },
           {

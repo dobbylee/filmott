@@ -11,6 +11,9 @@ import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { IntentAnalyzerService } from './intent-analyzer';
 import { ContentSearchService } from './content-search.service';
+import { ChatContextService } from './chat-context.service';
+import { RecommendationCandidateService } from './recommendation-candidate.service';
+import { ChatResponseStreamService } from './chat-response-stream.service';
 
 @Module({
   imports: [
@@ -20,6 +23,13 @@ import { ContentSearchService } from './content-search.service';
     EmbeddingModule,
   ],
   controllers: [ChatController],
-  providers: [ChatService, IntentAnalyzerService, ContentSearchService],
+  providers: [
+    ChatService,
+    IntentAnalyzerService,
+    ContentSearchService,
+    ChatContextService,
+    RecommendationCandidateService,
+    ChatResponseStreamService,
+  ],
 })
 export class ChatModule {}
