@@ -83,6 +83,7 @@ describe('채팅 추천 품질 평가셋', () => {
         'duplicate-recommendation-exclusion',
         'tv-content-type-guard',
         'negative-preference-exclusion',
+        'personalized-candidate-rerank',
       ]),
     );
   });
@@ -107,6 +108,7 @@ describe('채팅 추천 품질 평가셋', () => {
         candidates,
         preferredContentType,
         previouslyRecommended,
+        rerankContext,
         expectedTitles,
       } = testCase.candidateFixture;
 
@@ -115,6 +117,7 @@ describe('채팅 추천 품질 평가셋', () => {
           candidates,
           preferredContentType,
           previouslyRecommended,
+          rerankContext,
         )
         .map((candidate) => candidate.title);
 
@@ -148,10 +151,11 @@ describe('채팅 추천 품질 평가셋', () => {
       (testCase) => testCase.expectedPreferenceFilters,
     );
 
-    expect(cases).toHaveLength(1);
-    expect(cases[0].expectedPreferenceFilters).toEqual({
-      excludeGenres: ['공포'],
-      excludePersonNames: ['감독A'],
-    });
+    expect(cases.map((testCase) => testCase.id)).toEqual(
+      expect.arrayContaining([
+        'negative-preference-exclusion',
+        'personalized-candidate-rerank',
+      ]),
+    );
   });
 });

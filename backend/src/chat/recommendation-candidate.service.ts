@@ -8,6 +8,21 @@ import { ResolvedChatRecommendation } from './structured-chat-response';
 
 const CHAT_RECOMMENDATION_LIMIT = 5;
 
+export interface RecommendationRerankContext {
+  contentType?: 'movie' | 'tv' | null;
+  genres?: string[];
+  countries?: string[];
+  personNames?: string[];
+}
+
+const RERANK_WEIGHTS = {
+  GENRE_MATCH: 0.25,
+  COUNTRY_MATCH: 0.15,
+  PERSON_MATCH: 0.15,
+  CONTENT_TYPE_MATCH: 0.1,
+  VOTE_AVERAGE: 0.1,
+} as const;
+
 interface ReferenceRow {
   content_id: number;
   tmdb_id: number;
@@ -28,14 +43,16 @@ export class RecommendationCandidateService {
     candidates: SimilarContent[],
     preferredContentType: 'movie' | 'tv' | null,
     previouslyRecommended: string[],
+    rerankContext: RecommendationRerankContext = {},
   ): SimilarContent[] {
     const selected: SimilarContent[] = [];
     const usedKeys = new Set<string>();
     const previousTitleKeys = new Set(
       previouslyRecommended.map((title) => this.normalizeTitleForMatch(title)),
     );
+    const rankedCandidates = this.rerankCandidates(candidates, rerankContext);
 
-    for (const candidate of candidates) {
+    for (const candidate of rankedCandidates) {
       if (selected.length >= CHAT_RECOMMENDATION_LIMIT) break;
 
       const contentType = this.parseContentType(candidate.contentType);
@@ -132,6 +149,107 @@ export class RecommendationCandidateService {
     if (intent.contentType) filters.contentType = intent.contentType;
     if (intent.genres.length > 0) filters.genres = intent.genres;
     return filters;
+  }
+
+  private rerankCandidates(
+    candidates: SimilarContent[],
+    context: RecommendationRerankContext,
+  ): SimilarContent[] {
+    if (!this.hasRerankContext(context)) {
+      return candidates;
+    }
+
+    return candidates
+      .map((candidate, index) => ({
+        candidate,
+        index,
+        score: this.calculateRerankScore(candidate, context),
+      }))
+      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .map(({ candidate }) => candidate);
+  }
+
+  private hasRerankContext(context: RecommendationRerankContext): boolean {
+    return (
+      context.contentType !== undefined ||
+      (context.genres?.length ?? 0) > 0 ||
+      (context.countries?.length ?? 0) > 0 ||
+      (context.personNames?.length ?? 0) > 0
+    );
+  }
+
+  private calculateRerankScore(
+    candidate: SimilarContent,
+    context: RecommendationRerankContext,
+  ): number {
+    let score = candidate.similarity;
+    score +=
+      (Math.max(candidate.voteAverage, 0) / 10) * RERANK_WEIGHTS.VOTE_AVERAGE;
+
+    if (
+      context.contentType &&
+      this.parseContentType(candidate.contentType) === context.contentType
+    ) {
+      score += RERANK_WEIGHTS.CONTENT_TYPE_MATCH;
+    }
+
+    const genreMatchRatio = this.calculateGenreMatchRatio(
+      candidate.genres.map((genre) => genre.name),
+      context.genres ?? [],
+    );
+    score += genreMatchRatio * RERANK_WEIGHTS.GENRE_MATCH;
+
+    if (this.matchesCountry(candidate.originCountry, context.countries ?? [])) {
+      score += RERANK_WEIGHTS.COUNTRY_MATCH;
+    }
+
+    if (this.matchesPerson(candidate.director, context.personNames ?? [])) {
+      score += RERANK_WEIGHTS.PERSON_MATCH;
+    }
+
+    return score;
+  }
+
+  private calculateGenreMatchRatio(
+    candidateGenres: string[],
+    requestedGenres: string[],
+  ): number {
+    if (candidateGenres.length === 0 || requestedGenres.length === 0) return 0;
+
+    const normalizedCandidateGenres = new Set(
+      candidateGenres.map((genre) => this.normalizeTitleForMatch(genre)),
+    );
+    const matchedCount = requestedGenres.filter((genre) =>
+      normalizedCandidateGenres.has(this.normalizeTitleForMatch(genre)),
+    ).length;
+
+    return matchedCount / requestedGenres.length;
+  }
+
+  private matchesCountry(
+    originCountry: string | null,
+    requestedCountries: string[],
+  ): boolean {
+    if (!originCountry || requestedCountries.length === 0) return false;
+
+    const candidateCountries = originCountry
+      .split(',')
+      .map((country) => country.trim());
+
+    return requestedCountries.some((country) =>
+      candidateCountries.includes(country),
+    );
+  }
+
+  private matchesPerson(
+    director: string | null,
+    requestedPersonNames: string[],
+  ): boolean {
+    if (!director || requestedPersonNames.length === 0) return false;
+
+    return requestedPersonNames.some((personName) =>
+      director.includes(personName),
+    );
   }
 
   private async resolveReferenceEmbeddingFromDb(

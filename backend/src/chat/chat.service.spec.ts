@@ -1051,6 +1051,9 @@ describe('ChatService', () => {
         expect.objectContaining({ ottProviderNames: ['Netflix'] }),
         undefined,
       );
+      const calledFilters =
+        mockContentSearchService.searchWithFilters.mock.calls[0][3];
+      expect(calledFilters.relaxableFilterKeys).toEqual([]);
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
@@ -1272,6 +1275,7 @@ describe('ChatService', () => {
           ottProviderNames: ['Netflix'],
           genres: ['드라마', '스릴러'],
           countries: ['KR'],
+          relaxableFilterKeys: ['ottProviderNames', 'genres', 'countries'],
         }),
         undefined,
       );
@@ -1312,6 +1316,7 @@ describe('ChatService', () => {
       expect(calledFilters.countries).toEqual(['US']);
       // 명시적 필터가 없는 필드에는 유저 선호가 WHERE 필터로 적용된다
       expect(calledFilters.genres).toEqual(['드라마']);
+      expect(calledFilters.relaxableFilterKeys).toEqual(['genres']);
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
@@ -1343,6 +1348,10 @@ describe('ChatService', () => {
       // 명시적 필터가 없는 장르/국가는 유저 선호가 WHERE 필터로 합쳐져야 한다
       expect(calledFilters.genres).toEqual(['드라마', '로맨스']);
       expect(calledFilters.countries).toEqual(['KR']);
+      expect(calledFilters.relaxableFilterKeys).toEqual([
+        'genres',
+        'countries',
+      ]);
     });
 
     it('confidence=low + 유저 OTT 구독만 있고 장르/국가 선호 없는 경우 OTT 필터만 적용해야 한다', async () => {
@@ -1374,6 +1383,7 @@ describe('ChatService', () => {
       expect(calledFilters.ottProviderNames).toEqual(['wavve']);
       expect(calledFilters.genres).toBeUndefined();
       expect(calledFilters.countries).toBeUndefined();
+      expect(calledFilters.relaxableFilterKeys).toEqual(['ottProviderNames']);
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
@@ -1411,6 +1421,7 @@ describe('ChatService', () => {
       expect(calledFilters.countries).toEqual(['US']);
       // OTT는 의도에 없으므로 유저 선호 합산
       expect(calledFilters.ottProviderNames).toEqual(['Netflix']);
+      expect(calledFilters.relaxableFilterKeys).toEqual(['ottProviderNames']);
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
@@ -1440,6 +1451,11 @@ describe('ChatService', () => {
       expect(calledFilters.genres).toEqual(['드라마']);
       expect(calledFilters.countries).toEqual(['KR']);
       expect(calledFilters.ottProviderNames).toEqual(['Netflix']);
+      expect(calledFilters.relaxableFilterKeys).toEqual([
+        'ottProviderNames',
+        'genres',
+        'countries',
+      ]);
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 

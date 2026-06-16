@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import { ContentSearchService } from './content-search.service';
+import {
+  ContentSearchService,
+  FILTER_RELAXATION_SEQUENCE,
+} from './content-search.service';
 import { EmbeddingService } from './embedding.service';
 
 describe('ContentSearchService', () => {
@@ -371,6 +374,69 @@ describe('ContentSearchService', () => {
       // 5차 쿼리: OTT 제거
       const fifthQuery = mockDataSource.query.mock.calls[4][0] as string;
       expect(fifthQuery).not.toContain('provider_name');
+    });
+
+    it('필터 완화 순서를 명시적으로 유지해야 한다', () => {
+      expect(FILTER_RELAXATION_SEQUENCE).toEqual([
+        'genres',
+        'personNames',
+        'countries',
+        'ottProviderNames',
+      ]);
+    });
+
+    it('relaxableFilterKeys에 지정된 필터만 완화해야 한다', async () => {
+      const twoRows = fiveRows.slice(0, 2);
+      const sixRows = Array.from({ length: 6 }, (_, i) => ({
+        ...baseRow,
+        content_id: i + 1,
+        tmdb_id: 496243 + i,
+        title: `영화${i + 1}`,
+      }));
+
+      mockDataSource.query
+        .mockResolvedValueOnce(twoRows)
+        .mockResolvedValueOnce(sixRows);
+
+      const result = await service.searchWithFilters(
+        '넷플릭스 한국 스릴러 영화',
+        10,
+        [],
+        {
+          ottProviderNames: ['Netflix'],
+          countries: ['KR'],
+          genres: ['스릴러'],
+          relaxableFilterKeys: ['genres'],
+        },
+      );
+
+      expect(mockDataSource.query).toHaveBeenCalledTimes(2);
+      expect(result).toHaveLength(6);
+
+      const secondQuery = mockDataSource.query.mock.calls[1][0] as string;
+      expect(secondQuery).toContain('provider_name');
+      expect(secondQuery).toContain('origin_country =');
+      expect(secondQuery).not.toContain("g->>'name'");
+    });
+
+    it('relaxableFilterKeys가 비어 있으면 명시적 필터를 완화하지 않아야 한다', async () => {
+      const twoRows = fiveRows.slice(0, 2);
+      mockDataSource.query.mockResolvedValue(twoRows);
+
+      const result = await service.searchWithFilters(
+        '넷플릭스 한국 스릴러 영화',
+        10,
+        [],
+        {
+          ottProviderNames: ['Netflix'],
+          countries: ['KR'],
+          genres: ['스릴러'],
+          relaxableFilterKeys: [],
+        },
+      );
+
+      expect(mockDataSource.query).toHaveBeenCalledTimes(1);
+      expect(result).toHaveLength(2);
     });
 
     it('fallback: 결과가 충분하면 추가 쿼리를 실행하지 않아야 한다', async () => {

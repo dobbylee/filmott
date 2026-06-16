@@ -2,6 +2,7 @@ import type { ContentSearchFilters } from './content-search.service';
 import type { ChatHistoryMessageDto } from './dto/send-message.dto';
 import type { SimilarContent } from './embedding.service';
 import type { ParsedIntent } from './intent-analyzer';
+import type { RecommendationRerankContext } from './recommendation-candidate.service';
 
 export interface ChatQualityCase {
   id: string;
@@ -15,6 +16,7 @@ export interface ChatQualityCase {
     candidates: SimilarContent[];
     preferredContentType: 'movie' | 'tv' | null;
     previouslyRecommended: string[];
+    rerankContext?: RecommendationRerankContext;
     expectedTitles: string[];
   };
 }
@@ -194,6 +196,50 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
     expectedPreferenceFilters: {
       excludeGenres: ['공포'],
       excludePersonNames: ['감독A'],
+    },
+  },
+  {
+    id: 'personalized-candidate-rerank',
+    description: '개인화 기준에 더 맞는 후보를 확정 후보 앞순위로 재랭킹한다',
+    userMessage: '내 취향에 맞는 영화 추천해줘',
+    expectedIntent: {
+      confidence: 'low',
+      genres: [],
+      contentType: null,
+    },
+    expectedFilters: {},
+    expectedPreferenceFilters: {
+      genres: ['스릴러'],
+      countries: ['KR'],
+    },
+    candidateFixture: {
+      preferredContentType: null,
+      previouslyRecommended: [],
+      rerankContext: {
+        genres: ['스릴러'],
+        countries: ['KR'],
+      },
+      expectedTitles: ['추격자', '인기 로맨스'],
+      candidates: [
+        createSimilarContent({
+          contentId: 5,
+          tmdbId: 100001,
+          title: '인기 로맨스',
+          genres: [{ id: 10749, name: '로맨스' }],
+          originCountry: 'US',
+          similarity: 0.95,
+          voteAverage: 8,
+        }),
+        createSimilarContent({
+          contentId: 6,
+          tmdbId: 13855,
+          title: '추격자',
+          genres: [{ id: 53, name: '스릴러' }],
+          originCountry: 'KR',
+          similarity: 0.82,
+          voteAverage: 8.1,
+        }),
+      ],
     },
   },
 ];

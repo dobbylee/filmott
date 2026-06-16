@@ -8,6 +8,7 @@ import { EmbeddingService, SimilarContent } from './embedding.service';
 import {
   ContentSearchService,
   ContentSearchFilters,
+  type RelaxableFilterKey,
 } from './content-search.service';
 import { User } from '../users/user.entity';
 import { buildSystemPrompt, UserContext } from './prompts/system-prompt';
@@ -20,7 +21,10 @@ import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 import { extractPreviouslyRecommendedTitles } from './structured-chat-response';
 import { ChatContextService } from './chat-context.service';
-import { RecommendationCandidateService } from './recommendation-candidate.service';
+import {
+  RecommendationCandidateService,
+  type RecommendationRerankContext,
+} from './recommendation-candidate.service';
 import { ChatResponseStreamService } from './chat-response-stream.service';
 
 const OPENAI_CHAT_TIMEOUT_MS = 30_000;
@@ -98,6 +102,7 @@ export class ChatService {
       genres: [],
       confidence: 'low',
     };
+    let candidateRerankContext: RecommendationRerankContext = {};
 
     if (hasMetadata) {
       const userMessages = (history || [])
@@ -138,26 +143,34 @@ export class ChatService {
 
       if (intent.confidence === 'high') {
         // 구체적 요청: SQL 필터 우선, 유저 선호는 명시적 필터가 없는 필드에만 합산
-        const mergedFilters: ContentSearchFilters = { ...filters };
+        const mergedFilters: ContentSearchFilters = {
+          ...filters,
+          relaxableFilterKeys: [],
+        };
+        const relaxableFilterKeys: RelaxableFilterKey[] = [];
 
         if (
           !mergedFilters.ottProviderNames?.length &&
           userPref.ottProviderNames.length > 0
         ) {
           mergedFilters.ottProviderNames = userPref.ottProviderNames;
+          relaxableFilterKeys.push('ottProviderNames');
         }
         if (
           !mergedFilters.genres?.length &&
           userPref.preferredGenres.length > 0
         ) {
           mergedFilters.genres = userPref.preferredGenres;
+          relaxableFilterKeys.push('genres');
         }
         if (
           !mergedFilters.countries?.length &&
           userPref.preferredCountries.length > 0
         ) {
           mergedFilters.countries = userPref.preferredCountries;
+          relaxableFilterKeys.push('countries');
         }
+        mergedFilters.relaxableFilterKeys = relaxableFilterKeys;
 
         // 비선호 장르/감독 제외 (명시적 요청과 겹치지 않는 것만)
         if (userPref.excludeGenres.length > 0) {
@@ -176,6 +189,10 @@ export class ChatService {
             mergedFilters.excludePersonNames = effectiveExcludePersons;
           }
         }
+        candidateRerankContext = this.buildCandidateRerankContext(
+          intent,
+          mergedFilters,
+        );
 
         const enrichedQuery = enrichQueryWithPreference(
           semanticQuery,
@@ -194,17 +211,31 @@ export class ChatService {
         // 모호한 요청 (confidence='low')
         if (userPref.hasData) {
           // 유저 선호 있음: intent 필터 스킵, 유저 선호만으로 검색
-          const prefOnlyFilters: ContentSearchFilters = {};
-          if (userPref.ottProviderNames.length > 0)
+          const prefOnlyFilters: ContentSearchFilters = {
+            relaxableFilterKeys: [],
+          };
+          const relaxableFilterKeys: RelaxableFilterKey[] = [];
+          if (userPref.ottProviderNames.length > 0) {
             prefOnlyFilters.ottProviderNames = userPref.ottProviderNames;
-          if (userPref.preferredGenres.length > 0)
+            relaxableFilterKeys.push('ottProviderNames');
+          }
+          if (userPref.preferredGenres.length > 0) {
             prefOnlyFilters.genres = userPref.preferredGenres;
-          if (userPref.preferredCountries.length > 0)
+            relaxableFilterKeys.push('genres');
+          }
+          if (userPref.preferredCountries.length > 0) {
             prefOnlyFilters.countries = userPref.preferredCountries;
+            relaxableFilterKeys.push('countries');
+          }
           if (userPref.excludeGenres.length > 0)
             prefOnlyFilters.excludeGenres = userPref.excludeGenres;
           if (userPref.excludePersonNames.length > 0)
             prefOnlyFilters.excludePersonNames = userPref.excludePersonNames;
+          prefOnlyFilters.relaxableFilterKeys = relaxableFilterKeys;
+          candidateRerankContext = this.buildCandidateRerankContext(
+            intent,
+            prefOnlyFilters,
+          );
 
           const enrichedQuery = enrichQueryWithPreference(
             semanticQuery,
@@ -243,6 +274,7 @@ export class ChatService {
         similarContents,
         intent.contentType,
         previouslyRecommended,
+        candidateRerankContext,
       );
 
     // 10. 시스템 프롬프트 구성 (확정 추천 후보 + 필터 맥락 포함)
@@ -308,5 +340,17 @@ export class ChatService {
 
   async buildUserContext(userId: number): Promise<UserContext> {
     return this.chatContextService.buildUserContext(userId);
+  }
+
+  private buildCandidateRerankContext(
+    intent: ParsedIntent,
+    filters: ContentSearchFilters,
+  ): RecommendationRerankContext {
+    return {
+      contentType: intent.contentType ?? undefined,
+      genres: filters.genres ?? [],
+      countries: filters.countries ?? [],
+      personNames: filters.personNames ?? [],
+    };
   }
 }

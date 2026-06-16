@@ -2,6 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { EmbeddingService, SimilarContent } from './embedding.service';
 
+export const FILTER_RELAXATION_SEQUENCE = [
+  'genres',
+  'personNames',
+  'countries',
+  'ottProviderNames',
+] as const;
+
+export type RelaxableFilterKey = (typeof FILTER_RELAXATION_SEQUENCE)[number];
+
 export interface ContentSearchFilters {
   ottProviderNames?: string[];
   countries?: string[];
@@ -12,6 +21,7 @@ export interface ContentSearchFilters {
   genres?: string[];
   excludeGenres?: string[];
   excludePersonNames?: string[];
+  relaxableFilterKeys?: RelaxableFilterKey[];
 }
 
 interface FilteredRow {
@@ -35,6 +45,8 @@ const SCORE_WEIGHTS = {
   VECTOR_DEFAULT: 0.7,
   POPULARITY_DEFAULT: 0.3,
 } as const;
+
+const MINIMUM_FILTERED_RESULTS = 5;
 
 @Injectable()
 export class ContentSearchService {
@@ -67,55 +79,33 @@ export class ContentSearchService {
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];
 
     const hasFilters = this.hasActiveFilters(filters);
+    const relaxableFilterKeys =
+      filters.relaxableFilterKeys ?? FILTER_RELAXATION_SEQUENCE;
+    const executableFilters = this.toExecutableFilters(filters);
 
     // 1차: 전체 필터 적용
     let results = await this.executeFilteredSearch(
       embeddingStr,
       limit,
       excludeIds,
-      filters,
+      executableFilters,
     );
 
-    // 2차: 결과 부족 시 필터 단계적 완화
-    // contentType, dateRange는 완화하지 않고 유지 (사용자 의도 보존)
-    if (results.length < 5 && hasFilters) {
-      const relaxedFilters: ContentSearchFilters = { ...filters };
+    // 2차: 결과 부족 시 지정된 필터만 단계적으로 완화한다.
+    // contentType, dateRange, 제외 필터는 완화 대상에 넣지 않아 사용자 의도를 보존한다.
+    if (
+      results.length < MINIMUM_FILTERED_RESULTS &&
+      hasFilters &&
+      relaxableFilterKeys.length > 0
+    ) {
+      let relaxedFilters: ContentSearchFilters = { ...executableFilters };
 
-      if (results.length < 5 && (relaxedFilters.genres?.length ?? 0) > 0) {
-        delete relaxedFilters.genres;
-        results = await this.executeFilteredSearch(
-          embeddingStr,
-          limit,
-          excludeIds,
-          relaxedFilters,
-        );
-      }
+      for (const filterKey of FILTER_RELAXATION_SEQUENCE) {
+        if (results.length >= MINIMUM_FILTERED_RESULTS) break;
+        if (!relaxableFilterKeys.includes(filterKey)) continue;
+        if (!this.hasRelaxableValue(relaxedFilters, filterKey)) continue;
 
-      if (results.length < 5 && (relaxedFilters.personNames?.length ?? 0) > 0) {
-        delete relaxedFilters.personNames;
-        results = await this.executeFilteredSearch(
-          embeddingStr,
-          limit,
-          excludeIds,
-          relaxedFilters,
-        );
-      }
-
-      if (results.length < 5 && (relaxedFilters.countries?.length ?? 0) > 0) {
-        delete relaxedFilters.countries;
-        results = await this.executeFilteredSearch(
-          embeddingStr,
-          limit,
-          excludeIds,
-          relaxedFilters,
-        );
-      }
-
-      if (
-        results.length < 5 &&
-        (relaxedFilters.ottProviderNames?.length ?? 0) > 0
-      ) {
-        delete relaxedFilters.ottProviderNames;
+        relaxedFilters = this.removeRelaxableFilter(relaxedFilters, filterKey);
         results = await this.executeFilteredSearch(
           embeddingStr,
           limit,
@@ -135,9 +125,35 @@ export class ContentSearchService {
       (filters.excludeCountries?.length ?? 0) > 0 ||
       (filters.personNames?.length ?? 0) > 0 ||
       (filters.genres?.length ?? 0) > 0 ||
+      (filters.excludeGenres?.length ?? 0) > 0 ||
+      (filters.excludePersonNames?.length ?? 0) > 0 ||
       !!(filters.dateRange?.from || filters.dateRange?.to) ||
       filters.contentType !== undefined
     );
+  }
+
+  private toExecutableFilters(
+    filters: ContentSearchFilters,
+  ): ContentSearchFilters {
+    const executableFilters: ContentSearchFilters = { ...filters };
+    delete executableFilters.relaxableFilterKeys;
+    return executableFilters;
+  }
+
+  private hasRelaxableValue(
+    filters: ContentSearchFilters,
+    filterKey: RelaxableFilterKey,
+  ): boolean {
+    return (filters[filterKey]?.length ?? 0) > 0;
+  }
+
+  private removeRelaxableFilter(
+    filters: ContentSearchFilters,
+    filterKey: RelaxableFilterKey,
+  ): ContentSearchFilters {
+    const relaxedFilters: ContentSearchFilters = { ...filters };
+    delete relaxedFilters[filterKey];
+    return relaxedFilters;
   }
 
   // P1-6: 필터 구성 로직은 EmbeddingService와 중복되지만, 쿼리 구조가 다르므로(CTE vs 단일 쿼리)
