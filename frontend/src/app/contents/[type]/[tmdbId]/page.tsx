@@ -188,16 +188,18 @@ export default async function ContentDetailPage({
       <div className="relative">
         {/* 백드롭 */}
         {content.backdropUrl ? (
-          <div className="relative h-[40vh] md:h-[55vh] w-full">
-            <TmdbImage
-              src={replaceTmdbSize(content.backdropUrl, 'w1280')}
-              alt={content.title}
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
+          <div className="relative h-[40vh] w-full bg-[#050505] md:h-[70vh] md:max-h-[760px]">
+            <div className="relative mx-auto h-full w-full max-w-[1920px] overflow-hidden">
+              <TmdbImage
+                src={replaceTmdbSize(content.backdropUrl, 'original')}
+                alt={content.title}
+                fill
+                priority
+                sizes="(min-width: 1920px) 1920px, 100vw"
+                className="object-cover object-top"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
+            </div>
           </div>
         ) : (
           <div className="h-[200px] w-full bg-gradient-to-b from-white/5 to-transparent md:h-[280px]" />
