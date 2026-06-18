@@ -63,6 +63,15 @@ jobs:
               fi
             done
 
+            # Let's Encrypt 인증서 갱신
+            docker run --rm \
+              -v "$PWD/certbot/conf:/etc/letsencrypt" \
+              -v "$PWD/certbot/www:/var/www/certbot" \
+              certbot/certbot renew \
+              --webroot \
+              -w /var/www/certbot \
+              --non-interactive
+
             # nginx 재시작 (컨테이너 IP 변경 시 upstream resolve 갱신)
             compose restart nginx
 
@@ -114,7 +123,7 @@ jobs:
             fi
 
             for i in $(seq 1 24); do
-              status=$(curl -sk --resolve filmott.kr:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://filmott.kr || true)
+              status=$(curl -sS --resolve filmott.kr:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://filmott.kr || true)
               if [ "$status" = "200" ]; then
                 echo "Origin health check passed"
                 break
@@ -130,7 +139,7 @@ jobs:
               sleep 5
             done
 
-            www_status=$(curl -sk --resolve www.filmott.kr:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://www.filmott.kr || true)
+            www_status=$(curl -sS --resolve www.filmott.kr:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://www.filmott.kr || true)
             if [ "$www_status" != "301" ]; then
               echo "www redirect check failed: ${www_status}"
               exit 1
