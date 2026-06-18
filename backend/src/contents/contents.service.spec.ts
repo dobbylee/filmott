@@ -754,12 +754,34 @@ describe('ContentsService', () => {
 
       expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith('movie', {
         genres: undefined,
-        watchProviders: undefined,
+        watchProviders: '8|1883|337|97|1881|356|350|119',
         year: undefined,
         sort: undefined,
         page: undefined,
       });
       expect(result).toEqual(discoverResult);
+    });
+
+    it('OTT를 명시 선택하지 않으면 지원 provider 목록으로 기본 탐색해야 한다', async () => {
+      const discoverResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
+      mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
+
+      await service.discoverContents('movie', {
+        sort: 'primary_release_date.desc',
+      });
+
+      expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith('movie', {
+        genres: undefined,
+        watchProviders: '8|1883|337|97|1881|356|350|119',
+        year: undefined,
+        sort: 'primary_release_date.desc',
+        page: undefined,
+      });
     });
   });
 

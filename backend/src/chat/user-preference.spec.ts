@@ -165,9 +165,17 @@ describe('extractUserPreference', () => {
         'netflix',
         'tving',
         'wavve',
+        'apple_tv_plus',
+        'amazon_prime',
       ]);
 
-      expect(result.ottProviderNames).toEqual(['Netflix', 'Tving', 'wavve']);
+      expect(result.ottProviderNames).toEqual([
+        'Netflix',
+        'Tving',
+        'wavve',
+        'Apple TV Plus',
+        'Amazon Prime Video',
+      ]);
     });
 
     it('OTT_ID_TO_TMDB_NAME에 없는 ID는 결과에서 제외해야 한다', () => {

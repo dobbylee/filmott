@@ -12,6 +12,8 @@ const SORT_OPTIONS = [
   { value: 'revenue.desc', label: '수익순', movieOnly: true },
 ] as const;
 
+const COUPANG_PLAY_PROVIDER_ID = 1881;
+
 interface FilterBarProps {
   type: string;
   selectedGenres: number[];
@@ -31,6 +33,9 @@ export default function FilterBar({
   const searchParams = useSearchParams();
 
   const genres = type === 'tv' ? TV_GENRES : MOVIE_GENRES;
+  const visibleProviders = OTT_PROVIDERS.filter(
+    (provider) => type === 'tv' || provider.id !== COUPANG_PLAY_PROVIDER_ID,
+  );
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 30 }, (_, i) => currentYear - i);
@@ -93,7 +98,7 @@ export default function FilterBar({
       <div>
         <h3 className="mb-2 text-sm font-medium text-muted-foreground">OTT</h3>
         <div className="flex flex-wrap gap-1.5">
-          {OTT_PROVIDERS.map((provider) => (
+          {visibleProviders.map((provider) => (
             <button
               key={provider.id}
               onClick={() => toggleProvider(provider.id)}

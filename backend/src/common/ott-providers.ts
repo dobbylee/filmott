@@ -14,6 +14,12 @@ export const OTT_PROVIDERS: OttProvider[] = [
     logoPath: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg',
   },
   {
+    id: 'tving',
+    name: '티빙',
+    tmdbProviderId: 1883,
+    logoPath: '/qHThQdkJuROK0k5QTCrknaNukWe.jpg',
+  },
+  {
     id: 'disney_plus',
     name: '디즈니+',
     tmdbProviderId: 337,
@@ -26,23 +32,33 @@ export const OTT_PROVIDERS: OttProvider[] = [
     logoPath: '/5gmEivxOGPdq4Afpq1f8ktLtEW1.jpg',
   },
   {
-    id: 'wavve',
-    name: '웨이브',
-    tmdbProviderId: 356,
-    logoPath: '/hPcjSaWfMwEqXaCMu7Fkb529Dkc.jpg',
-  },
-  {
-    id: 'tving',
-    name: '티빙',
-    tmdbProviderId: 1883,
-    logoPath: '/qHThQdkJuROK0k5QTCrknaNukWe.jpg',
-  },
-  {
     id: 'coupang_play',
     name: '쿠팡플레이',
     tmdbProviderId: 1881,
     logoPath: '/vpBRsCSyuwxwGDB2JeqyBVECUYF.jpg',
   },
+  {
+    id: 'wavve',
+    name: '웨이브',
+    tmdbProviderId: 356,
+    logoPath: '/2ioan5BX5L9tz4fIGU93blTeFhv.jpg',
+  },
+  {
+    id: 'apple_tv_plus',
+    name: '애플 TV+',
+    tmdbProviderId: 350,
+    logoPath: '/6uhKBfmtzFqOcLousHwZuzcrScK.jpg',
+  },
+  {
+    id: 'amazon_prime',
+    name: '아마존 프라임',
+    tmdbProviderId: 119,
+    logoPath: '/emthp39XA2YScoYL1p0sdbAH2WA.jpg',
+  },
 ];
 
 export const VALID_OTT_IDS = OTT_PROVIDERS.map((p) => p.id);
+
+export const DISCOVER_TMDB_PROVIDER_IDS = OTT_PROVIDERS.map(
+  (p) => p.tmdbProviderId,
+);

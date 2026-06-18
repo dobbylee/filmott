@@ -1065,6 +1065,8 @@ describe('UsersService', () => {
         'disney_plus',
         'watcha',
         'wavve',
+        'apple_tv_plus',
+        'amazon_prime',
         'tving',
         'coupang_play',
       ];

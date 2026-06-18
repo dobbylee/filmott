@@ -196,10 +196,11 @@ export const TV_GENRES = [
  */
 export const OTT_PROVIDERS = [
   { id: 8, name: '넷플릭스', logo: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' },
+  { id: 1883, name: '티빙', logo: '/qHThQdkJuROK0k5QTCrknaNukWe.jpg' },
   { id: 337, name: '디즈니+', logo: '/97yvRBw1GzX7fXprcF80er19ot.jpg' },
+  { id: 97, name: '왓챠', logo: '/5gmEivxOGPdq4Afpq1f8ktLtEW1.jpg' },
+  { id: 1881, name: '쿠팡플레이', logo: '/vpBRsCSyuwxwGDB2JeqyBVECUYF.jpg' },
   { id: 356, name: '웨이브', logo: '/2ioan5BX5L9tz4fIGU93blTeFhv.jpg' },
-  { id: 97, name: '왓챠', logo: '/681L3YVSY7FVjAufGKoagM17VEh.jpg' },
   { id: 350, name: '애플 TV+', logo: '/6uhKBfmtzFqOcLousHwZuzcrScK.jpg' },
   { id: 119, name: '아마존 프라임', logo: '/emthp39XA2YScoYL1p0sdbAH2WA.jpg' },
-  { id: 1883, name: '티빙', logo: '/cNi4Nv5EPsnvf5WmgkyT1DDho3u.jpg' },
 ];

@@ -36,6 +36,17 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+const expectedOttOrder = [
+  '넷플릭스',
+  '티빙',
+  '디즈니+',
+  '왓챠',
+  '쿠팡플레이',
+  '웨이브',
+  '애플 TV+',
+  '아마존 프라임',
+];
+
 describe('OttSubscriptions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -72,8 +83,19 @@ describe('OttSubscriptions', () => {
     expect(screen.getByText('디즈니+')).toBeInTheDocument();
     expect(screen.getByText('왓챠')).toBeInTheDocument();
     expect(screen.getByText('웨이브')).toBeInTheDocument();
+    expect(screen.getByText('애플 TV+')).toBeInTheDocument();
+    expect(screen.getByText('아마존 프라임')).toBeInTheDocument();
     expect(screen.getByText('쿠팡플레이')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '저장' })).toBeInTheDocument();
+
+    const providerButtons = screen
+      .getAllByRole('button')
+      .filter((button) =>
+        expectedOttOrder.some((name) => button.textContent?.includes(name)),
+      );
+    expect(providerButtons.map((button) => button.textContent)).toEqual(
+      expectedOttOrder,
+    );
   });
 
   it('편집 모드에서 취소 버튼 클릭 시 보기 모드로 돌아가야 한다', async () => {

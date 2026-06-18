@@ -21,6 +21,7 @@ import {
   CONTENT_DETAIL_TTL_MS,
 } from '../common/constants';
 import { RevalidateService } from '../common/revalidate.service';
+import { DISCOVER_TMDB_PROVIDER_IDS } from '../common/ott-providers';
 
 const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000; // 5분
 const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72시간
@@ -296,10 +297,15 @@ export class ContentsService {
       page?: number;
     } = {},
   ) {
+    const watchProviders =
+      options.providers && options.providers.trim().length > 0
+        ? options.providers
+        : DISCOVER_TMDB_PROVIDER_IDS.join('|');
+
     const [result, blockedIds] = await Promise.all([
       this.tmdbService.discoverByFilters(type, {
         genres: options.genres,
-        watchProviders: options.providers,
+        watchProviders,
         year: options.year,
         sort: options.sort,
         page: options.page,

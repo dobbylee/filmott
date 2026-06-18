@@ -48,6 +48,17 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+const expectedOttOrder = [
+  '넷플릭스',
+  '티빙',
+  '디즈니+',
+  '왓챠',
+  '쿠팡플레이',
+  '웨이브',
+  '애플 TV+',
+  '아마존 프라임',
+];
+
 describe('NicknameSetupModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -82,7 +93,18 @@ describe('NicknameSetupModal', () => {
     expect(screen.getByText('왓챠')).toBeInTheDocument();
     expect(screen.getByText('웨이브')).toBeInTheDocument();
     expect(screen.getByText('티빙')).toBeInTheDocument();
+    expect(screen.getByText('애플 TV+')).toBeInTheDocument();
+    expect(screen.getByText('아마존 프라임')).toBeInTheDocument();
     expect(screen.getByText('쿠팡플레이')).toBeInTheDocument();
+
+    const providerButtons = screen
+      .getAllByRole('button')
+      .filter((button) =>
+        expectedOttOrder.some((name) => button.textContent?.includes(name)),
+      );
+    expect(providerButtons.map((button) => button.textContent)).toEqual(
+      expectedOttOrder,
+    );
   });
 
   it('OTT 선택 단계에서 뒤로 가기 시 닉네임 단계로 돌아가야 한다', async () => {

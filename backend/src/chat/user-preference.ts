@@ -20,6 +20,8 @@ const OTT_ID_TO_TMDB_NAME: Record<string, string> = {
   disney_plus: 'Disney Plus',
   watcha: 'Watcha',
   wavve: 'wavve',
+  apple_tv_plus: 'Apple TV Plus',
+  amazon_prime: 'Amazon Prime Video',
   tving: 'Tving',
   coupang_play: 'Coupang Play',
 };
@@ -187,6 +189,8 @@ const TMDB_NAME_TO_KOREAN: Record<string, string> = {
   'Disney Plus': '디즈니플러스',
   Watcha: '왓챠',
   wavve: '웨이브',
+  'Apple TV Plus': '애플 TV+',
+  'Amazon Prime Video': '아마존 프라임',
   Tving: '티빙',
   'Coupang Play': '쿠팡플레이',
 };

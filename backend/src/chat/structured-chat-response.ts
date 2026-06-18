@@ -161,7 +161,7 @@ function stripTrailingRecommendationMeta(reason: string): string {
   while (true) {
     const next = result
       .replace(
-        /\s*\((?=[^)]*(?:가능|OTT|넷플릭스|Netflix|왓챠|Watcha|웨이브|wavve|티빙|TVING|디즈니|Disney|쿠팡|Coupang|Apple|Prime|WAVVE|톤|장르))[^)]*\)\s*$/i,
+        /\s*\((?=[^)]*(?:가능|OTT|넷플릭스|Netflix|왓챠|Watcha|웨이브|wavve|티빙|TVING|디즈니|Disney|Apple|Prime|쿠팡|Coupang|WAVVE|톤|장르))[^)]*\)\s*$/i,
         '',
       )
       .trim();

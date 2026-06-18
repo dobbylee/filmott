@@ -41,7 +41,7 @@ function buildIntentSystemPrompt(): string {
   return `오늘 날짜: ${today}
 
 사용자 메시지에서 영화/시리즈 추천에 필요한 조건을 JSON으로 추출하세요.
-- ottProviderNames: OTT 플랫폼 (Netflix, Tving, wavve, Watcha, Disney Plus, Coupang Play). 없으면 빈 배열.
+- ottProviderNames: OTT 플랫폼 (Netflix, Tving, wavve, Watcha, Disney Plus, Apple TV Plus, Amazon Prime Video, Coupang Play). 없으면 빈 배열.
 - countries: 제작 국가 ISO 코드 (KR, US, JP, GB 등). 없으면 빈 배열.
 - excludeCountries: 제외할 국가 ISO 코드. "외국"/"해외" → ["KR"] (한국 제외), "비영어권" → ["US", "GB", "CA", "AU"]. 없으면 빈 배열.
 - personNames: 감독/배우 이름. "기생충 감독" → "봉준호"처럼 작품으로 유추 가능하면 실제 이름으로. 없으면 빈 배열.
@@ -156,7 +156,7 @@ function parseIntentResponse(raw: unknown): ParsedIntent {
 
 // OTT명 정규식: 한/영 변형 포함
 const OTT_PATTERN =
-  /(?:넷플릭스|넷플|netflix|티빙|tving|웨이브|wavve|왓챠|watcha|디즈니플러스|디즈니\+|disney\s*plus|disney\+|쿠팡플레이|쿠팡|coupang\s*play)/gi;
+  /(?:넷플릭스|넷플|netflix|티빙|tving|웨이브|wavve|왓챠|watcha|디즈니플러스|디즈니\+|disney\s*plus|disney\+|애플\s*(?:TV|티비)\+?|apple\s*tv(?:\+|\s*plus)?|아마존\s*프라임|amazon\s*prime(?:\s*video)?|prime\s*video|쿠팡플레이|쿠팡|coupang\s*play)/gi;
 
 // 국가명 매핑 (한국어 → ISO)
 const COUNTRY_NAMES: Record<string, string> = {
