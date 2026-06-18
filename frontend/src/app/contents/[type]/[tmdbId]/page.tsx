@@ -191,7 +191,7 @@ export default async function ContentDetailPage({
           <div className="relative h-[40vh] w-full bg-[#050505] md:h-[70vh] md:max-h-[760px]">
             <div className="relative mx-auto h-full w-full max-w-[1920px] overflow-hidden">
               <TmdbImage
-                src={replaceTmdbSize(content.backdropUrl, 'original')}
+                src={replaceTmdbSize(content.backdropUrl, 'w1920')}
                 alt={content.title}
                 fill
                 priority
