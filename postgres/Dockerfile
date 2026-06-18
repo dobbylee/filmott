@@ -1,8 +1,13 @@
 FROM postgres:18-alpine
 
-RUN apk add --no-cache --virtual .build-deps git build-base clang21 llvm21-dev \
+RUN apk add --no-cache --virtual .build-deps \
+        git \
+        build-base \
+        $DOCKER_PG_LLVM_DEPS \
     && git clone --branch v0.8.2 https://github.com/pgvector/pgvector.git /tmp/pgvector \
     && cd /tmp/pgvector \
-    && make clean && make OPTFLAGS="" && make install \
+    && make clean \
+    && make OPTFLAGS="" \
+    && make install \
     && rm -rf /tmp/pgvector \
     && apk del .build-deps
