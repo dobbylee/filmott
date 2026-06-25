@@ -32,6 +32,13 @@ describe('KobisService', () => {
 
   describe('getDailyBoxOffice', () => {
     it('일일 박스오피스 목록을 반환해야 한다', async () => {
+      const loggerSpy = jest
+        .spyOn(Logger.prototype, 'log')
+        .mockImplementation();
+      jest
+        .spyOn(Date, 'now')
+        .mockReturnValueOnce(1_000)
+        .mockReturnValueOnce(1_242);
       const mockItems = [
         {
           rank: '1',
@@ -67,6 +74,14 @@ describe('KobisService', () => {
       expect(mockHttpService.get).toHaveBeenCalledWith(
         '/boxoffice/searchDailyBoxOfficeList.json',
         { params: { targetDt: '20260309' } },
+      );
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'KOBIS daily box office request succeeded',
+        {
+          targetDt: '20260309',
+          durationMs: 242,
+          itemCount: 1,
+        },
       );
     });
 
@@ -105,6 +120,10 @@ describe('KobisService', () => {
       const loggerSpy = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
+      jest
+        .spyOn(Date, 'now')
+        .mockReturnValueOnce(2_000)
+        .mockReturnValueOnce(2_510);
       const error = new AxiosError(
         'Request failed with status code 401',
         '401',
@@ -130,6 +149,8 @@ describe('KobisService', () => {
         expect.objectContaining({
           service: 'KOBIS',
           endpointPath: '/boxoffice/searchDailyBoxOfficeList.json',
+          targetDt: '20260309',
+          durationMs: 510,
         }),
       );
     });

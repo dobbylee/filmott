@@ -23,6 +23,10 @@ export interface KobisBoxOfficeResult {
   };
 }
 
+function getElapsedMs(startedAt: number): number {
+  return Date.now() - startedAt;
+}
+
 @Injectable()
 export class KobisService {
   private readonly logger = new Logger(KobisService.name);
@@ -34,6 +38,8 @@ export class KobisService {
    * @param targetDt YYYYMMDD 형식 (예: '20260309')
    */
   async getDailyBoxOffice(targetDt: string): Promise<KobisBoxOfficeItem[]> {
+    const startedAt = Date.now();
+
     try {
       const { data } = await firstValueFrom(
         this.httpService.get<KobisBoxOfficeResult>(
@@ -42,16 +48,23 @@ export class KobisService {
         ),
       );
 
-      return data.boxOfficeResult.dailyBoxOfficeList ?? [];
+      const items = data.boxOfficeResult.dailyBoxOfficeList ?? [];
+      this.logger.log('KOBIS daily box office request succeeded', {
+        targetDt,
+        durationMs: getElapsedMs(startedAt),
+        itemCount: items.length,
+      });
+      return items;
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch daily box office for ${targetDt}`,
-        summarizeExternalApiError(
+      this.logger.error(`Failed to fetch daily box office for ${targetDt}`, {
+        ...summarizeExternalApiError(
           'KOBIS',
           error,
           '/boxoffice/searchDailyBoxOfficeList.json',
         ),
-      );
+        targetDt,
+        durationMs: getElapsedMs(startedAt),
+      });
       throw error;
     }
   }
@@ -65,6 +78,8 @@ export class KobisService {
     targetDt: string,
     weekGb: '0' | '1' | '2' = '0',
   ): Promise<KobisBoxOfficeItem[]> {
+    const startedAt = Date.now();
+
     try {
       const { data } = await firstValueFrom(
         this.httpService.get<KobisBoxOfficeResult>(
@@ -73,16 +88,25 @@ export class KobisService {
         ),
       );
 
-      return data.boxOfficeResult.weeklyBoxOfficeList ?? [];
+      const items = data.boxOfficeResult.weeklyBoxOfficeList ?? [];
+      this.logger.log('KOBIS weekly box office request succeeded', {
+        targetDt,
+        weekGb,
+        durationMs: getElapsedMs(startedAt),
+        itemCount: items.length,
+      });
+      return items;
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch weekly box office for ${targetDt}`,
-        summarizeExternalApiError(
+      this.logger.error(`Failed to fetch weekly box office for ${targetDt}`, {
+        ...summarizeExternalApiError(
           'KOBIS',
           error,
           '/boxoffice/searchWeeklyBoxOfficeList.json',
         ),
-      );
+        targetDt,
+        weekGb,
+        durationMs: getElapsedMs(startedAt),
+      });
       throw error;
     }
   }

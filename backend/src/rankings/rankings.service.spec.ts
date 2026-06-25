@@ -216,6 +216,7 @@ describe('RankingsService', () => {
       await service.scheduleDailyBoxOfficeMidnight();
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-midnight');
     });
 
     it('정오 스케줄러가 fetchDailyBoxOffice를 호출해야 한다', async () => {
@@ -226,6 +227,7 @@ describe('RankingsService', () => {
       await service.scheduleDailyBoxOfficeNoon();
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-noon');
     });
 
     it('백필 스케줄러는 전일 데이터가 없을 때만 fetchDailyBoxOffice를 호출해야 한다', async () => {
@@ -244,6 +246,7 @@ describe('RankingsService', () => {
         }),
       });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-backfill');
     });
 
     it('백필 스케줄러는 전일 데이터가 이미 있으면 호출하지 않아야 한다', async () => {
@@ -441,6 +444,10 @@ describe('RankingsService', () => {
         expect.objectContaining({
           service: 'KOBIS',
           message: 'KOBIS API error',
+          trigger: 'manual-refresh',
+          targetDt: expect.stringMatching(/^\d{8}$/),
+          targetDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          durationMs: expect.any(Number),
         }),
       );
     });

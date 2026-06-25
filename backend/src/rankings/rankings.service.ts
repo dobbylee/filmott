@@ -17,6 +17,12 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const TMDB_CALL_DELAY_MS = 250;
 const RANKINGS_REVALIDATE_TAGS = ['rankings'];
 
+type DailyBoxOfficeTrigger =
+  | 'daily-box-office-midnight'
+  | 'daily-box-office-backfill'
+  | 'daily-box-office-noon'
+  | 'manual-refresh';
+
 @Injectable()
 export class RankingsService {
   private readonly logger = new Logger(RankingsService.name);
@@ -42,7 +48,7 @@ export class RankingsService {
     timeZone: 'Asia/Seoul',
   })
   async scheduleDailyBoxOfficeMidnight(): Promise<Ranking[]> {
-    return this.fetchDailyBoxOffice();
+    return this.fetchDailyBoxOffice('daily-box-office-midnight');
   }
 
   /**
@@ -66,14 +72,24 @@ export class RankingsService {
     if (existingCount > 0) {
       this.logger.log(
         `Daily box office already exists for ${targetDate}, skipping backfill`,
+        {
+          trigger: 'daily-box-office-backfill',
+          targetDate,
+          existingCount,
+        },
       );
       return;
     }
 
     this.logger.warn(
       `Daily box office missing for ${targetDate}, running backfill`,
+      {
+        trigger: 'daily-box-office-backfill',
+        targetDate,
+        existingCount,
+      },
     );
-    return this.fetchDailyBoxOffice();
+    return this.fetchDailyBoxOffice('daily-box-office-backfill');
   }
 
   /**
@@ -85,17 +101,24 @@ export class RankingsService {
     timeZone: 'Asia/Seoul',
   })
   async scheduleDailyBoxOfficeNoon(): Promise<Ranking[]> {
-    return this.fetchDailyBoxOffice();
+    return this.fetchDailyBoxOffice('daily-box-office-noon');
   }
 
   /**
    * KOBIS 일별 박스오피스를 가져와 rankings에 저장
    * 수동 실행 및 스케줄러 공용
    */
-  async fetchDailyBoxOffice(): Promise<Ranking[]> {
+  async fetchDailyBoxOffice(
+    trigger: DailyBoxOfficeTrigger = 'manual-refresh',
+  ): Promise<Ranking[]> {
+    const startedAt = Date.now();
     const yesterday = this.getYesterdayDate();
     const targetDate = this.formatDateWithDashes(yesterday);
-    this.logger.log(`Fetching daily box office for ${yesterday}`);
+    this.logger.log(`Fetching daily box office for ${yesterday}`, {
+      trigger,
+      targetDt: yesterday,
+      targetDate,
+    });
 
     try {
       const boxOfficeItems =
@@ -148,6 +171,14 @@ export class RankingsService {
 
       this.logger.log(
         `Saved ${rankingsToUpsert.length} daily box office rankings`,
+        {
+          trigger,
+          targetDt: yesterday,
+          targetDate,
+          itemCount: boxOfficeItems.length,
+          savedCount: rankingsToUpsert.length,
+          durationMs: Date.now() - startedAt,
+        },
       );
 
       const contentIds = rankingsToUpsert
@@ -163,7 +194,13 @@ export class RankingsService {
       );
       return rankingsToUpsert;
     } catch (error) {
-      const errorSummary = summarizeExternalApiError('KOBIS', error);
+      const errorSummary = {
+        ...summarizeExternalApiError('KOBIS', error),
+        trigger,
+        targetDt: yesterday,
+        targetDate,
+        durationMs: Date.now() - startedAt,
+      };
       this.logger.error('Failed to fetch daily box office', errorSummary);
       Sentry.captureException(errorSummary);
       throw error;
