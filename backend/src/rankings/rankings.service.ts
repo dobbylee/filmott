@@ -35,9 +35,9 @@ export class RankingsService {
 
   /**
    * KOBIS 일별 박스오피스 1차 수집
-   * 매일 00:10 실행 (전일자 데이터)
+   * 매일 00:05 실행 (전일자 데이터)
    */
-  @Cron('10 0 * * *', {
+  @Cron('5 0 * * *', {
     name: 'daily-box-office-midnight',
     timeZone: 'Asia/Seoul',
   })
