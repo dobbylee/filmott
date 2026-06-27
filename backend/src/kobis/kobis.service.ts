@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { summarizeExternalApiError } from '../common/external-api-error.util';
@@ -27,6 +27,49 @@ function getElapsedMs(startedAt: number): number {
   return Date.now() - startedAt;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isKobisBoxOfficeItem(value: unknown): value is KobisBoxOfficeItem {
+  return (
+    isRecord(value) &&
+    typeof value.rank === 'string' &&
+    typeof value.movieNm === 'string' &&
+    typeof value.movieCd === 'string' &&
+    typeof value.openDt === 'string' &&
+    typeof value.audiCnt === 'string' &&
+    typeof value.audiAcc === 'string' &&
+    typeof value.salesAmt === 'string' &&
+    typeof value.salesAcc === 'string'
+  );
+}
+
+function extractBoxOfficeList(
+  data: unknown,
+  listKey: 'dailyBoxOfficeList' | 'weeklyBoxOfficeList',
+  context: string,
+): KobisBoxOfficeItem[] {
+  if (!isRecord(data) || !isRecord(data.boxOfficeResult)) {
+    throw new BadGatewayException(
+      `KOBIS ${context} 응답 형식이 올바르지 않습니다.`,
+    );
+  }
+
+  const list = data.boxOfficeResult[listKey];
+  if (list === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(list) || !list.every(isKobisBoxOfficeItem)) {
+    throw new BadGatewayException(
+      `KOBIS ${context} 목록 형식이 올바르지 않습니다.`,
+    );
+  }
+
+  return list;
+}
+
 @Injectable()
 export class KobisService {
   private readonly logger = new Logger(KobisService.name);
@@ -42,13 +85,17 @@ export class KobisService {
 
     try {
       const { data } = await firstValueFrom(
-        this.httpService.get<KobisBoxOfficeResult>(
+        this.httpService.get<unknown>(
           '/boxoffice/searchDailyBoxOfficeList.json',
           { params: { targetDt } },
         ),
       );
 
-      const items = data.boxOfficeResult.dailyBoxOfficeList ?? [];
+      const items = extractBoxOfficeList(
+        data,
+        'dailyBoxOfficeList',
+        'daily box office',
+      );
       this.logger.log('KOBIS daily box office request succeeded', {
         targetDt,
         durationMs: getElapsedMs(startedAt),
@@ -82,13 +129,17 @@ export class KobisService {
 
     try {
       const { data } = await firstValueFrom(
-        this.httpService.get<KobisBoxOfficeResult>(
+        this.httpService.get<unknown>(
           '/boxoffice/searchWeeklyBoxOfficeList.json',
           { params: { targetDt, weekGb } },
         ),
       );
 
-      const items = data.boxOfficeResult.weeklyBoxOfficeList ?? [];
+      const items = extractBoxOfficeList(
+        data,
+        'weeklyBoxOfficeList',
+        'weekly box office',
+      );
       this.logger.log('KOBIS weekly box office request succeeded', {
         targetDt,
         weekGb,

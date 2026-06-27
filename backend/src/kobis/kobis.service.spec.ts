@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
-import { Logger } from '@nestjs/common';
+import { BadGatewayException, Logger } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { KobisService } from './kobis.service';
 import { AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
@@ -116,6 +116,64 @@ describe('KobisService', () => {
       );
     });
 
+    it('KOBIS 응답에 boxOfficeResult가 없으면 BadGatewayException을 던져야 한다', async () => {
+      const loggerSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      jest
+        .spyOn(Date, 'now')
+        .mockReturnValueOnce(3_000)
+        .mockReturnValueOnce(3_120);
+      const response: AxiosResponse = {
+        data: {
+          faultInfo: {
+            message: 'temporary upstream response',
+          },
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+      };
+      mockHttpService.get.mockReturnValue(of(response));
+
+      await expect(service.getDailyBoxOffice('20260309')).rejects.toThrow(
+        BadGatewayException,
+      );
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Failed to fetch daily box office for 20260309',
+        expect.objectContaining({
+          service: 'KOBIS',
+          endpointPath: '/boxoffice/searchDailyBoxOfficeList.json',
+          message: 'KOBIS daily box office 응답 형식이 올바르지 않습니다.',
+          targetDt: '20260309',
+          durationMs: 120,
+        }),
+      );
+    });
+
+    it('KOBIS 일일 목록이 배열이 아니면 BadGatewayException을 던져야 한다', async () => {
+      const response: AxiosResponse = {
+        data: {
+          boxOfficeResult: {
+            boxofficeType: 'Daily',
+            showRange: '20260309~20260309',
+            dailyBoxOfficeList: {},
+          },
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+      };
+      mockHttpService.get.mockReturnValue(of(response));
+
+      await expect(service.getDailyBoxOffice('20260309')).rejects.toThrow(
+        BadGatewayException,
+      );
+    });
+
     it('API 실패 로그에 key와 Authorization을 포함하지 않아야 한다', async () => {
       const loggerSpy = jest
         .spyOn(Logger.prototype, 'error')
@@ -193,6 +251,21 @@ describe('KobisService', () => {
       expect(mockHttpService.get).toHaveBeenCalledWith(
         '/boxoffice/searchWeeklyBoxOfficeList.json',
         { params: { targetDt: '20260309', weekGb: '0' } },
+      );
+    });
+
+    it('KOBIS 주간 응답에 boxOfficeResult가 없으면 BadGatewayException을 던져야 한다', async () => {
+      const response: AxiosResponse = {
+        data: { faultInfo: { message: 'temporary upstream response' } },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+      };
+      mockHttpService.get.mockReturnValue(of(response));
+
+      await expect(service.getWeeklyBoxOffice('20260309', '0')).rejects.toThrow(
+        BadGatewayException,
       );
     });
   });
