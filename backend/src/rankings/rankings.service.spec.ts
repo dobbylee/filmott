@@ -196,14 +196,14 @@ describe('RankingsService', () => {
   });
 
   describe('daily box office schedulers', () => {
-    it('자정 스케줄러가 매일 00:10에 실행되도록 설정되어야 한다', () => {
+    it('자정 스케줄러가 매일 00:15에 실행되도록 설정되어야 한다', () => {
       const cronMetadata = Reflect.getMetadata(
         'SCHEDULE_CRON_OPTIONS',
         service.scheduleDailyBoxOfficeMidnight,
       ) as { cronTime?: unknown; timeZone?: unknown };
 
       expect(cronMetadata).toMatchObject({
-        cronTime: '10 0 * * *',
+        cronTime: '15 0 * * *',
         timeZone: 'Asia/Seoul',
       });
     });
