@@ -10,6 +10,14 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+const mockCaptureAuthFailure = vi.fn();
+const mockCaptureAuthFailureMessage = vi.fn();
+vi.mock('@/lib/auth-error-reporting', () => ({
+  captureAuthFailure: (...args: unknown[]) => mockCaptureAuthFailure(...args),
+  captureAuthFailureMessage: (...args: unknown[]) =>
+    mockCaptureAuthFailureMessage(...args),
+}));
+
 describe('useAuthCallback', () => {
   const mockOnAuthSuccess = vi.fn();
   const mockOnRedirect = vi.fn();
@@ -49,7 +57,8 @@ describe('useAuthCallback', () => {
     });
 
     it('세션 확인 실패 시 에러 상태를 반환한다', async () => {
-      mockSessionGet.mockRejectedValue(new Error('session failed'));
+      const error = new Error('session failed');
+      mockSessionGet.mockRejectedValue(error);
 
       const { result } = renderHook(() =>
         useAuthCallback({
@@ -66,6 +75,9 @@ describe('useAuthCallback', () => {
         if (result.current.type === 'error') {
           expect(result.current.message).toBe('소셜 인증에 실패했습니다. 다시 시도해주세요.');
         }
+      });
+      expect(mockCaptureAuthFailure).toHaveBeenCalledWith(error, {
+        flow: 'social_session_restore',
       });
     });
   });
@@ -106,7 +118,7 @@ describe('useAuthCallback', () => {
   });
 
   describe('에러 처리', () => {
-    it('social_auth_failed 에러 메시지를 반환한다', () => {
+    it('social_auth_failed 에러 메시지를 반환하고 Sentry에 기록해야 한다', async () => {
       const { result } = renderHook(() =>
         useAuthCallback({
           status: null,
@@ -121,6 +133,15 @@ describe('useAuthCallback', () => {
       if (result.current.type === 'error') {
         expect(result.current.message).toBe('소셜 인증에 실패했습니다. 다시 시도해주세요.');
       }
+      await waitFor(() => {
+        expect(mockCaptureAuthFailureMessage).toHaveBeenCalledWith(
+          'Social auth callback failed',
+          {
+            flow: 'social_auth_callback',
+            reason: 'social_auth_failed',
+          },
+        );
+      });
     });
 
     it('알 수 없는 에러 코드일 때 기본 메시지를 반환한다', () => {

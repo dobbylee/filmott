@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
+import { captureAuthFailure } from '@/lib/auth-error-reporting';
 import type { AuthResponse } from '@/types/auth';
 
 export default function AdminLoginPage() {
@@ -22,7 +23,8 @@ export default function AdminLoginPage() {
       const { data } = await api.post<AuthResponse>('/auth/login', { email, password });
       handleAuthSuccess(data);
       router.replace('/admin');
-    } catch {
+    } catch (err) {
+      captureAuthFailure(err, { flow: 'admin_login' });
       setError('로그인에 실패했습니다.');
     } finally {
       setLoading(false);

@@ -1,6 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  UnauthorizedException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -19,6 +24,10 @@ import {
   AUTH_REFRESH_TOKEN_COOKIE,
   SOCIAL_SIGNUP_COOKIE,
 } from './auth-cookie.util';
+
+jest.mock('@sentry/nestjs', () => ({
+  captureException: jest.fn(),
+}));
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -145,6 +154,8 @@ describe('AuthController', () => {
   };
 
   beforeEach(async () => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [AuthController],
@@ -514,6 +525,25 @@ describe('AuthController', () => {
       expect(mockRes.redirect).toHaveBeenCalledWith(
         expect.stringContaining('error=invalid_state'),
       );
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          level: 'error',
+          tags: expect.objectContaining({
+            feature: 'auth',
+            auth_flow: 'social_callback',
+            provider: 'google',
+            auth_error_reason: 'invalid_state',
+          }),
+          contexts: {
+            auth: expect.objectContaining({
+              flow: 'social_callback',
+              provider: 'google',
+              reason: 'invalid_state',
+            }),
+          },
+        }),
+      );
     });
 
     it('code가 없으면 에러와 함께 리다이렉트해야 한다', async () => {
@@ -533,6 +563,24 @@ describe('AuthController', () => {
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
         expect.stringContaining('error=missing_code'),
+      );
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            feature: 'auth',
+            auth_flow: 'social_callback',
+            provider: 'google',
+            auth_error_reason: 'missing_code',
+          }),
+          contexts: {
+            auth: expect.objectContaining({
+              flow: 'social_callback',
+              provider: 'google',
+              reason: 'missing_code',
+            }),
+          },
+        }),
       );
     });
 
@@ -563,6 +611,26 @@ describe('AuthController', () => {
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
         expect.stringContaining('error=suspended'),
+      );
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            feature: 'auth',
+            auth_flow: 'social_callback',
+            provider: 'google',
+            auth_error_reason: 'suspended',
+          }),
+          contexts: {
+            auth: expect.objectContaining({
+              flow: 'social_callback',
+              provider: 'google',
+              reason: 'suspended',
+              statusCode: 401,
+              originalName: 'UnauthorizedException',
+            }),
+          },
+        }),
       );
       // error.message 원문이 노출되지 않아야 한다
       expect(mockRes.redirect).not.toHaveBeenCalledWith(
@@ -620,6 +688,25 @@ describe('AuthController', () => {
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
         expect.stringContaining('error=social_auth_failed'),
+      );
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            feature: 'auth',
+            auth_flow: 'social_callback',
+            provider: 'google',
+            auth_error_reason: 'social_auth_failed',
+          }),
+          contexts: {
+            auth: expect.objectContaining({
+              flow: 'social_callback',
+              provider: 'google',
+              reason: 'social_auth_failed',
+              originalName: 'Error',
+            }),
+          },
+        }),
       );
       // error.message가 직접 노출되지 않아야 한다
       expect(mockRes.redirect).not.toHaveBeenCalledWith(

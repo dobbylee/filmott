@@ -9,6 +9,7 @@ import { validateNickname } from '@/utils/nickname';
 import { getErrorMessage } from '@/utils/error';
 import { OTT_PROVIDERS } from '@/lib/ott-providers';
 import api from '@/lib/api';
+import { captureAuthFailure } from '@/lib/auth-error-reporting';
 import { trackEvent } from '@/lib/ga';
 import {
   clearStoredSocialSignupToken,
@@ -103,6 +104,7 @@ export default function NicknameSetupModal() {
       handleAuthSuccess(response.data);
       router.replace('/');
     } catch (err) {
+      captureAuthFailure(err, { flow: 'social_signup_complete' });
       setError(getErrorMessage(err));
     } finally {
       setIsSubmitting(false);

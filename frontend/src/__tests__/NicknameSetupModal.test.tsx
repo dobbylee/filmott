@@ -8,6 +8,11 @@ vi.mock('@/lib/ga', () => ({
   trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
 }));
 
+const mockCaptureAuthFailure = vi.fn();
+vi.mock('@/lib/auth-error-reporting', () => ({
+  captureAuthFailure: (...args: unknown[]) => mockCaptureAuthFailure(...args),
+}));
+
 const mockHandleAuthSuccess = vi.fn();
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -267,7 +272,8 @@ describe('NicknameSetupModal', () => {
   it('API 실패 시 signup_completed 이벤트를 호출하지 않아야 한다', async () => {
     const user = userEvent.setup();
     mockApiGet.mockResolvedValue({ data: { available: true } });
-    mockApiPost.mockRejectedValue(new Error('서버 오류'));
+    const error = new Error('서버 오류');
+    mockApiPost.mockRejectedValue(error);
 
     render(<NicknameSetupModal />);
 
@@ -282,6 +288,9 @@ describe('NicknameSetupModal', () => {
     await user.click(screen.getByRole('button', { name: '시작하기' }));
 
     expect(mockTrackEvent).not.toHaveBeenCalled();
+    expect(mockCaptureAuthFailure).toHaveBeenCalledWith(error, {
+      flow: 'social_signup_complete',
+    });
   });
 
   it('나중에 프로필에서 변경할 수 있어요 안내 문구가 표시되어야 한다', async () => {

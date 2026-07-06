@@ -33,6 +33,11 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+const mockCaptureAuthFailure = vi.fn();
+vi.mock('@/lib/auth-error-reporting', () => ({
+  captureAuthFailure: (...args: unknown[]) => mockCaptureAuthFailure(...args),
+}));
+
 describe('AdminLoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,7 +63,8 @@ describe('AdminLoginPage', () => {
   });
 
   it('로그인 실패 시 에러 메시지를 표시해야 한다', async () => {
-    mockPost.mockRejectedValue(new Error('Login failed'));
+    const error = new Error('Login failed');
+    mockPost.mockRejectedValue(error);
     const user = userEvent.setup();
 
     render(<AdminLoginPage />);
@@ -69,6 +75,9 @@ describe('AdminLoginPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('로그인에 실패했습니다.')).toBeInTheDocument();
+    });
+    expect(mockCaptureAuthFailure).toHaveBeenCalledWith(error, {
+      flow: 'admin_login',
     });
     expect(mockReplace).not.toHaveBeenCalled();
   });

@@ -11,7 +11,10 @@ import {
   UseGuards,
   BadRequestException,
   UnauthorizedException,
+  HttpException,
+  Logger,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
@@ -46,9 +49,18 @@ const INTERNAL_FRONTEND_HOSTNAMES = new Set([
   '0.0.0.0',
 ]);
 
+type SocialLoginProvider = 'google' | 'kakao' | 'naver';
+type AuthFailureReason =
+  | 'deleted'
+  | 'invalid_state'
+  | 'missing_code'
+  | 'social_auth_failed'
+  | 'suspended';
+
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
   private readonly frontendUrl: string;
   private readonly isProduction: boolean;
 
@@ -154,9 +166,16 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.handleSocialCallback(req, res, code, state, async () => {
-      return this.googleService.getProfile(code);
-    });
+    return this.handleSocialCallback(
+      'google',
+      req,
+      res,
+      code,
+      state,
+      async () => {
+        return this.googleService.getProfile(code);
+      },
+    );
   }
 
   @Get('kakao')
@@ -176,9 +195,16 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.handleSocialCallback(req, res, code, state, async () => {
-      return this.kakaoService.getProfile(code);
-    });
+    return this.handleSocialCallback(
+      'kakao',
+      req,
+      res,
+      code,
+      state,
+      async () => {
+        return this.kakaoService.getProfile(code);
+      },
+    );
   }
 
   @Get('naver')
@@ -198,9 +224,16 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.handleSocialCallback(req, res, code, state, async () => {
-      return this.naverService.getProfile(code, state);
-    });
+    return this.handleSocialCallback(
+      'naver',
+      req,
+      res,
+      code,
+      state,
+      async () => {
+        return this.naverService.getProfile(code, state);
+      },
+    );
   }
 
   @HttpCode(HttpStatus.OK)
@@ -298,6 +331,40 @@ export class AuthController {
     clearSocialSignupCookie(res, this.isProduction);
   }
 
+  private reportAuthFailure(
+    provider: SocialLoginProvider,
+    reason: AuthFailureReason,
+    error?: unknown,
+  ): void {
+    const statusCode =
+      error instanceof HttpException ? error.getStatus() : undefined;
+    const originalName = error instanceof Error ? error.name : undefined;
+    const context = {
+      flow: 'social_callback',
+      provider,
+      reason,
+      ...(statusCode ? { statusCode } : {}),
+      ...(originalName ? { originalName } : {}),
+    };
+    const sentryError = new Error(
+      `Social auth callback failed: ${provider}/${reason}`,
+    );
+
+    this.logger.error(sentryError.message, context);
+    Sentry.captureException(sentryError, {
+      level: 'error',
+      tags: {
+        feature: 'auth',
+        auth_flow: 'social_callback',
+        provider,
+        auth_error_reason: reason,
+      },
+      contexts: {
+        auth: context,
+      },
+    });
+  }
+
   private validateFrontendUrl(): void {
     if (!this.isProduction) {
       return;
@@ -318,6 +385,7 @@ export class AuthController {
   }
 
   private async handleSocialCallback(
+    provider: SocialLoginProvider,
     req: Request,
     res: Response,
     code: string,
@@ -328,11 +396,13 @@ export class AuthController {
 
     try {
       if (!code) {
+        this.reportAuthFailure(provider, 'missing_code');
         res.redirect(`${callbackUrl}?error=missing_code`);
         return;
       }
 
       if (!this.verifyState(req, res, state)) {
+        this.reportAuthFailure(provider, 'invalid_state');
         res.redirect(`${callbackUrl}?error=invalid_state`);
         return;
       }
@@ -353,12 +423,13 @@ export class AuthController {
         );
       }
     } catch (error) {
-      let errorCode = 'social_auth_failed';
+      let errorCode: AuthFailureReason = 'social_auth_failed';
       if (error instanceof UnauthorizedException) {
         const message = error.message;
         if (message.includes('정지')) errorCode = 'suspended';
         else if (message.includes('탈퇴')) errorCode = 'deleted';
       }
+      this.reportAuthFailure(provider, errorCode, error);
       res.redirect(`${callbackUrl}?error=${errorCode}`);
     }
   }

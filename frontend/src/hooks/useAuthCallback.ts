@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { refreshApi } from '@/lib/api';
+import {
+  captureAuthFailure,
+  captureAuthFailureMessage,
+} from '@/lib/auth-error-reporting';
 import { persistSocialSignupTokenFromHash } from '@/lib/social-signup-storage';
 import type { AuthResponse, User } from '@/types/auth';
 
@@ -44,6 +48,7 @@ export function useAuthCallback({
   });
   const onAuthSuccessRef = useRef(onAuthSuccess);
   const onRedirectRef = useRef(onRedirect);
+  const reportedErrorRef = useRef<string | null>(null);
 
   useEffect(() => {
     onAuthSuccessRef.current = onAuthSuccess;
@@ -52,6 +57,14 @@ export function useAuthCallback({
 
   useEffect(() => {
     if (error) {
+      if (reportedErrorRef.current !== error) {
+        captureAuthFailureMessage('Social auth callback failed', {
+          flow: 'social_auth_callback',
+          reason: error,
+        });
+        reportedErrorRef.current = error;
+      }
+
       const timer = setTimeout(() => {
         onRedirectRef.current('/');
       }, 3000);
@@ -70,9 +83,10 @@ export function useAuthCallback({
           onAuthSuccessRef.current({ user: data });
           setAsyncState({ type: 'success' });
           onRedirectRef.current('/');
-        } catch {
+        } catch (err) {
           if (!active) return;
 
+          captureAuthFailure(err, { flow: 'social_session_restore' });
           setAsyncState({
             type: 'error',
             message: getErrorText('social_auth_failed'),
