@@ -18,6 +18,11 @@ vi.mock('@/lib/auth-error-reporting', () => ({
     mockCaptureAuthFailureMessage(...args),
 }));
 
+const mockTrackEvent = vi.fn();
+vi.mock('@/lib/ga', () => ({
+  trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
+}));
+
 describe('useAuthCallback', () => {
   const mockOnAuthSuccess = vi.fn();
   const mockOnRedirect = vi.fn();
@@ -32,7 +37,12 @@ describe('useAuthCallback', () => {
 
   describe('기존 유저 callback 처리', () => {
     it('status=success면 /users/me로 세션을 확인한다', async () => {
-      const mockUser = { id: 1, nickname: 'testuser', role: 'USER' };
+      const mockUser = {
+        id: 1,
+        nickname: 'testuser',
+        role: 'USER',
+        provider: 'GOOGLE',
+      };
       mockSessionGet.mockResolvedValue({ data: mockUser });
 
       const { result } = renderHook(() =>
@@ -51,6 +61,9 @@ describe('useAuthCallback', () => {
 
       await waitFor(() => {
         expect(mockOnAuthSuccess).toHaveBeenCalledWith({ user: mockUser });
+        expect(mockTrackEvent).toHaveBeenCalledWith('login_completed', {
+          provider: 'google',
+        });
         expect(mockOnRedirect).toHaveBeenCalledWith('/');
         expect(result.current.type).toBe('success');
       });

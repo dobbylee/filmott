@@ -38,6 +38,11 @@ vi.mock('@/lib/auth-error-reporting', () => ({
   captureAuthFailure: (...args: unknown[]) => mockCaptureAuthFailure(...args),
 }));
 
+const mockTrackEvent = vi.fn();
+vi.mock('@/lib/ga', () => ({
+  trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
+}));
+
 describe('AdminLoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,6 +63,9 @@ describe('AdminLoginPage', () => {
 
     await waitFor(() => {
       expect(mockHandleAuthSuccess).toHaveBeenCalledWith(authResponse);
+      expect(mockTrackEvent).toHaveBeenCalledWith('login_completed', {
+        provider: 'local',
+      });
       expect(mockReplace).toHaveBeenCalledWith('/admin');
     });
   });

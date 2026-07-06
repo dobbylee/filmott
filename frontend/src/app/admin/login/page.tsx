@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { captureAuthFailure } from '@/lib/auth-error-reporting';
+import { trackEvent } from '@/lib/ga';
 import type { AuthResponse } from '@/types/auth';
 
 export default function AdminLoginPage() {
@@ -22,6 +23,9 @@ export default function AdminLoginPage() {
     try {
       const { data } = await api.post<AuthResponse>('/auth/login', { email, password });
       handleAuthSuccess(data);
+      trackEvent('login_completed', {
+        provider: data.user.provider?.toLowerCase() ?? 'local',
+      });
       router.replace('/admin');
     } catch (err) {
       captureAuthFailure(err, { flow: 'admin_login' });
