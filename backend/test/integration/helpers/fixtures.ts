@@ -1,4 +1,5 @@
 import { DataSource, type DeepPartial } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { AuthProvider } from '../../../src/users/enums/auth-provider.enum';
 import { UserRole } from '../../../src/users/enums/user-role.enum';
 import { UserStatus } from '../../../src/users/enums/user-status.enum';
@@ -33,6 +34,29 @@ export function createIntegrationFixtures(dataSource: DataSource) {
           ...overrides,
         }),
       );
+    },
+
+    async loginAdmin(
+      overrides: DeepPartial<User> = {},
+    ): Promise<{ user: User; password: string }> {
+      const nickname = next('login_admin');
+      const password = 'e2e-password-123';
+      const user = await dataSource.getRepository(User).save(
+        dataSource.getRepository(User).create({
+          nickname,
+          email: `${nickname}@example.com`,
+          password: await bcrypt.hash(password, 10),
+          provider: AuthProvider.LOCAL,
+          providerId: null,
+          profileImage: undefined,
+          status: UserStatus.ACTIVE,
+          role: UserRole.ADMIN,
+          subscribedOtts: [],
+          ...overrides,
+        }),
+      );
+
+      return { user, password };
     },
 
     async content(overrides: DeepPartial<Content> = {}): Promise<Content> {
