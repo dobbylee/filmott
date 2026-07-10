@@ -1,4 +1,8 @@
-import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
+import {
+  clearServerSession,
+  notifyAuthRequired,
+  refreshSession,
+} from '@/lib/auth-session';
 import { isChatRecommendationArray, isRecord } from '@/lib/chat-guards';
 import type { ChatRecommendationWithPoster } from '@/types/chat';
 
@@ -23,28 +27,18 @@ export interface ChatRequestOptions {
   signal?: AbortSignal;
 }
 
-async function refreshAccessToken(signal?: AbortSignal): Promise<boolean> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+async function refreshAccessToken(): Promise<boolean> {
   try {
-    const res = await fetch(`${apiUrl}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      signal,
-    });
-    return res.ok;
+    await refreshSession();
+    return true;
   } catch {
     return false;
   }
 }
 
-async function clearServerSession(signal?: AbortSignal): Promise<void> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+async function clearExpiredServerSession(): Promise<void> {
   try {
-    await fetch(`${apiUrl}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include',
-      signal,
-    });
+    await clearServerSession();
   } catch {
     // 쿠키 정리 실패는 무시하고 원래 에러 처리 흐름을 따른다.
   }
@@ -69,13 +63,13 @@ async function fetchWithAuth(
   const response = await fetch(url, requestInit);
 
   if (response.status === 401) {
-    const refreshed = await refreshAccessToken(signal);
+    const refreshed = await refreshAccessToken();
     if (refreshed) {
       return fetch(url, requestInit);
     }
 
     if (!isAuthenticated) {
-      await clearServerSession(signal);
+      await clearExpiredServerSession();
       return fetch(url, requestInit);
     }
   }
@@ -154,7 +148,7 @@ export async function sendChatMessage(
   if (!response.ok) {
     if (response.status === 401) {
       if (isAuthenticated && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
+        notifyAuthRequired();
       }
       callbacks.onError(
         isAuthenticated

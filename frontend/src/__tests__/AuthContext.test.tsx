@@ -18,6 +18,10 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+vi.mock('@/lib/auth-session', () => ({
+  refreshSession: () => mockRefreshPost('/auth/refresh'),
+}));
+
 const mockUser: User = {
   id: 1,
   nickname: 'testuser',

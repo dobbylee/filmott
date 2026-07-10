@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { sendChatMessage } from '@/lib/chat-stream';
 import type { ChatStreamCallbacks } from '@/lib/chat-stream';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
+import { sessionApi } from '@/lib/auth-session';
 
 function createMockResponse(chunks: string[], status = 200): Response {
   let chunkIndex = 0;
@@ -80,39 +81,41 @@ describe('sendChatMessage', () => {
   });
 
   it('guest 요청이 401 후 refresh 실패면 서버 세션을 정리한 뒤 다시 guest 요청을 시도한다', async () => {
+    const sessionPostSpy = vi
+      .spyOn(sessionApi, 'post')
+      .mockRejectedValueOnce(new Error('refresh 실패'))
+      .mockResolvedValueOnce({ status: 204 });
     const fetchSpy = vi.spyOn(global, 'fetch');
     fetchSpy
       .mockResolvedValueOnce(createMockResponse([], 401))
-      .mockResolvedValueOnce(createMockResponse([], 401))
-      .mockResolvedValueOnce(createMockResponse([], 204))
       .mockResolvedValueOnce(createMockResponse(['event: done\ndata: {}\n\n']));
 
     await sendChatMessage('테스트', [], callbacks);
 
-    expect(fetchSpy).toHaveBeenNthCalledWith(
-      3,
-      expect.stringContaining('/auth/logout'),
-      expect.objectContaining({
-        method: 'POST',
-        credentials: 'include',
-      }),
+    expect(sessionPostSpy).toHaveBeenNthCalledWith(1, '/auth/refresh');
+    expect(sessionPostSpy).toHaveBeenNthCalledWith(
+      2,
+      '/auth/logout',
+      undefined,
+      {},
     );
-    expect(fetchSpy).toHaveBeenCalledTimes(4);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(callbacks.onDone).toHaveBeenCalledTimes(1);
     expect(callbacks.onError).not.toHaveBeenCalled();
   });
 
   it('로그인 사용자의 401 응답이 refresh 실패로 이어지면 세션 만료 에러를 호출한다', async () => {
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    vi.spyOn(sessionApi, 'post').mockRejectedValueOnce(
+      new Error('refresh 실패'),
+    );
     const fetchSpy = vi.spyOn(global, 'fetch');
-    fetchSpy
-      .mockResolvedValueOnce(createMockResponse([], 401))
-      .mockResolvedValueOnce(createMockResponse([], 401));
+    fetchSpy.mockResolvedValueOnce(createMockResponse([], 401));
 
     await sendChatMessage('테스트', [], callbacks, { isAuthenticated: true });
 
     expect(callbacks.onError).toHaveBeenCalledWith('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
 
     const authEvent = dispatchSpy.mock.calls.find(
       (call) => (call[0] as CustomEvent).type === AUTH_REQUIRED_EVENT,
@@ -121,23 +124,18 @@ describe('sendChatMessage', () => {
   });
 
   it('401 응답 후 refresh가 성공하면 원 요청을 재시도해야 한다', async () => {
+    const sessionPostSpy = vi
+      .spyOn(sessionApi, 'post')
+      .mockResolvedValueOnce({ status: 200 });
     const fetchSpy = vi.spyOn(global, 'fetch');
     fetchSpy
       .mockResolvedValueOnce(createMockResponse([], 401))
-      .mockResolvedValueOnce(createMockResponse([], 200))
       .mockResolvedValueOnce(createMockResponse(['event: done\ndata: {}\n\n']));
 
     await sendChatMessage('테스트', [], callbacks);
 
-    expect(fetchSpy).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining('/auth/refresh'),
-      expect.objectContaining({
-        method: 'POST',
-        credentials: 'include',
-      }),
-    );
-    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(sessionPostSpy).toHaveBeenCalledWith('/auth/refresh');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(callbacks.onDone).toHaveBeenCalledTimes(1);
   });
 

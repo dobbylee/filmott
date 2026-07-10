@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { isAxiosError } from 'axios';
 import { refreshApi } from '@/lib/api';
+import { refreshSession } from '@/lib/auth-session';
 import { clearLegacyAuthStorage } from '@/lib/auth-storage';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
 import type { User, AuthResponse } from '@/types/auth';
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         try {
-          await refreshApi.post('/auth/refresh');
+          await refreshSession();
           const { data } = await refreshApi.get<User>('/users/me');
           if (isMounted) {
             setUser(data);
