@@ -90,6 +90,13 @@ jobs:
         working-directory: frontend
       - run: npm run check
         working-directory: frontend
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Run frontend Playwright smoke
+        run: npm run test:e2e
+        working-directory: frontend
+
   mcp-check:
     runs-on: ubuntu-latest
     steps:
