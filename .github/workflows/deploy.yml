@@ -7,20 +7,38 @@ on:
     types: [completed]
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: appleboy/ssh-action@v1
+      - name: Deploy verified commit
+        # v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DEPLOY_SHA
           script: |
             set -Eeuo pipefail
 
             cd ~/filmott
+
+            if ! [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Invalid deploy SHA: ${DEPLOY_SHA}"
+              exit 1
+            fi
+            echo "Deploy target: ${DEPLOY_SHA}"
 
             compose() {
               docker compose --env-file .env -f docker-compose.prod.yml "$@"
@@ -44,8 +62,22 @@ jobs:
               fi
             done
 
-            git fetch origin main
-            git reset --hard origin/main
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+
+            if ! git cat-file -e "${DEPLOY_SHA}^{commit}"; then
+              echo "Deploy target is not a commit: ${DEPLOY_SHA}"
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$DEPLOY_SHA" origin/main; then
+              echo "Deploy target is not contained in origin/main: ${DEPLOY_SHA}"
+              exit 1
+            fi
+
+            git reset --hard "$DEPLOY_SHA"
+            if [ "$(git rev-parse HEAD)" != "$DEPLOY_SHA" ]; then
+              echo "Checked-out SHA does not match deploy target"
+              exit 1
+            fi
 
             compose config > /dev/null
             compose build --no-cache frontend backend
