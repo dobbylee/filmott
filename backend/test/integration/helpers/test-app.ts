@@ -41,7 +41,9 @@ export async function createIntegrationApp(
     ],
     controllers: options.controllers ?? [],
     providers: options.providers ?? [],
-  });
+  })
+    .overrideProvider(R2StorageService)
+    .useValue(r2StorageServiceStub);
 
   const configuredBuilder = options.configure
     ? options.configure(builder)
