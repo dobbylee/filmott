@@ -45,9 +45,12 @@ export class WatchlistService {
       dto.contentType,
     );
 
-    if (dto.status === 'want_to_watch') {
-      await this.assertNoReviewForWantToWatch(userId, content.id);
-    }
+    await this.assertStatusTransitionAllowed(
+      this.reviewRepo,
+      userId,
+      content.id,
+      dto.status,
+    );
 
     // Check if already in watchlist
     const existing = await this.watchlistRepo.findOne({
@@ -89,6 +92,7 @@ export class WatchlistService {
   ): Promise<Watchlist> {
     return this.upsertByContentId(
       this.watchlistRepo,
+      this.reviewRepo,
       userId,
       contentId,
       status,
@@ -105,6 +109,7 @@ export class WatchlistService {
   ): Promise<Watchlist> {
     return this.upsertByContentId(
       manager.getRepository(Watchlist),
+      manager.getRepository(Review),
       userId,
       contentId,
       status,
@@ -135,6 +140,12 @@ export class WatchlistService {
     }
 
     if (dto.status) {
+      await this.assertStatusTransitionAllowed(
+        this.reviewRepo,
+        userId,
+        item.contentId,
+        dto.status,
+      );
       item.status = dto.status;
       if (dto.status === 'watched') {
         item.watchedAt = normalizeKoreaDateInput(dto.watchedAt);
@@ -374,14 +385,18 @@ export class WatchlistService {
 
   private async upsertByContentId(
     repo: Repository<Watchlist>,
+    reviewRepo: Repository<Review>,
     userId: number,
     contentId: number,
     status: 'watched' | 'want_to_watch',
     watchedAt?: string,
   ): Promise<Watchlist> {
-    if (status === 'want_to_watch') {
-      await this.assertNoReviewForWantToWatch(userId, contentId);
-    }
+    await this.assertStatusTransitionAllowed(
+      reviewRepo,
+      userId,
+      contentId,
+      status,
+    );
 
     const existing = await repo.findOne({
       where: { userId, contentId },
@@ -406,11 +421,15 @@ export class WatchlistService {
     return repo.save(watchlist);
   }
 
-  private async assertNoReviewForWantToWatch(
+  private async assertStatusTransitionAllowed(
+    reviewRepo: Repository<Review>,
     userId: number,
     contentId: number,
+    targetStatus: 'watched' | 'want_to_watch',
   ): Promise<void> {
-    const existingReview = await this.reviewRepo.findOne({
+    if (targetStatus !== 'want_to_watch') return;
+
+    const existingReview = await reviewRepo.findOne({
       where: { userId, contentId },
       select: ['id'],
     });

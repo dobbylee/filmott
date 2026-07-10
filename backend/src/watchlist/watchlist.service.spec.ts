@@ -247,6 +247,7 @@ describe('WatchlistService', () => {
       const item = {
         id: 1,
         userId: 1,
+        contentId: 10,
         status: 'watched',
         watchedAt: '2026-01-01',
       };
@@ -259,6 +260,32 @@ describe('WatchlistService', () => {
 
       expect(result.status).toBe('want_to_watch');
       expect(result.watchedAt).toBeNull();
+    });
+
+    it('리뷰가 있는 작품은 want_to_watch로 변경할 수 없어야 한다', async () => {
+      const item = {
+        id: 1,
+        userId: 1,
+        contentId: 10,
+        status: 'watched' as const,
+        watchedAt: '2026-01-01',
+      };
+      mockWatchlistRepo.findOne.mockResolvedValue(item);
+      mockReviewRepo.findOne.mockResolvedValue({ id: 20 });
+
+      await expect(
+        service.updateStatus(1, 1, { status: 'want_to_watch' }),
+      ).rejects.toThrow(
+        '작성한 리뷰가 있는 작품은 감상할 작품으로 등록할 수 없습니다.',
+      );
+
+      expect(mockReviewRepo.findOne).toHaveBeenCalledWith({
+        where: { userId: 1, contentId: 10 },
+        select: ['id'],
+      });
+      expect(mockWatchlistRepo.save).not.toHaveBeenCalled();
+      expect(item.status).toBe('watched');
+      expect(item.watchedAt).toBe('2026-01-01');
     });
 
     it('watched 항목에 watchedAt만 제공되면 watchedAt을 업데이트해야 한다', async () => {
@@ -910,6 +937,17 @@ describe('WatchlistService', () => {
       );
     });
 
+    it('리뷰가 있는 작품은 contentId 기반 upsert로도 want_to_watch 등록할 수 없어야 한다', async () => {
+      mockReviewRepo.findOne.mockResolvedValue({ id: 20 });
+
+      await expect(
+        service.addToWatchlistByContentId(1, 5, 'want_to_watch'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockWatchlistRepo.findOne).not.toHaveBeenCalled();
+      expect(mockWatchlistRepo.save).not.toHaveBeenCalled();
+    });
+
     it('기존 워치리스트 항목을 업데이트해야 한다', async () => {
       const existing = {
         id: 5,
@@ -1005,8 +1043,13 @@ describe('WatchlistService', () => {
           .fn()
           .mockImplementation((data: any) => Promise.resolve(data)),
       };
+      const transactionalReviewRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+      };
       const mockManager = {
-        getRepository: jest.fn().mockReturnValue(transactionalRepo),
+        getRepository: jest.fn((entity: typeof Watchlist | typeof Review) =>
+          entity === Watchlist ? transactionalRepo : transactionalReviewRepo,
+        ),
       };
 
       const result = await service.addToWatchlistByContentIdWithManager(
