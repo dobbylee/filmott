@@ -25,8 +25,6 @@ jobs:
         working-directory: backend
       - run: npm run check
         working-directory: backend
-      - run: npm run test:e2e
-        working-directory: backend
 
   backend-integration:
     runs-on: ubuntu-latest
@@ -69,6 +67,8 @@ jobs:
           exit 1
       - run: npm ci
         working-directory: backend
+      - run: npm run test:e2e
+        working-directory: backend
       - run: npm run test:integration
         working-directory: backend
       - name: Stop PostgreSQL test container
@@ -90,7 +90,6 @@ jobs:
         working-directory: frontend
       - run: npm run check
         working-directory: frontend
-
   mcp-check:
     runs-on: ubuntu-latest
     steps:

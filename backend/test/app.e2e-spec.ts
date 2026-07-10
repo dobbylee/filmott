@@ -1,216 +1,69 @@
-import {
-  Body,
-  Controller,
-  INestApplication,
-  UnauthorizedException,
-  Post,
-  ValidationPipe,
-} from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { IsString } from 'class-validator';
-import { EventEmitter } from 'events';
-import { createRequest, createResponse } from 'node-mocks-http';
-import type { Request, Response } from 'express';
-import { ContentsController } from '../src/contents/contents.controller';
-import { ContentsService } from '../src/contents/contents.service';
-import { Content } from '../src/contents/content.entity';
-import { TmdbService } from '../src/tmdb/tmdb.service';
-import { RevalidateService } from '../src/common/revalidate.service';
-import { ReviewsController } from '../src/reviews/reviews.controller';
-import { ReviewsService } from '../src/reviews/reviews.service';
-import { ReviewCommentsService } from '../src/reviews/review-comments.service';
-import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import type { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { DataSource } from 'typeorm';
+import { AUTH_REFRESH_TOKEN_COOKIE } from '../src/auth/auth-cookie.util';
+import { resetIntegrationDatabase } from './integration/helpers/database';
+import { createE2eTestApp } from './integration/helpers/test-app';
 
-interface MemoryResponse {
-  status: number;
-  body: unknown;
-}
-
-class ValidationProbeDto {
-  @IsString()
-  name!: string;
-}
-
-@Controller('validation-probe')
-class ValidationProbeController {
-  @Post()
-  create(@Body() dto: ValidationProbeDto) {
-    return dto;
-  }
-}
-
-describe('HTTP boundary smoke (e2e)', () => {
+describe('실제 AppModule HTTP e2e', () => {
   let app: INestApplication;
-  const contentRepo = {
-    findOne: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
-    find: jest.fn(),
-    findAndCount: jest.fn(),
-    update: jest.fn(),
-    createQueryBuilder: jest.fn(),
-  };
-  const tmdbService = {
-    getDetails: jest.fn(),
-    searchByType: jest.fn(),
-    discoverByFilters: jest.fn(),
-    getPersonDetail: jest.fn(),
-    getPersonCredits: jest.fn(),
-  };
-  const revalidateService = {
-    revalidatePath: jest.fn(),
-    revalidatePaths: jest.fn(),
-  };
-  const reviewsService = {
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    findMyReview: jest.fn(),
-    getLikedReviewIdsByIds: jest.fn(),
-    getLikedReviewIds: jest.fn(),
-    getRecentReviews: jest.fn(),
-    findByContent: jest.fn(),
-    findByUser: jest.fn(),
-    getContentStats: jest.fn(),
-    toggleLike: jest.fn(),
-  };
-  const reviewCommentsService = {
-    create: jest.fn(),
-    delete: jest.fn(),
-    findByReview: jest.fn(),
-  };
+  let dataSource: DataSource;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }])],
-      controllers: [
-        ContentsController,
-        ReviewsController,
-        ValidationProbeController,
-      ],
-      providers: [
-        ContentsService,
-        { provide: getRepositoryToken(Content), useValue: contentRepo },
-        { provide: TmdbService, useValue: tmdbService },
-        { provide: RevalidateService, useValue: revalidateService },
-        { provide: ReviewsService, useValue: reviewsService },
-        { provide: ReviewCommentsService, useValue: reviewCommentsService },
-      ],
-    })
-      .overrideGuard(JwtAuthGuard)
-      .useValue({
-        canActivate: () => {
-          throw new UnauthorizedException();
-        },
-      })
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-    await app.init();
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
+    app = await createE2eTestApp();
+    dataSource = app.get(DataSource);
+    await resetIntegrationDatabase(dataSource);
   });
 
   afterAll(async () => {
-    await app.close();
+    if (!app) return;
+
+    try {
+      await resetIntegrationDatabase(dataSource);
+    } finally {
+      await app.close();
+    }
   });
 
-  async function requestMemory(
-    method: 'GET' | 'POST',
-    path: string,
-    body?: Record<string, unknown>,
-  ): Promise<MemoryResponse> {
-    const expressApp = app.getHttpAdapter().getInstance() as {
-      handle: (
-        req: Request,
-        res: Response,
-        next: (error?: unknown) => void,
-      ) => void;
-    };
-    const req = createRequest<Request>({
-      method,
-      url: path,
-      originalUrl: path,
-      body,
-      headers:
-        body === undefined ? undefined : { 'content-type': 'application/json' },
-    });
-    const res = createResponse<Response>({ eventEmitter: EventEmitter });
+  it('실제 public route를 /api prefix와 CORS 설정으로 제공해야 한다', async () => {
+    await request(app.getHttpServer()).get('/').expect(404);
 
-    return new Promise((resolve, reject) => {
-      res.once('end', () => {
-        resolve({
-          status: res._getStatusCode(),
-          body: res._isJSON() ? res._getJSONData() : res._getData(),
-        });
-      });
-      expressApp.handle(req, res, (error?: unknown) => {
-        if (error) {
-          reject(
-            error instanceof Error
-              ? error
-              : new Error(
-                  typeof error === 'string' ? error : 'HTTP adapter error',
-                ),
-          );
-        } else if (!res.headersSent) {
-          resolve({
-            status: res._getStatusCode(),
-            body: res._isJSON() ? res._getJSONData() : res._getData(),
-          });
-        }
-      });
-    });
-  }
+    const response = await request(app.getHttpServer())
+      .get('/api')
+      .set('Origin', 'http://e2e.filmott.local')
+      .expect(200);
 
-  it('전역 prefix /api 아래에서만 라우트를 제공해야 한다', async () => {
-    const withoutPrefix = await requestMemory('POST', '/validation-probe', {
-      name: 'filmott',
-    });
-    expect(withoutPrefix.status).toBe(404);
-
-    const withPrefix = await requestMemory('POST', '/api/validation-probe', {
-      name: 'filmott',
-    });
-    expect(withPrefix.status).toBe(201);
+    expect(response.text).toBe('Hello World!');
+    expect(response.headers['access-control-allow-origin']).toBe(
+      'http://e2e.filmott.local',
+    );
+    expect(response.headers['access-control-allow-credentials']).toBe('true');
   });
 
-  it('ValidationPipe가 허용되지 않은 body 필드를 거부해야 한다', async () => {
-    const response = await requestMemory('POST', '/api/validation-probe', {
-      name: 'filmott',
-      extra: 'blocked',
-    });
+  it('전역 ValidationPipe가 허용되지 않은 body 필드를 거부해야 한다', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({
+        email: 'e2e@filmott.local',
+        password: 'password123',
+        extra: 'blocked',
+      })
+      .expect(400);
 
-    expect(response.status).toBe(400);
+    expect(response.body.message).toContain('property extra should not exist');
   });
 
-  it('인증이 필요한 리뷰 작성 API는 토큰이 없으면 401을 반환해야 한다', async () => {
-    const response = await requestMemory('POST', '/api/reviews', {
-      contentId: 1,
-      rating: 8,
-    });
-
-    expect(response.status).toBe(401);
+  it('실제 JWT guard가 인증 없는 protected route를 거부해야 한다', async () => {
+    await request(app.getHttpServer()).get('/api/users/me').expect(401);
   });
 
-  it('비정상 TMDB ID는 외부 API 호출 전에 거부해야 한다', async () => {
-    const response = await requestMemory('GET', '/api/contents/movie/0');
+  it('cookie parser가 refresh cookie를 컨트롤러에 전달해야 한다', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/auth/refresh')
+      .set('Cookie', `${AUTH_REFRESH_TOKEN_COOKIE}=not-found`)
+      .send({})
+      .expect(401);
 
-    expect(response.status).toBe(400);
-
-    expect(tmdbService.getDetails).not.toHaveBeenCalled();
-    expect(contentRepo.findOne).not.toHaveBeenCalled();
+    expect(response.body.message).toBe('유효하지 않은 리프레시 토큰입니다.');
   });
 });

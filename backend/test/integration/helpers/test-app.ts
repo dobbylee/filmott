@@ -1,18 +1,18 @@
-import {
-  ClassSerializerInterceptor,
-  type INestApplication,
-  type ModuleMetadata,
-  ValidationPipe,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
+import { type INestApplication, type ModuleMetadata } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import cookieParser from 'cookie-parser';
 import { EventEmitter } from 'events';
 import { createRequest, createResponse } from 'node-mocks-http';
 import type { Request, Response } from 'express';
+import { AppModule } from '../../../src/app.module';
+import { ChatService } from '../../../src/chat/chat.service';
+import { EmbeddingService } from '../../../src/chat/embedding.service';
+import { R2StorageService } from '../../../src/common/r2-storage.service';
+import { configureApp } from '../../../src/configure-app';
+import { KobisService } from '../../../src/kobis/kobis.service';
+import { TmdbService } from '../../../src/tmdb/tmdb.service';
 import { createIntegrationTypeOrmOptions } from './database';
 
 interface IntegrationAppOptions {
@@ -54,16 +54,7 @@ export async function createIntegrationApp(
 }
 
 export function configureIntegrationApp(app: INestApplication): void {
-  app.use(cookieParser());
-  app.setGlobalPrefix('api');
-  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  configureApp(app);
 }
 
 export async function requestIntegrationApp(
@@ -112,4 +103,60 @@ export async function requestIntegrationApp(
       }
     });
   });
+}
+
+const tmdbServiceStub = {
+  getDetails: jest.fn().mockResolvedValue(null),
+  searchByType: jest.fn().mockResolvedValue({ results: [] }),
+  discoverByFilters: jest.fn().mockResolvedValue({ results: [] }),
+  getPersonDetail: jest.fn().mockResolvedValue(null),
+  getPersonCredits: jest.fn().mockResolvedValue({ cast: [], crew: [] }),
+  getTrending: jest.fn().mockResolvedValue({ results: [] }),
+};
+
+const kobisServiceStub = {
+  getDailyBoxOffice: jest.fn().mockResolvedValue([]),
+  getWeeklyBoxOffice: jest.fn().mockResolvedValue([]),
+};
+
+const r2StorageServiceStub = {
+  getPublicUrl: jest.fn().mockReturnValue('https://e2e.invalid'),
+  upload: jest.fn().mockResolvedValue('https://e2e.invalid/image'),
+  delete: jest.fn().mockResolvedValue(undefined),
+};
+
+const embeddingServiceStub = {
+  hasAnyMetadata: jest.fn().mockResolvedValue(false),
+  generateEmbedding: jest.fn(),
+  cacheContentMetadata: jest.fn(),
+  searchSimilar: jest.fn(),
+  batchCacheByContentIds: jest
+    .fn()
+    .mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
+};
+
+const chatServiceStub = {
+  sendMessageStream: jest.fn(),
+};
+
+export async function createE2eTestApp(): Promise<INestApplication> {
+  const moduleFixture = await Test.createTestingModule({
+    imports: [AppModule],
+  })
+    .overrideProvider(TmdbService)
+    .useValue(tmdbServiceStub)
+    .overrideProvider(KobisService)
+    .useValue(kobisServiceStub)
+    .overrideProvider(R2StorageService)
+    .useValue(r2StorageServiceStub)
+    .overrideProvider(EmbeddingService)
+    .useValue(embeddingServiceStub)
+    .overrideProvider(ChatService)
+    .useValue(chatServiceStub)
+    .compile();
+
+  const app = moduleFixture.createNestApplication();
+  configureApp(app);
+  await app.init();
+  return app;
 }
