@@ -7,6 +7,7 @@ import {
 } from './intent-analyzer';
 import { GENRE_NAME_MAP } from '../common/constants';
 import { CHAT_MODEL } from './chat.constants';
+import { CHAT_QUALITY_CASES } from './chat-quality-cases';
 import { CHAT_INTENT_RESPONSE_FORMAT } from './intent-schema';
 
 // OpenAI SDK mock
@@ -946,6 +947,32 @@ describe('IntentAnalyzerService', () => {
       expect(result).toContain('반전');
       expect(result).toContain('영화');
     });
+  });
+
+  describe('채팅 품질 recorded Structured Output replay', () => {
+    it.each(CHAT_QUALITY_CASES)(
+      '$id fixture는 message/history를 IntentAnalyzer 경계에 전달해야 한다',
+      async (testCase) => {
+        mockLlmResponse(JSON.stringify(testCase.recordedStructuredOutput));
+
+        const result = await service.analyzeIntent(
+          testCase.userMessage,
+          testCase.history,
+        );
+
+        expect(result).toEqual(testCase.recordedStructuredOutput);
+
+        const request = mockCreate.mock.calls.at(-1)?.[0];
+        const expectedConversation = [
+          ...(testCase.history ?? []).slice(-4).map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          { role: 'user', content: testCase.userMessage },
+        ];
+        expect(request.messages.slice(1)).toEqual(expectedConversation);
+      },
+    );
   });
 
   describe('GENRE_ALIAS_MAP / GENRE_NAME_MAP 동기화', () => {

@@ -2,25 +2,11 @@ import { DataSource } from 'typeorm';
 import type { ContentsService } from '../contents/contents.service';
 import type { ContentSearchFilters } from './content-search.service';
 import type { EmbeddingService } from './embedding.service';
-import type { ParsedIntent } from './intent-analyzer';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
 import { extractPreviouslyRecommendedTitles } from './structured-chat-response';
 
-const BASE_INTENT: ParsedIntent = {
-  ottProviderNames: [],
-  countries: [],
-  excludeCountries: [],
-  personNames: [],
-  referenceTitles: [],
-  dateRange: null,
-  contentType: null,
-  genres: [],
-  confidence: 'low',
-};
-
 type FilterQualityCase = ChatQualityCase & {
-  expectedIntent: Partial<ParsedIntent>;
   expectedFilters: ContentSearchFilters;
 };
 
@@ -28,14 +14,10 @@ type CandidateQualityCase = ChatQualityCase & {
   candidateFixture: NonNullable<ChatQualityCase['candidateFixture']>;
 };
 
-function toIntent(overrides: Partial<ParsedIntent> = {}): ParsedIntent {
-  return { ...BASE_INTENT, ...overrides };
-}
-
 function hasExpectedFilters(
   testCase: ChatQualityCase,
 ): testCase is FilterQualityCase {
-  return Boolean(testCase.expectedIntent && testCase.expectedFilters);
+  return Boolean(testCase.expectedFilters);
 }
 
 function hasCandidateFixture(
@@ -60,7 +42,9 @@ function createRecommendationCandidateService(): RecommendationCandidateService 
   );
 }
 
-describe('채팅 추천 품질 평가셋', () => {
+// 이 suite는 기록된 intent 이후의 결정적 정책만 검증한다.
+// userMessage/history -> IntentAnalyzer 경계는 intent-analyzer.spec.ts의 replay가 담당한다.
+describe('채팅 추천 downstream contract 평가셋 (LLM-free)', () => {
   let recommendationCandidateService: RecommendationCandidateService;
 
   beforeEach(() => {
@@ -88,15 +72,24 @@ describe('채팅 추천 품질 평가셋', () => {
     );
   });
 
-  it('기대 intent를 검색 필터 계약으로 변환해야 한다', () => {
+  it('기록된 intent를 검색 필터 계약으로 변환해야 한다', () => {
     const cases = CHAT_QUALITY_CASES.filter(hasExpectedFilters);
 
     for (const testCase of cases) {
       expect(
         recommendationCandidateService.buildFiltersFromIntent(
-          toIntent(testCase.expectedIntent),
+          testCase.recordedStructuredOutput,
         ),
       ).toEqual(testCase.expectedFilters);
+    }
+  });
+
+  it('기록된 intent는 사람이 검토한 핵심 기대값과 일치해야 한다', () => {
+    for (const testCase of CHAT_QUALITY_CASES) {
+      if (!testCase.expectedIntent) continue;
+      expect(testCase.recordedStructuredOutput).toMatchObject(
+        testCase.expectedIntent,
+      );
     }
   });
 
@@ -146,7 +139,7 @@ describe('채팅 추천 품질 평가셋', () => {
     }
   });
 
-  it('개인화 제외 필터 기준 케이스를 유지해야 한다', () => {
+  it('개인화 merge 검증에 필요한 입력과 기대 필터를 함께 유지해야 한다', () => {
     const cases = CHAT_QUALITY_CASES.filter(
       (testCase) => testCase.expectedPreferenceFilters,
     );
@@ -157,5 +150,6 @@ describe('채팅 추천 품질 평가셋', () => {
         'personalized-candidate-rerank',
       ]),
     );
+    expect(cases.every((testCase) => testCase.preferenceFixture)).toBe(true);
   });
 });

@@ -2,6 +2,7 @@ import type { ContentSearchFilters } from './content-search.service';
 import type { ChatHistoryMessageDto } from './dto/send-message.dto';
 import type { SimilarContent } from './embedding.service';
 import type { ParsedIntent } from './intent-analyzer';
+import type { UserContext } from './prompts/system-prompt';
 import type { RecommendationRerankContext } from './recommendation-candidate.service';
 
 export interface ChatQualityCase {
@@ -9,9 +10,14 @@ export interface ChatQualityCase {
   description: string;
   userMessage: string;
   history?: ChatHistoryMessageDto[];
+  recordedStructuredOutput: ParsedIntent;
   expectedIntent?: Partial<ParsedIntent>;
   expectedFilters?: ContentSearchFilters;
   expectedPreferenceFilters?: ContentSearchFilters;
+  preferenceFixture?: {
+    userContext: UserContext;
+    subscribedOtts: string[];
+  };
   candidateFixture?: {
     candidates: SimilarContent[];
     preferredContentType: 'movie' | 'tv' | null;
@@ -19,6 +25,33 @@ export interface ChatQualityCase {
     rerankContext?: RecommendationRerankContext;
     expectedTitles: string[];
   };
+}
+
+const EMPTY_RECORDED_INTENT: ParsedIntent = {
+  ottProviderNames: [],
+  countries: [],
+  excludeCountries: [],
+  personNames: [],
+  referenceTitles: [],
+  dateRange: null,
+  contentType: null,
+  genres: [],
+  confidence: 'low',
+};
+
+const EMPTY_USER_CONTEXT: UserContext = {
+  favorites: [],
+  disliked: [],
+  genreStats: [],
+  watchedTmdbIds: [],
+  wantToWatch: [],
+  watchedGenres: [],
+};
+
+function createRecordedIntent(
+  overrides: Partial<ParsedIntent> = {},
+): ParsedIntent {
+  return { ...EMPTY_RECORDED_INTENT, ...overrides };
 }
 
 function createSimilarContent(
@@ -48,6 +81,7 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
     id: 'vague-new-user',
     description: '모호한 신규 유저 요청은 낮은 confidence를 유지한다',
     userMessage: '오늘 뭐 볼까?',
+    recordedStructuredOutput: createRecordedIntent(),
     expectedIntent: {
       confidence: 'low',
       genres: [],
@@ -59,14 +93,23 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
     id: 'netflix-latest-thriller-tv',
     description: 'OTT, 최신성, 장르, 시리즈 조건을 함께 유지한다',
     userMessage: '넷플릭스에서 볼 최신 스릴러 시리즈 추천해줘',
+    recordedStructuredOutput: createRecordedIntent({
+      ottProviderNames: ['Netflix'],
+      dateRange: { from: '2025-01-01', to: null },
+      contentType: 'tv',
+      genres: ['스릴러'],
+      confidence: 'high',
+    }),
     expectedIntent: {
       ottProviderNames: ['Netflix'],
+      dateRange: { from: '2025-01-01', to: null },
       genres: ['스릴러'],
       contentType: 'tv',
       confidence: 'high',
     },
     expectedFilters: {
       ottProviderNames: ['Netflix'],
+      dateRange: { from: '2025-01-01', to: null },
       genres: ['스릴러'],
       contentType: 'tv',
     },
@@ -85,6 +128,11 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
         ],
       },
     ],
+    recordedStructuredOutput: createRecordedIntent({
+      countries: ['KR'],
+      genres: ['스릴러', '공포'],
+      confidence: 'high',
+    }),
     expectedIntent: {
       countries: ['KR'],
       genres: ['스릴러', '공포'],
@@ -99,6 +147,11 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
     id: 'reference-parasite',
     description: '참조 작품 요청은 referenceTitles를 유지한다',
     userMessage: '기생충 같은 영화 추천해줘',
+    recordedStructuredOutput: createRecordedIntent({
+      referenceTitles: ['기생충'],
+      contentType: 'movie',
+      confidence: 'high',
+    }),
     expectedIntent: {
       referenceTitles: ['기생충'],
       contentType: 'movie',
@@ -121,6 +174,11 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
         ],
       },
     ],
+    recordedStructuredOutput: createRecordedIntent({
+      countries: ['KR'],
+      contentType: 'movie',
+      confidence: 'high',
+    }),
     expectedIntent: {
       countries: ['KR'],
       contentType: 'movie',
@@ -154,6 +212,10 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
     id: 'tv-content-type-guard',
     description: '시리즈 요청에서는 movie 후보를 확정 후보에서 제외한다',
     userMessage: '몰입감 있는 시리즈 추천해줘',
+    recordedStructuredOutput: createRecordedIntent({
+      contentType: 'tv',
+      confidence: 'high',
+    }),
     expectedIntent: {
       contentType: 'tv',
       confidence: 'high',
@@ -187,6 +249,7 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
     id: 'negative-preference-exclusion',
     description: '비선호 장르와 감독은 개인화 검색 제외 조건으로 유지한다',
     userMessage: '오늘 뭐 볼까?',
+    recordedStructuredOutput: createRecordedIntent(),
     expectedIntent: {
       confidence: 'low',
       genres: [],
@@ -194,26 +257,74 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
     },
     expectedFilters: {},
     expectedPreferenceFilters: {
+      relaxableFilterKeys: [],
       excludeGenres: ['공포'],
       excludePersonNames: ['감독A'],
+    },
+    preferenceFixture: {
+      userContext: {
+        ...EMPTY_USER_CONTEXT,
+        disliked: [
+          {
+            title: '비선호 작품 1',
+            year: '2024',
+            genres: '공포',
+            rating: 2,
+            originCountry: 'KR',
+            director: '감독A',
+          },
+          {
+            title: '비선호 작품 2',
+            year: '2023',
+            genres: '공포',
+            rating: 3,
+            originCountry: 'KR',
+            director: '감독A',
+          },
+        ],
+        genreStats: [{ genre: '드라마', avgRating: '0', count: 1 }],
+      },
+      subscribedOtts: [],
     },
   },
   {
     id: 'personalized-candidate-rerank',
     description: '개인화 기준에 더 맞는 후보를 확정 후보 앞순위로 재랭킹한다',
     userMessage: '내 취향에 맞는 영화 추천해줘',
+    recordedStructuredOutput: createRecordedIntent({
+      contentType: 'movie',
+      confidence: 'high',
+    }),
     expectedIntent: {
-      confidence: 'low',
+      confidence: 'high',
       genres: [],
-      contentType: null,
+      contentType: 'movie',
     },
-    expectedFilters: {},
+    expectedFilters: { contentType: 'movie' },
     expectedPreferenceFilters: {
+      contentType: 'movie',
       genres: ['스릴러'],
       countries: ['KR'],
+      relaxableFilterKeys: ['genres', 'countries'],
+    },
+    preferenceFixture: {
+      userContext: {
+        ...EMPTY_USER_CONTEXT,
+        favorites: [
+          {
+            title: '선호 작품',
+            year: '2024',
+            genres: '스릴러',
+            rating: 9,
+            originCountry: 'KR',
+          },
+        ],
+        genreStats: [{ genre: '스릴러', avgRating: '9', count: 2 }],
+      },
+      subscribedOtts: [],
     },
     candidateFixture: {
-      preferredContentType: null,
+      preferredContentType: 'movie',
       previouslyRecommended: [],
       rerankContext: {
         genres: ['스릴러'],
