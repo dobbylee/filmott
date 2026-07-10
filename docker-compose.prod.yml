@@ -98,7 +98,7 @@ services:
       POSTGRES_DB: ${DB_NAME}
       TZ: Asia/Seoul
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME} -d ${DB_NAME}']
       interval: 10s
