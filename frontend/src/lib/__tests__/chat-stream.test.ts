@@ -80,6 +80,31 @@ describe('sendChatMessage', () => {
     expect(callbacks.onError).toHaveBeenCalledWith('오류 발생');
   });
 
+  it('일부 text 뒤 terminal event 없이 EOF가 오면 오류로 처리한다', async () => {
+    const sseData = 'event: text\ndata: {"content":"일부 응답"}\n\n';
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(createMockResponse([sseData]));
+
+    await sendChatMessage('테스트', [], callbacks);
+
+    expect(callbacks.onText).toHaveBeenCalledWith('일부 응답');
+    expect(callbacks.onDone).not.toHaveBeenCalled();
+    expect(callbacks.onError).toHaveBeenCalledWith(
+      '응답 연결이 예기치 않게 종료되었습니다. 다시 시도해주세요.',
+    );
+  });
+
+  it('terminal event 이후의 추가 이벤트는 무시한다', async () => {
+    const sseData =
+      'event: done\ndata: {}\n\nevent: text\ndata: {"content":"늦은 응답"}\n\n';
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(createMockResponse([sseData]));
+
+    await sendChatMessage('테스트', [], callbacks);
+
+    expect(callbacks.onDone).toHaveBeenCalledTimes(1);
+    expect(callbacks.onText).not.toHaveBeenCalled();
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
   it('guest 요청이 401 후 refresh 실패면 서버 세션을 정리한 뒤 다시 guest 요청을 시도한다', async () => {
     const sessionPostSpy = vi
       .spyOn(sessionApi, 'post')

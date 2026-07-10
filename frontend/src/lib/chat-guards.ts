@@ -30,7 +30,7 @@ export function isChatRecommendationArray(
 export function isChatMessageData(value: unknown): value is ChatMessageData {
   if (!isRecord(value)) return false;
 
-  const { id, role, content, recommendations, createdAt } = value;
+  const { id, role, content, recommendations, createdAt, isIncomplete } = value;
 
   return (
     typeof id === 'number' &&
@@ -39,6 +39,7 @@ export function isChatMessageData(value: unknown): value is ChatMessageData {
     (role === 'user' || role === 'assistant') &&
     typeof content === 'string' &&
     (recommendations === null || isChatRecommendationArray(recommendations)) &&
-    typeof createdAt === 'string'
+    typeof createdAt === 'string' &&
+    (isIncomplete === undefined || typeof isIncomplete === 'boolean')
   );
 }

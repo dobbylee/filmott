@@ -313,6 +313,32 @@ describe('ChatSection', () => {
     });
   });
 
+  it('일부 응답 뒤 onError가 오면 불완전 응답을 보존한다', async () => {
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        callbacks.onText('먼저 도착한 일부 응답');
+        callbacks.onError('스트림 처리 중 오류가 발생했습니다.');
+        return Promise.resolve();
+      },
+    );
+
+    render(<ChatSection />);
+
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '부분 응답 테스트' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(screen.getByText('먼저 도착한 일부 응답')).toBeInTheDocument();
+      expect(
+        screen.getByText('연결이 중단되어 일부 응답만 표시됩니다.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('스트림 처리 중 오류가 발생했습니다.'),
+      ).toBeInTheDocument();
+    });
+  });
+
   it('세션 만료 에러가 나도 기존 대화 localStorage는 지우지 않는다', async () => {
     const savedMessages = [
       { id: 1, role: 'user', content: '기존 메시지', recommendations: null, createdAt: '2026-03-25T00:00:00Z' },
@@ -481,6 +507,46 @@ describe('ChatSection', () => {
             },
           ],
         }),
+      ]),
+    );
+  });
+
+  it('불완전한 어시스턴트 응답은 다음 요청 history에서 제외한다', async () => {
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        callbacks.onText('잘린 응답');
+        callbacks.onError('연결이 끊겼습니다.');
+        return Promise.resolve();
+      },
+    );
+
+    render(<ChatSection />);
+
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '첫 질문' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(screen.getByText('잘린 응답')).toBeInTheDocument();
+    });
+
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        callbacks.onDone();
+        return Promise.resolve();
+      },
+    );
+    fireEvent.change(textarea, { target: { value: '두 번째 질문' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(mockSendChatMessage).toHaveBeenCalledTimes(2);
+    });
+
+    const history = mockSendChatMessage.mock.calls[1][1] as ChatHistoryMessage[];
+    expect(history).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'assistant', content: '잘린 응답' }),
       ]),
     );
   });

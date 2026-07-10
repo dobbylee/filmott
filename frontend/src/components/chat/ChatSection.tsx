@@ -83,7 +83,7 @@ export default function ChatSection() {
     streamingRecsRef.current = null;
   }, [isActiveRequest]);
 
-  const appendAssistantMessage = useCallback(() => {
+  const appendAssistantMessage = useCallback((isIncomplete = false) => {
     const cleanedText = streamingTextRef.current;
     const recommendations = streamingRecsRef.current;
 
@@ -99,6 +99,7 @@ export default function ChatSection() {
         content: cleanedText,
         recommendations,
         createdAt: new Date().toISOString(),
+        isIncomplete,
       },
     ]);
 
@@ -205,6 +206,7 @@ export default function ChatSection() {
 
     // 대화 이력 구성 (최근 20개만 전송, 추천 메타데이터는 중복 방지용)
     const history: ChatHistoryMessage[] = messages
+      .filter((msg) => !(msg.role === 'assistant' && msg.isIncomplete))
       .slice(-MAX_HISTORY_MESSAGES)
       .map((msg) => ({
         role: msg.role,
@@ -253,6 +255,7 @@ export default function ChatSection() {
         onError: (message) => {
           if (!isActiveRequest(requestId)) return;
           isDoneCalledRef.current = true;
+          appendAssistantMessage(true);
           setError(message);
           clearStreamingState(requestId);
         },
@@ -262,10 +265,12 @@ export default function ChatSection() {
 
       // onDone이 호출되지 않은 경우 (연결 끊김 등) 받은 텍스트 보존
       if (!isDoneCalledRef.current) {
-        const appended = appendAssistantMessage();
-        if (!appended) {
-          setError('응답을 받지 못했습니다. 다시 시도해주세요.');
-        }
+        const appended = appendAssistantMessage(true);
+        setError(
+          appended
+            ? '응답 연결이 예기치 않게 종료되었습니다. 다시 시도해주세요.'
+            : '응답을 받지 못했습니다. 다시 시도해주세요.',
+        );
         clearStreamingState(requestId);
       }
     } catch {
@@ -276,7 +281,8 @@ export default function ChatSection() {
         !isDoneCalledRef.current &&
         hasAssistantResponse(streamingTextRef.current, streamingRecsRef.current)
       ) {
-        appendAssistantMessage();
+        appendAssistantMessage(true);
+        setError('메시지 전송 중 연결이 끊겼습니다. 다시 시도해주세요.');
       } else if (!isDoneCalledRef.current) {
         setError('메시지 전송 중 오류가 발생했습니다.');
       }

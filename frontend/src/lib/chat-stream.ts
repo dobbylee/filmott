@@ -137,6 +137,25 @@ export async function sendChatMessage(
 ): Promise<void> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   const isAuthenticated = options.isAuthenticated ?? false;
+  let hasTerminalEvent = false;
+  const guardedCallbacks: ChatStreamCallbacks = {
+    onText: (text) => {
+      if (!hasTerminalEvent) callbacks.onText(text);
+    },
+    onRecommendations: (recommendations) => {
+      if (!hasTerminalEvent) callbacks.onRecommendations(recommendations);
+    },
+    onDone: () => {
+      if (hasTerminalEvent) return;
+      hasTerminalEvent = true;
+      callbacks.onDone();
+    },
+    onError: (message) => {
+      if (hasTerminalEvent) return;
+      hasTerminalEvent = true;
+      callbacks.onError(message);
+    },
+  };
 
   const response = await fetchWithAuth(
     `${apiUrl}/chat/messages`,
@@ -184,7 +203,7 @@ export async function sendChatMessage(
     buffer = lines.pop() || '';
 
     for (const line of lines) {
-      currentEvent = handleSseLine(line, currentEvent, callbacks);
+      currentEvent = handleSseLine(line, currentEvent, guardedCallbacks);
     }
   }
 
@@ -192,7 +211,13 @@ export async function sendChatMessage(
   if (buffer.trim()) {
     const remainingLines = buffer.split('\n');
     for (const line of remainingLines) {
-      currentEvent = handleSseLine(line, currentEvent, callbacks);
+      currentEvent = handleSseLine(line, currentEvent, guardedCallbacks);
     }
+  }
+
+  if (!hasTerminalEvent) {
+    guardedCallbacks.onError(
+      '응답 연결이 예기치 않게 종료되었습니다. 다시 시도해주세요.',
+    );
   }
 }

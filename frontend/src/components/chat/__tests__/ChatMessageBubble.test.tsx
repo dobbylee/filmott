@@ -76,4 +76,16 @@ describe('ChatMessageBubble', () => {
     render(<ChatMessageBubble message={userMessage} />);
     expect(screen.queryByTestId('recommendation-cards')).not.toBeInTheDocument();
   });
+
+  it('불완전한 어시스턴트 응답에 중단 안내를 표시한다', () => {
+    render(
+      <ChatMessageBubble
+        message={{ ...assistantMessage, isIncomplete: true }}
+      />,
+    );
+
+    expect(
+      screen.getByText('연결이 중단되어 일부 응답만 표시됩니다.'),
+    ).toBeInTheDocument();
+  });
 });

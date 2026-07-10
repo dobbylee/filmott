@@ -33,6 +33,12 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
         {!isUser && message.recommendations && message.recommendations.length > 0 && (
           <RecommendationCards recommendations={message.recommendations} />
         )}
+
+        {!isUser && message.isIncomplete && (
+          <p className="mt-2 text-xs text-amber-300/80">
+            연결이 중단되어 일부 응답만 표시됩니다.
+          </p>
+        )}
       </div>
     </div>
   );

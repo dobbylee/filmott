@@ -4,6 +4,7 @@ export interface ChatMessageData {
   content: string;
   recommendations: ChatRecommendationWithPoster[] | null;
   createdAt: string;
+  isIncomplete?: boolean;
 }
 
 export interface ChatRecommendation {
