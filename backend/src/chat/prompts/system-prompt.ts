@@ -2,6 +2,10 @@ import { OttProvider } from '../../common/ott-providers';
 import { getKoreaDateString } from '../../common/date.util';
 import { SimilarContent } from '../embedding.service';
 import { ParsedIntent } from '../intent-analyzer';
+import {
+  RECOMMENDATIONS_TRAILER_CLOSE,
+  RECOMMENDATIONS_TRAILER_OPEN,
+} from '../structured-chat-response';
 
 export interface FavoriteContent {
   title: string;
@@ -124,12 +128,12 @@ export function buildSystemPrompt(
     : '## 추천 후보 작품';
   const candidateSelectionGuide = hasConfirmedSelection
     ? recommendationCandidates.length > 0
-      ? '아래 목록은 서버가 검증한 최종 추천 후보입니다. 본문에는 아래 확정 추천 작품 전체를 같은 순서로 각각 1줄씩 사용하세요. 후보가 3개 미만이어도 후보 밖 작품을 보충하지 마세요.'
-      : '서버가 검증한 확정 추천 후보가 없습니다. 작품명을 새로 만들지 말고 조건을 조금 더 좁혀 달라고 짧게 답하세요.'
+      ? '아래 목록은 서버가 검증할 수 있는 최종 후보입니다. 사용자 요청과 실제로 맞는 작품만 골라 본문에 추천하고, 조건에 맞지 않는 후보는 제외하세요. 후보 밖 작품은 보충하지 마세요.'
+      : '서버가 검증할 수 있는 추천 후보가 없습니다. 작품명을 새로 만들지 말고 조건을 조금 더 좁혀 달라고 짧게 답하세요.'
     : '아래 목록에 있는 작품에서만 선택하세요. 사용자 요청과 맞지 않는 후보는 제외하세요. 적합한 후보가 3개 미만이면 후보 수만큼만 추천하고, 본인 지식으로 후보 밖 작품을 보충하지 마세요.';
   const recommendationCountRule = hasConfirmedSelection
     ? recommendationCandidates.length > 0
-      ? `- 추천 요청 시 확정 추천 작품 ${recommendationCandidates.length}개를 반드시 모두 추천하세요. 일부만 고르거나 3개로 줄이지 마세요. 확정 후보가 3개 미만이어도 후보 밖 작품을 보충하지 마세요.`
+      ? `- 추천 요청 시 확정 후보 ${recommendationCandidates.length}개 중 사용자 조건에 맞는 작품만 최대 5개 선택하세요. 일부 후보를 제외해도 되며 후보 밖 작품은 보충하지 마세요.`
       : '- 추천 요청 시 확정 추천 작품이 없으면 작품 추천을 만들지 말고 선호 기준을 물어보세요.'
     : '- 추천 요청 시 즉시 3~5개를 추천하세요. 역질문하지 마세요.';
 
@@ -188,6 +192,15 @@ export function buildSystemPrompt(
       : '';
 
   const today = getKoreaDateString();
+  const trailerExample =
+    recommendationCandidates.length > 0
+      ? JSON.stringify([
+          {
+            tmdbId: recommendationCandidates[0].tmdbId,
+            contentType: recommendationCandidates[0].contentType,
+          },
+        ])
+      : '[]';
 
   return `당신은 filmott의 AI 영화 큐레이터입니다. 한국어로 친근하되 반드시 존댓말(해요체)로 대화합니다. 대화가 이어져도 절대 반말로 전환하지 마세요.
 오늘 날짜: ${today}. "최신", "요즘", "올해" 등의 표현은 이 날짜를 기준으로 판단하세요.
@@ -228,5 +241,10 @@ ${recommendationCountRule}
 - 굵게 표시한 작품 제목에는 부가정보, 시즌 설명, 장르 설명, 괄호 수식어를 넣지 마세요.
 - 추천 이유 끝에 플랫폼명, 장르 조합, 톤 분석 같은 메타 정보를 괄호로 덧붙이지 마세요. 예: "(넷플릭스 가능)", "(wavve/Watcha/TVING 가능)", "(코미디+사랑 이야기 톤)" 금지.
 - 작품 추천 끝에 대화와 연결된 간단한 질문을 덧붙여 대화를 이어가세요.
-- JSON, ID 배열, 내부 데이터, trailer, XML 태그를 출력하지 마세요.`;
+- 본문을 모두 작성한 뒤, 실제로 본문에 추천한 작품만 같은 순서로 아래 trailer에 기록하세요. 본문에서 제외한 후보는 trailer에도 넣지 마세요.
+- 추천 작품이 없으면 trailer 배열은 반드시 빈 배열이어야 합니다.
+- trailer 밖에는 JSON, ID 배열, 내부 데이터를 출력하지 마세요.
+${RECOMMENDATIONS_TRAILER_OPEN}
+${trailerExample}
+${RECOMMENDATIONS_TRAILER_CLOSE}`;
 }

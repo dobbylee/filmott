@@ -19,7 +19,11 @@ import {
 } from './user-preference';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
-import { extractPreviouslyRecommendedTitles } from './structured-chat-response';
+import {
+  extractPreviouslyRecommendedTitles,
+  matchStructuredRecommendationsToCandidates,
+  parseRecommendationTrailer,
+} from './structured-chat-response';
 import { ChatContextService } from './chat-context.service';
 import {
   RecommendationCandidateService,
@@ -313,25 +317,37 @@ export class ChatService {
       return;
     }
 
-    await this.chatResponseStreamService.emitStreamingText(
-      stream,
-      emit,
-      signal,
-    );
+    const streamedResponse =
+      await this.chatResponseStreamService.emitStreamingText(
+        stream,
+        emit,
+        signal,
+      );
 
     if (signal?.aborted) {
       return;
     }
 
-    const matched =
-      this.recommendationCandidateService.toResolvedRecommendations(
-        confirmedRecommendationCandidates,
-      );
+    const trailerRecommendations = parseRecommendationTrailer(
+      streamedResponse.trailerText,
+    );
+    const matched = matchStructuredRecommendationsToCandidates(
+      trailerRecommendations,
+      confirmedRecommendationCandidates,
+    );
 
     if (matched.length > 0) {
       emit('recommendations', { recommendations: matched });
+      const matchedKeys = new Set(
+        matched.map(
+          (recommendation) =>
+            `${recommendation.contentType}:${recommendation.tmdbId}`,
+        ),
+      );
       this.recommendationCandidateService.cacheRecommendationMetadataInBackground(
-        confirmedRecommendationCandidates,
+        confirmedRecommendationCandidates.filter((candidate) =>
+          matchedKeys.has(`${candidate.contentType}:${candidate.tmdbId}`),
+        ),
       );
     }
 

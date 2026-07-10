@@ -4,7 +4,10 @@ import type { ContentSearchFilters } from './content-search.service';
 import type { EmbeddingService } from './embedding.service';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
-import { extractPreviouslyRecommendedTitles } from './structured-chat-response';
+import {
+  extractPreviouslyRecommendedTitles,
+  matchStructuredRecommendationsToCandidates,
+} from './structured-chat-response';
 
 type FilterQualityCase = ChatQualityCase & {
   expectedFilters: ContentSearchFilters;
@@ -115,6 +118,36 @@ describe('채팅 추천 downstream contract 평가셋 (LLM-free)', () => {
         .map((candidate) => candidate.title);
 
       expect(selectedTitles).toEqual(expectedTitles);
+    }
+  });
+
+  it('본문 trailer가 선택한 확정 후보와의 교집합만 카드 계약으로 유지해야 한다', () => {
+    const cases = CHAT_QUALITY_CASES.filter(hasCandidateFixture);
+
+    for (const testCase of cases) {
+      const fixture = testCase.candidateFixture;
+      const confirmed =
+        recommendationCandidateService.selectConfirmedRecommendationCandidates(
+          fixture.candidates,
+          fixture.preferredContentType,
+          fixture.previouslyRecommended,
+          fixture.rerankContext,
+        );
+      const selected = confirmed.slice(0, 1);
+      const trailerRecommendations = [
+        ...selected.map((candidate) => ({
+          tmdbId: candidate.tmdbId,
+          contentType: candidate.contentType as 'movie' | 'tv',
+        })),
+        { tmdbId: 999999, contentType: 'movie' as const },
+      ];
+
+      expect(
+        matchStructuredRecommendationsToCandidates(
+          trailerRecommendations,
+          confirmed,
+        ).map((recommendation) => recommendation.title),
+      ).toEqual(selected.map((candidate) => candidate.title));
     }
   });
 

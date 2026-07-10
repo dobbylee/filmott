@@ -426,7 +426,7 @@ describe('ChatService', () => {
       expect(text).not.toContain('**- 다멜리오 쇼');
     });
 
-    it('trailer가 없어도 본문 제목이 후보와 매칭되면 추천 카드를 emit해야 한다', async () => {
+    it('trailer가 없으면 본문 제목이 후보와 같아도 추천 카드를 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([
         {
@@ -463,11 +463,7 @@ describe('ChatService', () => {
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
-      expect(recEvents).toHaveLength(1);
-      expect(
-        (recEvents[0].data as { recommendations: { title: string }[] })
-          .recommendations[0].title,
-      ).toBe('피의 게임');
+      expect(recEvents).toHaveLength(0);
       expect(mockContentsService.searchContents).not.toHaveBeenCalled();
     });
 
@@ -657,7 +653,7 @@ describe('ChatService', () => {
       ]);
       mockStreamingResponse([
         `**대탈출** - 퍼즐과 정보 해석이 좋아요.\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n`,
-        '[{"tmdbId":801,"contentType":"movie"}]',
+        '[{"tmdbId":156402,"contentType":"tv"}]',
         `\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
       ]);
 
@@ -711,7 +707,7 @@ describe('ChatService', () => {
       expect(confirmedSection).not.toContain('더 지니어스');
     });
 
-    it('서버 확정 후보와 추천 카드는 최대 5개까지 emit해야 한다', async () => {
+    it('trailer가 선택한 서버 확정 후보만 최대 5개까지 emit해야 한다', async () => {
       setupEmptyUserContext();
       const candidates: SimilarContent[] = Array.from(
         { length: 6 },
@@ -732,7 +728,14 @@ describe('ChatService', () => {
       );
       mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
       mockStreamingResponse([
-        '**추천작1** - 잘 맞아요.\n\n**추천작2** - 이어 보기 좋아요.\n\n**추천작3** - 취향에 맞아요.',
+        `**추천작1** - 잘 맞아요.\n\n**추천작2** - 이어 보기 좋아요.\n\n**추천작3** - 취향에 맞아요.\n\n**추천작4** - 분위기가 좋아요.\n\n**추천작5** - 마무리로 좋아요.\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n`,
+        JSON.stringify(
+          candidates.map((candidate) => ({
+            tmdbId: candidate.tmdbId,
+            contentType: candidate.contentType,
+          })),
+        ),
+        `\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
       ]);
 
       const emittedEvents: { event: string; data: unknown }[] = [];
@@ -758,9 +761,9 @@ describe('ChatService', () => {
       const systemMessage = mockStreamCreate.mock.calls[0][0].messages[0];
       const confirmedSection = systemMessage.content.split('## 규칙')[0];
       expect(systemMessage.content).toContain(
-        '확정 추천 작품 5개를 반드시 모두 추천',
+        '확정 후보 5개 중 사용자 조건에 맞는 작품만 최대 5개 선택',
       );
-      expect(systemMessage.content).toContain('3개로 줄이지 마세요');
+      expect(systemMessage.content).not.toContain('반드시 모두 추천');
       expect(confirmedSection).toContain('추천작3');
       expect(confirmedSection).toContain('추천작5');
       expect(confirmedSection).not.toContain('추천작6');
@@ -852,7 +855,7 @@ describe('ChatService', () => {
       expect(text).not.toContain('contentType');
     });
 
-    it('확정 추천 후보가 있으면 trailer가 비어도 서버 후보를 카드로 emit해야 한다', async () => {
+    it('확정 추천 후보가 있어도 trailer가 비어 있으면 카드를 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([
         {
@@ -889,18 +892,61 @@ describe('ChatService', () => {
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
-      expect(recEvents).toHaveLength(1);
-      expect(recEvents[0].data).toEqual({
-        recommendations: [
+      expect(recEvents).toHaveLength(0);
+      expect(
+        mockEmbeddingService.batchCacheByContentIds,
+      ).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        '형식이 깨진',
+        `${RECOMMENDATIONS_TRAILER_OPEN}\n[{"tmdbId":"123","contentType":"movie"}]\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ],
+      [
+        '서버 후보 밖 작품을 가리키는',
+        `${RECOMMENDATIONS_TRAILER_OPEN}\n[{"tmdbId":999,"contentType":"movie"}]\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ],
+    ])(
+      '%s trailer는 서버 후보 전체 카드로 fallback하지 않아야 한다',
+      async (_description, trailer) => {
+        setupEmptyUserContext();
+        mockEmbeddingService.searchSimilar.mockResolvedValue([
           {
+            contentId: 1,
             tmdbId: 123,
             contentType: 'movie',
             title: '청춘',
             posterUrl: '/youth.jpg',
+            genres: [{ id: 18, name: '드라마' }],
+            voteAverage: 7.5,
+            description: '청춘 영화',
+            similarity: 0.8,
+            director: null,
+            originCountry: 'KR',
+            overview: null,
           },
-        ],
-      });
-    });
+        ]);
+        mockStreamingResponse([`**청춘** - 추천 이유입니다.\n\n${trailer}`]);
+
+        const emittedEvents: { event: string; data: unknown }[] = [];
+        await service.sendMessageStream(
+          1,
+          '청춘 영화 추천해줘',
+          [],
+          (event, data) => {
+            emittedEvents.push({ event, data });
+          },
+        );
+
+        expect(
+          emittedEvents.filter((event) => event.event === 'recommendations'),
+        ).toHaveLength(0);
+        expect(
+          mockEmbeddingService.batchCacheByContentIds,
+        ).not.toHaveBeenCalled();
+      },
+    );
 
     it('이전 추천작은 history의 recommendations 메타데이터를 우선 사용해야 한다', async () => {
       setupEmptyUserContext();
