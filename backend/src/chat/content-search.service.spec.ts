@@ -66,6 +66,29 @@ describe('ContentSearchService', () => {
       title: `영화${i + 1}`,
     }));
 
+    it('TypeORM 검색 완료 후 signal이 중단되면 필터 완화 쿼리를 시작하지 않아야 한다', async () => {
+      const controller = new AbortController();
+      mockDataSource.query.mockImplementation(async () => {
+        controller.abort();
+        return [];
+      });
+
+      const result = await service.searchWithFilters(
+        '스릴러 추천',
+        20,
+        [],
+        {
+          genres: ['스릴러'],
+          relaxableFilterKeys: ['genres'],
+        },
+        mockEmbedding,
+        controller.signal,
+      );
+
+      expect(result).toEqual([]);
+      expect(mockDataSource.query).toHaveBeenCalledTimes(1);
+    });
+
     it('1순위가 content_metadata 기준으로 검색해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 

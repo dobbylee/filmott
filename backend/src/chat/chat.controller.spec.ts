@@ -405,6 +405,32 @@ describe('ChatController', () => {
       expect(writeCalls).toHaveLength(1);
       expect(writeCalls[0][0]).toContain('test');
     });
+
+    it('연결 중단으로 service가 reject되어도 error SSE를 전송하지 않아야 한다', async () => {
+      let closeCallback: (() => void) | undefined;
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn((event: string, handler: () => void) => {
+          if (event === 'close') closeCallback = handler;
+        }),
+        destroyed: false,
+      };
+      mockChatService.sendMessageStream.mockImplementation(async () => {
+        closeCallback?.();
+        throw new Error('요청 중단');
+      });
+
+      await controller.sendMessage(
+        user,
+        { content: '추천해줘' },
+        mockRes as unknown as import('express').Response,
+      );
+
+      expect(mockRes.write).not.toHaveBeenCalled();
+    });
   });
 });
 

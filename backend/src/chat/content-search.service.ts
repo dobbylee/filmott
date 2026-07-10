@@ -63,13 +63,20 @@ export class ContentSearchService {
     excludeTmdbIds: number[],
     filters: ContentSearchFilters,
     precomputedEmbedding?: number[],
+    signal?: AbortSignal,
   ): Promise<SimilarContent[]> {
+    if (signal?.aborted) return [];
+    const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
     // P0-2: 임베딩 실패 시 null 반환 → 벡터 유사도 없이 2/3순위 결과만 반환
     let embedding: number[] | null = precomputedEmbedding ?? null;
     if (!embedding) {
       try {
-        embedding = await this.embeddingService.generateEmbedding(queryText);
+        embedding = await this.embeddingService.generateEmbedding(
+          queryText,
+          ...signalArgs,
+        );
       } catch (error) {
+        if (signal?.aborted) return [];
         this.logger.warn(
           `임베딩 생성 실패, 벡터 유사도 없이 검색 진행: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -90,6 +97,7 @@ export class ContentSearchService {
       excludeIds,
       executableFilters,
     );
+    if (signal?.aborted) return [];
 
     // 2차: 결과 부족 시 지정된 필터만 단계적으로 완화한다.
     // contentType, dateRange, 제외 필터는 완화 대상에 넣지 않아 사용자 의도를 보존한다.
@@ -101,6 +109,7 @@ export class ContentSearchService {
       let relaxedFilters: ContentSearchFilters = { ...executableFilters };
 
       for (const filterKey of FILTER_RELAXATION_SEQUENCE) {
+        if (signal?.aborted) return [];
         if (results.length >= MINIMUM_FILTERED_RESULTS) break;
         if (!relaxableFilterKeys.includes(filterKey)) continue;
         if (!this.hasRelaxableValue(relaxedFilters, filterKey)) continue;
@@ -112,6 +121,7 @@ export class ContentSearchService {
           excludeIds,
           relaxedFilters,
         );
+        if (signal?.aborted) return [];
       }
     }
 

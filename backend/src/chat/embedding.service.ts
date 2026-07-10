@@ -93,19 +93,27 @@ export class EmbeddingService {
     return this.hasMetadataCache;
   }
 
-  async generateEmbedding(text: string): Promise<number[]> {
+  async generateEmbedding(
+    text: string,
+    signal?: AbortSignal,
+  ): Promise<number[]> {
+    signal?.throwIfAborted();
     const openai = this.ensureOpenAI();
     const response = await openai.embeddings.create(
       {
         model: 'text-embedding-3-small',
         input: text,
       },
-      { timeout: OPENAI_EMBEDDING_TIMEOUT_MS },
+      { timeout: OPENAI_EMBEDDING_TIMEOUT_MS, signal },
     );
     return response.data[0].embedding;
   }
 
-  async generateDescription(content: Content): Promise<string> {
+  async generateDescription(
+    content: Content,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    signal?.throwIfAborted();
     const openai = this.ensureOpenAI();
 
     const genreNames = (content.genres || []).map((g) => g.name).join(', ');
@@ -144,7 +152,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
         max_completion_tokens: 2048,
         messages: [{ role: 'user', content: prompt }],
       },
-      { timeout: OPENAI_EMBEDDING_TIMEOUT_MS },
+      { timeout: OPENAI_EMBEDDING_TIMEOUT_MS, signal },
     );
 
     return response.choices[0]?.message?.content?.trim() || '';
@@ -153,23 +161,29 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
   async cacheContentMetadata(
     contentId: number,
     force = false,
+    signal?: AbortSignal,
   ): Promise<ContentMetadata | null> {
+    if (signal?.aborted) return null;
     if (!force) {
       const existing = await this.metadataRepo.findOne({
         where: { contentId },
       });
+      if (signal?.aborted) return null;
       if (existing) return existing;
     }
 
     const content = await this.contentRepo.findOne({
       where: { id: contentId },
     });
+    if (signal?.aborted) return null;
     if (!content) return null;
 
-    const description = await this.generateDescription(content);
+    const description = await this.generateDescription(content, signal);
+    if (signal?.aborted) return null;
     if (!description) return null;
 
-    const embedding = await this.generateEmbedding(description);
+    const embedding = await this.generateEmbedding(description, signal);
+    if (signal?.aborted) return null;
     const embeddingStr = `[${embedding.join(',')}]`;
 
     // upsert: INSERT ... ON CONFLICT 로 이중 조회 제거
@@ -180,6 +194,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
        DO UPDATE SET description = EXCLUDED.description, embedding = EXCLUDED.embedding`,
       [contentId, description, embeddingStr],
     );
+    if (signal?.aborted) return null;
 
     this.hasMetadataCache = true;
 
@@ -194,11 +209,15 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     excludeTmdbIds: number[],
     filters?: SearchFilters,
     precomputedEmbedding?: number[],
+    signal?: AbortSignal,
   ): Promise<SimilarContent[]> {
-    if (!this.openai) return [];
+    if (!this.openai || signal?.aborted) return [];
+    const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
 
     const embedding =
-      precomputedEmbedding ?? (await this.generateEmbedding(queryText));
+      precomputedEmbedding ??
+      (await this.generateEmbedding(queryText, ...signalArgs));
+    if (signal?.aborted) return [];
     const embeddingStr = `[${embedding.join(',')}]`;
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];
 
@@ -218,12 +237,14 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
       excludeIds,
       filters,
     );
+    if (signal?.aborted) return [];
 
     // 2차: 결과 부족 시 필터 단계적 완화
     if (results.length < 5 && hasFilters) {
       const relaxedFilters: SearchFilters = { ...filters };
 
       if (results.length < 5 && (relaxedFilters.personNames?.length ?? 0) > 0) {
+        if (signal?.aborted) return [];
         delete relaxedFilters.personNames;
         results = await this.executeSearch(
           embeddingStr,
@@ -231,9 +252,11 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
           excludeIds,
           relaxedFilters,
         );
+        if (signal?.aborted) return [];
       }
 
       if (results.length < 5 && (relaxedFilters.countries?.length ?? 0) > 0) {
+        if (signal?.aborted) return [];
         delete relaxedFilters.countries;
         results = await this.executeSearch(
           embeddingStr,
@@ -241,12 +264,14 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
           excludeIds,
           relaxedFilters,
         );
+        if (signal?.aborted) return [];
       }
 
       if (
         results.length < 5 &&
         (relaxedFilters.ottProviderNames?.length ?? 0) > 0
       ) {
+        if (signal?.aborted) return [];
         delete relaxedFilters.ottProviderNames;
         results = await this.executeSearch(
           embeddingStr,
@@ -254,6 +279,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
           excludeIds,
           relaxedFilters,
         );
+        if (signal?.aborted) return [];
       }
     }
 

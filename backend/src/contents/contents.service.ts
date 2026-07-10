@@ -69,16 +69,24 @@ export class ContentsService {
   async findOrFetchByTmdbId(
     tmdbId: number,
     type: 'movie' | 'tv',
+    signal?: AbortSignal,
   ): Promise<Content> {
+    const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
     const existing = await this.contentRepo.findOne({
       where: { tmdbId, contentType: type },
     });
+    signal?.throwIfAborted();
 
     if (existing) {
       return existing;
     }
 
-    const tmdbData = await this.tmdbService.getDetails(tmdbId, type);
+    const tmdbData = await this.tmdbService.getDetails(
+      tmdbId,
+      type,
+      ...signalArgs,
+    );
+    signal?.throwIfAborted();
     return this.saveFromTmdb(tmdbData, type);
   }
 
@@ -89,15 +97,24 @@ export class ContentsService {
     query: string,
     type?: 'movie' | 'tv' | 'person',
     page = 1,
+    signal?: AbortSignal,
   ) {
+    const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
     const blockedIds = await this.getBlockedTmdbIds();
+    signal?.throwIfAborted();
 
     if (type === 'person') {
-      return this.tmdbService.searchByType(query, type, page);
+      return this.tmdbService.searchByType(query, type, page, ...signalArgs);
     }
 
     if (type === 'movie' || type === 'tv') {
-      const result = await this.tmdbService.searchByType(query, type, page);
+      const result = await this.tmdbService.searchByType(
+        query,
+        type,
+        page,
+        ...signalArgs,
+      );
+      signal?.throwIfAborted();
       const originalCount = result.results.length;
       result.results = result.results.filter(
         (item) => !blockedIds.has(`${type}:${item.id}`),
@@ -109,10 +126,11 @@ export class ContentsService {
 
     // "전체" 검색: 인물(page 1 고정) + 영화/시리즈(페이징) 각각 호출
     const [personResult, movieResult, tvResult] = await Promise.all([
-      this.tmdbService.searchByType(query, 'person', 1),
-      this.tmdbService.searchByType(query, 'movie', page),
-      this.tmdbService.searchByType(query, 'tv', page),
+      this.tmdbService.searchByType(query, 'person', 1, ...signalArgs),
+      this.tmdbService.searchByType(query, 'movie', page, ...signalArgs),
+      this.tmdbService.searchByType(query, 'tv', page, ...signalArgs),
     ]);
+    signal?.throwIfAborted();
 
     const filteredMovies = movieResult.results.filter(
       (item) => !blockedIds.has(`movie:${item.id}`),

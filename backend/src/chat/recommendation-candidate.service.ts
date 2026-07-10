@@ -115,17 +115,25 @@ export class RecommendationCandidateService {
 
   async resolveReferenceEmbedding(
     referenceTitles: string[],
+    signal?: AbortSignal,
   ): Promise<{ embedding: number[]; tmdbId: number } | null> {
-    if (referenceTitles.length === 0) return null;
+    if (referenceTitles.length === 0 || signal?.aborted) return null;
 
     for (const title of referenceTitles) {
+      if (signal?.aborted) return null;
       try {
         const dbResult = await this.resolveReferenceEmbeddingFromDb(title);
+        if (signal?.aborted) return null;
         if (dbResult) return dbResult;
 
-        const tmdbResult = await this.resolveReferenceEmbeddingFromTmdb(title);
+        const tmdbResult = await this.resolveReferenceEmbeddingFromTmdb(
+          title,
+          signal,
+        );
+        if (signal?.aborted) return null;
         if (tmdbResult) return tmdbResult;
       } catch (error) {
+        if (signal?.aborted) return null;
         this.logger.warn(
           `참조 작품 임베딩 해결 실패 ("${title}"): ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -282,11 +290,18 @@ export class RecommendationCandidateService {
 
   private async resolveReferenceEmbeddingFromTmdb(
     title: string,
+    signal?: AbortSignal,
   ): Promise<{ embedding: number[]; tmdbId: number } | null> {
+    const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
     const [movieResult, tvResult] = await Promise.all([
-      this.contentsService.searchContents(title, 'movie', 1).catch(() => null),
-      this.contentsService.searchContents(title, 'tv', 1).catch(() => null),
+      this.contentsService
+        .searchContents(title, 'movie', 1, ...signalArgs)
+        .catch(() => null),
+      this.contentsService
+        .searchContents(title, 'tv', 1, ...signalArgs)
+        .catch(() => null),
     ]);
+    if (signal?.aborted) return null;
 
     const firstMatch =
       (movieResult?.results?.[0]
@@ -301,10 +316,17 @@ export class RecommendationCandidateService {
     const content = await this.contentsService.findOrFetchByTmdbId(
       firstMatch.id,
       firstMatch.type,
+      ...signalArgs,
     );
-    const metadata = await this.embeddingService.cacheContentMetadata(
-      content.id,
-    );
+    if (signal?.aborted) return null;
+    const metadata = signal
+      ? await this.embeddingService.cacheContentMetadata(
+          content.id,
+          false,
+          signal,
+        )
+      : await this.embeddingService.cacheContentMetadata(content.id);
+    if (signal?.aborted) return null;
     if (!metadata?.embedding) return null;
 
     const embedding = this.parseEmbedding(metadata.embedding);

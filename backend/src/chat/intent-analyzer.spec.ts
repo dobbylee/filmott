@@ -84,6 +84,18 @@ describe('IntentAnalyzerService', () => {
   };
 
   describe('analyzeIntent', () => {
+    it('OpenAI 의도 분석 요청에 AbortSignal을 전달해야 한다', async () => {
+      const controller = new AbortController();
+      mockIntent();
+
+      await service.analyzeIntent('영화 추천해줘', [], controller.signal);
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
+
     it('OpenAI 호출에 10초 timeout 옵션이 전달되어야 한다', async () => {
       mockIntent({ ottProviderNames: [] });
 

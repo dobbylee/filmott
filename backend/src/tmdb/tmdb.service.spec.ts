@@ -75,6 +75,24 @@ describe('TmdbService', () => {
   });
 
   describe('searchByType', () => {
+    it('Axios 검색 요청에 AbortSignal을 전달해야 한다', async () => {
+      const controller = new AbortController();
+      const mockData = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
+      mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
+
+      await service.searchByType('test', 'movie', 1, controller.signal);
+
+      expect(mockHttpService.get).toHaveBeenCalledWith(
+        '/search/movie',
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
+
     it('결과에 media_type을 주입해야 한다', async () => {
       const mockData = {
         page: 1,
@@ -100,6 +118,24 @@ describe('TmdbService', () => {
   });
 
   describe('getDetails', () => {
+    it('Axios 상세 요청에 AbortSignal을 전달해야 한다', async () => {
+      const controller = new AbortController();
+      const mockData = {
+        id: 123,
+        title: 'Test Movie',
+        credits: { cast: [] },
+        'watch/providers': { results: {} },
+      };
+      mockHttpService.get.mockReturnValue(of(makeAxiosResponse(mockData)));
+
+      await service.getDetails(123, 'movie', controller.signal);
+
+      expect(mockHttpService.get).toHaveBeenCalledWith(
+        '/movie/123',
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
+
     it('크레딧과 시청 제공자를 포함한 영화 상세 정보를 가져와야 한다', async () => {
       const mockData = {
         id: 123,

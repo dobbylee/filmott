@@ -252,6 +252,7 @@ export class IntentAnalyzerService {
   async analyzeIntent(
     userMessage: string,
     recentHistory?: ChatHistoryMessageDto[],
+    signal?: AbortSignal,
   ): Promise<ParsedIntent> {
     if (!this.openai) {
       return { ...EMPTY_INTENT };
@@ -272,7 +273,7 @@ export class IntentAnalyzerService {
             { role: 'user', content: userMessage },
           ],
         },
-        { timeout: OPENAI_INTENT_TIMEOUT_MS },
+        { timeout: OPENAI_INTENT_TIMEOUT_MS, signal },
       );
 
       const text = response.choices[0]?.message?.content?.trim();
@@ -360,6 +361,9 @@ export class IntentAnalyzerService {
 
       return intent;
     } catch (error) {
+      if (signal?.aborted) {
+        return { ...EMPTY_INTENT };
+      }
       this.logger.warn(
         `의도 분석 실패, 빈 ParsedIntent 반환: ${error instanceof Error ? error.message : String(error)}`,
       );

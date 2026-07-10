@@ -61,6 +61,9 @@ export class ChatService {
     emit: SseEmitter,
     signal?: AbortSignal,
   ): Promise<void> {
+    if (signal?.aborted) return;
+    const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
+
     if (!this.openai) {
       throw new BadRequestException('AI 추천 기능이 현재 비활성화 상태입니다.');
     }
@@ -91,9 +94,11 @@ export class ChatService {
       };
       subscribedOtts = [];
     }
+    if (signal?.aborted) return;
 
     // 2. 대화 맥락을 합쳐서 벡터 검색 (전체 user 메시지 + 현재 메시지)
     const hasMetadata = await this.embeddingService.hasAnyMetadata();
+    if (signal?.aborted) return;
     let similarContents: SimilarContent[] = [];
     let intent: ParsedIntent = {
       ottProviderNames: [],
@@ -116,7 +121,12 @@ export class ChatService {
       const searchQuery = userMessages.join(' ');
 
       // 3. LLM 의도 분석 → 최근 대화 맥락 포함 (멀티턴)
-      intent = await this.intentAnalyzer.analyzeIntent(content, history);
+      intent = await this.intentAnalyzer.analyzeIntent(
+        content,
+        history,
+        ...signalArgs,
+      );
+      if (signal?.aborted) return;
 
       // 4. ParsedIntent → ContentSearchFilters 변환
       const filters =
@@ -132,7 +142,9 @@ export class ChatService {
       const referenceResult =
         await this.recommendationCandidateService.resolveReferenceEmbedding(
           intent.referenceTitles,
+          ...signalArgs,
         );
+      if (signal?.aborted) return;
       const referenceEmbedding = referenceResult?.embedding ?? null;
       const referenceExcludeTmdbIds = referenceResult?.tmdbId
         ? [...userContext.watchedTmdbIds, referenceResult.tmdbId]
@@ -210,6 +222,7 @@ export class ChatService {
           referenceExcludeTmdbIds,
           mergedFilters,
           referenceEmbedding ?? undefined,
+          ...signalArgs,
         );
       } else {
         // 모호한 요청 (confidence='low')
@@ -253,6 +266,7 @@ export class ChatService {
             referenceExcludeTmdbIds,
             prefOnlyFilters,
             referenceEmbedding ?? undefined,
+            ...signalArgs,
           );
         } else {
           // 신규 유저: 벡터 유사도만
@@ -262,9 +276,11 @@ export class ChatService {
             referenceExcludeTmdbIds,
             undefined,
             referenceEmbedding ?? undefined,
+            ...signalArgs,
           );
         }
       }
+      if (signal?.aborted) return;
     }
 
     // 8. 이전 대화에서 추천한 작품 제목 추출
@@ -300,6 +316,7 @@ export class ChatService {
       })),
       { role: 'user' as const, content },
     ];
+    if (signal?.aborted) return;
 
     // 12. GPT 스트리밍 응답 호출
     const stream = await this.openai.chat.completions.create(
@@ -335,9 +352,11 @@ export class ChatService {
       trailerRecommendations,
       confirmedRecommendationCandidates,
     );
+    if (signal?.aborted) return;
 
     if (matched.length > 0) {
       emit('recommendations', { recommendations: matched });
+      if (signal?.aborted) return;
       const matchedKeys = new Set(
         matched.map(
           (recommendation) =>
@@ -351,6 +370,7 @@ export class ChatService {
       );
     }
 
+    if (signal?.aborted) return;
     emit('done', {});
   }
 

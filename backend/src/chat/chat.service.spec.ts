@@ -47,6 +47,7 @@ jest.mock('openai', () => {
 
 describe('ChatService', () => {
   let service: ChatService;
+  let recommendationCandidateService: RecommendationCandidateService;
 
   const mockEmbeddingService = {
     hasAnyMetadata: jest.fn(),
@@ -132,6 +133,9 @@ describe('ChatService', () => {
     }).compile();
 
     service = module.get<ChatService>(ChatService);
+    recommendationCandidateService = module.get<RecommendationCandidateService>(
+      RecommendationCandidateService,
+    );
     mockStreamingResponse([
       '추천해 드릴게요.\n\n다른 분위기나 장르도 말해주세요.',
     ]);
@@ -1574,6 +1578,166 @@ describe('ChatService', () => {
       expect(calledFilters.genres).toEqual(['공포']);
       expect(calledFilters.excludeGenres).toEqual(['스릴러']);
     });
+
+    describe('전처리 cancellation', () => {
+      it('이미 중단된 요청은 어떤 전처리도 시작하지 않아야 한다', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        const emit = jest.fn();
+
+        await service.sendMessageStream(
+          1,
+          '추천해줘',
+          [],
+          emit,
+          controller.signal,
+        );
+
+        expect(mockUserRepo.findOne).not.toHaveBeenCalled();
+        expect(mockEmbeddingService.hasAnyMetadata).not.toHaveBeenCalled();
+        expect(mockStreamCreate).not.toHaveBeenCalled();
+        expect(emit).not.toHaveBeenCalled();
+      });
+
+      it('사용자 컨텍스트 TypeORM 작업 중 중단되면 다음 phase로 진행하지 않아야 한다', async () => {
+        setupEmptyUserContext();
+        const controller = new AbortController();
+        mockUserRepo.findOne.mockImplementation(async () => {
+          controller.abort();
+          return { id: 1, subscribedOtts: [] };
+        });
+
+        await service.sendMessageStream(
+          1,
+          '추천해줘',
+          [],
+          jest.fn(),
+          controller.signal,
+        );
+
+        expect(mockEmbeddingService.hasAnyMetadata).not.toHaveBeenCalled();
+        expect(mockIntentAnalyzerService.analyzeIntent).not.toHaveBeenCalled();
+        expect(mockStreamCreate).not.toHaveBeenCalled();
+      });
+
+      it('signal을 intent와 검색 경계에 전달하고 검색 완료 후 중단되면 응답 생성을 시작하지 않아야 한다', async () => {
+        setupEmptyUserContext();
+        const controller = new AbortController();
+        const resolveReferenceSpy = jest.spyOn(
+          recommendationCandidateService,
+          'resolveReferenceEmbedding',
+        );
+        mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+          ...emptyIntent,
+          contentType: 'movie',
+          confidence: 'high',
+        });
+        mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('영화');
+        mockContentSearchService.searchWithFilters.mockImplementation(
+          async () => {
+            controller.abort();
+            return [];
+          },
+        );
+
+        await service.sendMessageStream(
+          1,
+          '영화 추천해줘',
+          [],
+          jest.fn(),
+          controller.signal,
+        );
+
+        expect(mockIntentAnalyzerService.analyzeIntent).toHaveBeenCalledWith(
+          '영화 추천해줘',
+          [],
+          controller.signal,
+        );
+        expect(resolveReferenceSpy).toHaveBeenCalledWith([], controller.signal);
+        expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+          '영화',
+          20,
+          [],
+          expect.objectContaining({ contentType: 'movie' }),
+          undefined,
+          controller.signal,
+        );
+        expect(mockStreamCreate).not.toHaveBeenCalled();
+      });
+
+      it('참조 작품 DB 조회 완료 후 중단되면 TMDB와 검색 phase를 시작하지 않아야 한다', async () => {
+        setupEmptyUserContext();
+        const controller = new AbortController();
+        mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
+          ...emptyIntent,
+          referenceTitles: ['기생충'],
+          contentType: 'movie',
+          confidence: 'high',
+        });
+        mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('');
+        mockDataSource.query.mockImplementation(async () => {
+          controller.abort();
+          return [];
+        });
+
+        await service.sendMessageStream(
+          1,
+          '기생충 같은 영화',
+          [],
+          jest.fn(),
+          controller.signal,
+        );
+
+        expect(mockContentsService.searchContents).not.toHaveBeenCalled();
+        expect(
+          mockContentSearchService.searchWithFilters,
+        ).not.toHaveBeenCalled();
+        expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+        expect(mockStreamCreate).not.toHaveBeenCalled();
+      });
+
+      it('recommendations emit 중 중단되면 metadata background와 done을 시작하지 않아야 한다', async () => {
+        setupEmptyUserContext();
+        const controller = new AbortController();
+        mockEmbeddingService.searchSimilar.mockResolvedValue([
+          {
+            contentId: 1,
+            tmdbId: 123,
+            contentType: 'movie',
+            title: '추천작',
+            posterUrl: '/poster.jpg',
+            genres: [],
+            voteAverage: 8,
+            description: '추천작 설명',
+            similarity: 0.9,
+            director: null,
+            originCountry: 'KR',
+            overview: null,
+          },
+        ]);
+        mockStreamingResponse([
+          `**추천작** - 잘 맞아요.\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n[{"tmdbId":123,"contentType":"movie"}]\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+        ]);
+        const emittedEvents: string[] = [];
+
+        await service.sendMessageStream(
+          1,
+          '추천해줘',
+          [],
+          (event) => {
+            emittedEvents.push(event);
+            if (event === 'recommendations') controller.abort();
+          },
+          controller.signal,
+        );
+
+        expect(emittedEvents).toContain('recommendations');
+        expect(emittedEvents).not.toContain('done');
+        expect(
+          mockEmbeddingService.batchCacheByContentIds,
+        ).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('resolveReferenceEmbedding 통합', () => {
@@ -1652,6 +1816,7 @@ describe('ChatService', () => {
 
     it('DB에서 못 찾으면 TMDB fallback으로 임베딩을 생성해야 한다', async () => {
       setupForReferenceTest();
+      const controller = new AbortController();
 
       const fakeEmbedding = [0.4, 0.5, 0.6];
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
@@ -1685,27 +1850,38 @@ describe('ChatService', () => {
 
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
 
-      await service.sendMessageStream(1, '영야성하 같은 드라마', [], jest.fn());
+      await service.sendMessageStream(
+        1,
+        '영야성하 같은 드라마',
+        [],
+        jest.fn(),
+        controller.signal,
+      );
 
       // TMDB 검색 호출 확인
       expect(mockContentsService.searchContents).toHaveBeenCalledWith(
         '영야성하',
         'movie',
         1,
+        controller.signal,
       );
       expect(mockContentsService.searchContents).toHaveBeenCalledWith(
         '영야성하',
         'tv',
         1,
+        controller.signal,
       );
 
       // findOrFetchByTmdbId + cacheContentMetadata 호출 확인
       expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
         12345,
         'tv',
+        controller.signal,
       );
       expect(mockEmbeddingService.cacheContentMetadata).toHaveBeenCalledWith(
         100,
+        false,
+        controller.signal,
       );
 
       // precomputedEmbedding 전달 확인
@@ -1715,6 +1891,11 @@ describe('ChatService', () => {
         expect.any(Array),
         expect.any(Object),
         fakeEmbedding,
+        controller.signal,
+      );
+      expect(mockStreamCreate).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ signal: controller.signal }),
       );
     });
 

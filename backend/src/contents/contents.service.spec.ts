@@ -153,6 +153,26 @@ describe('ContentsService', () => {
   });
 
   describe('searchContents', () => {
+    it('채팅 검색의 AbortSignal을 TMDB 요청에 전달해야 한다', async () => {
+      const controller = new AbortController();
+      const searchResult = {
+        page: 1,
+        total_pages: 1,
+        total_results: 0,
+        results: [],
+      };
+      mockTmdbService.searchByType.mockResolvedValue(searchResult);
+
+      await service.searchContents('테스트', 'movie', 1, controller.signal);
+
+      expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
+        '테스트',
+        'movie',
+        1,
+        controller.signal,
+      );
+    });
+
     it('type이 지정되지 않으면 person, movie, tv에 대해 searchByType을 호출해야 한다', async () => {
       const personResult = {
         page: 1,

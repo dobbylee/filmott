@@ -176,6 +176,7 @@ export class TmdbService {
     query: string,
     type: 'movie' | 'tv' | 'person',
     page = 1,
+    signal?: AbortSignal,
   ): Promise<TmdbSearchResult> {
     const { data } = await firstValueFrom(
       this.httpService.get<TmdbSearchResult>(`/search/${type}`, {
@@ -186,6 +187,7 @@ export class TmdbService {
           region: 'KR',
           include_adult: false,
         },
+        signal,
       }),
     );
     // media_type 주입 (search/{type}은 media_type을 반환하지 않음)
@@ -196,13 +198,18 @@ export class TmdbService {
     return data;
   }
 
-  async getDetails(tmdbId: number, type: 'movie' | 'tv'): Promise<TmdbItem> {
+  async getDetails(
+    tmdbId: number,
+    type: 'movie' | 'tv',
+    signal?: AbortSignal,
+  ): Promise<TmdbItem> {
     const { data } = await firstValueFrom(
       this.httpService.get<TmdbItem>(`/${type}/${tmdbId}`, {
         params: {
           language: 'ko-KR',
           append_to_response: 'credits,watch/providers',
         },
+        signal,
       }),
     );
     return data;

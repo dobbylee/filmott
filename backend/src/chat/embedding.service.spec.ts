@@ -106,6 +106,20 @@ describe('EmbeddingService', () => {
   });
 
   describe('generateEmbedding', () => {
+    it('OpenAI 임베딩 요청에 AbortSignal을 전달해야 한다', async () => {
+      const controller = new AbortController();
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [{ embedding: [0.1, 0.2] }],
+      });
+
+      await service.generateEmbedding('테스트 텍스트', controller.signal);
+
+      expect(mockEmbeddingsCreate).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
+
     it('텍스트를 임베딩 벡터로 변환해야 한다', async () => {
       const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
       mockEmbeddingsCreate.mockResolvedValue({
