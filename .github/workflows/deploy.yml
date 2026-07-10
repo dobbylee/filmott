@@ -81,7 +81,9 @@ jobs:
 
             compose config > /dev/null
             compose build --no-cache frontend backend
-            compose up -d --remove-orphans frontend backend
+            # PostgreSQL volume 변경은 별도 점검 절차로만 반영한다.
+            # 앱 배포가 dependency인 postgres를 암묵적으로 재생성하지 않게 한다.
+            compose up -d --no-deps --remove-orphans frontend backend
 
             for service in frontend backend; do
               container_id=$(compose ps -q "$service")
