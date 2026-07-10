@@ -19,6 +19,12 @@ export interface IntegrationDatabaseConfig {
   database: string;
 }
 
+const REQUIRED_INTEGRATION_DATABASE_ENV_NAMES = [
+  'TEST_DB_NAME',
+  'TEST_DB_USERNAME',
+  'TEST_DB_PASSWORD',
+] as const;
+
 export const INTEGRATION_ENTITIES = [
   User,
   RefreshToken,
@@ -65,11 +71,30 @@ export function getIntegrationDatabaseConfig(): IntegrationDatabaseConfig {
 }
 
 export function hasIntegrationDatabaseConfig(): boolean {
-  return Boolean(
-    process.env.TEST_DB_NAME &&
-    process.env.TEST_DB_USERNAME &&
-    process.env.TEST_DB_PASSWORD,
+  return REQUIRED_INTEGRATION_DATABASE_ENV_NAMES.every((name) =>
+    Boolean(process.env[name]),
   );
+}
+
+export function assertIntegrationDatabaseConfig(allowMissing = false): void {
+  const missingNames = REQUIRED_INTEGRATION_DATABASE_ENV_NAMES.filter(
+    (name) => !process.env[name],
+  );
+
+  if (
+    allowMissing &&
+    missingNames.length === REQUIRED_INTEGRATION_DATABASE_ENV_NAMES.length
+  ) {
+    return;
+  }
+
+  if (missingNames.length > 0) {
+    throw new Error(
+      `통합 테스트 DB 환경변수가 필요합니다: ${missingNames.join(', ')}`,
+    );
+  }
+
+  getIntegrationDatabaseConfig();
 }
 
 export function createIntegrationTypeOrmOptions(): TypeOrmModuleOptions {

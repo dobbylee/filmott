@@ -6,6 +6,5 @@
   "setupFilesAfterEnv": ["<rootDir>/integration/setup.ts"],
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  },
-  "passWithNoTests": true
+  }
 }
