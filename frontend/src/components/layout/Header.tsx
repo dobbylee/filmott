@@ -17,6 +17,8 @@ export default function Header() {
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLElement>(null);
 
   // 헤더 스크롤 배경 변경
   useEffect(() => {
@@ -35,6 +37,22 @@ export default function Header() {
       document.body.style.overflow = '';
     }
     return () => { document.body.style.overflow = ''; };
+  }, [showMobileMenu]);
+
+  // 모바일 메뉴와 토글 외부를 누르면 메뉴 닫기
+  useEffect(() => {
+    if (!showMobileMenu) return;
+
+    const handlePointerDownOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (mobileMenuRef.current?.contains(target) || mobileMenuButtonRef.current?.contains(target)) return;
+
+      setShowMobileMenu(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDownOutside, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDownOutside, true);
   }, [showMobileMenu]);
 
   // 검색창 외부 클릭 시 닫기
@@ -77,7 +95,7 @@ export default function Header() {
           : 'bg-transparent border-transparent py-5'
       }`}
     >
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl px-4 items-center">
+      <div className="mx-auto flex w-full max-w-7xl px-4 items-center">
         {/* 왼쪽: 로고 */}
         <div className="flex-1">
           <Link
@@ -132,7 +150,8 @@ export default function Header() {
           </div>
           {/* 모바일 메뉴 토글 */}
           <button
-            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            ref={mobileMenuButtonRef}
+            onClick={() => setShowMobileMenu((isOpen) => !isOpen)}
             className="md:hidden rounded-full p-2 text-white/80 hover:bg-white/10"
             aria-label="메뉴"
           >
@@ -162,48 +181,40 @@ export default function Header() {
 
       {/* 모바일 네비게이션 */}
       {showMobileMenu && (
-        <>
-          <button
-            type="button"
-            aria-label="모바일 메뉴 닫기"
-            className="fixed inset-0 z-0 cursor-default md:hidden"
-            onClick={() => setShowMobileMenu(false)}
-          />
-          <nav className="absolute top-full left-0 right-0 z-10 border-b border-white/10 bg-[#050505]/95 backdrop-blur-xl px-4 py-4 md:hidden shadow-2xl">
-            <div className="flex flex-col gap-2">
-              <Link href="/discover?type=movie" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-                <Film className="h-5 w-5" /> 영화
-              </Link>
-              <Link href="/discover?type=tv" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-                <Tv className="h-5 w-5" /> 시리즈
-              </Link>
-              {user && (
-                <>
-                  <Link href="/profile/watchlist?status=watched" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-                    <Layers className="h-5 w-5" /> 내 기록
-                  </Link>
-                  <Link href="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
-                    <UserIcon className="h-5 w-5" /> 프로필
-                  </Link>
-                </>
-              )}
+        <nav ref={mobileMenuRef} className="absolute top-full left-0 right-0 border-b border-white/10 bg-[#050505]/95 backdrop-blur-xl px-4 py-4 md:hidden shadow-2xl">
+          <div className="flex flex-col gap-2">
+            <Link href="/discover?type=movie" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+              <Film className="h-5 w-5" /> 영화
+            </Link>
+            <Link href="/discover?type=tv" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+              <Tv className="h-5 w-5" /> 시리즈
+            </Link>
+            {user && (
+              <>
+                <Link href="/profile/watchlist?status=watched" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+                  <Layers className="h-5 w-5" /> 내 기록
+                </Link>
+                <Link href="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white">
+                  <UserIcon className="h-5 w-5" /> 프로필
+                </Link>
+              </>
+            )}
 
-              <form onSubmit={handleSearch} className="mt-2 px-2">
-                <div className="relative w-full">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                  <input
-                    ref={mobileSearchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="작품 / 인물 검색"
-                    className="w-full rounded-full border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-base text-white placeholder-white/40 outline-none focus:border-white/30"
-                  />
-                </div>
-              </form>
-            </div>
-          </nav>
-        </>
+            <form onSubmit={handleSearch} className="mt-2 px-2">
+              <div className="relative w-full">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                <input
+                  ref={mobileSearchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="작품 / 인물 검색"
+                  className="w-full rounded-full border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-base text-white placeholder-white/40 outline-none focus:border-white/30"
+                />
+              </div>
+            </form>
+          </div>
+        </nav>
       )}
     </header>
   );
