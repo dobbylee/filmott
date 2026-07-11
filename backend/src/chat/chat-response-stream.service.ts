@@ -46,6 +46,7 @@ export class ChatResponseStreamService {
     let visibleLineBuffer = '';
     let isCollectingTrailer = false;
     let hasEmittedText = false;
+    let hasEmittedRecommendation = false;
     let finishReason: OpenAI.Chat.ChatCompletionChunk.Choice['finish_reason'] =
       null;
 
@@ -63,10 +64,22 @@ export class ChatResponseStreamService {
         if (formatted === null) continue;
         if (!hasEmittedText && formatted.trim().length === 0) continue;
 
+        const isRecommendation = /^\*\*.+\*\*\s[—-]\s.+$/.test(formatted);
+        if (
+          isRecommendation &&
+          hasEmittedRecommendation &&
+          !visibleTextBuffer.endsWith('\n\n')
+        ) {
+          const separator = visibleTextBuffer.endsWith('\n') ? '\n' : '\n\n';
+          visibleTextBuffer += separator;
+          this.emitTextIfNotEmpty(separator, emit);
+        }
+
         const output = `${formatted}${isLastFlushedLine ? '' : '\n'}`;
         visibleTextBuffer += output;
         this.emitTextIfNotEmpty(output, emit);
         hasEmittedText = hasEmittedText || formatted.length > 0;
+        hasEmittedRecommendation = hasEmittedRecommendation || isRecommendation;
       }
     };
 
