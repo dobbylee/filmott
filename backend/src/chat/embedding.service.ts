@@ -8,6 +8,7 @@ import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
 
 const OPENAI_EMBEDDING_TIMEOUT_MS = 10_000;
+const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
 
 export interface SimilarContent {
   contentId: number;
@@ -22,20 +23,6 @@ export interface SimilarContent {
   director: string | null;
   originCountry: string | null;
   overview: string | null;
-}
-
-export interface SearchFilters {
-  ottProviderNames?: string[];
-  countries?: string[];
-  personNames?: string[];
-  dateRange?: { from: string | null; to: string | null };
-  contentType?: 'movie' | 'tv';
-}
-
-export interface CacheCriteria {
-  minVoteCount: number;
-  minReleaseDate: Date | null;
-  originCountry?: string;
 }
 
 export interface BatchResult {
@@ -207,7 +194,6 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     queryText: string,
     limit: number,
     excludeTmdbIds: number[],
-    filters?: SearchFilters,
     precomputedEmbedding?: number[],
     signal?: AbortSignal,
   ): Promise<SimilarContent[]> {
@@ -221,68 +207,8 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     const embeddingStr = `[${embedding.join(',')}]`;
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];
 
-    const hasFilters =
-      filters &&
-      ((filters.ottProviderNames?.length ?? 0) > 0 ||
-        (filters.countries?.length ?? 0) > 0 ||
-        (filters.personNames?.length ?? 0) > 0 ||
-        filters.dateRange?.from ||
-        filters.dateRange?.to ||
-        filters.contentType !== undefined);
-
-    // 1차: 전체 필터 적용
-    let results = await this.executeSearch(
-      embeddingStr,
-      limit,
-      excludeIds,
-      filters,
-    );
+    const results = await this.executeSearch(embeddingStr, limit, excludeIds);
     if (signal?.aborted) return [];
-
-    // 2차: 결과 부족 시 필터 단계적 완화
-    if (results.length < 5 && hasFilters) {
-      const relaxedFilters: SearchFilters = { ...filters };
-
-      if (results.length < 5 && (relaxedFilters.personNames?.length ?? 0) > 0) {
-        if (signal?.aborted) return [];
-        delete relaxedFilters.personNames;
-        results = await this.executeSearch(
-          embeddingStr,
-          limit,
-          excludeIds,
-          relaxedFilters,
-        );
-        if (signal?.aborted) return [];
-      }
-
-      if (results.length < 5 && (relaxedFilters.countries?.length ?? 0) > 0) {
-        if (signal?.aborted) return [];
-        delete relaxedFilters.countries;
-        results = await this.executeSearch(
-          embeddingStr,
-          limit,
-          excludeIds,
-          relaxedFilters,
-        );
-        if (signal?.aborted) return [];
-      }
-
-      if (
-        results.length < 5 &&
-        (relaxedFilters.ottProviderNames?.length ?? 0) > 0
-      ) {
-        if (signal?.aborted) return [];
-        delete relaxedFilters.ottProviderNames;
-        results = await this.executeSearch(
-          embeddingStr,
-          limit,
-          excludeIds,
-          relaxedFilters,
-        );
-        if (signal?.aborted) return [];
-      }
-    }
-
     return results;
   }
 
@@ -290,73 +216,14 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     embeddingStr: string,
     limit: number,
     excludeIds: number[],
-    filters?: SearchFilters,
   ): Promise<SimilarContent[]> {
-    const conditions: string[] = [];
-    const params: (string | number | number[] | string[])[] = [
+    const params: (string | number | number[])[] = [
       embeddingStr,
       excludeIds,
+      limit,
     ];
-    let paramIndex = 3;
 
-    // OTT 필터
-    if (filters?.ottProviderNames?.length) {
-      conditions.push(
-        `AND EXISTS (SELECT 1 FROM jsonb_array_elements(c.watch_providers->'flatrate') AS p WHERE p->>'provider_name' = ANY($${paramIndex}::text[]))`,
-      );
-      params.push(filters.ottProviderNames);
-      paramIndex++;
-    }
-
-    // 국가 필터 (정확한 boundary 매칭: 쉼표 구분 문자열에서 오탐 방지)
-    if (filters?.countries?.length) {
-      const countryConditions = filters.countries.map(() => {
-        const idx = paramIndex;
-        paramIndex++;
-        return `(c.origin_country = $${idx} OR c.origin_country LIKE $${idx} || ', %' OR c.origin_country LIKE '%, ' || $${idx} OR c.origin_country LIKE '%, ' || $${idx} || ', %')`;
-      });
-      conditions.push(`AND (${countryConditions.join(' OR ')})`);
-      filters.countries.forEach((country) => params.push(country));
-    }
-
-    // 인물 필터 (director LIKE + credits jsonb name/character 필드만 검색)
-    if (filters?.personNames?.length) {
-      const personConditions = filters.personNames.flatMap(() => {
-        const idx = paramIndex;
-        const directorCond = `c.director LIKE $${idx}`;
-        const creditsCond = `EXISTS (SELECT 1 FROM jsonb_array_elements(c.credits) AS cr WHERE cr->>'name' LIKE $${idx} OR cr->>'character' LIKE $${idx})`;
-        paramIndex++;
-        return [directorCond, creditsCond];
-      });
-      conditions.push(`AND (${personConditions.join(' OR ')})`);
-      filters.personNames.forEach((name) => params.push(`%${name}%`));
-    }
-
-    // contentType 필터
-    if (filters?.contentType) {
-      conditions.push(`AND c.content_type = $${paramIndex}`);
-      params.push(filters.contentType);
-      paramIndex++;
-    }
-
-    // dateRange 필터
-    if (filters?.dateRange) {
-      if (filters.dateRange.from) {
-        conditions.push(`AND c.release_date >= $${paramIndex}`);
-        params.push(filters.dateRange.from);
-        paramIndex++;
-      }
-      if (filters.dateRange.to) {
-        conditions.push(`AND c.release_date <= $${paramIndex}`);
-        params.push(filters.dateRange.to);
-        paramIndex++;
-      }
-    }
-
-    params.push(limit);
-    const limitParam = `$${paramIndex}`;
-
-    const rows: {
+    type SimilarContentRow = {
       content_id: number;
       description: string;
       tmdb_id: number;
@@ -368,8 +235,8 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
       similarity: number;
       director: string | null;
       origin_country: string | null;
-    }[] = await this.dataSource.query(
-      `SELECT cm.content_id, cm.description,
+    };
+    const query = `SELECT cm.content_id, cm.description,
               c.tmdb_id, c.content_type, c.title, c.poster_url, c.genres, c.vote_average,
               c.director, c.origin_country, c.vote_count,
               1 - (cm.embedding <=> $1::vector) AS similarity,
@@ -380,11 +247,15 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
        WHERE c.tmdb_id != ALL($2::int[])
        AND (c.adult IS NOT TRUE)
        AND (c.watch_providers IS NOT NULL OR c.origin_country LIKE '%KR%' OR r.id IS NOT NULL)
-       ${conditions.join('\n       ')}
        ORDER BY weighted_score DESC
-       LIMIT ${limitParam}`,
-      params,
-    );
+       LIMIT $3`;
+    const rows = await this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT set_config('statement_timeout', $1, true)`, [
+        `${CHAT_QUERY_STATEMENT_TIMEOUT_MS}ms`,
+      ]);
+      const result: unknown = await manager.query(query, params);
+      return result as SimilarContentRow[];
+    });
 
     return rows.map((row) => ({
       contentId: row.content_id,
@@ -426,62 +297,6 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
         result.failed++;
         this.logger.warn(
           `배치 캐싱 실패 (contentId: ${contentId}): ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
-
-    return result;
-  }
-
-  async batchCacheMetadata(criteria: CacheCriteria): Promise<BatchResult> {
-    const result: BatchResult = { cached: 0, skipped: 0, failed: 0 };
-
-    const qb = this.contentRepo
-      .createQueryBuilder('c')
-      .select(['c.id'])
-      .where('c.voteCount >= :minVoteCount', {
-        minVoteCount: criteria.minVoteCount,
-      });
-
-    if (criteria.minReleaseDate) {
-      qb.andWhere('c.releaseDate >= :minReleaseDate', {
-        minReleaseDate: criteria.minReleaseDate,
-      });
-    }
-
-    if (criteria.originCountry) {
-      qb.andWhere('c.originCountry LIKE :country', {
-        country: `%${criteria.originCountry}%`,
-      });
-    }
-
-    const contents = await qb.getMany();
-
-    // 이미 캐싱된 content_id 목록 조회
-    const existingIds = new Set(
-      (
-        await this.metadataRepo
-          .createQueryBuilder('cm')
-          .select('cm.contentId')
-          .getMany()
-      ).map((m) => m.contentId),
-    );
-
-    for (const content of contents) {
-      if (existingIds.has(content.id)) {
-        result.skipped++;
-        continue;
-      }
-
-      try {
-        await this.cacheContentMetadata(content.id);
-        result.cached++;
-        // Rate limit 고려: 100ms 딜레이
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error) {
-        result.failed++;
-        this.logger.warn(
-          `임베딩 캐싱 실패 (contentId: ${content.id}): ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }

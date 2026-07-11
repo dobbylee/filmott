@@ -47,6 +47,7 @@ const SCORE_WEIGHTS = {
 } as const;
 
 const MINIMUM_FILTERED_RESULTS = 5;
+const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
 
 @Injectable()
 export class ContentSearchService {
@@ -358,7 +359,13 @@ SELECT * FROM (
 ORDER BY priority, score DESC
 LIMIT ${limitParam}`;
 
-    const rows: FilteredRow[] = await this.dataSource.query(query, params);
+    const rows = await this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT set_config('statement_timeout', $1, true)`, [
+        `${CHAT_QUERY_STATEMENT_TIMEOUT_MS}ms`,
+      ]);
+      const result: unknown = await manager.query(query, params);
+      return result as FilteredRow[];
+    });
 
     return rows.map((row) => ({
       contentId: row.content_id,

@@ -96,7 +96,10 @@ describe('ChatService', () => {
     get: jest.fn().mockReturnValue('test-openai-key'),
   };
 
-  async function* createChatStream(chunks: string[]) {
+  async function* createChatStream(
+    chunks: string[],
+    finishReason: 'stop' | 'length' | 'content_filter' | null = 'stop',
+  ) {
     for (const content of chunks) {
       yield {
         choices: [
@@ -106,10 +109,27 @@ describe('ChatService', () => {
         ],
       };
     }
+    if (finishReason) {
+      yield {
+        choices: [
+          {
+            delta: {},
+            finish_reason: finishReason,
+          },
+        ],
+      };
+    }
   }
 
   const mockStreamingResponse = (chunks: string[]) => {
     mockStreamCreate.mockResolvedValue(createChatStream(chunks));
+  };
+
+  const mockIncompleteStreamingResponse = (
+    chunks: string[],
+    finishReason: 'length' | 'content_filter' | null,
+  ) => {
+    mockStreamCreate.mockResolvedValue(createChatStream(chunks, finishReason));
   };
 
   beforeEach(async () => {
@@ -143,128 +163,6 @@ describe('ChatService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
-  });
-
-  describe('buildUserContext', () => {
-    const mockQueryBuilder = () => ({
-      innerJoin: jest.fn().mockReturnThis(),
-      leftJoin: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      addOrderBy: jest.fn().mockReturnThis(),
-      groupBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      getRawMany: jest.fn().mockResolvedValue([]),
-    });
-
-    it('사용자 컨텍스트를 올바르게 구성해야 한다', async () => {
-      const favoritesQb = mockQueryBuilder();
-      favoritesQb.getRawMany.mockResolvedValue([
-        {
-          title: '기생충',
-          releaseDate: '2019-05-30',
-          genres: '드라마, 스릴러',
-          rating: 10,
-          originCountry: 'KR',
-        },
-      ]);
-
-      const dislikedQb = mockQueryBuilder();
-      dislikedQb.getRawMany.mockResolvedValue([
-        {
-          title: '영화X',
-          releaseDate: '2020-01-01',
-          genres: '액션',
-          rating: 2,
-          originCountry: 'US',
-        },
-      ]);
-
-      const genreStatsQb = mockQueryBuilder();
-      genreStatsQb.getRawMany.mockResolvedValue([
-        { genre: '드라마', avgRating: '8.5', count: '5' },
-      ]);
-
-      const watchedTmdbIdsQb = mockQueryBuilder();
-      watchedTmdbIdsQb.getRawMany.mockResolvedValue([{ tmdbId: 496243 }]);
-
-      const wantToWatchQb = mockQueryBuilder();
-      wantToWatchQb.getRawMany.mockResolvedValue([
-        {
-          title: '인셉션',
-          releaseDate: '2010-07-16',
-          genres: 'SF, 액션',
-          originCountry: 'US',
-        },
-      ]);
-
-      const watchedGenresQb = mockQueryBuilder();
-      watchedGenresQb.getRawMany.mockResolvedValue([
-        { genre: '코미디', avgRating: '0', count: '3' },
-      ]);
-
-      mockReviewRepo.createQueryBuilder
-        .mockReturnValueOnce(favoritesQb)
-        .mockReturnValueOnce(dislikedQb)
-        .mockReturnValueOnce(genreStatsQb);
-
-      mockWatchlistRepo.createQueryBuilder
-        .mockReturnValueOnce(watchedTmdbIdsQb)
-        .mockReturnValueOnce(wantToWatchQb)
-        .mockReturnValueOnce(watchedGenresQb);
-
-      const result = await service.buildUserContext(1);
-
-      expect(result.favorites).toHaveLength(1);
-      expect(result.favorites[0].title).toBe('기생충');
-      expect(result.favorites[0].year).toBe('2019');
-      expect(result.favorites[0].rating).toBe(10);
-      expect(result.favorites[0].originCountry).toBe('KR');
-
-      expect(result.disliked).toHaveLength(1);
-      expect(result.disliked[0].rating).toBe(2);
-      expect(result.disliked[0].originCountry).toBe('US');
-
-      expect(result.genreStats).toHaveLength(1);
-      expect(result.genreStats[0].genre).toBe('드라마');
-      expect(result.genreStats[0].count).toBe(5);
-
-      expect(result.watchedTmdbIds).toEqual([496243]);
-
-      expect(result.wantToWatch).toHaveLength(1);
-      expect(result.wantToWatch[0].title).toBe('인셉션');
-      expect(result.wantToWatch[0].genres).toBe('SF, 액션');
-      expect(result.wantToWatch[0].originCountry).toBe('US');
-
-      expect(result.watchedGenres).toHaveLength(1);
-      expect(result.watchedGenres[0].genre).toBe('코미디');
-      expect(result.watchedGenres[0].count).toBe(3);
-    });
-
-    it('데이터가 없으면 빈 배열을 반환해야 한다', async () => {
-      const emptyQb = mockQueryBuilder();
-
-      mockReviewRepo.createQueryBuilder
-        .mockReturnValueOnce(emptyQb)
-        .mockReturnValueOnce(mockQueryBuilder())
-        .mockReturnValueOnce(mockQueryBuilder());
-
-      mockWatchlistRepo.createQueryBuilder
-        .mockReturnValueOnce(mockQueryBuilder())
-        .mockReturnValueOnce(mockQueryBuilder())
-        .mockReturnValueOnce(mockQueryBuilder());
-
-      const result = await service.buildUserContext(1);
-
-      expect(result.favorites).toEqual([]);
-      expect(result.disliked).toEqual([]);
-      expect(result.genreStats).toEqual([]);
-      expect(result.watchedTmdbIds).toEqual([]);
-      expect(result.wantToWatch).toEqual([]);
-      expect(result.watchedGenres).toEqual([]);
-    });
   });
 
   describe('sendMessageStream', () => {
@@ -404,7 +302,7 @@ describe('ChatService', () => {
       expect(doneEvents).toHaveLength(1);
     });
 
-    it('스트리밍 본문의 깨진 추천 줄 불릿을 정규화해서 emit해야 한다', async () => {
+    it('후보와 trailer가 없는 추천 본문은 불완전 응답으로 거부해야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
       mockContentsService.searchContents.mockResolvedValue({ results: [] });
@@ -418,16 +316,9 @@ describe('ChatService', () => {
         emittedEvents.push({ event, data });
       };
 
-      await service.sendMessageStream(1, '리얼리티 예능 추천해줘', [], emit);
-
-      const text = emittedEvents
-        .filter((e) => e.event === 'text')
-        .map((e) => (e.data as { content: string }).content)
-        .join('');
-      expect(text).toContain(
-        '**다멜리오 쇼** - 가족/일상 기반의 리얼리티라 몰입하기 좋아요.',
-      );
-      expect(text).not.toContain('**- 다멜리오 쇼');
+      await expect(
+        service.sendMessageStream(1, '리얼리티 예능 추천해줘', [], emit),
+      ).rejects.toThrow('추천 본문과 카드 정보가 일치하지 않습니다');
     });
 
     it('trailer가 없으면 본문 제목이 후보와 같아도 추천 카드를 emit하지 않아야 한다', async () => {
@@ -457,12 +348,9 @@ describe('ChatService', () => {
         emittedEvents.push({ event, data });
       };
 
-      await service.sendMessageStream(
-        1,
-        '두뇌 서바이벌 예능 추천해줘',
-        [],
-        emit,
-      );
+      await expect(
+        service.sendMessageStream(1, '두뇌 서바이벌 예능 추천해줘', [], emit),
+      ).rejects.toThrow('추천 본문과 카드 정보가 일치하지 않습니다');
 
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
@@ -499,7 +387,9 @@ describe('ChatService', () => {
         emittedEvents.push({ event, data });
       };
 
-      await service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit);
+      await expect(
+        service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit),
+      ).rejects.toThrow('추천 본문과 카드 정보가 일치하지 않습니다');
 
       expect(mockContentsService.searchContents).not.toHaveBeenCalled();
       const recEvents = emittedEvents.filter(
@@ -508,7 +398,7 @@ describe('ChatService', () => {
       expect(recEvents).toHaveLength(0);
     });
 
-    it('trailer 매칭이 하나라도 있으면 본문 제목 fallback을 실행하지 않아야 한다', async () => {
+    it('trailer 카드 외 다른 본문 추천이 있으면 응답을 거부해야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([
         {
@@ -537,13 +427,15 @@ describe('ChatService', () => {
         emittedEvents.push({ event, data });
       };
 
-      await service.sendMessageStream(1, '두뇌 예능 추천해줘', [], emit);
+      await expect(
+        service.sendMessageStream(1, '두뇌 예능 추천해줘', [], emit),
+      ).rejects.toThrow('추천 본문과 카드 정보가 일치하지 않습니다');
 
       expect(mockContentsService.searchContents).not.toHaveBeenCalled();
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
-      expect(recEvents).toHaveLength(1);
+      expect(recEvents).toHaveLength(0);
     });
 
     it('tv 의도에서는 trailer에 movie 후보가 들어와도 추천 카드로 emit하지 않아야 한다', async () => {
@@ -581,7 +473,9 @@ describe('ChatService', () => {
         emittedEvents.push({ event, data });
       };
 
-      await service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit);
+      await expect(
+        service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit),
+      ).rejects.toThrow('추천 본문과 카드 정보가 일치하지 않습니다');
 
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
@@ -801,7 +695,9 @@ describe('ChatService', () => {
         emittedEvents.push({ event, data });
       };
 
-      await service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit);
+      await expect(
+        service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit),
+      ).rejects.toThrow('추천 본문과 카드 정보가 일치하지 않습니다');
 
       expect(mockContentsService.searchContents).not.toHaveBeenCalled();
       const recEvents = emittedEvents.filter(
@@ -857,6 +753,57 @@ describe('ChatService', () => {
       expect(text).toBe('추천 본문입니다.\n\n');
       expect(text).not.toContain('tmdbId');
       expect(text).not.toContain('contentType');
+    });
+
+    it('finish_reason이 stop이 아니면 부분 본문을 보존하고 완료 처리하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockIncompleteStreamingResponse(['일부 응답입니다.'], 'length');
+      const emittedEvents: { event: string; data: unknown }[] = [];
+
+      await expect(
+        service.sendMessageStream(1, '추천해줘', [], (event, data) => {
+          emittedEvents.push({ event, data });
+        }),
+      ).rejects.toThrow('AI 응답이 완성되기 전에 종료되었습니다');
+
+      expect(emittedEvents).toContainEqual({
+        event: 'text',
+        data: { content: '일부 응답입니다.' },
+      });
+      expect(emittedEvents.some((event) => event.event === 'done')).toBe(false);
+    });
+
+    it('추천 trailer 닫기 태그가 없으면 완료 처리하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockStreamingResponse([
+        `일부 응답입니다.\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n[]`,
+      ]);
+
+      await expect(
+        service.sendMessageStream(1, '추천해줘', [], jest.fn()),
+      ).rejects.toThrow('AI 응답이 완성되기 전에 종료되었습니다');
+    });
+
+    it('추천 trailer 시작 태그가 잘린 경우 내부 태그를 노출하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockIncompleteStreamingResponse(['일부 응답입니다.\n\n<filmott_'], null);
+      const emittedEvents: { event: string; data: unknown }[] = [];
+
+      await expect(
+        service.sendMessageStream(1, '추천해줘', [], (event, data) => {
+          emittedEvents.push({ event, data });
+        }),
+      ).rejects.toThrow('AI 응답이 완성되기 전에 종료되었습니다');
+
+      const text = emittedEvents
+        .filter((event) => event.event === 'text')
+        .map((event) => (event.data as { content: string }).content)
+        .join('');
+      expect(text).toBe('일부 응답입니다.\n\n');
+      expect(text).not.toContain('filmott');
     });
 
     it('확정 추천 후보가 있어도 trailer가 비어 있으면 카드를 emit하지 않아야 한다', async () => {
@@ -934,14 +881,16 @@ describe('ChatService', () => {
         mockStreamingResponse([`**청춘** - 추천 이유입니다.\n\n${trailer}`]);
 
         const emittedEvents: { event: string; data: unknown }[] = [];
-        await service.sendMessageStream(
-          1,
-          '청춘 영화 추천해줘',
-          [],
-          (event, data) => {
-            emittedEvents.push({ event, data });
-          },
-        );
+        await expect(
+          service.sendMessageStream(
+            1,
+            '청춘 영화 추천해줘',
+            [],
+            (event, data) => {
+              emittedEvents.push({ event, data });
+            },
+          ),
+        ).rejects.toThrow('추천 본문과 카드 정보가 일치하지 않습니다');
 
         expect(
           emittedEvents.filter((event) => event.event === 'recommendations'),
@@ -1130,7 +1079,6 @@ describe('ChatService', () => {
         '재미있는 영화',
         20,
         expect.any(Array),
-        undefined,
         undefined,
       );
       expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();

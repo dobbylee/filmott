@@ -68,6 +68,43 @@ describe('ChatController', () => {
       expect(mockRes.end).toHaveBeenCalled();
     });
 
+    it('브라우저 parser 계약에 맞는 event/data frame을 기록해야 한다', async () => {
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+        destroyed: false,
+      };
+      mockChatService.sendMessageStream.mockImplementation(
+        async (
+          _userId: number,
+          _content: string,
+          _history: unknown[],
+          emit: (event: string, data: unknown) => void,
+        ) => {
+          emit('text', { content: '응답' });
+          emit('done', {});
+        },
+      );
+
+      await controller.sendMessage(
+        user,
+        { content: '추천해줘' },
+        mockRes as unknown as import('express').Response,
+      );
+
+      expect(mockRes.write).toHaveBeenNthCalledWith(
+        1,
+        'event: text\ndata: {"content":"응답"}\n\n',
+      );
+      expect(mockRes.write).toHaveBeenNthCalledWith(
+        2,
+        'event: done\ndata: {}\n\n',
+      );
+    });
+
     it('sendMessageStream에 올바른 인자를 전달해야 한다', async () => {
       const mockRes = {
         setHeader: jest.fn(),

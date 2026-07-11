@@ -42,7 +42,6 @@ export default function ChatSection() {
   const [streamingText, setStreamingText] = useState('');
   const [streamingRecs, setStreamingRecs] = useState<ChatRecommendationWithPoster[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // onDone 콜백에서 최신 streaming 상태를 참조하기 위한 ref
@@ -260,19 +259,6 @@ export default function ChatSection() {
           clearStreamingState(requestId);
         },
       }, { isAuthenticated: Boolean(user), signal: abortController.signal });
-
-      if (!isActiveRequest(requestId)) return;
-
-      // onDone이 호출되지 않은 경우 (연결 끊김 등) 받은 텍스트 보존
-      if (!isDoneCalledRef.current) {
-        const appended = appendAssistantMessage(true);
-        setError(
-          appended
-            ? '응답 연결이 예기치 않게 종료되었습니다. 다시 시도해주세요.'
-            : '응답을 받지 못했습니다. 다시 시도해주세요.',
-        );
-        clearStreamingState(requestId);
-      }
     } catch {
       if (!isActiveRequest(requestId) || abortController.signal.aborted) return;
 
@@ -389,7 +375,6 @@ export default function ChatSection() {
               </div>
             )}
 
-            <div ref={messagesEndRef} />
           </div>
         </div>
       )}

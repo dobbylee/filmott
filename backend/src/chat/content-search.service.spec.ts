@@ -13,8 +13,24 @@ describe('ContentSearchService', () => {
     generateEmbedding: jest.fn(),
   };
 
+  const mockStatementTimeoutQuery = jest.fn().mockResolvedValue([]);
   const mockDataSource = {
     query: jest.fn(),
+    transaction: jest.fn(
+      async (
+        callback: (manager: {
+          query: (query: string, parameters?: unknown[]) => Promise<unknown>;
+        }) => Promise<unknown>,
+      ) =>
+        callback({
+          query: async (query, parameters) => {
+            if (query.includes("set_config('statement_timeout'")) {
+              return mockStatementTimeoutQuery(query, parameters);
+            }
+            return mockDataSource.query(query, parameters);
+          },
+        }),
+    ),
   };
 
   const mockEmbedding = [0.1, 0.2, 0.3];
@@ -106,6 +122,10 @@ describe('ContentSearchService', () => {
       // 1순위: content_metadata 기준 JOIN
       expect(query).toContain('FROM content_metadata cm');
       expect(query).toContain('JOIN contents c ON c.id = cm.content_id');
+      expect(mockStatementTimeoutQuery).toHaveBeenCalledWith(
+        expect.stringContaining("set_config('statement_timeout'"),
+        ['5000ms'],
+      );
     });
 
     it('adult 콘텐츠를 검색 결과에서 제외해야 한다', async () => {

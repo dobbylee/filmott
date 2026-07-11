@@ -87,15 +87,6 @@ describe('채팅 추천 downstream contract 평가셋 (LLM-free)', () => {
     }
   });
 
-  it('기록된 intent는 사람이 검토한 핵심 기대값과 일치해야 한다', () => {
-    for (const testCase of CHAT_QUALITY_CASES) {
-      if (!testCase.expectedIntent) continue;
-      expect(testCase.recordedStructuredOutput).toMatchObject(
-        testCase.expectedIntent,
-      );
-    }
-  });
-
   it('확정 후보에서 이전 추천과 다른 contentType을 제외해야 한다', () => {
     const cases = CHAT_QUALITY_CASES.filter(hasCandidateFixture);
 

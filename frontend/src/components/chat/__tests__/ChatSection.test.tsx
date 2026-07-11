@@ -397,21 +397,6 @@ describe('ChatSection', () => {
     });
   });
 
-  it('done 없이 빈 스트림이 종료되면 로딩을 끝내고 에러를 표시한다', async () => {
-    mockSendChatMessage.mockResolvedValueOnce(undefined);
-
-    render(<ChatSection />);
-
-    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
-    fireEvent.change(textarea, { target: { value: '빈 응답 테스트' } });
-    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
-
-    await waitFor(() => {
-      expect(screen.getByText('응답을 받지 못했습니다. 다시 시도해주세요.')).toBeInTheDocument();
-      expect(textarea).not.toBeDisabled();
-    });
-  });
-
   it('두 번째 메시지 전송 시 이전 대화를 history로 전달한다', async () => {
     mockSendChatMessage.mockImplementationOnce(
       (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {

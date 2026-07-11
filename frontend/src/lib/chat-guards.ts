@@ -9,14 +9,13 @@ export function isChatRecommendationWithPoster(
 ): value is ChatRecommendationWithPoster {
   if (!isRecord(value)) return false;
 
-  const { tmdbId, contentType, title, reason, posterUrl } = value;
+  const { tmdbId, contentType, title, posterUrl } = value;
 
   return (
     typeof tmdbId === 'number' &&
     Number.isSafeInteger(tmdbId) &&
     (contentType === 'movie' || contentType === 'tv') &&
     typeof title === 'string' &&
-    (reason === undefined || typeof reason === 'string') &&
     (posterUrl === null || typeof posterUrl === 'string')
   );
 }

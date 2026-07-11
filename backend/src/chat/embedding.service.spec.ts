@@ -47,8 +47,24 @@ describe('EmbeddingService', () => {
     get: jest.fn().mockReturnValue('test-openai-key'),
   };
 
+  const mockStatementTimeoutQuery = jest.fn().mockResolvedValue([]);
   const mockDataSource = {
     query: jest.fn(),
+    transaction: jest.fn(
+      async (
+        callback: (manager: {
+          query: (query: string, parameters?: unknown[]) => Promise<unknown>;
+        }) => Promise<unknown>,
+      ) =>
+        callback({
+          query: async (query, parameters) => {
+            if (query.includes("set_config('statement_timeout'")) {
+              return mockStatementTimeoutQuery(query, parameters);
+            }
+            return mockDataSource.query(query, parameters);
+          },
+        }),
+    ),
   };
 
   beforeEach(async () => {
@@ -365,157 +381,11 @@ describe('EmbeddingService', () => {
       expect(query).not.toContain('release_date >=');
     });
 
-    it('OTT 필터가 쿼리에 포함되어야 한다', async () => {
-      mockDataSource.query.mockResolvedValue(fiveRows);
-
-      await service.searchSimilar('넷플릭스 영화', 10, [], {
-        ottProviderNames: ['Netflix'],
-      });
-
-      const query = mockDataSource.query.mock.calls[0][0] as string;
-      expect(query).toContain('watch_providers');
-      expect(query).toContain('provider_name');
-      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
-      expect(params).toContain(10); // limit
-      expect(params).toContainEqual(['Netflix']);
-    });
-
-    it('국가 필터가 정확한 boundary 매칭으로 쿼리에 포함되어야 한다', async () => {
-      mockDataSource.query.mockResolvedValue(fiveRows);
-
-      await service.searchSimilar('한국 영화', 10, [], {
-        countries: ['KR'],
-      });
-
-      const query = mockDataSource.query.mock.calls[0][0] as string;
-      expect(query).toContain('origin_country =');
-      expect(query).toContain('origin_country LIKE');
-      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
-      // 정확한 국가 코드가 파라미터로 전달 ('%KR%'가 아닌 'KR')
-      expect(params).toContain('KR');
-      expect(params).not.toContain('%KR%');
-    });
-
-    it('인물 필터가 director LIKE + credits jsonb 검색으로 쿼리에 포함되어야 한다', async () => {
-      mockDataSource.query.mockResolvedValue(fiveRows);
-
-      await service.searchSimilar('봉준호 영화', 10, [], {
-        personNames: ['봉준호'],
-      });
-
-      const query = mockDataSource.query.mock.calls[0][0] as string;
-      expect(query).toContain('director LIKE');
-      expect(query).toContain('jsonb_array_elements(c.credits)');
-      expect(query).toContain("cr->>'name'");
-      expect(query).toContain("cr->>'character'");
-      expect(query).not.toContain('credits::text LIKE');
-      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
-      expect(params).toContain('%봉준호%');
-    });
-
-    it('contentType 필터가 쿼리에 포함되어야 한다', async () => {
-      mockDataSource.query.mockResolvedValue(fiveRows);
-
-      await service.searchSimilar('드라마 추천', 10, [], {
-        contentType: 'tv',
-      });
-
-      const query = mockDataSource.query.mock.calls[0][0] as string;
-      expect(query).toContain('content_type =');
-      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
-      expect(params).toContain('tv');
-    });
-
-    it('dateRange 필터가 쿼리에 포함되어야 한다', async () => {
-      mockDataSource.query.mockResolvedValue(fiveRows);
-
-      await service.searchSimilar('최신 영화', 10, [], {
-        dateRange: { from: '2024-01-01', to: null },
-      });
-
-      const query = mockDataSource.query.mock.calls[0][0] as string;
-      expect(query).toContain('release_date >=');
-      const params = mockDataSource.query.mock.calls[0][1] as unknown[];
-      expect(params).toContain('2024-01-01');
-    });
-
-    it('fallback: 결과 부족 시 필터를 단계적으로 완화해야 한다', async () => {
-      // 1차: 전체 필터 → 2개 결과 (부족)
-      // 2차: 인물 제거 → 3개 결과 (부족)
-      // 3차: 국가 제거 → 4개 결과 (부족)
-      // 4차: OTT 제거 → 6개 결과 (충분)
-      const twoRows = fiveRows.slice(0, 2);
-      const threeRows = fiveRows.slice(0, 3);
-      const fourRows = fiveRows.slice(0, 4);
-      const sixRows = Array.from({ length: 6 }, (_, i) => ({
-        ...mockRow,
-        content_id: i + 1,
-        tmdb_id: 496243 + i,
-        title: `영화${i + 1}`,
-      }));
-
-      mockDataSource.query
-        .mockResolvedValueOnce(twoRows) // 전체 필터
-        .mockResolvedValueOnce(threeRows) // -인물
-        .mockResolvedValueOnce(fourRows) // -국가
-        .mockResolvedValueOnce(sixRows); // -OTT
-
-      const result = await service.searchSimilar(
-        '넷플릭스 한국 봉준호 영화',
-        10,
-        [],
-        {
-          ottProviderNames: ['Netflix'],
-          countries: ['KR'],
-          personNames: ['봉준호'],
-        },
-      );
-
-      // 4번의 쿼리가 실행되어야 한다
-      expect(mockDataSource.query).toHaveBeenCalledTimes(4);
-      expect(result).toHaveLength(6);
-
-      // 임베딩은 1회만 생성해야 한다
-      expect(mockEmbeddingsCreate).toHaveBeenCalledTimes(1);
-
-      // 1차 쿼리: 모든 필터 포함
-      const firstQuery = mockDataSource.query.mock.calls[0][0] as string;
-      expect(firstQuery).toContain('provider_name');
-      expect(firstQuery).toContain('origin_country LIKE');
-      expect(firstQuery).toContain('director LIKE');
-
-      // 2차 쿼리: 인물 필터 제거
-      const secondQuery = mockDataSource.query.mock.calls[1][0] as string;
-      expect(secondQuery).toContain('provider_name');
-      expect(secondQuery).toContain('origin_country LIKE');
-      expect(secondQuery).not.toContain('director LIKE');
-
-      // 3차 쿼리: 국가 동적 필터 제거 (기본 조건 '%KR%'는 유지)
-      const thirdQuery = mockDataSource.query.mock.calls[2][0] as string;
-      expect(thirdQuery).toContain('provider_name');
-      expect(thirdQuery).not.toContain('origin_country =');
-
-      // 4차 쿼리: OTT 동적 필터 제거 (기본 조건은 유지)
-      const fourthQuery = mockDataSource.query.mock.calls[3][0] as string;
-      expect(fourthQuery).not.toContain('provider_name');
-    });
-
-    it('dateRange가 null이면 hasFilters에서 제외되어야 한다', async () => {
-      mockDataSource.query.mockResolvedValue([mockRow]);
-
-      await service.searchSimilar('테스트', 10, [], {
-        dateRange: { from: null, to: null },
-      });
-
-      // dateRange가 null/null이면 필터로 간주하지 않음 → fallback 미실행
-      expect(mockDataSource.query).toHaveBeenCalledTimes(1);
-    });
-
     it('precomputedEmbedding이 있으면 generateEmbedding을 호출하지 않아야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
       const precomputed = [0.5, 0.6, 0.7];
 
-      await service.searchSimilar('테스트', 10, [], undefined, precomputed);
+      await service.searchSimilar('테스트', 10, [], precomputed);
 
       // generateEmbedding 호출 없이 precomputed 벡터를 사용해야 한다
       expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
@@ -540,16 +410,15 @@ describe('EmbeddingService', () => {
       expect(query).toContain('c.adult IS NOT TRUE');
     });
 
-    it('fallback: 결과가 충분하면 추가 쿼리를 실행하지 않아야 한다', async () => {
+    it('검색 쿼리에 5초 statement timeout을 적용해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
-      await service.searchSimilar('넷플릭스 한국 영화', 10, [], {
-        ottProviderNames: ['Netflix'],
-        countries: ['KR'],
-      });
+      await service.searchSimilar('스릴러 추천', 10, []);
 
-      // 1차 쿼리만 실행
-      expect(mockDataSource.query).toHaveBeenCalledTimes(1);
+      expect(mockStatementTimeoutQuery).toHaveBeenCalledWith(
+        expect.stringContaining("set_config('statement_timeout'"),
+        ['5000ms'],
+      );
     });
   });
 
@@ -645,93 +514,6 @@ describe('EmbeddingService', () => {
 
       expect(result).toEqual({ cached: 0, skipped: 0, failed: 0 });
       expect(mockDataSource.query).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('batchCacheMetadata', () => {
-    it('조건에 맞는 콘텐츠를 배치 캐싱해야 한다', async () => {
-      const mockQb = {
-        select: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]),
-      };
-      mockContentRepo.createQueryBuilder.mockReturnValue(mockQb);
-
-      const metadataQb = {
-        select: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ contentId: 1 }]),
-      };
-      mockMetadataRepo.createQueryBuilder.mockReturnValue(metadataQb);
-
-      // id=1은 이미 캐싱됨, id=2만 캐싱
-      mockMetadataRepo.findOne.mockResolvedValue(null);
-      const content = {
-        id: 2,
-        title: '테스트',
-        genres: [],
-        overview: '설명',
-        credits: [],
-        releaseDate: new Date(),
-      } as unknown as Content;
-      mockContentRepo.findOne.mockResolvedValue(content);
-
-      mockCreate.mockResolvedValue({
-        choices: [{ message: { content: '설명' } }],
-      });
-      mockEmbeddingsCreate.mockResolvedValue({
-        data: [{ embedding: [0.1] }],
-      });
-
-      const metadata = { id: 1, contentId: 2, description: '설명' };
-      mockMetadataRepo.create.mockReturnValue(metadata);
-      mockMetadataRepo.save.mockResolvedValue(metadata);
-
-      const result = await service.batchCacheMetadata({
-        minVoteCount: 1000,
-        minReleaseDate: null,
-      });
-
-      expect(result.cached).toBe(1);
-      expect(result.skipped).toBe(1);
-      expect(result.failed).toBe(0);
-    });
-
-    it('캐싱 실패 시 에러를 무시하고 계속 진행해야 한다', async () => {
-      const mockQb = {
-        select: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 1 }]),
-      };
-      mockContentRepo.createQueryBuilder.mockReturnValue(mockQb);
-
-      const metadataQb = {
-        select: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
-      mockMetadataRepo.createQueryBuilder.mockReturnValue(metadataQb);
-
-      // cacheContentMetadata가 실패하도록 설정
-      mockMetadataRepo.findOne.mockResolvedValue(null);
-      mockContentRepo.findOne.mockResolvedValue({
-        id: 1,
-        title: '테스트',
-        genres: [],
-        overview: '설명',
-        credits: [],
-        releaseDate: new Date(),
-      });
-
-      mockCreate.mockRejectedValue(new Error('API 오류'));
-
-      const result = await service.batchCacheMetadata({
-        minVoteCount: 1000,
-        minReleaseDate: null,
-      });
-
-      expect(result.failed).toBe(1);
-      expect(result.cached).toBe(0);
     });
   });
 });

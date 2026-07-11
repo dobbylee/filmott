@@ -4,7 +4,6 @@ import { ContentsService } from '../contents/contents.service';
 import { ContentSearchFilters } from './content-search.service';
 import { EmbeddingService, SimilarContent } from './embedding.service';
 import { ParsedIntent } from './intent-analyzer';
-import { ResolvedChatRecommendation } from './structured-chat-response';
 
 const CHAT_RECOMMENDATION_LIMIT = 5;
 
@@ -73,26 +72,6 @@ export class RecommendationCandidateService {
     }
 
     return selected;
-  }
-
-  toResolvedRecommendations(
-    candidates: SimilarContent[],
-  ): ResolvedChatRecommendation[] {
-    const recommendations: ResolvedChatRecommendation[] = [];
-
-    for (const candidate of candidates) {
-      const contentType = this.parseContentType(candidate.contentType);
-      if (!contentType || !candidate.posterUrl) continue;
-
-      recommendations.push({
-        tmdbId: candidate.tmdbId,
-        contentType,
-        title: candidate.title,
-        posterUrl: candidate.posterUrl,
-      });
-    }
-
-    return recommendations;
   }
 
   cacheRecommendationMetadataInBackground(candidates: SimilarContent[]): void {

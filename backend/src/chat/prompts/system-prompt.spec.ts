@@ -69,7 +69,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('유사도:');
   });
 
-  it('후보가 유사도 내림차순으로 정렬되어야 한다', () => {
+  it('서버가 확정한 후보 순서를 유지해야 한다', () => {
     const candidates = makeCandidates([
       { similarity: 0.5, title: '중간작품', tmdbId: 2001 },
       { similarity: 0.9, title: '높은작품', tmdbId: 2002 },
@@ -86,8 +86,8 @@ describe('buildSystemPrompt', () => {
     const idx1 = prompt.indexOf('높은작품');
     const idx2 = prompt.indexOf('중간작품');
     const idx3 = prompt.indexOf('낮은작품');
-    expect(idx1).toBeLessThan(idx2);
-    expect(idx2).toBeLessThan(idx3);
+    expect(idx2).toBeLessThan(idx1);
+    expect(idx1).toBeLessThan(idx3);
   });
 
   it('유사도 규칙이 시스템 프롬프트에 포함되어야 한다', () => {
@@ -106,10 +106,9 @@ describe('buildSystemPrompt', () => {
       emptyContext,
       [],
       [],
-      candidates,
+      [candidates[1]],
       emptyIntent,
       [],
-      [candidates[1]],
     );
 
     expect(prompt).toContain('## 확정 추천 작품');
@@ -130,30 +129,18 @@ describe('buildSystemPrompt', () => {
   });
 
   it('확정 추천 후보가 없으면 후보 밖 작품을 만들지 않도록 안내해야 한다', () => {
-    const candidates = makeCandidates([
-      { title: '검색 후보', tmdbId: 2001, posterUrl: '/search.jpg' },
-    ]);
-    const prompt = buildSystemPrompt(
-      emptyContext,
-      [],
-      [],
-      candidates,
-      emptyIntent,
-      [],
-      [],
-    );
+    const prompt = buildSystemPrompt(emptyContext, [], [], [], emptyIntent, []);
 
     expect(prompt).toContain('(확정 추천 후보가 없습니다)');
     expect(prompt).toContain('작품명을 새로 만들지 말고');
     expect(prompt).toContain('작품 추천을 만들지 말고');
     expect(prompt).toContain('<filmott_recommendations>');
     expect(prompt).toContain('[]');
-    expect(prompt).not.toContain('검색 후보');
   });
 
-  it('확정 후보가 없을 때는 추천 기본 개수를 3~5개로 안내해야 한다', () => {
+  it('확정 후보가 없을 때는 작품을 만들지 않도록 안내해야 한다', () => {
     const prompt = buildSystemPrompt(emptyContext, [], [], [], emptyIntent);
 
-    expect(prompt).toContain('추천 요청 시 즉시 3~5개를 추천하세요');
+    expect(prompt).toContain('확정 추천 작품이 없으면 작품 추천을 만들지 말고');
   });
 });

@@ -59,7 +59,6 @@ describe('RecommendationCard', () => {
   it('추천 이유는 카드에 렌더링하지 않는다', () => {
     const recommendationWithReason = {
       ...recommendation,
-      reason: '봉준호 감독의 명작입니다.',
     };
 
     render(<RecommendationCard recommendation={recommendationWithReason} />);

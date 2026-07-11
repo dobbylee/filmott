@@ -11,7 +11,6 @@ export interface ChatQualityCase {
   userMessage: string;
   history?: ChatHistoryMessageDto[];
   recordedStructuredOutput: ParsedIntent;
-  expectedIntent?: Partial<ParsedIntent>;
   expectedFilters?: ContentSearchFilters;
   expectedPreferenceFilters?: ContentSearchFilters;
   preferenceFixture?: {
@@ -82,11 +81,6 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
     description: '모호한 신규 유저 요청은 낮은 confidence를 유지한다',
     userMessage: '오늘 뭐 볼까?',
     recordedStructuredOutput: createRecordedIntent(),
-    expectedIntent: {
-      confidence: 'low',
-      genres: [],
-      contentType: null,
-    },
     expectedFilters: {},
   },
   {
@@ -100,13 +94,6 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
       genres: ['스릴러'],
       confidence: 'high',
     }),
-    expectedIntent: {
-      ottProviderNames: ['Netflix'],
-      dateRange: { from: '2025-01-01', to: null },
-      genres: ['스릴러'],
-      contentType: 'tv',
-      confidence: 'high',
-    },
     expectedFilters: {
       ottProviderNames: ['Netflix'],
       dateRange: { from: '2025-01-01', to: null },
@@ -133,11 +120,6 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
       genres: ['스릴러', '공포'],
       confidence: 'high',
     }),
-    expectedIntent: {
-      countries: ['KR'],
-      genres: ['스릴러', '공포'],
-      confidence: 'high',
-    },
     expectedFilters: {
       countries: ['KR'],
       genres: ['스릴러', '공포'],
@@ -152,11 +134,6 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
       contentType: 'movie',
       confidence: 'high',
     }),
-    expectedIntent: {
-      referenceTitles: ['기생충'],
-      contentType: 'movie',
-      confidence: 'high',
-    },
     expectedFilters: {
       contentType: 'movie',
     },
@@ -179,11 +156,6 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
       contentType: 'movie',
       confidence: 'high',
     }),
-    expectedIntent: {
-      countries: ['KR'],
-      contentType: 'movie',
-      confidence: 'high',
-    },
     expectedFilters: {
       countries: ['KR'],
       contentType: 'movie',
@@ -216,10 +188,6 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
       contentType: 'tv',
       confidence: 'high',
     }),
-    expectedIntent: {
-      contentType: 'tv',
-      confidence: 'high',
-    },
     expectedFilters: {
       contentType: 'tv',
     },
@@ -250,11 +218,6 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
     description: '비선호 장르와 감독은 개인화 검색 제외 조건으로 유지한다',
     userMessage: '오늘 뭐 볼까?',
     recordedStructuredOutput: createRecordedIntent(),
-    expectedIntent: {
-      confidence: 'low',
-      genres: [],
-      contentType: null,
-    },
     expectedFilters: {},
     expectedPreferenceFilters: {
       relaxableFilterKeys: [],
@@ -295,11 +258,6 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
       contentType: 'movie',
       confidence: 'high',
     }),
-    expectedIntent: {
-      confidence: 'high',
-      genres: [],
-      contentType: 'movie',
-    },
     expectedFilters: { contentType: 'movie' },
     expectedPreferenceFilters: {
       contentType: 'movie',

@@ -7,6 +7,7 @@ import {
   parseRecommendationTrailer,
   RECOMMENDATIONS_TRAILER_CLOSE,
   RECOMMENDATIONS_TRAILER_OPEN,
+  visibleRecommendationsMatchResolvedCards,
 } from './structured-chat-response';
 
 describe('structured-chat-response', () => {
@@ -88,6 +89,35 @@ ${RECOMMENDATIONS_TRAILER_CLOSE}`);
     );
 
     expect(matched).toEqual([]);
+  });
+
+  it('노출된 추천 제목과 카드 제목 및 순서가 모두 일치해야 한다', () => {
+    const resolved = matchStructuredRecommendationsToCandidates(
+      [
+        { tmdbId: 496243, contentType: 'movie' },
+        { tmdbId: 27205, contentType: 'movie' },
+      ],
+      candidates,
+    );
+
+    expect(
+      visibleRecommendationsMatchResolvedCards(
+        '**기생충** - 강렬한 영화예요.\n\n**Inception** - 몰입감이 좋아요.',
+        resolved,
+      ),
+    ).toBe(true);
+    expect(
+      visibleRecommendationsMatchResolvedCards(
+        '**Inception** - 몰입감이 좋아요.\n\n**기생충** - 강렬한 영화예요.',
+        resolved,
+      ),
+    ).toBe(false);
+    expect(
+      visibleRecommendationsMatchResolvedCards(
+        '**기생충** - 강렬한 영화예요.',
+        resolved,
+      ),
+    ).toBe(false);
   });
 
   it('굵은 글씨 키워드는 이전 추천작 fallback에서 제외해야 한다', () => {

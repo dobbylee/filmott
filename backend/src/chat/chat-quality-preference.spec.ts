@@ -43,6 +43,9 @@ async function* createResponseStream() {
   yield {
     choices: [{ delta: { content: '추천 결과입니다.' } }],
   };
+  yield {
+    choices: [{ delta: {}, finish_reason: 'stop' }],
+  };
 }
 
 describe('채팅 품질 개인화 merge/relaxation contract', () => {

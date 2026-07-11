@@ -239,6 +239,36 @@ describe('sendChatMessage', () => {
     expect(callbacks.onDone).toHaveBeenCalledTimes(1);
   });
 
+  it('event와 data가 청크 경계에서 분리되어도 하나의 SSE frame으로 파싱한다', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+      createMockResponse([
+        'event: te',
+        'xt\ndata: {"content":"분할 응답"}\n\nevent: do',
+        'ne\ndata: {}\n\n',
+      ]),
+    );
+
+    await sendChatMessage('테스트', [], callbacks);
+
+    expect(callbacks.onText).toHaveBeenCalledWith('분할 응답');
+    expect(callbacks.onDone).toHaveBeenCalledTimes(1);
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
+  it('CRLF로 구분된 SSE frame을 파싱한다', async () => {
+    const sseData =
+      'event: text\r\ndata: {"content":"윈도우 개행"}\r\n\r\nevent: done\r\ndata: {}\r\n\r\n';
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+      createMockResponse([sseData]),
+    );
+
+    await sendChatMessage('테스트', [], callbacks);
+
+    expect(callbacks.onText).toHaveBeenCalledWith('윈도우 개행');
+    expect(callbacks.onDone).toHaveBeenCalledTimes(1);
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
   it('response.body가 null이면 onError를 호출한다', async () => {
     const nullBodyResponse = {
       ok: true,

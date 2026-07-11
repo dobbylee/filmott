@@ -23,6 +23,7 @@ import {
   extractPreviouslyRecommendedTitles,
   matchStructuredRecommendationsToCandidates,
   parseRecommendationTrailer,
+  visibleRecommendationsMatchResolvedCards,
 } from './structured-chat-response';
 import { ChatContextService } from './chat-context.service';
 import {
@@ -274,7 +275,6 @@ export class ChatService {
             semanticQuery,
             20,
             referenceExcludeTmdbIds,
-            undefined,
             referenceEmbedding ?? undefined,
             ...signalArgs,
           );
@@ -302,10 +302,9 @@ export class ChatService {
       userContext,
       subscribedOtts,
       OTT_PROVIDERS,
-      similarContents,
+      confirmedRecommendationCandidates,
       intent,
       previouslyRecommended,
-      confirmedRecommendationCandidates,
     );
 
     // 11. 대화 이력 구성
@@ -352,6 +351,16 @@ export class ChatService {
       trailerRecommendations,
       confirmedRecommendationCandidates,
     );
+    if (
+      !visibleRecommendationsMatchResolvedCards(
+        streamedResponse.visibleText,
+        matched,
+      )
+    ) {
+      throw new BadRequestException(
+        '추천 본문과 카드 정보가 일치하지 않습니다. 다시 시도해주세요.',
+      );
+    }
     if (signal?.aborted) return;
 
     if (matched.length > 0) {
@@ -372,10 +381,6 @@ export class ChatService {
 
     if (signal?.aborted) return;
     emit('done', {});
-  }
-
-  async buildUserContext(userId: number): Promise<UserContext> {
-    return this.chatContextService.buildUserContext(userId);
   }
 
   private buildCandidateRerankContext(

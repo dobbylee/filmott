@@ -42,10 +42,9 @@ export function buildSystemPrompt(
   context: UserContext,
   subscribedOtts: string[],
   ottProviders: OttProvider[],
-  candidates: SimilarContent[],
+  confirmedCandidates: SimilarContent[],
   intent?: ParsedIntent,
   previouslyRecommended: string[] = [],
-  confirmedCandidates?: SimilarContent[],
 ): string {
   const ottNames = subscribedOtts
     .map((id) => ottProviders.find((p) => p.id === id)?.name)
@@ -94,13 +93,7 @@ export function buildSystemPrompt(
     ? `### 구독 중인 OTT\n${ottNames}\n\n해당 OTT에서 볼 수 있는 작품을 우선적으로 추천하세요. 다른 플랫폼의 작품도 추천할 수 있지만, 구독 중인 OTT에서 볼 수 있는 작품을 먼저 제안하세요.`
     : '';
 
-  const sortedCandidates = [...candidates].sort(
-    (a, b) => b.similarity - a.similarity,
-  );
-  const hasConfirmedSelection = confirmedCandidates !== undefined;
-  const recommendationCandidates = hasConfirmedSelection
-    ? confirmedCandidates
-    : sortedCandidates;
+  const recommendationCandidates = confirmedCandidates;
 
   const candidatesSection =
     recommendationCandidates.length > 0
@@ -119,23 +112,16 @@ export function buildSystemPrompt(
             return `${i + 1}. [ID:${c.tmdbId}|${c.contentType}] ${c.title} (${c.voteAverage}점${similarityStr}) - 장르: ${genreStr}${directorStr}${countryStr}\n   ${descriptionText}`;
           })
           .join('\n')
-      : hasConfirmedSelection
-        ? '(확정 추천 후보가 없습니다)'
-        : '(추천 후보가 없습니다)';
+      : '(확정 추천 후보가 없습니다)';
 
-  const candidateSectionTitle = hasConfirmedSelection
-    ? '## 확정 추천 작품'
-    : '## 추천 후보 작품';
-  const candidateSelectionGuide = hasConfirmedSelection
-    ? recommendationCandidates.length > 0
+  const candidateSelectionGuide =
+    recommendationCandidates.length > 0
       ? '아래 목록은 서버가 검증할 수 있는 최종 후보입니다. 사용자 요청과 실제로 맞는 작품만 골라 본문에 추천하고, 조건에 맞지 않는 후보는 제외하세요. 후보 밖 작품은 보충하지 마세요.'
-      : '서버가 검증할 수 있는 추천 후보가 없습니다. 작품명을 새로 만들지 말고 조건을 조금 더 좁혀 달라고 짧게 답하세요.'
-    : '아래 목록에 있는 작품에서만 선택하세요. 사용자 요청과 맞지 않는 후보는 제외하세요. 적합한 후보가 3개 미만이면 후보 수만큼만 추천하고, 본인 지식으로 후보 밖 작품을 보충하지 마세요.';
-  const recommendationCountRule = hasConfirmedSelection
-    ? recommendationCandidates.length > 0
+      : '서버가 검증할 수 있는 추천 후보가 없습니다. 작품명을 새로 만들지 말고 조건을 조금 더 좁혀 달라고 짧게 답하세요.';
+  const recommendationCountRule =
+    recommendationCandidates.length > 0
       ? `- 추천 요청 시 확정 후보 ${recommendationCandidates.length}개 중 사용자 조건에 맞는 작품만 최대 5개 선택하세요. 일부 후보를 제외해도 되며 후보 밖 작품은 보충하지 마세요.`
-      : '- 추천 요청 시 확정 추천 작품이 없으면 작품 추천을 만들지 말고 선호 기준을 물어보세요.'
-    : '- 추천 요청 시 즉시 3~5개를 추천하세요. 역질문하지 마세요.';
+      : '- 추천 요청 시 확정 추천 작품이 없으면 작품 추천을 만들지 말고 선호 기준을 물어보세요.';
 
   // 필터 맥락 설명 구성
   const filterDescriptions: string[] = [];
@@ -217,7 +203,7 @@ export function buildSystemPrompt(
 
 ${ottSection}
 ${filterSection}
-${candidateSectionTitle}
+## 확정 추천 작품
 ${candidateSelectionGuide}
 ${candidatesSection}
 

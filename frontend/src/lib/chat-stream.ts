@@ -118,12 +118,14 @@ function handleSseLine(
   currentEvent: string,
   callbacks: ChatStreamCallbacks,
 ): string {
-  if (line.startsWith('event: ')) {
-    return line.slice(7);
+  const normalizedLine = line.endsWith('\r') ? line.slice(0, -1) : line;
+
+  if (normalizedLine.startsWith('event: ')) {
+    return normalizedLine.slice(7);
   }
 
-  if (line.startsWith('data: ')) {
-    handleSseData(currentEvent, line.slice(6), callbacks);
+  if (normalizedLine.startsWith('data: ')) {
+    handleSseData(currentEvent, normalizedLine.slice(6), callbacks);
   }
 
   return currentEvent;

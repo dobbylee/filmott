@@ -126,6 +126,22 @@ export function matchStructuredRecommendationsToCandidates(
   return matched;
 }
 
+export function visibleRecommendationsMatchResolvedCards(
+  visibleText: string,
+  recommendations: ResolvedChatRecommendation[],
+): boolean {
+  const visibleTitles =
+    extractRecommendationLineTitles(visibleText).map(normalizeTitle);
+  const resolvedTitles = recommendations.map((recommendation) =>
+    normalizeTitle(stripRecommendationTitleSuffix(recommendation.title)),
+  );
+
+  return (
+    visibleTitles.length === resolvedTitles.length &&
+    visibleTitles.every((title, index) => title === resolvedTitles[index])
+  );
+}
+
 function findCandidate(
   recommendation: TrailerRecommendation,
   candidates: SimilarContent[],
