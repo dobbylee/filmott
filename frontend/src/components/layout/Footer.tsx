@@ -5,16 +5,15 @@ export default function Footer() {
     <footer className="mt-12 border-t border-border bg-card">
       <div className="mx-auto max-w-7xl px-4 py-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
-          {/* 왼쪽: 로고 + 태그라인 */}
-          <div className="space-y-2">
+          {/* 왼쪽: 로고 */}
+          <div>
             <Link
               href="/"
-              className="text-2xl font-black tracking-tight text-white hover-glow transition-all duration-300"
+              className="text-3xl font-black tracking-tight text-white hover-glow transition-all duration-300"
               style={{ letterSpacing: '-0.05em' }}
             >
               film<span className="text-gradient">ott</span>
             </Link>
-            <p className="text-sm text-white/40">AI가 취향에 맞는 영화/시리즈를 추천해 드립니다</p>
           </div>
 
           {/* 오른쪽: 커뮤니티 + 연락처 + 정책 링크 */}

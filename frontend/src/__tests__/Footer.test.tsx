@@ -5,7 +5,16 @@ import Footer from '@/components/layout/Footer';
 describe('Footer', () => {
   it('로고를 렌더링한다', () => {
     render(<Footer />);
-    expect(screen.getByText((_, el) => el?.textContent === 'filmott')).toBeInTheDocument();
+    const logo = screen.getByRole('link', { name: /^film\s*ott$/i });
+    expect(logo).toBeInTheDocument();
+    expect(logo).toHaveClass('text-3xl');
+  });
+
+  it('기존 AI 추천 태그라인을 표시하지 않는다', () => {
+    render(<Footer />);
+    expect(
+      screen.queryByText('AI가 취향에 맞는 영화/시리즈를 추천해 드립니다'),
+    ).not.toBeInTheDocument();
   });
 
   it('개인정보처리방침과 이용약관 링크를 렌더링한다', () => {
