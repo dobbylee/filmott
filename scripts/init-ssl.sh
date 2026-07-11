@@ -21,19 +21,19 @@ fi
 cert_dir="./certbot/conf/live/${domain}"
 archive_dir="./certbot/conf/archive/${domain}"
 renewal_file="./certbot/conf/renewal/${domain}.conf"
+lock_file="${FILMOTT_OPS_LOCK_FILE:-/var/lock/filmott-ops.lock}"
+exec 9>"$lock_file"
+if ! flock -w 900 9; then
+  echo "다른 운영 작업이 실행 중이어서 SSL 초기 설정을 중단합니다: ${lock_file}" >&2
+  exit 1
+fi
+
 if [ -e "${cert_dir}/fullchain.pem" ] ||
   [ -e "${cert_dir}/privkey.pem" ] ||
   [ -d "$archive_dir" ] ||
   [ -e "$renewal_file" ]; then
   echo "기존 인증서가 있어 초기 발급을 중단합니다: ${domain}" >&2
   echo "갱신은 scripts/renew-ssl.sh를 사용하세요." >&2
-  exit 1
-fi
-
-lock_file="${FILMOTT_OPS_LOCK_FILE:-/var/lock/filmott-ops.lock}"
-exec 9>"$lock_file"
-if ! flock -w 900 9; then
-  echo "다른 운영 작업이 실행 중이어서 SSL 초기 설정을 중단합니다: ${lock_file}" >&2
   exit 1
 fi
 

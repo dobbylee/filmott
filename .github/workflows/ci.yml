@@ -114,6 +114,8 @@ jobs:
           touch backend/.env backend/.env.production
           docker compose --env-file /dev/null -f docker-compose.yml config --quiet
           docker compose --env-file /dev/null -f docker-compose.prod.yml config --quiet
+      - name: Validate operations script safety
+        run: bash scripts/ops-safety.test.sh
       - name: Validate nginx configuration
         run: |
           set -Eeuo pipefail

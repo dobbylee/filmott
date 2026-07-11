@@ -58,6 +58,6 @@ npm --prefix backend run migration:run
 
 ## CI/CD와 운영
 
-`main` push에서 backend, PostgreSQL integration, frontend/Playwright, production config 검증을 병렬 실행한다. 모든 CI가 성공한 정확한 커밋만 운영 서버에 배포한다.
+`main` push에서 backend 기본 검증이 통과하면 PostgreSQL integration을 실행한다. frontend/Playwright와 production config 검증은 이 흐름과 함께 실행한다. 모든 CI가 성공한 최신 `main` 커밋만 운영 서버에 배포한다.
 
-운영 작업은 `/var/lock/filmott-ops.lock`을 공유한다. DB는 매일 custom-format dump와 SHA-256 체크섬을 만들고, 주 1회 임시 DB에 실제 복원해 검증한다. 원격 보관은 서버의 `/home/ubuntu/.config/filmott-backup.env`에서 `BACKUP_REMOTE`를 rclone 대상 경로로 설정하면 활성화된다.
+배포는 stale SHA를 교체 직전에 다시 확인하며, 새 컨테이너의 readiness 또는 origin 검증이 실패하면 보존한 Git checkout과 frontend/backend 이미지로 복구한다. 배포, 인증서 갱신, DB 백업/복원 검증, Docker 정리는 `/var/lock/filmott-ops.lock`을 공유한다. DB는 매일 custom-format dump와 SHA-256 체크섬을 만들고, 주 1회 `_restore_verify` 전용 임시 DB에 실제 복원해 검증한다. 원격 보관은 서버의 `/home/ubuntu/.config/filmott-backup.env`에서 `BACKUP_REMOTE`를 rclone 대상 경로로 설정하면 활성화된다.

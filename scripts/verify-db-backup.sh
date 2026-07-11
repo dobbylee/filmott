@@ -8,9 +8,32 @@ db_user="${POSTGRES_USER:-filmott}"
 verify_db="${POSTGRES_VERIFY_DB:-filmott_restore_verify}"
 lock_file="${FILMOTT_OPS_LOCK_FILE:-/var/lock/filmott-ops.lock}"
 
+if [[ ! "$verify_db" =~ ^[a-z][a-z0-9_]*_restore_verify$ ]] ||
+  [ "${#verify_db}" -gt 63 ]; then
+  echo "복원 검증 DB 이름은 안전한 PostgreSQL identifier와 _restore_verify 접미사를 사용해야 합니다: ${verify_db}" >&2
+  exit 1
+fi
+
 exec 9>"$lock_file"
 if ! flock -w 900 9; then
   echo "[$(date)] 다른 운영 작업이 실행 중이어서 복원 검증을 중단합니다: ${lock_file}"
+  exit 1
+fi
+
+production_db="${POSTGRES_DB:-}"
+if [ -z "$production_db" ]; then
+  production_db="$(
+    docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$container" |
+      sed -n 's/^POSTGRES_DB=//p' |
+      head -n 1
+  )"
+fi
+if [ -z "$production_db" ]; then
+  echo "운영 DB 이름을 확인할 수 없습니다: ${container}" >&2
+  exit 1
+fi
+if [ "$verify_db" = "$production_db" ]; then
+  echo "복원 검증 DB는 운영 DB와 달라야 합니다: ${verify_db}" >&2
   exit 1
 fi
 

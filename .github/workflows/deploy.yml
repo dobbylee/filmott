@@ -88,14 +88,29 @@ jobs:
             }
 
             cutover_started=0
+            checkout_changed=0
             rollback_ready=0
+            previous_head=""
             previous_frontend_ref=""
             previous_backend_ref=""
 
-            restore_previous_release() {
-              echo "Restoring previous frontend/backend images"
+            restore_previous_checkout() {
+              git reset --hard "$previous_head" || return 1
+              [ "$(git rev-parse HEAD)" = "$previous_head" ] || return 1
+            }
+
+            restore_previous_build_state() {
+              echo "Restoring previous checkout and frontend/backend image tags"
               docker image tag filmott-frontend:rollback "$previous_frontend_ref" || return 1
               docker image tag filmott-backend:rollback "$previous_backend_ref" || return 1
+              [ "$(docker image inspect -f '{{.Id}}' "$previous_frontend_ref")" = "$previous_frontend_image" ] || return 1
+              [ "$(docker image inspect -f '{{.Id}}' "$previous_backend_ref")" = "$previous_backend_image" ] || return 1
+              restore_previous_checkout || return 1
+            }
+
+            restore_previous_release() {
+              echo "Restoring previous frontend/backend release"
+              restore_previous_build_state || return 1
               compose up -d --no-deps --force-recreate frontend backend || return 1
               wait_for_backend || return 1
               wait_for_frontend || return 1
@@ -113,6 +128,14 @@ jobs:
                 if ! restore_previous_release; then
                   echo "Automatic rollback failed"
                   print_diagnostics
+                fi
+              elif [ "$rollback_ready" = "1" ]; then
+                if ! restore_previous_build_state; then
+                  echo "Failed to restore checkout or image tags after pre-cutover failure"
+                fi
+              elif [ "$checkout_changed" = "1" ]; then
+                if ! restore_previous_checkout; then
+                  echo "Failed to restore checkout after pre-cutover failure"
                 fi
               fi
 
@@ -147,10 +170,15 @@ jobs:
               exit 0
             fi
 
+            previous_head=$(git rev-parse HEAD)
+            if ! git cat-file -e "${previous_head}^{commit}"; then
+              echo "Previous checkout is not a commit: ${previous_head}"
+              exit 1
+            fi
+            checkout_changed=1
             git reset --hard "$DEPLOY_SHA"
             if [ "$(git rev-parse HEAD)" != "$DEPLOY_SHA" ]; then
-              echo "Checked-out SHA does not match deploy target"
-              exit 1
+              fail_deploy "Checked-out SHA does not match deploy target"
             fi
 
             compose config > /dev/null
@@ -175,6 +203,7 @@ jobs:
             latest_main_sha=$(git rev-parse origin/main)
             if [ "$DEPLOY_SHA" != "$latest_main_sha" ]; then
               echo "Skipping stale deploy target ${DEPLOY_SHA}; origin/main advanced to ${latest_main_sha} during build"
+              restore_previous_build_state
               exit 0
             fi
 
