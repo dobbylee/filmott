@@ -87,7 +87,7 @@ export default function ChatSection() {
     const recommendations = streamingRecsRef.current;
 
     if (!hasAssistantResponse(cleanedText, recommendations)) {
-      return false;
+      return;
     }
 
     setMessages((prev) => [
@@ -101,8 +101,6 @@ export default function ChatSection() {
         isIncomplete,
       },
     ]);
-
-    return true;
   }, [getNextMessageId]);
 
   const abortActiveRequest = useCallback(() => {

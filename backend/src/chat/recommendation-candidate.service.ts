@@ -9,6 +9,7 @@ import {
 import { ParsedIntent } from './intent-analyzer';
 
 const CHAT_RECOMMENDATION_LIMIT = 5;
+const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
 
 export interface RecommendationRerankContext {
   contentType?: 'movie' | 'tv' | null;
@@ -26,7 +27,6 @@ const RERANK_WEIGHTS = {
 } as const;
 
 interface ReferenceRow {
-  content_id: number;
   tmdb_id: number;
   embedding: string;
 }
@@ -245,14 +245,18 @@ export class RecommendationCandidateService {
   private async resolveReferenceEmbeddingFromDb(
     title: string,
   ): Promise<{ embedding: number[]; tmdbId: number } | null> {
-    const rows: ReferenceRow[] = await this.dataSource.query(
-      `SELECT c.id AS content_id, c.tmdb_id, cm.embedding::text
+    const query = `SELECT c.tmdb_id, cm.embedding::text
        FROM contents c
        JOIN content_metadata cm ON cm.content_id = c.id
        WHERE c.title ILIKE $1
-       LIMIT 1`,
-      [title],
-    );
+       LIMIT 1`;
+    const rows = await this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT set_config('statement_timeout', $1, true)`, [
+        `${CHAT_QUERY_STATEMENT_TIMEOUT_MS}ms`,
+      ]);
+      const result: unknown = await manager.query(query, [title]);
+      return result as ReferenceRow[];
+    });
 
     if (rows.length === 0 || !rows[0].embedding) return null;
 

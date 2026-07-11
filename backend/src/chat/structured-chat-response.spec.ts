@@ -182,6 +182,23 @@ ${RECOMMENDATIONS_TRAILER_CLOSE}`);
     expect(formatRecommendationVisibleLine('대탈출(예능)')).toBe('**대탈출**');
   });
 
+  it('일반 안내 문장의 대시는 추천 구분자로 오인하지 않아야 한다', () => {
+    const guidance =
+      '후보가 부족해요 - 선호하는 장르나 분위기를 더 알려주세요.';
+
+    expect(formatRecommendationVisibleLine(guidance)).toBe(guidance);
+    expect(visibleRecommendationsMatchResolvedCards(guidance, [])).toBe(true);
+  });
+
+  it('작품 제목 안의 대시는 닫는 굵은 표시까지 제목으로 유지해야 한다', () => {
+    const line = '**스파이더맨 - 홈커밍** - 경쾌한 액션이 좋아요.';
+
+    expect(formatRecommendationVisibleLine(line)).toBe(line);
+    expect(extractRecommendationLineTitles(line)).toEqual([
+      '스파이더맨 - 홈커밍',
+    ]);
+  });
+
   it('추천 줄 앞에 잘못 붙은 굵은 표시와 불릿을 제거해야 한다', () => {
     expect(
       formatRecommendationVisibleLine(

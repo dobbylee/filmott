@@ -91,8 +91,24 @@ describe('ChatService', () => {
     findOne: jest.fn(),
   };
 
+  const mockStatementTimeoutQuery = jest.fn().mockResolvedValue([]);
   const mockDataSource = {
     query: jest.fn().mockResolvedValue([]),
+    transaction: jest.fn(
+      async (
+        callback: (manager: {
+          query: (query: string, parameters?: unknown[]) => Promise<unknown>;
+        }) => Promise<unknown>,
+      ) =>
+        callback({
+          query: async (query, parameters) => {
+            if (query.includes("set_config('statement_timeout'")) {
+              return mockStatementTimeoutQuery(query, parameters);
+            }
+            return mockDataSource.query(query, parameters);
+          },
+        }),
+    ),
   };
 
   const mockConfigService = {
@@ -305,6 +321,32 @@ describe('ChatService', () => {
       expect(doneEvents).toHaveLength(1);
     });
 
+    it('대시가 포함된 일반 안내 문장은 추천 제목으로 오인하지 않아야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockStreamingResponse([
+        '후보가 부족해요 - 선호하는 장르나 분위기를 더 알려주세요.',
+        `\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n[]\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
+      ]);
+      const emittedEvents: { event: string; data: unknown }[] = [];
+
+      await service.sendMessageStream(1, '추천해줘', [], (event, data) => {
+        emittedEvents.push({ event, data });
+      });
+
+      const text = emittedEvents
+        .filter((event) => event.event === 'text')
+        .map((event) => (event.data as { content: string }).content)
+        .join('');
+      expect(text).toBe(
+        '후보가 부족해요 - 선호하는 장르나 분위기를 더 알려주세요.\n\n',
+      );
+      expect(emittedEvents.some((event) => event.event === 'done')).toBe(true);
+      expect(
+        emittedEvents.some((event) => event.event === 'recommendations'),
+      ).toBe(false);
+    });
+
     it('후보와 trailer가 없는 추천 본문은 불완전 응답으로 거부해야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
@@ -466,7 +508,7 @@ describe('ChatService', () => {
         },
       ]);
       mockStreamingResponse([
-        `더 콜 - 제한된 단서 안에서 다음 선택을 계산해야 해요.\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n`,
+        `**더 콜** - 제한된 단서 안에서 다음 선택을 계산해야 해요.\n\n${RECOMMENDATIONS_TRAILER_OPEN}\n`,
         '[{"tmdbId":801,"contentType":"movie"}]',
         `\n${RECOMMENDATIONS_TRAILER_CLOSE}`,
       ]);
@@ -1753,6 +1795,10 @@ describe('ChatService', () => {
       expect(mockDataSource.query).toHaveBeenCalledWith(
         expect.stringContaining('ILIKE'),
         ['기생충'],
+      );
+      expect(mockStatementTimeoutQuery).toHaveBeenCalledWith(
+        expect.stringContaining("set_config('statement_timeout'"),
+        ['5000ms'],
       );
 
       // precomputedEmbedding이 searchWithFilters에 전달됨

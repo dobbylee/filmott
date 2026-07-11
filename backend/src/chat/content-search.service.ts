@@ -170,9 +170,6 @@ export class ContentSearchService {
     return relaxedFilters;
   }
 
-  // P1-6: 필터 구성 로직은 EmbeddingService와 중복되지만, 쿼리 구조가 다르므로(CTE vs 단일 쿼리)
-  // 무리한 추출은 오히려 복잡도를 높인다. 필터 조건 변경 시 양쪽 동기화 필요.
-  // 관련: EmbeddingService.searchSimilar()
   private async executeFilteredSearch(
     embeddingStr: string | null,
     limit: number,
