@@ -9,16 +9,11 @@ import * as Sentry from '@sentry/nestjs';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
 import { GoogleService } from './social/google.service';
 import { KakaoService } from './social/kakao.service';
 import { NaverService } from './social/naver.service';
 import { AuthProvider } from '../users/enums/auth-provider.enum';
-import { UserRole } from '../users/enums/user-role.enum';
 import { SocialCallbackResult } from './auth.service';
-import { ROLES_KEY } from './decorators/roles.decorator';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import {
   AUTH_ACCESS_TOKEN_COOKIE,
   AUTH_REFRESH_TOKEN_COOKIE,
@@ -120,7 +115,6 @@ describe('AuthController', () => {
 
   const mockAuthService = {
     login: jest.fn(),
-    register: jest.fn(),
     refreshTokens: jest.fn(),
     revokeRefreshToken: jest.fn(),
     handleSocialCallback: jest.fn(),
@@ -202,46 +196,6 @@ describe('AuthController', () => {
     );
   });
 
-  describe('POST /auth/signup (register) -- ADMIN 전용', () => {
-    it('authService.register를 호출하고 토큰과 사용자를 반환해야 한다', async () => {
-      const dto = {
-        nickname: 'test',
-        email: 'test@test.com',
-        password: 'password1',
-      };
-      const response = {
-        access_token: 'token',
-        refresh_token: 'refresh-token',
-        user: { id: 1, nickname: 'test', email: 'test@test.com' },
-      };
-      mockAuthService.register.mockResolvedValue(response);
-
-      const result = await controller.register(dto);
-
-      expect(mockAuthService.register).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(response);
-    });
-
-    it('register 메서드에 JwtAuthGuard와 RolesGuard가 적용되어 있어야 한다', () => {
-      const guards = Reflect.getMetadata(
-        '__guards__',
-        AuthController.prototype.register,
-      );
-      expect(guards).toBeDefined();
-      expect(guards).toContainEqual(JwtAuthGuard);
-      expect(guards).toContainEqual(RolesGuard);
-    });
-
-    it('register 메서드에 ADMIN 역할만 허용되어야 한다', () => {
-      const roles = Reflect.getMetadata(
-        ROLES_KEY,
-        AuthController.prototype.register,
-      );
-      expect(roles).toBeDefined();
-      expect(roles).toEqual([UserRole.ADMIN]);
-    });
-  });
-
   describe('POST /auth/login (login)', () => {
     it('authService.login을 호출하고 세션 쿠키를 설정한 뒤 사용자만 반환해야 한다', async () => {
       const dto = { email: 'test@test.com', password: 'password1' };
@@ -276,7 +230,6 @@ describe('AuthController', () => {
 
       const result = await controller.refresh(
         mockReq as never,
-        {} as RefreshTokenDto,
         mockRes as never,
       );
 
@@ -287,29 +240,20 @@ describe('AuthController', () => {
       expect(result).toEqual({ user: response.user });
     });
 
-    it('cookie가 없으면 body fallback으로 refresh token을 읽어야 한다', async () => {
+    it('refresh token 쿠키가 없으면 요청을 거부하고 쿠키를 변경하지 않아야 한다', async () => {
       const mockReq = { cookies: {} };
       const mockRes = createMockResponse();
-      const response = {
-        access_token: 'new-access-token',
-        refresh_token: 'new-refresh-token',
-        user: { id: 1, nickname: 'test', role: 'USER' },
-      };
-      mockAuthService.refreshTokens.mockResolvedValue(response);
 
-      await controller.refresh(
-        mockReq as never,
-        { refresh_token: 'body-refresh-token' },
-        mockRes as never,
-      );
+      await expect(
+        controller.refresh(mockReq as never, mockRes as never),
+      ).rejects.toThrow(UnauthorizedException);
 
-      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith(
-        'body-refresh-token',
-      );
-      expectAuthCookies(mockRes, 'new-access-token', 'new-refresh-token');
+      expect(mockAuthService.refreshTokens).not.toHaveBeenCalled();
+      expect(mockRes.cookie).not.toHaveBeenCalled();
+      expect(mockRes.clearCookie).not.toHaveBeenCalled();
     });
 
-    it('유효하지 않은 토큰이면 쿠키를 정리하고 UnauthorizedException을 던져야 한다', async () => {
+    it('유효하지 않은 토큰의 늦은 실패는 다른 탭의 새 쿠키를 삭제하지 않아야 한다', async () => {
       const mockReq = {
         cookies: { [AUTH_REFRESH_TOKEN_COOKIE]: 'invalid-token' },
       };
@@ -319,16 +263,13 @@ describe('AuthController', () => {
       );
 
       await expect(
-        controller.refresh(
-          mockReq as never,
-          {} as RefreshTokenDto,
-          mockRes as never,
-        ),
+        controller.refresh(mockReq as never, mockRes as never),
       ).rejects.toThrow(UnauthorizedException);
       expect(mockAuthService.refreshTokens).toHaveBeenCalledWith(
         'invalid-token',
       );
-      expectAuthCookiesCleared(mockRes);
+      expect(mockRes.cookie).not.toHaveBeenCalled();
+      expect(mockRes.clearCookie).not.toHaveBeenCalled();
     });
   });
 
@@ -342,7 +283,6 @@ describe('AuthController', () => {
 
       const result = await controller.logout(
         mockReq as never,
-        {} as RefreshTokenDto,
         mockRes as never,
       );
 
@@ -825,15 +765,6 @@ describe('AuthController', () => {
       const guards = Reflect.getMetadata('__guards__', AuthController);
       expect(guards).toBeDefined();
       expect(guards).toContainEqual(ThrottlerGuard);
-    });
-
-    it('register 메서드에 Throttle 데코레이터가 있어야 한다', () => {
-      const allMetadataKeys = Reflect.getMetadataKeys(
-        AuthController.prototype.register,
-      );
-      expect(
-        allMetadataKeys.some((key) => key.toString().includes('THROTTLER')),
-      ).toBe(true);
     });
 
     it('login 메서드에 Throttle 데코레이터가 있어야 한다', () => {

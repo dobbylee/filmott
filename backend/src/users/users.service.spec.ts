@@ -197,65 +197,6 @@ describe('UsersService', () => {
     });
   });
 
-  describe('create', () => {
-    it('닉네임이 이미 사용 중이면 ConflictException을 던져야 한다', async () => {
-      mockUsersRepo.findOne.mockResolvedValueOnce({
-        id: 1,
-        nickname: 'existing',
-      });
-
-      await expect(
-        service.create({
-          nickname: 'existing',
-          email: 'test@test.com',
-          password: 'password',
-        }),
-      ).rejects.toThrow(ConflictException);
-    });
-
-    it('이메일이 이미 사용 중이면 ConflictException을 던져야 한다', async () => {
-      mockUsersRepo.findOne.mockResolvedValueOnce(null); // nickname not found
-      mockUsersRepo.findOne.mockResolvedValueOnce({
-        id: 1,
-        email: 'taken@test.com',
-      }); // email found
-
-      await expect(
-        service.create({
-          nickname: 'new',
-          email: 'taken@test.com',
-          password: 'password',
-        }),
-      ).rejects.toThrow(ConflictException);
-    });
-
-    it('새 사용자를 성공적으로 생성하고 비밀번호 없이 반환해야 한다', async () => {
-      mockUsersRepo.findOne.mockResolvedValue(null);
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashedpass');
-      mockUsersRepo.create.mockReturnValue({
-        nickname: 'test',
-        email: 'test@test.com',
-        password: 'hashedpass',
-      });
-      mockUsersRepo.save.mockResolvedValue({
-        id: 1,
-        nickname: 'test',
-        email: 'test@test.com',
-        password: 'hashedpass',
-      });
-
-      const result = await service.create({
-        nickname: 'test',
-        email: 'test@test.com',
-        password: 'password',
-      });
-
-      expect(bcrypt.hash).toHaveBeenCalledWith('password', 10);
-      expect(result).not.toHaveProperty('password');
-      expect(result.nickname).toEqual('test');
-    });
-  });
-
   describe('createSocialUser', () => {
     it('소셜 유저를 생성하고 비밀번호 없이 반환해야 한다', async () => {
       mockUsersRepo.findOne.mockResolvedValue(null); // 닉네임 중복 없음

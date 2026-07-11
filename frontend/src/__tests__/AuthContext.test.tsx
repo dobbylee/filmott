@@ -4,11 +4,13 @@ import { renderHook } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
+import { AUTH_SESSION_CLEARED_EVENT } from '@/lib/auth-session';
 import type { ReactNode } from 'react';
 import type { User } from '@/types/auth';
 
 const mockRefreshGet = vi.fn();
 const mockRefreshPost = vi.fn();
+const mockClearServerSession = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   default: {},
@@ -20,6 +22,9 @@ vi.mock('@/lib/api', () => ({
 
 vi.mock('@/lib/auth-session', () => ({
   refreshSession: () => mockRefreshPost('/auth/refresh'),
+  clearServerSession: () => mockClearServerSession(),
+  initializeAuthSessionChannel: () => undefined,
+  AUTH_SESSION_CLEARED_EVENT: 'auth:session-cleared',
 }));
 
 const mockUser: User = {
@@ -61,7 +66,6 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 function AuthConsumer() {
   const {
     user,
-    token,
     isLoading,
     isLoggingOut,
     logoutError,
@@ -76,7 +80,6 @@ function AuthConsumer() {
   return (
     <div>
       <div data-testid="user">{user ? user.nickname : 'null'}</div>
-      <div data-testid="token">{token ?? 'null'}</div>
       <div data-testid="isLoading">{isLoading ? 'true' : 'false'}</div>
       <div data-testid="isLoggingOut">{isLoggingOut ? 'true' : 'false'}</div>
       <div data-testid="logoutError">{logoutError ?? 'null'}</div>
@@ -96,6 +99,7 @@ describe('AuthContext', () => {
     localStorageMock.clear();
     mockRefreshGet.mockReset();
     mockRefreshPost.mockReset();
+    mockClearServerSession.mockReset();
   });
 
   describe('useAuth', () => {
@@ -128,7 +132,6 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
       });
       expect(screen.getByTestId('user')).toHaveTextContent('null');
-      expect(screen.getByTestId('token')).toHaveTextContent('null');
     });
 
     it('/users/me 응답으로 세션을 복원해야 한다', async () => {
@@ -194,7 +197,6 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('user')).toHaveTextContent('testuser');
       });
 
-      expect(screen.getByTestId('token')).toHaveTextContent('null');
       expect(localStorageMock.setItem).not.toHaveBeenCalled();
     });
   });
@@ -218,7 +220,7 @@ describe('AuthContext', () => {
       localStorageMock.setItem('refresh_token', 'legacy-refresh-token');
       localStorageMock.setItem('user', JSON.stringify(mockUser));
       mockRefreshPost.mockClear();
-      mockRefreshPost.mockResolvedValueOnce({});
+      mockClearServerSession.mockResolvedValueOnce(undefined);
 
       await user.click(screen.getByRole('button', { name: 'logout' }));
 
@@ -226,11 +228,7 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('user')).toHaveTextContent('null');
       });
 
-      expect(screen.getByTestId('token')).toHaveTextContent('null');
-      expect(mockRefreshPost).toHaveBeenCalledWith('/auth/logout');
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('access_token');
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('refresh_token');
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('user');
+      expect(mockClearServerSession).toHaveBeenCalledTimes(1);
     });
 
     it('서버 로그아웃 실패 시 user를 유지하고 실패 상태를 표시해야 한다', async () => {
@@ -247,8 +245,7 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('user')).toHaveTextContent('testuser');
       });
 
-      mockRefreshPost.mockClear();
-      mockRefreshPost.mockRejectedValueOnce(new Error('Network error'));
+      mockClearServerSession.mockRejectedValueOnce(new Error('Network error'));
 
       await user.click(screen.getByRole('button', { name: 'logout' }));
 
@@ -259,7 +256,6 @@ describe('AuthContext', () => {
       });
 
       expect(screen.getByTestId('user')).toHaveTextContent('testuser');
-      expect(screen.getByTestId('token')).toHaveTextContent('null');
     });
 
     it('로그아웃 실패 후 재시도에 성공하면 user와 실패 상태를 초기화해야 한다', async () => {
@@ -276,9 +272,9 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('user')).toHaveTextContent('testuser');
       });
 
-      mockRefreshPost
+      mockClearServerSession
         .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({});
+        .mockResolvedValueOnce(undefined);
 
       await user.click(screen.getByRole('button', { name: 'logout' }));
       await waitFor(() => {
@@ -342,9 +338,32 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('user')).toHaveTextContent('null');
       });
 
-      expect(screen.getByTestId('token')).toHaveTextContent('null');
       expect(screen.getByTestId('modalOpen')).toHaveTextContent('true');
       expect(localStorageMock.removeItem).toHaveBeenCalledWith('refresh_token');
+    });
+
+    it('다른 탭의 세션 종료 이벤트는 사용자와 열린 모달을 함께 초기화해야 한다', async () => {
+      const user = userEvent.setup();
+      mockRefreshGet.mockResolvedValueOnce({ data: mockUser });
+
+      render(
+        <AuthProvider>
+          <AuthConsumer />
+        </AuthProvider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('user')).toHaveTextContent('testuser');
+      });
+      await user.click(screen.getByText('openModal'));
+      expect(screen.getByTestId('modalOpen')).toHaveTextContent('true');
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent(AUTH_SESSION_CLEARED_EVENT));
+      });
+
+      expect(screen.getByTestId('user')).toHaveTextContent('null');
+      expect(screen.getByTestId('modalOpen')).toHaveTextContent('false');
     });
 
     it('이벤트 리스닝에 AUTH_REQUIRED_EVENT 상수를 사용해야 한다', () => {

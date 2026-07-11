@@ -13,7 +13,6 @@ const mockOpenAuthModal = vi.fn();
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     user: null,
-    token: null,
     isLoading: false,
     handleAuthSuccess: vi.fn(),
     logout: vi.fn(),
@@ -42,7 +41,6 @@ describe('LoginPage', () => {
     vi.doMock('@/contexts/AuthContext', () => ({
       useAuth: () => ({
         user: { id: 1, nickname: 'testuser' },
-        token: 'token',
         isLoading: false,
         handleAuthSuccess: vi.fn(),
         logout: vi.fn(),

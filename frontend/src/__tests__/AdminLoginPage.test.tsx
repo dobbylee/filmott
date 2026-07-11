@@ -13,7 +13,6 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     handleAuthSuccess: mockHandleAuthSuccess,
     user: null,
-    token: null,
     isLoading: false,
     logout: vi.fn(),
     updateUser: vi.fn(),

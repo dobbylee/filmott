@@ -15,7 +15,6 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
 import { Cron } from '@nestjs/schedule';
 import { LoginDto } from './dto/login.dto';
-import { CreateUserDto } from '../users/dto/create-user.dto';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { SocialProfile } from './interfaces/social-profile.interface';
 
@@ -186,10 +185,6 @@ export class AuthService {
     await this.refreshTokenRepo.delete({ token: hashedToken });
   }
 
-  async revokeAllUserTokens(userId: number): Promise<void> {
-    await this.refreshTokenRepo.delete({ userId });
-  }
-
   @Cron('0 3 * * *', { name: 'clean-expired-tokens', timeZone: 'Asia/Seoul' })
   async cleanExpiredTokens(): Promise<void> {
     await this.refreshTokenRepo
@@ -290,11 +285,6 @@ export class AuthService {
       throw new UnauthorizedException('소셜 로그인을 이용해주세요.');
     }
 
-    return this.buildAuthSession(user);
-  }
-
-  async register(createUserDto: CreateUserDto) {
-    const user = await this.usersService.create(createUserDto);
     return this.buildAuthSession(user);
   }
 

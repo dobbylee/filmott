@@ -37,6 +37,5 @@ import { NaverService } from './social/naver.service';
     NaverService,
   ],
   controllers: [AuthController],
-  exports: [AuthService],
 })
 export class AuthModule {}

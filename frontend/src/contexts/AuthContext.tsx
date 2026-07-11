@@ -10,14 +10,18 @@ import {
 } from 'react';
 import { isAxiosError } from 'axios';
 import { refreshApi } from '@/lib/api';
-import { refreshSession } from '@/lib/auth-session';
+import {
+  AUTH_SESSION_CLEARED_EVENT,
+  clearServerSession,
+  initializeAuthSessionChannel,
+  refreshSession,
+} from '@/lib/auth-session';
 import { clearLegacyAuthStorage } from '@/lib/auth-storage';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
 import type { User, AuthResponse } from '@/types/auth';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
   isLoggingOut: boolean;
   logoutError: string | null;
@@ -44,13 +48,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 401 응답 시 모달 열기
   useEffect(() => {
     const handleAuthRequired = () => {
-      clearLegacyAuthStorage();
       setUser(null);
       setLogoutError(null);
       setAuthModal({ isOpen: true });
     };
+    const handleSessionCleared = () => {
+      setUser(null);
+      setLogoutError(null);
+      setAuthModal({ isOpen: false });
+    };
+    initializeAuthSessionChannel();
     window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
-    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+    window.addEventListener(AUTH_SESSION_CLEARED_EVENT, handleSessionCleared);
+    return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+      window.removeEventListener(
+        AUTH_SESSION_CLEARED_EVENT,
+        handleSessionCleared,
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -113,9 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoggingOut(true);
     setLogoutError(null);
     try {
-      await refreshApi.post('/auth/logout');
+      await clearServerSession();
       setUser(null);
-      clearLegacyAuthStorage();
       setAuthModal({ isOpen: false });
       return true;
     } catch {
@@ -148,7 +163,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        token: null,
         isLoading,
         isLoggingOut,
         logoutError,

@@ -20,13 +20,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { randomBytes } from 'crypto';
 import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
-import { Roles } from './decorators/roles.decorator';
-import { UserRole } from '../users/enums/user-role.enum';
 import { LoginDto } from './dto/login.dto';
-import { CreateUserDto } from '../users/dto/create-user.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { CompleteSocialSignupDto } from './dto/complete-social-signup.dto';
 import { GoogleService } from './social/google.service';
 import { KakaoService } from './social/kakao.service';
@@ -77,16 +71,6 @@ export class AuthController {
     this.validateFrontendUrl();
   }
 
-  // --- 기존 엔드포인트 ---
-
-  @Post('signup')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
-  async register(@Body() createUserDto: CreateUserDto) {
-    return this.authService.register(createUserDto);
-  }
-
   @HttpCode(HttpStatus.OK)
   @Post('login')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
@@ -104,40 +88,23 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   async refresh(
     @Req() req: Request,
-    @Body() refreshTokenDto: RefreshTokenDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = this.getRefreshToken(
-      req,
-      refreshTokenDto?.refresh_token,
-    );
+    const refreshToken = this.getRefreshToken(req);
     if (!refreshToken) {
-      this.clearSessionCookies(res);
       throw new UnauthorizedException('리프레시 토큰이 필요합니다.');
     }
 
-    try {
-      const session = await this.authService.refreshTokens(refreshToken);
-      this.setSessionCookies(res, session);
-      return { user: session.user };
-    } catch (error) {
-      this.clearSessionCookies(res);
-      throw error;
-    }
+    const session = await this.authService.refreshTokens(refreshToken);
+    this.setSessionCookies(res, session);
+    return { user: session.user };
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post('logout')
   @Throttle({ default: { ttl: 60000, limit: 10 } })
-  async logout(
-    @Req() req: Request,
-    @Body() refreshTokenDto: RefreshTokenDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const refreshToken = this.getRefreshToken(
-      req,
-      refreshTokenDto?.refresh_token,
-    );
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = this.getRefreshToken(req);
     try {
       if (refreshToken) {
         await this.authService.revokeRefreshToken(refreshToken);
@@ -291,13 +258,8 @@ export class AuthController {
     return true;
   }
 
-  private getRefreshToken(
-    req: Request,
-    bodyRefreshToken?: string,
-  ): string | undefined {
-    return (
-      this.getCookieValue(req, AUTH_REFRESH_TOKEN_COOKIE) ?? bodyRefreshToken
-    );
+  private getRefreshToken(req: Request): string | undefined {
+    return this.getCookieValue(req, AUTH_REFRESH_TOKEN_COOKIE);
   }
 
   private getSocialSignupToken(req: Request): string | undefined {

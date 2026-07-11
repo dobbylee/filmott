@@ -405,16 +405,6 @@ describe('AuthService', () => {
     });
   });
 
-  describe('revokeAllUserTokens', () => {
-    it('해당 유저의 모든 토큰을 삭제해야 한다', async () => {
-      mockRefreshTokenRepo.delete.mockResolvedValue({ affected: 3 });
-
-      await service.revokeAllUserTokens(1);
-
-      expect(mockRefreshTokenRepo.delete).toHaveBeenCalledWith({ userId: 1 });
-    });
-  });
-
   describe('cleanExpiredTokens', () => {
     it('만료된 토큰을 삭제해야 한다', async () => {
       const mockQb = {
@@ -831,50 +821,6 @@ describe('AuthService', () => {
       await expect(
         service.completeSocialSignup('reused-temp-token', 'newnickname'),
       ).rejects.toThrow(new ConflictException('이미 가입된 소셜 계정입니다.'));
-    });
-  });
-
-  describe('register', () => {
-    it('사용자를 생성하고 access_token, refresh_token, 사용자 정보를 반환해야 한다', async () => {
-      const createUserDto = {
-        nickname: 'newuser',
-        email: 'new@example.com',
-        password: 'password123',
-      };
-      const createdUser = {
-        id: 2,
-        nickname: 'newuser',
-        email: 'new@example.com',
-        status: UserStatus.ACTIVE,
-        role: UserRole.USER,
-      };
-
-      mockUsersService.create.mockResolvedValue(createdUser);
-      mockJwtService.sign.mockReturnValue('new.jwt.token');
-      mockRefreshTokenRepo.create.mockImplementation(
-        (data: Partial<RefreshToken>) => data,
-      );
-      mockRefreshTokenRepo.save.mockResolvedValue({});
-
-      const result = await service.register(createUserDto);
-
-      expect(mockUsersService.create).toHaveBeenCalledWith(createUserDto);
-      expect(mockJwtService.sign).toHaveBeenCalledWith({
-        nickname: createdUser.nickname,
-        sub: createdUser.id,
-        role: UserRole.USER,
-      });
-      expect(result.access_token).toBe('new.jwt.token');
-      expect(result.refresh_token).toBeDefined();
-      expect(typeof result.refresh_token).toBe('string');
-      expect(result.user).toEqual({
-        id: 2,
-        nickname: 'newuser',
-        email: 'new@example.com',
-        role: UserRole.USER,
-        profileImage: null,
-        subscribedOtts: [],
-      });
     });
   });
 });

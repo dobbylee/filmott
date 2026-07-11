@@ -118,7 +118,7 @@ describe('api response 인터셉터 - cookie session refresh', () => {
     refreshPostSpy.mockRestore();
   });
 
-  it('refresh 실패 시 legacy auth storage를 지우고 AUTH_REQUIRED_EVENT를 dispatch해야 한다', async () => {
+  it('refresh 실패 시 AUTH_REQUIRED_EVENT를 dispatch하고 mount 전 legacy storage는 유지해야 한다', async () => {
     const { default: api, refreshApi } = await import('@/lib/api');
 
     localStorage.setItem('access_token', 'old-token');
@@ -133,9 +133,9 @@ describe('api response 인터셉터 - cookie session refresh', () => {
       'Refresh failed',
     );
 
-    expect(localStorage.getItem('access_token')).toBeNull();
-    expect(localStorage.getItem('refresh_token')).toBeNull();
-    expect(localStorage.getItem('user')).toBeNull();
+    expect(localStorage.getItem('access_token')).toBe('old-token');
+    expect(localStorage.getItem('refresh_token')).toBe('expired-refresh-token');
+    expect(localStorage.getItem('user')).toBe('{"id":1}');
 
     const authEvent = dispatchEventSpy.mock.calls.find(
       (call) => (call[0] as CustomEvent).type === AUTH_REQUIRED_EVENT,
@@ -162,24 +162,24 @@ describe('api response 인터셉터 - cookie session refresh', () => {
     refreshPostSpy.mockRestore();
   });
 
-  it('/auth/refresh 요청 자체가 401이면 무한 루프 없이 바로 로그아웃해야 한다', async () => {
+  it('공개 인증 요청의 401은 refresh 없이 원래 오류를 반환해야 한다', async () => {
     const { default: api, refreshApi } = await import('@/lib/api');
 
     localStorage.setItem('access_token', 'old-token');
     localStorage.setItem('refresh_token', 'bad-refresh-token');
 
     const refreshPostSpy = vi.spyOn(refreshApi, 'post');
-    await expect(getRejectedHandler(api)(createMockError(401, '/auth/refresh'))).rejects.toBeDefined();
+    dispatchEventSpy.mockClear();
+    await expect(getRejectedHandler(api)(createMockError(401, '/auth/login'))).rejects.toBeDefined();
 
     expect(refreshPostSpy).not.toHaveBeenCalled();
-    expect(localStorage.getItem('access_token')).toBeNull();
-    expect(localStorage.getItem('refresh_token')).toBeNull();
-    expect(localStorage.getItem('user')).toBeNull();
+    expect(localStorage.getItem('access_token')).toBe('old-token');
+    expect(localStorage.getItem('refresh_token')).toBe('bad-refresh-token');
 
     const authEvent = dispatchEventSpy.mock.calls.find(
       (call) => (call[0] as CustomEvent).type === AUTH_REQUIRED_EVENT,
     );
-    expect(authEvent).toBeDefined();
+    expect(authEvent).toBeUndefined();
 
     refreshPostSpy.mockRestore();
   });

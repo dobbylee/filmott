@@ -3,7 +3,6 @@ import { vi } from 'vitest';
 interface MockAuthOverrides {
   user?: { id?: number; nickname?: string; email?: string } | null;
   openAuthModal?: ReturnType<typeof vi.fn>;
-  token?: string | null;
   isLoading?: boolean;
 }
 
@@ -14,7 +13,6 @@ interface MockAuthOverrides {
 export function createMockAuth(overrides: MockAuthOverrides = {}) {
   return {
     user: overrides.user ?? null,
-    token: overrides.token ?? null,
     isLoading: overrides.isLoading ?? false,
     isLoggingOut: false,
     logoutError: null,

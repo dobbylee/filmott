@@ -1,9 +1,5 @@
 import axios, { type AxiosRequestConfig } from 'axios';
-import {
-  notifyAuthRequired,
-  refreshSession,
-  sessionApi,
-} from '@/lib/auth-session';
+import { refreshSession, sessionApi } from '@/lib/auth-session';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
@@ -22,9 +18,8 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // refresh 요청 자체가 실패한 경우 -> 바로 로그인 모달
-    if (originalRequest.url === '/auth/refresh') {
-      notifyAuthRequired();
+    // 로그인 등 공개 인증 요청의 401은 세션 갱신 대상이 아니다.
+    if (originalRequest.url?.startsWith('/auth/')) {
       return Promise.reject(error);
     }
 

@@ -11,7 +11,6 @@ const mockOpenAuthModal = vi.fn();
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     user: null,
-    token: null,
     isLoading: false,
     handleAuthSuccess: vi.fn(),
     logout: vi.fn(),

@@ -15,7 +15,6 @@ import { R2StorageService } from '../common/r2-storage.service';
 import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
 import { UserRole } from './enums/user-role.enum';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AdminGetUsersDto } from './dto/admin-get-users.dto';
 import { VALID_OTT_IDS } from '../common/ott-providers';
@@ -186,39 +185,6 @@ export class UsersService {
     const reserved = ['admin', 'filmott', 'deleted'];
     const lower = nickname.toLowerCase();
     return reserved.some((w) => lower.startsWith(w));
-  }
-
-  async create(createUserDto: CreateUserDto): Promise<SafeUser> {
-    const { nickname, email, password } = createUserDto;
-
-    if (this.isReservedNickname(nickname)) {
-      throw new ConflictException('사용할 수 없는 닉네임입니다.');
-    }
-
-    // Check if user already exists
-    const existingNickname = await this.findOne(nickname);
-    if (existingNickname) {
-      throw new ConflictException('이미 사용 중인 닉네임입니다.');
-    }
-    const existingEmail = await this.findByEmail(email);
-    if (existingEmail) {
-      throw new ConflictException('이미 사용 중인 이메일입니다.');
-    }
-
-    // Hash password
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-    const newUser = this.usersRepo.create({
-      nickname,
-      email,
-      password: hashedPassword,
-    });
-
-    const savedUser = await this.usersRepo.save(newUser);
-
-    // Return user without password
-    return this.toSafeUser(savedUser);
   }
 
   /**
