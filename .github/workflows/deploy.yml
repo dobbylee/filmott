@@ -40,6 +40,13 @@ jobs:
             fi
             echo "Deploy target: ${DEPLOY_SHA}"
 
+            lock_file="${FILMOTT_OPS_LOCK_FILE:-/var/lock/filmott-ops.lock}"
+            exec 9>"$lock_file"
+            if ! flock -w 900 9; then
+              echo "Another production operation is still running: ${lock_file}"
+              exit 1
+            fi
+
             compose() {
               docker compose --env-file .env -f docker-compose.prod.yml "$@"
             }
@@ -51,7 +58,73 @@ jobs:
               compose logs --tail=160 frontend backend nginx || true
             }
 
-            trap 'echo "Deploy failed"; print_diagnostics' ERR
+            wait_for_backend() {
+              for i in $(seq 1 12); do
+                if docker exec "$(compose ps -q backend)" wget -q -O- http://localhost:3001/api/ > /dev/null 2>&1; then
+                  echo "Backend is healthy"
+                  return 0
+                fi
+                if [ "$i" -lt 12 ]; then
+                  sleep 5
+                fi
+              done
+              echo "Backend not responding"
+              return 1
+            }
+
+            wait_for_frontend() {
+              for i in $(seq 1 24); do
+                if compose exec -T frontend \
+                  node -e "fetch('http://127.0.0.1:3000/robots.txt', { cache: 'no-store' }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+                  echo "Frontend is healthy"
+                  return 0
+                fi
+                if [ "$i" -lt 24 ]; then
+                  sleep 5
+                fi
+              done
+              echo "Frontend not responding"
+              return 1
+            }
+
+            cutover_started=0
+            rollback_ready=0
+            previous_frontend_ref=""
+            previous_backend_ref=""
+
+            restore_previous_release() {
+              echo "Restoring previous frontend/backend images"
+              docker image tag filmott-frontend:rollback "$previous_frontend_ref" || return 1
+              docker image tag filmott-backend:rollback "$previous_backend_ref" || return 1
+              compose up -d --no-deps --force-recreate frontend backend || return 1
+              wait_for_backend || return 1
+              wait_for_frontend || return 1
+              compose restart nginx || return 1
+              echo "Previous frontend/backend release restored"
+            }
+
+            handle_deploy_error() {
+              status=$?
+              trap - ERR
+              echo "Deploy failed"
+              print_diagnostics
+
+              if [ "$cutover_started" = "1" ] && [ "$rollback_ready" = "1" ]; then
+                if ! restore_previous_release; then
+                  echo "Automatic rollback failed"
+                  print_diagnostics
+                fi
+              fi
+
+              exit "$status"
+            }
+
+            trap handle_deploy_error ERR
+
+            fail_deploy() {
+              echo "$1"
+              return 1
+            }
 
             test -f .env
             test -f backend/.env.production
@@ -68,9 +141,10 @@ jobs:
               echo "Deploy target is not a commit: ${DEPLOY_SHA}"
               exit 1
             fi
-            if ! git merge-base --is-ancestor "$DEPLOY_SHA" origin/main; then
-              echo "Deploy target is not contained in origin/main: ${DEPLOY_SHA}"
-              exit 1
+            latest_main_sha=$(git rev-parse origin/main)
+            if [ "$DEPLOY_SHA" != "$latest_main_sha" ]; then
+              echo "Skipping stale deploy target ${DEPLOY_SHA}; origin/main is ${latest_main_sha}"
+              exit 0
             fi
 
             git reset --hard "$DEPLOY_SHA"
@@ -80,61 +154,51 @@ jobs:
             fi
 
             compose config > /dev/null
-            compose build --no-cache frontend backend
+            previous_frontend_container=$(compose ps -q frontend)
+            previous_backend_container=$(compose ps -q backend)
+            if [ -z "$previous_frontend_container" ] || [ -z "$previous_backend_container" ]; then
+              echo "Cannot preserve rollback images because frontend/backend is not running"
+              exit 1
+            fi
+
+            previous_frontend_image=$(docker inspect -f '{{.Image}}' "$previous_frontend_container")
+            previous_backend_image=$(docker inspect -f '{{.Image}}' "$previous_backend_container")
+            previous_frontend_ref=$(docker inspect -f '{{.Config.Image}}' "$previous_frontend_container")
+            previous_backend_ref=$(docker inspect -f '{{.Config.Image}}' "$previous_backend_container")
+            docker image tag "$previous_frontend_image" filmott-frontend:rollback
+            docker image tag "$previous_backend_image" filmott-backend:rollback
+            rollback_ready=1
+
+            compose build frontend backend
+
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            latest_main_sha=$(git rev-parse origin/main)
+            if [ "$DEPLOY_SHA" != "$latest_main_sha" ]; then
+              echo "Skipping stale deploy target ${DEPLOY_SHA}; origin/main advanced to ${latest_main_sha} during build"
+              exit 0
+            fi
+
             # PostgreSQL volume 변경은 별도 점검 절차로만 반영한다.
             # 앱 배포가 dependency인 postgres를 암묵적으로 재생성하지 않게 한다.
+            cutover_started=1
             compose up -d --no-deps --remove-orphans frontend backend
 
             for service in frontend backend; do
               container_id=$(compose ps -q "$service")
               if [ -z "$container_id" ]; then
-                echo "${service} container was not created"
-                exit 1
+                fail_deploy "${service} container was not created"
               fi
               if [ "$(docker inspect -f '{{.State.Running}}' "$container_id")" != "true" ]; then
-                echo "${service} container is not running"
-                exit 1
+                fail_deploy "${service} container is not running"
               fi
             done
 
-            # Let's Encrypt 인증서 갱신
-            docker run --rm \
-              -v "$PWD/certbot/conf:/etc/letsencrypt" \
-              -v "$PWD/certbot/www:/var/www/certbot" \
-              certbot/certbot renew \
-              --webroot \
-              -w /var/www/certbot \
-              --non-interactive
+            # 새 컨테이너 readiness check. 실패하면 ERR trap에서 이전 이미지로 복원한다.
+            wait_for_backend
+            wait_for_frontend
 
             # nginx 재시작 (컨테이너 IP 변경 시 upstream resolve 갱신)
             compose restart nginx
-
-            # 백엔드 health check (최대 60초 대기)
-            for i in $(seq 1 12); do
-              sleep 5
-              if docker exec "$(compose ps -q backend)" wget -q -O- http://localhost:3001/api/ > /dev/null 2>&1; then
-                echo "Backend is healthy"
-                break
-              fi
-              if [ $i -eq 12 ]; then
-                echo "Backend not responding"
-                exit 1
-              fi
-            done
-
-            # 프론트엔드 readiness check (Next 서버가 3000 포트 listen할 때까지 대기)
-            for i in $(seq 1 24); do
-              if compose exec -T frontend \
-                node -e "fetch('http://127.0.0.1:3000/robots.txt', { cache: 'no-store' }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
-                echo "Frontend is healthy"
-                break
-              fi
-              if [ $i -eq 24 ]; then
-                echo "Frontend not responding"
-                exit 1
-              fi
-              sleep 5
-            done
 
             # ISR 캐시 revalidation (에러 페이지 캐시 방지)
             REVAL_SECRET=$(grep REVALIDATE_SECRET ~/filmott/.env | cut -d= -f2-)
@@ -167,19 +231,15 @@ jobs:
                 compose restart nginx
               fi
               if [ $i -eq 24 ]; then
-                echo "Origin health check failed: ${status}"
-                exit 1
+                fail_deploy "Origin health check failed: ${status}"
               fi
               sleep 5
             done
 
             www_status=$(curl -sS --resolve www.filmott.kr:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://www.filmott.kr || true)
             if [ "$www_status" != "301" ]; then
-              echo "www redirect check failed: ${www_status}"
-              exit 1
+              fail_deploy "www redirect check failed: ${www_status}"
             fi
-
-            docker image prune -f
       - name: Verify external site through Cloudflare
         run: |
           set -Eeuo pipefail
