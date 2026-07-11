@@ -1,5 +1,5 @@
 import { buildSystemPrompt, UserContext } from './system-prompt';
-import { SimilarContent } from '../embedding.service';
+import { SimilarContent } from '../../embedding/embedding.service';
 import { ParsedIntent } from '../intent-analyzer';
 
 describe('buildSystemPrompt', () => {

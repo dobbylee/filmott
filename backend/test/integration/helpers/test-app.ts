@@ -8,7 +8,7 @@ import { createRequest, createResponse } from 'node-mocks-http';
 import type { Request, Response } from 'express';
 import { AppModule } from '../../../src/app.module';
 import { ChatService } from '../../../src/chat/chat.service';
-import { EmbeddingService } from '../../../src/chat/embedding.service';
+import { EmbeddingService } from '../../../src/embedding/embedding.service';
 import { R2StorageService } from '../../../src/common/r2-storage.service';
 import { configureApp } from '../../../src/configure-app';
 import { KobisService } from '../../../src/kobis/kobis.service';

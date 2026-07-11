@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { EmbeddingService, SimilarContent } from './embedding.service';
+import {
+  EmbeddingService,
+  SimilarContent,
+} from '../embedding/embedding.service';
 
 export const FILTER_RELAXATION_SEQUENCE = [
   'genres',

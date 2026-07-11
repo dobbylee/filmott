@@ -4,7 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatService } from './chat.service';
-import { EmbeddingService, SimilarContent } from './embedding.service';
+import {
+  EmbeddingService,
+  SimilarContent,
+} from '../embedding/embedding.service';
 import { ContentSearchService } from './content-search.service';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentsService } from '../contents/contents.service';

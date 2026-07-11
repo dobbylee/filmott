@@ -9,7 +9,7 @@ import { Watchlist } from '../../../src/watchlist/watchlist.entity';
 import { Review } from '../../../src/reviews/review.entity';
 import { ReviewLike } from '../../../src/reviews/review-like.entity';
 import { ReviewComment } from '../../../src/reviews/review-comment.entity';
-import { ContentMetadata } from '../../../src/chat/entities/content-metadata.entity';
+import { ContentMetadata } from '../../../src/embedding/entities/content-metadata.entity';
 
 export interface IntegrationDatabaseConfig {
   host: string;

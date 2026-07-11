@@ -6,7 +6,7 @@ import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
 import { ContentsModule } from '../contents/contents.module';
-import { EmbeddingModule } from './embedding.module';
+import { EmbeddingModule } from '../embedding/embedding.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { IntentAnalyzerService } from './intent-analyzer';

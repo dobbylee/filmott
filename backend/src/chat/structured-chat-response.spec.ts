@@ -1,4 +1,4 @@
-import type { SimilarContent } from './embedding.service';
+import type { SimilarContent } from '../embedding/embedding.service';
 import {
   extractRecommendationLineTitles,
   extractPreviouslyRecommendedTitles,

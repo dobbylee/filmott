@@ -7,7 +7,7 @@ import { ChatContextService } from './chat-context.service';
 import { ChatResponseStreamService } from './chat-response-stream.service';
 import { ChatService } from './chat.service';
 import type { ContentSearchService } from './content-search.service';
-import type { EmbeddingService } from './embedding.service';
+import type { EmbeddingService } from '../embedding/embedding.service';
 import type { IntentAnalyzerService } from './intent-analyzer';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
 

@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ContentsService } from '../contents/contents.service';
 import { ContentSearchFilters } from './content-search.service';
-import { EmbeddingService, SimilarContent } from './embedding.service';
+import {
+  EmbeddingService,
+  SimilarContent,
+} from '../embedding/embedding.service';
 import { ParsedIntent } from './intent-analyzer';
 
 const CHAT_RECOMMENDATION_LIMIT = 5;

@@ -4,7 +4,7 @@ import {
   ContentSearchService,
   FILTER_RELAXATION_SEQUENCE,
 } from './content-search.service';
-import { EmbeddingService } from './embedding.service';
+import { EmbeddingService } from '../embedding/embedding.service';
 
 describe('ContentSearchService', () => {
   let service: ContentSearchService;

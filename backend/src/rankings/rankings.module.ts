@@ -6,7 +6,7 @@ import { RankingsController } from './rankings.controller';
 import { KobisModule } from '../kobis/kobis.module';
 import { TmdbModule } from '../tmdb/tmdb.module';
 import { ContentsModule } from '../contents/contents.module';
-import { EmbeddingModule } from '../chat/embedding.module';
+import { EmbeddingModule } from '../embedding/embedding.module';
 import { CommonModule } from '../common/common.module';
 
 @Module({
@@ -20,6 +20,5 @@ import { CommonModule } from '../common/common.module';
   ],
   controllers: [RankingsController],
   providers: [RankingsService],
-  exports: [RankingsService],
 })
 export class RankingsModule {}

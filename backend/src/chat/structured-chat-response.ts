@@ -1,5 +1,5 @@
 import type { ChatHistoryMessageDto } from './dto/send-message.dto';
-import type { SimilarContent } from './embedding.service';
+import type { SimilarContent } from '../embedding/embedding.service';
 
 export const RECOMMENDATIONS_TRAILER_OPEN = '<filmott_recommendations>';
 export const RECOMMENDATIONS_TRAILER_CLOSE = '</filmott_recommendations>';

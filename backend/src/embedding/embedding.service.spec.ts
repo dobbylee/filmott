@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { EmbeddingService } from './embedding.service';
-import { CHAT_MODEL } from './chat.constants';
+import { CHAT_MODEL } from '../chat/chat.constants';
 import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
 

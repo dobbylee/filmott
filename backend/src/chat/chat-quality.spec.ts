@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import type { ContentsService } from '../contents/contents.service';
 import type { ContentSearchFilters } from './content-search.service';
-import type { EmbeddingService } from './embedding.service';
+import type { EmbeddingService } from '../embedding/embedding.service';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
 import {

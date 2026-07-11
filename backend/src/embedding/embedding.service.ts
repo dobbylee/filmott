@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { CHAT_MODEL } from './chat.constants';
+import { CHAT_MODEL } from '../chat/chat.constants';
 import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
 

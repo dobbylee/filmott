@@ -4,7 +4,10 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { CHAT_MODEL } from './chat.constants';
-import { EmbeddingService, SimilarContent } from './embedding.service';
+import {
+  EmbeddingService,
+  SimilarContent,
+} from '../embedding/embedding.service';
 import {
   ContentSearchService,
   ContentSearchFilters,

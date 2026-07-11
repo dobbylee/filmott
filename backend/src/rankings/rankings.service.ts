@@ -7,7 +7,7 @@ import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentsService } from '../contents/contents.service';
-import { EmbeddingService } from '../chat/embedding.service';
+import { EmbeddingService } from '../embedding/embedding.service';
 import { RevalidateService } from '../common/revalidate.service';
 import { Content } from '../contents/content.entity';
 import { TMDB_IMAGE_BASE } from '../common/constants';

@@ -1,6 +1,6 @@
 import type { ContentSearchFilters } from './content-search.service';
 import type { ChatHistoryMessageDto } from './dto/send-message.dto';
-import type { SimilarContent } from './embedding.service';
+import type { SimilarContent } from '../embedding/embedding.service';
 import type { ParsedIntent } from './intent-analyzer';
 import type { UserContext } from './prompts/system-prompt';
 import type { RecommendationRerankContext } from './recommendation-candidate.service';

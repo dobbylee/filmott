@@ -1,6 +1,6 @@
 import { OttProvider } from '../../common/ott-providers';
 import { getKoreaDateString } from '../../common/date.util';
-import { SimilarContent } from '../embedding.service';
+import { SimilarContent } from '../../embedding/embedding.service';
 import { ParsedIntent } from '../intent-analyzer';
 import {
   RECOMMENDATIONS_TRAILER_CLOSE,

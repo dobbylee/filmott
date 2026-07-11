@@ -1,7 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { ContentSearchService } from '../../src/chat/content-search.service';
-import { EmbeddingService } from '../../src/chat/embedding.service';
+import { EmbeddingService } from '../../src/embedding/embedding.service';
 import {
   createIntegrationDataSource,
   hasIntegrationDatabaseConfig,
