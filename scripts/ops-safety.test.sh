@@ -114,4 +114,11 @@ if [ "$restore_call_count" -lt 4 ]; then
   exit 1
 fi
 
+post_checkout="${deploy_workflow#*git reset --hard \"\$DEPLOY_SHA\"}"
+pre_cutover="${post_checkout%%cutover_started=1*}"
+if [[ "$pre_cutover" == *'exit 1'* ]]; then
+  echo 'checkout 변경 후 cutover 전 오류가 복구 handler를 우회합니다.' >&2
+  exit 1
+fi
+
 echo '운영 스크립트 안전 회귀 검증 통과'
