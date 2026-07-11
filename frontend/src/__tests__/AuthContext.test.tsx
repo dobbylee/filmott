@@ -4,13 +4,17 @@ import { renderHook } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
-import { AUTH_SESSION_CLEARED_EVENT } from '@/lib/auth-session';
+import {
+  AUTH_SESSION_CLEARED_EVENT,
+  AUTH_SESSION_ESTABLISHED_EVENT,
+} from '@/lib/auth-session';
 import type { ReactNode } from 'react';
 import type { User } from '@/types/auth';
 
 const mockRefreshGet = vi.fn();
 const mockRefreshPost = vi.fn();
 const mockClearServerSession = vi.fn();
+const mockNotifySessionEstablished = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   default: {},
@@ -24,7 +28,9 @@ vi.mock('@/lib/auth-session', () => ({
   refreshSession: () => mockRefreshPost('/auth/refresh'),
   clearServerSession: () => mockClearServerSession(),
   initializeAuthSessionChannel: () => undefined,
+  notifySessionEstablished: () => mockNotifySessionEstablished(),
   AUTH_SESSION_CLEARED_EVENT: 'auth:session-cleared',
+  AUTH_SESSION_ESTABLISHED_EVENT: 'auth:session-established',
 }));
 
 const mockUser: User = {
@@ -100,6 +106,7 @@ describe('AuthContext', () => {
     mockRefreshGet.mockReset();
     mockRefreshPost.mockReset();
     mockClearServerSession.mockReset();
+    mockNotifySessionEstablished.mockReset();
   });
 
   describe('useAuth', () => {
@@ -173,6 +180,61 @@ describe('AuthContext', () => {
       expect(mockRefreshPost).toHaveBeenCalledWith('/auth/refresh');
       expect(mockRefreshGet).toHaveBeenCalledTimes(2);
     });
+
+    it('늦게 끝난 초기 세션 복원은 이후 로그인 성공 상태를 덮어쓰지 않아야 한다', async () => {
+      let resolveRestore:
+        | ((value: { data: User }) => void)
+        | undefined;
+      mockRefreshGet.mockReturnValueOnce(
+        new Promise<{ data: User }>((resolve) => {
+          resolveRestore = resolve;
+        }),
+      );
+      const user = userEvent.setup();
+
+      render(
+        <AuthProvider>
+          <AuthConsumer />
+        </AuthProvider>,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'handleAuthSuccess' }));
+      resolveRestore?.({
+        data: { id: 2, nickname: 'old-session' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('user')).toHaveTextContent('testuser');
+        expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
+      });
+    });
+
+    it('늦게 끝난 초기 세션 복원은 다른 탭 로그아웃 상태를 되살리지 않아야 한다', async () => {
+      let resolveRestore:
+        | ((value: { data: User }) => void)
+        | undefined;
+      mockRefreshGet.mockReturnValueOnce(
+        new Promise<{ data: User }>((resolve) => {
+          resolveRestore = resolve;
+        }),
+      );
+
+      render(
+        <AuthProvider>
+          <AuthConsumer />
+        </AuthProvider>,
+      );
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent(AUTH_SESSION_CLEARED_EVENT));
+      });
+      resolveRestore?.({ data: mockUser });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('user')).toHaveTextContent('null');
+        expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
+      });
+    });
   });
 
   describe('handleAuthSuccess', () => {
@@ -198,6 +260,7 @@ describe('AuthContext', () => {
       });
 
       expect(localStorageMock.setItem).not.toHaveBeenCalled();
+      expect(mockNotifySessionEstablished).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -231,7 +294,7 @@ describe('AuthContext', () => {
       expect(mockClearServerSession).toHaveBeenCalledTimes(1);
     });
 
-    it('서버 로그아웃 실패 시 user를 유지하고 실패 상태를 표시해야 한다', async () => {
+    it('서버 로그아웃 실패 시에도 local user를 초기화하고 실패 상태를 표시해야 한다', async () => {
       const user = userEvent.setup();
       mockRefreshGet.mockResolvedValueOnce({ data: mockUser });
 
@@ -255,7 +318,7 @@ describe('AuthContext', () => {
         );
       });
 
-      expect(screen.getByTestId('user')).toHaveTextContent('testuser');
+      expect(screen.getByTestId('user')).toHaveTextContent('null');
     });
 
     it('로그아웃 실패 후 재시도에 성공하면 user와 실패 상태를 초기화해야 한다', async () => {
@@ -364,6 +427,31 @@ describe('AuthContext', () => {
 
       expect(screen.getByTestId('user')).toHaveTextContent('null');
       expect(screen.getByTestId('modalOpen')).toHaveTextContent('false');
+    });
+
+    it('다른 탭의 로그인 이벤트는 현재 사용자 정보를 다시 불러와야 한다', async () => {
+      mockRefreshGet
+        .mockRejectedValueOnce(createAxiosError(401))
+        .mockResolvedValueOnce({ data: mockUser });
+      mockRefreshPost.mockRejectedValueOnce(createAxiosError(401));
+
+      render(
+        <AuthProvider>
+          <AuthConsumer />
+        </AuthProvider>,
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
+      });
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent(AUTH_SESSION_ESTABLISHED_EVENT));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('user')).toHaveTextContent('testuser');
+      });
+      expect(mockRefreshGet).toHaveBeenCalledTimes(2);
     });
 
     it('이벤트 리스닝에 AUTH_REQUIRED_EVENT 상수를 사용해야 한다', () => {

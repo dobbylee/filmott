@@ -6,14 +6,17 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import { isAxiosError } from 'axios';
 import { refreshApi } from '@/lib/api';
 import {
   AUTH_SESSION_CLEARED_EVENT,
+  AUTH_SESSION_ESTABLISHED_EVENT,
   clearServerSession,
   initializeAuthSessionChannel,
+  notifySessionEstablished,
   refreshSession,
 } from '@/lib/auth-session';
 import { clearLegacyAuthStorage } from '@/lib/auth-storage';
@@ -44,27 +47,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const sessionGenerationRef = useRef(0);
 
   // 401 응답 시 모달 열기
   useEffect(() => {
+    let isActive = true;
     const handleAuthRequired = () => {
+      sessionGenerationRef.current += 1;
       setUser(null);
+      setIsLoading(false);
       setLogoutError(null);
       setAuthModal({ isOpen: true });
     };
     const handleSessionCleared = () => {
+      sessionGenerationRef.current += 1;
       setUser(null);
+      setIsLoading(false);
       setLogoutError(null);
       setAuthModal({ isOpen: false });
+    };
+    const handleSessionEstablished = () => {
+      sessionGenerationRef.current += 1;
+      const generation = sessionGenerationRef.current;
+      void refreshApi
+        .get<User>('/users/me')
+        .then(({ data }) => {
+          if (isActive && sessionGenerationRef.current === generation) {
+            setUser(data);
+            setLogoutError(null);
+            setAuthModal({ isOpen: false });
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (isActive && sessionGenerationRef.current === generation) {
+            setIsLoading(false);
+          }
+        });
     };
     initializeAuthSessionChannel();
     window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
     window.addEventListener(AUTH_SESSION_CLEARED_EVENT, handleSessionCleared);
+    window.addEventListener(
+      AUTH_SESSION_ESTABLISHED_EVENT,
+      handleSessionEstablished,
+    );
     return () => {
+      isActive = false;
       window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
       window.removeEventListener(
         AUTH_SESSION_CLEARED_EVENT,
         handleSessionCleared,
+      );
+      window.removeEventListener(
+        AUTH_SESSION_ESTABLISHED_EVENT,
+        handleSessionEstablished,
       );
     };
   }, []);
@@ -73,17 +110,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearLegacyAuthStorage();
 
     let isMounted = true;
+    const generation = sessionGenerationRef.current;
+    const canApplyResult = () =>
+      isMounted && sessionGenerationRef.current === generation;
 
     const restoreSession = async () => {
       try {
         const { data } = await refreshApi.get<User>('/users/me');
-        if (isMounted) {
+        if (canApplyResult()) {
           setUser(data);
         }
         return;
       } catch (error) {
         if (!isAxiosError(error) || error.response?.status !== 401) {
-          if (isMounted) {
+          if (canApplyResult()) {
             setUser(null);
           }
           return;
@@ -92,23 +132,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           await refreshSession();
           const { data } = await refreshApi.get<User>('/users/me');
-          if (isMounted) {
+          if (canApplyResult()) {
             setUser(data);
           }
         } catch {
-          if (isMounted) {
+          if (canApplyResult()) {
             setUser(null);
           }
         }
       } finally {
-        if (isMounted) {
+        if (canApplyResult()) {
           setIsLoading(false);
         }
       }
     };
 
     restoreSession().catch(() => {
-      if (isMounted) {
+      if (canApplyResult()) {
         setUser(null);
         setIsLoading(false);
       }
@@ -120,18 +160,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const handleAuthSuccess = useCallback((response: AuthResponse) => {
+    sessionGenerationRef.current += 1;
     setUser(response.user);
+    setIsLoading(false);
     setLogoutError(null);
     setAuthModal({ isOpen: false });
+    notifySessionEstablished();
   }, []);
 
   const logout = useCallback(async (): Promise<boolean> => {
+    sessionGenerationRef.current += 1;
     setIsLoggingOut(true);
     setLogoutError(null);
+    setUser(null);
+    setAuthModal({ isOpen: false });
     try {
       await clearServerSession();
-      setUser(null);
-      setAuthModal({ isOpen: false });
       return true;
     } catch {
       setLogoutError(

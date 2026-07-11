@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  AUTH_SESSION_CLEARED_EVENT,
   clearServerSession,
+  isAuthSessionMessage,
   refreshSession,
   resetAuthSessionForTests,
   sessionApi,
@@ -129,5 +131,29 @@ describe('auth session coordinator', () => {
       'filmott-auth-session',
       expect.any(Function),
     );
+  });
+
+  it('로그아웃 요청이 실패해도 local 세션 종료 이벤트를 발생시켜야 한다', async () => {
+    vi.spyOn(sessionApi, 'post').mockRejectedValueOnce(
+      new Error('네트워크 오류'),
+    );
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
+    await expect(clearServerSession()).rejects.toThrow('네트워크 오류');
+
+    const sessionClearedEvents = dispatchSpy.mock.calls.filter(
+      ([event]) => (event as CustomEvent).type === AUTH_SESSION_CLEARED_EVENT,
+    );
+    expect(sessionClearedEvents).toHaveLength(1);
+  });
+
+  it('BroadcastChannel 외부 입력은 허용된 세션 메시지만 통과시켜야 한다', () => {
+    expect(isAuthSessionMessage({ type: 'auth-required' })).toBe(true);
+    expect(isAuthSessionMessage({ type: 'session-cleared' })).toBe(true);
+    expect(isAuthSessionMessage({ type: 'session-established' })).toBe(true);
+    expect(isAuthSessionMessage({ type: 'unknown' })).toBe(false);
+    expect(isAuthSessionMessage({ type: 1 })).toBe(false);
+    expect(isAuthSessionMessage(null)).toBe(false);
+    expect(isAuthSessionMessage('session-cleared')).toBe(false);
   });
 });

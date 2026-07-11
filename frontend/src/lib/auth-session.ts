@@ -8,9 +8,11 @@ const AUTH_SESSION_CHANNEL = 'filmott-auth-session';
 
 type AuthSessionMessage =
   | { type: 'auth-required' }
-  | { type: 'session-cleared' };
+  | { type: 'session-cleared' }
+  | { type: 'session-established' };
 
 export const AUTH_SESSION_CLEARED_EVENT = 'auth:session-cleared';
+export const AUTH_SESSION_ESTABLISHED_EVENT = 'auth:session-established';
 
 export const sessionApi = axios.create({
   baseURL: apiUrl,
@@ -31,12 +33,26 @@ function dispatchSessionEvent(message: AuthSessionMessage): void {
     return;
   }
 
-  window.dispatchEvent(
-    new CustomEvent(
-      message.type === 'auth-required'
-        ? AUTH_REQUIRED_EVENT
-        : AUTH_SESSION_CLEARED_EVENT,
-    ),
+  const eventName =
+    message.type === 'auth-required'
+      ? AUTH_REQUIRED_EVENT
+      : message.type === 'session-cleared'
+        ? AUTH_SESSION_CLEARED_EVENT
+        : AUTH_SESSION_ESTABLISHED_EVENT;
+  window.dispatchEvent(new CustomEvent(eventName));
+}
+
+export function isAuthSessionMessage(
+  value: unknown,
+): value is AuthSessionMessage {
+  if (typeof value !== 'object' || value === null || !('type' in value)) {
+    return false;
+  }
+
+  return (
+    value.type === 'auth-required' ||
+    value.type === 'session-cleared' ||
+    value.type === 'session-established'
   );
 }
 
@@ -49,13 +65,8 @@ function getAuthChannel(): BroadcastChannel | null {
     authChannel = new BroadcastChannel(AUTH_SESSION_CHANNEL);
     authChannel.addEventListener('message', (event: MessageEvent<unknown>) => {
       const message = event.data;
-      if (
-        typeof message === 'object' &&
-        message !== null &&
-        ('type' in message) &&
-        (message.type === 'auth-required' || message.type === 'session-cleared')
-      ) {
-        dispatchSessionEvent(message as AuthSessionMessage);
+      if (isAuthSessionMessage(message)) {
+        dispatchSessionEvent(message);
       }
     });
   }
@@ -87,6 +98,10 @@ export function notifyAuthRequired(): void {
   publishSessionEvent({ type: 'auth-required' });
 }
 
+export function notifySessionEstablished(): void {
+  getAuthChannel()?.postMessage({ type: 'session-established' });
+}
+
 export function refreshSession(
   options: RefreshSessionOptions = {},
 ): Promise<void> {
@@ -116,8 +131,11 @@ export function clearServerSession(
   config: AxiosRequestConfig = {},
 ): Promise<void> {
   return runSessionOperation(async () => {
-    await sessionApi.post('/auth/logout', undefined, config);
-    publishSessionEvent({ type: 'session-cleared' });
+    try {
+      await sessionApi.post('/auth/logout', undefined, config);
+    } finally {
+      publishSessionEvent({ type: 'session-cleared' });
+    }
   });
 }
 
