@@ -88,10 +88,6 @@ dist-ssr
 AGENTS.md
 CLAUDE.md
 
-# MCP server build artifacts
-mcp/dist/
-mcp/node_modules/
-
 # Frontend
 .npm-cache/
 frontend/.npm-cache/
