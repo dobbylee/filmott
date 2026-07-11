@@ -100,7 +100,9 @@ export default function NicknameSetupModal() {
         ...(signupToken ? { signupToken } : {}),
       });
       clearStoredSocialSignupToken();
-      trackEvent('signup_completed', { provider: response.data.user.provider ?? 'unknown' });
+      trackEvent('signup_completed', {
+        provider: response.data.user.provider?.toLowerCase() ?? 'unknown',
+      });
       handleAuthSuccess(response.data);
       router.replace('/');
     } catch (err) {

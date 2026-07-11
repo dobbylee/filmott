@@ -18,11 +18,18 @@ const MAX_STORED_MESSAGES = 50;
 const MAX_HISTORY_MESSAGES = 20;
 
 const EXAMPLE_QUESTIONS = [
-  '최신 넷플릭스 시리즈 추천해줘',
-  '친구들이랑 볼 코미디 영화 추천해줘',
-  '통쾌한 액션 영화 추천해줘',
-  '밤에 혼자 볼 스릴러 영화 추천해줘',
-];
+  { id: 'latest_netflix_series', question: '최신 넷플릭스 시리즈 추천해줘' },
+  { id: 'friends_comedy_movie', question: '친구들이랑 볼 코미디 영화 추천해줘' },
+  { id: 'cathartic_action_movie', question: '통쾌한 액션 영화 추천해줘' },
+  { id: 'solo_night_thriller', question: '밤에 혼자 볼 스릴러 영화 추천해줘' },
+] as const;
+
+type ChatEntryPoint = 'typed' | 'example' | 'content_detail';
+
+interface ChatAnalyticsContext {
+  entryPoint: ChatEntryPoint;
+  exampleId?: string;
+}
 
 function getHighestMessageId(messages: ChatMessageData[]): number {
   return messages.reduce((maxId, message) => Math.max(maxId, message.id), 0);
@@ -33,6 +40,10 @@ function hasAssistantResponse(
   recommendations: ChatRecommendationWithPoster[] | null,
 ): boolean {
   return text.length > 0 || (recommendations?.length ?? 0) > 0;
+}
+
+function getCurrentTimestamp(): number {
+  return Date.now();
 }
 
 export default function ChatSection() {
@@ -191,8 +202,26 @@ export default function ChatSection() {
     localStorage.removeItem(STORAGE_KEY);
   };
 
-  const handleSend = async (content: string) => {
-    trackEvent('chat_message_sent', { message_count: messages.length + 1 });
+  const handleSend = async (
+    content: string,
+    analyticsContext: ChatAnalyticsContext = { entryPoint: 'typed' },
+  ) => {
+    const turnNumber =
+      messages.filter((message) => message.role === 'user').length + 1;
+    const authenticated = user ? 1 : 0;
+    const startedAt = getCurrentTimestamp();
+    let terminalAnalyticsSent = false;
+    const commonAnalyticsParams = {
+      turn_number: turnNumber,
+      entry_point: analyticsContext.entryPoint,
+      authenticated,
+    };
+    trackEvent('chat_message_sent', {
+      ...commonAnalyticsParams,
+      ...(analyticsContext.exampleId
+        ? { example_id: analyticsContext.exampleId }
+        : {}),
+    });
     setError(null);
     abortControllerRef.current?.abort();
 
@@ -245,12 +274,27 @@ export default function ChatSection() {
         },
         onDone: () => {
           if (!isActiveRequest(requestId)) return;
+          if (!terminalAnalyticsSent) {
+            terminalAnalyticsSent = true;
+            trackEvent('chat_response_completed', {
+              ...commonAnalyticsParams,
+              recommendation_count: streamingRecsRef.current?.length ?? 0,
+              latency_ms: Math.max(0, getCurrentTimestamp() - startedAt),
+            });
+          }
           isDoneCalledRef.current = true;
           appendAssistantMessage();
           clearStreamingState(requestId);
         },
         onError: (message) => {
           if (!isActiveRequest(requestId)) return;
+          if (!terminalAnalyticsSent) {
+            terminalAnalyticsSent = true;
+            trackEvent('chat_response_failed', {
+              ...commonAnalyticsParams,
+              failure_type: 'server',
+            });
+          }
           isDoneCalledRef.current = true;
           appendAssistantMessage(true);
           setError(message);
@@ -259,6 +303,14 @@ export default function ChatSection() {
       }, { isAuthenticated: Boolean(user), signal: abortController.signal });
     } catch {
       if (!isActiveRequest(requestId) || abortController.signal.aborted) return;
+
+      if (!terminalAnalyticsSent) {
+        terminalAnalyticsSent = true;
+        trackEvent('chat_response_failed', {
+          ...commonAnalyticsParams,
+          failure_type: 'network',
+        });
+      }
 
       // 에러 시에도 받은 텍스트가 있으면 보존
       if (
@@ -274,9 +326,11 @@ export default function ChatSection() {
     }
   };
 
-  const handleExampleClick = (question: string) => {
-    trackEvent('chat_example_clicked', { question });
-    handleSend(question);
+  const handleExampleClick = (example: (typeof EXAMPLE_QUESTIONS)[number]) => {
+    handleSend(example.question, {
+      entryPoint: 'example',
+      exampleId: example.id,
+    });
   };
 
   const hasConversation = messages.length > 0 || isStreaming;
@@ -315,14 +369,14 @@ export default function ChatSection() {
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-md mb-4">
-              {EXAMPLE_QUESTIONS.map((question) => (
+              {EXAMPLE_QUESTIONS.map((example) => (
                 <button
-                  key={question}
-                  onClick={() => handleExampleClick(question)}
+                  key={example.id}
+                  onClick={() => handleExampleClick(example)}
                   className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white/70 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all break-keep"
                 >
                   <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 text-fuchsia-400/60" />
-                  {question}
+                  {example.question}
                 </button>
               ))}
             </div>

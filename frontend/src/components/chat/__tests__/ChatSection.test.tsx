@@ -21,6 +21,11 @@ vi.mock('@/lib/chat-stream', () => ({
   sendChatMessage: (...args: unknown[]) => mockSendChatMessage(...args),
 }));
 
+const mockTrackEvent = vi.fn();
+vi.mock('@/lib/ga', () => ({
+  trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
+}));
+
 // localStorage mock
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -39,6 +44,7 @@ describe('ChatSection', () => {
   beforeEach(() => {
     mockAuthUser = null;
     mockSendChatMessage.mockReset();
+    mockTrackEvent.mockReset();
     localStorageMock.clear();
     localStorageMock.getItem.mockReset();
     localStorageMock.setItem.mockReset();
@@ -101,6 +107,11 @@ describe('ChatSection', () => {
         }),
       );
     });
+    expect(mockTrackEvent).toHaveBeenCalledWith('chat_message_sent', {
+      turn_number: 1,
+      entry_point: 'typed',
+      authenticated: 0,
+    });
   });
 
   it('사용자 메시지가 낙관적으로 화면에 표시된다', async () => {
@@ -135,6 +146,16 @@ describe('ChatSection', () => {
         }),
       );
     });
+    expect(mockTrackEvent).toHaveBeenCalledWith('chat_message_sent', {
+      turn_number: 1,
+      entry_point: 'example',
+      authenticated: 0,
+      example_id: 'solo_night_thriller',
+    });
+    expect(mockTrackEvent).not.toHaveBeenCalledWith(
+      'chat_example_clicked',
+      expect.anything(),
+    );
   });
 
   it('로그인 상태면 sendChatMessage에 isAuthenticated=true를 전달한다', async () => {
@@ -158,6 +179,76 @@ describe('ChatSection', () => {
         }),
       );
     });
+  });
+
+  it('정상 완료 시 추천 수와 지연 시간을 chat_response_completed로 기록한다', async () => {
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        callbacks.onRecommendations([
+          {
+            tmdbId: 1,
+            contentType: 'movie',
+            title: '첫 작품',
+            posterUrl: null,
+          },
+          {
+            tmdbId: 2,
+            contentType: 'tv',
+            title: '두 번째 작품',
+            posterUrl: null,
+          },
+        ]);
+        callbacks.onDone();
+        return Promise.resolve();
+      },
+    );
+
+    render(<ChatSection />);
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '추천 완료 테스트' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        'chat_response_completed',
+        {
+          turn_number: 1,
+          entry_point: 'typed',
+          authenticated: 0,
+          recommendation_count: 2,
+          latency_ms: expect.any(Number),
+        },
+      );
+    });
+    expect(mockTrackEvent).not.toHaveBeenCalledWith(
+      'chat_response_failed',
+      expect.anything(),
+    );
+  });
+
+  it('네트워크 예외는 chat_response_failed를 한 번만 기록해야 한다', async () => {
+    mockSendChatMessage.mockRejectedValueOnce(new Error('network'));
+
+    render(<ChatSection />);
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '네트워크 실패 테스트' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await screen.findByText('메시지 전송 중 오류가 발생했습니다.');
+    const failedEvents = mockTrackEvent.mock.calls.filter(
+      ([eventName]) => eventName === 'chat_response_failed',
+    );
+    expect(failedEvents).toEqual([
+      [
+        'chat_response_failed',
+        {
+          turn_number: 1,
+          entry_point: 'typed',
+          authenticated: 0,
+          failure_type: 'network',
+        },
+      ],
+    ]);
   });
 
   it('메시지 전송 후 localStorage에 저장된다', async () => {
@@ -286,6 +377,10 @@ describe('ChatSection', () => {
 
     expect(screen.queryByText('늦은 응답')).not.toBeInTheDocument();
     expect(screen.getByText('오늘 뭐 볼까?')).toBeInTheDocument();
+    expect(mockTrackEvent).not.toHaveBeenCalledWith(
+      'chat_response_completed',
+      expect.anything(),
+    );
   });
 
   it('대화가 없을 때는 "새 대화" 버튼이 표시되지 않는다', () => {
@@ -310,6 +405,12 @@ describe('ChatSection', () => {
 
     await waitFor(() => {
       expect(screen.getByText('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.')).toBeInTheDocument();
+    });
+    expect(mockTrackEvent).toHaveBeenCalledWith('chat_response_failed', {
+      turn_number: 1,
+      entry_point: 'typed',
+      authenticated: 0,
+      failure_type: 'server',
     });
   });
 

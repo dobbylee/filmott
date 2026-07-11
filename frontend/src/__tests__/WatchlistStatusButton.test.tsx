@@ -81,6 +81,18 @@ describe('WatchlistStatusButton', () => {
 
     await user.click(screen.getByText('기록하기'));
     expect(mockOpenAuthModal).toHaveBeenCalled();
+    expect(mockTrackEvent).toHaveBeenCalledWith('detail_action_clicked', {
+      action: 'watchlist_menu',
+      content_type: 'movie',
+      tmdb_id: 123,
+      authenticated: 0,
+    });
+    expect(mockTrackEvent).toHaveBeenCalledWith('login_prompt_shown', {
+      source: 'content_detail',
+      action: 'watchlist_menu',
+      content_type: 'movie',
+      tmdb_id: 123,
+    });
   });
 
   it('미등록 상태에서 클릭 시 드롭다운 옵션을 표시해야 한다', async () => {
@@ -162,6 +174,12 @@ describe('WatchlistStatusButton', () => {
         status: 'want_to_watch',
       }));
     });
+    expect(mockTrackEvent).toHaveBeenCalledWith('detail_action_clicked', {
+      action: 'want_to_watch',
+      content_type: 'movie',
+      tmdb_id: 123,
+      authenticated: 1,
+    });
   });
 
   it('미등록 상태에서 "감상한 작품" 클릭 시 리뷰 작성 모달을 열어야 한다', async () => {
@@ -182,6 +200,12 @@ describe('WatchlistStatusButton', () => {
     await waitFor(() => {
       expect(screen.getByText('감상 날짜')).toBeInTheDocument();
       expect(screen.getByText('별점')).toBeInTheDocument();
+    });
+    expect(mockTrackEvent).toHaveBeenCalledWith('detail_action_clicked', {
+      action: 'watched',
+      content_type: 'movie',
+      tmdb_id: 123,
+      authenticated: 1,
     });
     expect(mockPost).not.toHaveBeenCalled();
   });
@@ -425,7 +449,10 @@ describe('WatchlistStatusButton', () => {
       expect(screen.getByText('기록하기')).toBeInTheDocument();
     });
 
-    expect(mockTrackEvent).not.toHaveBeenCalled();
+    expect(mockTrackEvent).not.toHaveBeenCalledWith(
+      'watchlist_added',
+      expect.anything(),
+    );
   });
 
   it('tv 콘텐츠 추가 시 content_type이 tv로 이벤트를 호출해야 한다', async () => {

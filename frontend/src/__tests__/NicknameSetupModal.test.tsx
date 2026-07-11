@@ -226,7 +226,7 @@ describe('NicknameSetupModal', () => {
     mockApiGet.mockResolvedValue({ data: { available: true } });
     mockApiPost.mockResolvedValue({
       data: {
-        user: { id: 1, nickname: 'testuser', provider: 'google' },
+        user: { id: 1, nickname: 'testuser', provider: 'Google' },
       },
     });
 

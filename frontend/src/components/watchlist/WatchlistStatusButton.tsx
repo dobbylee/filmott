@@ -91,7 +91,21 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
   }, [showDropdown]);
 
   const handleButtonClick = () => {
+    if (!showDropdown) {
+      trackEvent('detail_action_clicked', {
+        action: 'watchlist_menu',
+        content_type: contentType,
+        tmdb_id: tmdbId,
+        authenticated: user ? 1 : 0,
+      });
+    }
     if (!user) {
+      trackEvent('login_prompt_shown', {
+        source: 'content_detail',
+        action: 'watchlist_menu',
+        content_type: contentType,
+        tmdb_id: tmdbId,
+      });
       openAuthModal();
       return;
     }
@@ -157,6 +171,12 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
   };
 
   const handleWantToWatch = async () => {
+    trackEvent('detail_action_clicked', {
+      action: 'want_to_watch',
+      content_type: contentType,
+      tmdb_id: tmdbId,
+      authenticated: 1,
+    });
     await addToWatchlist('want_to_watch');
   };
 
@@ -198,6 +218,12 @@ export default function WatchlistStatusButton({ contentId, tmdbId, contentType }
   };
 
   const handleWatchedClick = async () => {
+    trackEvent('detail_action_clicked', {
+      action: 'watched',
+      content_type: contentType,
+      tmdb_id: tmdbId,
+      authenticated: 1,
+    });
     setShowDropdown(false);
     setIsLoading(true);
     try {

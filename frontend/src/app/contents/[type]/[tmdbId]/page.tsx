@@ -183,7 +183,7 @@ export default async function ContentDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
-      <ContentDetailTracker tmdbId={tmdbId} title={content.title} contentType={type} />
+      <ContentDetailTracker tmdbId={tmdbId} contentType={type} />
       {/* 상단: 백드롭 + 포스터 + 기본 정보 */}
       <div className="relative">
         {/* 백드롭 */}

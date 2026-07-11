@@ -62,9 +62,7 @@ describe('AdminLoginPage', () => {
 
     await waitFor(() => {
       expect(mockHandleAuthSuccess).toHaveBeenCalledWith(authResponse);
-      expect(mockTrackEvent).toHaveBeenCalledWith('login_completed', {
-        provider: 'local',
-      });
+      expect(mockTrackEvent).not.toHaveBeenCalled();
       expect(mockReplace).toHaveBeenCalledWith('/admin');
     });
   });
