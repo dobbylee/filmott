@@ -61,7 +61,7 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
       <div className="space-y-2">
         {subscriptions.length > 0 && (
           <div className="flex items-start gap-2">
-            <span className="w-14 shrink-0 pt-2 text-right text-xs text-muted-foreground">
+            <span className="w-14 shrink-0 pt-2 text-center text-xs text-muted-foreground">
               구독
             </span>
             {renderProviderLogos(subscriptions)}
@@ -69,7 +69,7 @@ export default function WatchProviders({ data, compact = false }: WatchProviders
         )}
         {rentOrBuy.length > 0 && (
           <div className="flex items-start gap-2">
-            <span className="w-14 shrink-0 pt-2 text-right text-xs text-muted-foreground">
+            <span className="w-14 shrink-0 pt-2 text-center text-xs text-muted-foreground">
               대여·구매
             </span>
             {renderProviderLogos(rentOrBuy)}
