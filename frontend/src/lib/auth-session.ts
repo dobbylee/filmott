@@ -27,6 +27,18 @@ let refreshPromise: Promise<void> | null = null;
 let shouldNotifyOnRefreshFailure = false;
 let fallbackOperationQueue: Promise<void> = Promise.resolve();
 let authChannel: BroadcastChannel | null = null;
+let sessionGeneration = 0;
+let sessionState: 'active' | 'cleared' = 'active';
+
+function markSessionCleared(): void {
+  sessionGeneration += 1;
+  sessionState = 'cleared';
+}
+
+function markSessionEstablished(): void {
+  sessionGeneration += 1;
+  sessionState = 'active';
+}
 
 function dispatchSessionEvent(message: AuthSessionMessage): void {
   if (typeof window === 'undefined') {
@@ -66,6 +78,11 @@ function getAuthChannel(): BroadcastChannel | null {
     authChannel.addEventListener('message', (event: MessageEvent<unknown>) => {
       const message = event.data;
       if (isAuthSessionMessage(message)) {
+        if (message.type === 'session-cleared') {
+          markSessionCleared();
+        } else if (message.type === 'session-established') {
+          markSessionEstablished();
+        }
         dispatchSessionEvent(message);
       }
     });
@@ -99,6 +116,7 @@ export function notifyAuthRequired(): void {
 }
 
 export function notifySessionEstablished(): void {
+  markSessionEstablished();
   getAuthChannel()?.postMessage({ type: 'session-established' });
 }
 
@@ -109,11 +127,16 @@ export function refreshSession(
     shouldNotifyOnRefreshFailure || options.notifyOnFailure === true;
 
   if (!refreshPromise) {
+    const refreshGeneration = sessionGeneration;
     refreshPromise = runSessionOperation(async () => {
       await sessionApi.post('/auth/refresh');
     })
       .catch((error: unknown) => {
-        if (shouldNotifyOnRefreshFailure) {
+        if (
+          shouldNotifyOnRefreshFailure &&
+          sessionState === 'active' &&
+          sessionGeneration === refreshGeneration
+        ) {
           notifyAuthRequired();
         }
         throw error;
@@ -130,6 +153,7 @@ export function refreshSession(
 export function clearServerSession(
   config: AxiosRequestConfig = {},
 ): Promise<void> {
+  markSessionCleared();
   return runSessionOperation(async () => {
     try {
       await sessionApi.post('/auth/logout', undefined, config);
@@ -149,4 +173,6 @@ export function resetAuthSessionForTests(): void {
   fallbackOperationQueue = Promise.resolve();
   authChannel?.close();
   authChannel = null;
+  sessionGeneration = 0;
+  sessionState = 'active';
 }

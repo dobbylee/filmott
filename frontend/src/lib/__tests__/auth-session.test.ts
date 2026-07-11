@@ -3,6 +3,7 @@ import {
   AUTH_SESSION_CLEARED_EVENT,
   clearServerSession,
   isAuthSessionMessage,
+  notifySessionEstablished,
   refreshSession,
   resetAuthSessionForTests,
   sessionApi,
@@ -145,6 +146,45 @@ describe('auth session coordinator', () => {
       ([event]) => (event as CustomEvent).type === AUTH_SESSION_CLEARED_EVENT,
     );
     expect(sessionClearedEvents).toHaveLength(1);
+  });
+
+  it('로그아웃 뒤 큐에서 실패한 refresh는 인증 필요 이벤트를 다시 열지 않아야 한다', async () => {
+    const postSpy = vi
+      .spyOn(sessionApi, 'post')
+      .mockResolvedValueOnce({ status: 204 })
+      .mockRejectedValueOnce(new Error('refresh 실패'));
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
+    const logout = clearServerSession();
+    const refresh = refreshSession({ notifyOnFailure: true });
+
+    await logout;
+    await expect(refresh).rejects.toThrow('refresh 실패');
+
+    expect(postSpy).toHaveBeenNthCalledWith(1, '/auth/logout', undefined, {});
+    expect(postSpy).toHaveBeenNthCalledWith(2, '/auth/refresh');
+    const authRequiredEvents = dispatchSpy.mock.calls.filter(
+      ([event]) => (event as CustomEvent).type === AUTH_REQUIRED_EVENT,
+    );
+    expect(authRequiredEvents).toHaveLength(0);
+  });
+
+  it('새 세션이 수립되면 이후 refresh 실패 알림을 다시 허용해야 한다', async () => {
+    vi.spyOn(sessionApi, 'post')
+      .mockResolvedValueOnce({ status: 204 })
+      .mockRejectedValueOnce(new Error('refresh 실패'));
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
+    await clearServerSession();
+    notifySessionEstablished();
+    await expect(
+      refreshSession({ notifyOnFailure: true }),
+    ).rejects.toThrow('refresh 실패');
+
+    const authRequiredEvents = dispatchSpy.mock.calls.filter(
+      ([event]) => (event as CustomEvent).type === AUTH_REQUIRED_EVENT,
+    );
+    expect(authRequiredEvents).toHaveLength(1);
   });
 
   it('BroadcastChannel 외부 입력은 허용된 세션 메시지만 통과시켜야 한다', () => {
