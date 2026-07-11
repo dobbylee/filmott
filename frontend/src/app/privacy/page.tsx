@@ -11,7 +11,7 @@ export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="text-2xl font-bold text-white mb-2">개인정보처리방침</h1>
-      <p className="text-sm text-white/40 mb-8">시행일: 2026년 3월 15일</p>
+      <p className="text-sm text-white/40 mb-8">시행일: 2026년 7월 11일</p>
 
       <div className="space-y-8 text-sm leading-relaxed text-white/70">
         <p>
@@ -64,7 +64,8 @@ export default function PrivacyPage() {
           <h3 className="text-base font-medium text-white/90 mb-2">자동으로 수집되는 정보</h3>
           <ul className="list-disc pl-5">
             <li><strong className="text-white/90">IP 주소</strong>: 서비스 접속 시 자동 수집</li>
-            <li><strong className="text-white/90">쿠키</strong>: OAuth 로그인 과정의 state 검증용 (httpOnly 쿠키로 제한적 사용)</li>
+            <li><strong className="text-white/90">서비스 이용 기록</strong>: 페이지 방문, 작품 및 기능 선택, 기능 이용 결과 등 서비스 개선을 위한 통계</li>
+            <li><strong className="text-white/90">쿠키</strong>: OAuth 로그인 검증 및 Google Analytics 이용 통계 분석에 사용</li>
           </ul>
         </section>
 
@@ -74,7 +75,7 @@ export default function PrivacyPage() {
             <li><strong className="text-white/90">회원 관리</strong>: 본인 식별, 가입 및 탈퇴 처리</li>
             <li><strong className="text-white/90">서비스 제공</strong>: 리뷰 작성, 별점 평가, 감상 기록 등 서비스 기능 제공</li>
             <li><strong className="text-white/90">AI 추천</strong>: 이용자의 취향 데이터(리뷰, 별점, 감상 기록, OTT 구독)를 기반으로 맞춤 작품 추천</li>
-            <li><strong className="text-white/90">서비스 개선</strong>: 접속 통계 분석, 오류 대응</li>
+            <li><strong className="text-white/90">서비스 개선</strong>: 이용 현황 분석, 오류 대응</li>
           </ul>
         </section>
 
@@ -157,7 +158,7 @@ export default function PrivacyPage() {
                 <tr>
                   <td className="py-2 pr-4">Google Analytics</td>
                   <td className="py-2 pr-4">접속 통계 분석</td>
-                  <td className="py-2">익명화된 접속 데이터</td>
+                  <td className="py-2">페이지 방문 및 기능 이용 기록</td>
                 </tr>
               </tbody>
             </table>
@@ -176,8 +177,8 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-lg font-semibold text-white mb-3">8. 쿠키의 사용</h2>
-          <p>서비스는 OAuth 로그인의 state 검증을 위해 httpOnly 쿠키를 사용합니다.</p>
-          <p className="mt-2">이 쿠키는 로그인 과정에서만 사용되며, 광고 추적이나 행동 분석 목적으로는 사용하지 않습니다.</p>
+          <p>서비스는 OAuth 로그인 검증과 Google Analytics를 통한 이용 통계 분석에 쿠키를 사용합니다.</p>
+          <p className="mt-2">분석 쿠키는 페이지 방문과 기능 이용 현황을 파악하는 데 사용하며, 맞춤 광고 목적으로는 사용하지 않습니다.</p>
         </section>
 
         <section>
