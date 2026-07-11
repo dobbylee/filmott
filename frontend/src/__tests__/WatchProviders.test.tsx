@@ -55,4 +55,53 @@ describe('WatchProviders', () => {
     expect(img).toHaveAttribute('src', expect.stringContaining('/w92/'));
     expect(img).not.toHaveAttribute('src', expect.stringContaining('/original/'));
   });
+
+  it('compact 모드에서 구독과 대여·구매 로고를 구분해야 한다', () => {
+    const data: WatchProviderData = {
+      flatrate: [
+        { provider_id: 8, provider_name: '넷플릭스', logo_path: '/netflix.jpg' },
+      ],
+      rent: [
+        { provider_id: 100, provider_name: '구글 플레이', logo_path: '/gplay.jpg' },
+      ],
+      buy: [
+        { provider_id: 101, provider_name: '애플 TV', logo_path: '/apple.jpg' },
+      ],
+    };
+
+    render(<WatchProviders data={data} compact />);
+
+    expect(screen.getByText('구독')).toBeInTheDocument();
+    expect(screen.getByText('대여·구매')).toBeInTheDocument();
+    expect(screen.getByAltText('넷플릭스')).toBeInTheDocument();
+    expect(screen.getByAltText('구글 플레이')).toBeInTheDocument();
+    expect(screen.getByAltText('애플 TV')).toBeInTheDocument();
+  });
+
+  it('compact 대여·구매 그룹에서 같은 제공자와 광고 요금제를 중복 표시하지 않아야 한다', () => {
+    const googlePlay = {
+      provider_id: 100,
+      provider_name: '구글 플레이',
+      logo_path: '/gplay.jpg',
+    };
+    const data: WatchProviderData = {
+      rent: [googlePlay],
+      buy: [
+        googlePlay,
+        {
+          provider_id: 1796,
+          provider_name: 'Netflix Standard with Ads',
+          logo_path: '/netflix-ads.jpg',
+        },
+      ],
+    };
+
+    render(<WatchProviders data={data} compact />);
+
+    expect(screen.queryByText('구독')).not.toBeInTheDocument();
+    expect(screen.getAllByAltText('구글 플레이')).toHaveLength(1);
+    expect(
+      screen.queryByAltText('Netflix Standard with Ads'),
+    ).not.toBeInTheDocument();
+  });
 });
