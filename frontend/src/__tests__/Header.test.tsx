@@ -105,4 +105,20 @@ describe('Header', () => {
     expect(mockPush).toHaveBeenCalledWith('/search?q=%EB%93%84');
     expect(blurSpy).toHaveBeenCalled();
   });
+
+  it('모바일 메뉴 외부를 누르면 메뉴를 닫고 배경 스크롤을 복원해야 한다', async () => {
+    const user = userEvent.setup();
+
+    render(<Header />);
+
+    await user.click(screen.getByLabelText('메뉴'));
+
+    expect(screen.getByPlaceholderText('작품 / 인물 검색')).toBeInTheDocument();
+    expect(document.body.style.overflow).toBe('hidden');
+
+    await user.click(screen.getByLabelText('모바일 메뉴 닫기'));
+
+    expect(screen.queryByPlaceholderText('작품 / 인물 검색')).not.toBeInTheDocument();
+    expect(document.body.style.overflow).toBe('');
+  });
 });
