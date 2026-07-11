@@ -48,6 +48,7 @@ describe('EmbeddingService', () => {
   };
 
   const mockStatementTimeoutQuery = jest.fn().mockResolvedValue([]);
+  const mockIterativeScanQuery = jest.fn().mockResolvedValue([]);
   const mockDataSource = {
     query: jest.fn(),
     transaction: jest.fn(
@@ -60,6 +61,9 @@ describe('EmbeddingService', () => {
           query: async (query, parameters) => {
             if (query.includes("set_config('statement_timeout'")) {
               return mockStatementTimeoutQuery(query, parameters);
+            }
+            if (query.includes("set_config('hnsw.iterative_scan'")) {
+              return mockIterativeScanQuery(query, parameters);
             }
             return mockDataSource.query(query, parameters);
           },
@@ -419,6 +423,101 @@ describe('EmbeddingService', () => {
         expect.stringContaining("set_config('statement_timeout'"),
         ['5000ms'],
       );
+    });
+  });
+
+  describe('findRelatedContents', () => {
+    const relatedRow = {
+      tmdb_id: 27205,
+      content_type: 'movie',
+      title: '인셉션',
+      poster_url: '/inception.jpg',
+      release_date: '2010-07-16',
+      vote_average: 8.4,
+    };
+
+    it('저장된 source embedding만 사용해 색인 가능한 관련 작품을 반환해야 한다', async () => {
+      mockDataSource.query
+        .mockResolvedValueOnce([{ content_id: 1, embedding: '[1,0,0]' }])
+        .mockResolvedValueOnce([relatedRow]);
+
+      const result = await service.findRelatedContents(496243, 'movie', 6);
+
+      expect(result).toEqual([
+        {
+          tmdbId: 27205,
+          contentType: 'movie',
+          title: '인셉션',
+          posterUrl: '/inception.jpg',
+          releaseDate: '2010-07-16',
+          voteAverage: 8.4,
+        },
+      ]);
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
+
+      const [sourceQuery, sourceParameters] = mockDataSource.query.mock
+        .calls[0] as [string, unknown[]];
+      const [candidateQuery, candidateParameters] = mockDataSource.query.mock
+        .calls[1] as [string, unknown[]];
+      expect(sourceQuery).toContain('source_metadata.embedding::text');
+      expect(sourceQuery).toContain('source_content.adult IS NOT TRUE');
+      expect(sourceQuery).toContain('source_content.vote_count >= $3');
+      expect(sourceParameters).toEqual([496243, 'movie', 100]);
+      expect(candidateQuery).toContain('FROM content_metadata cm');
+      expect(candidateQuery).toContain('cm.content_id <> $4');
+      expect(candidateQuery).toContain('ORDER BY cm.embedding <=> $1::vector');
+      expect(candidateQuery).toContain('c.adult IS NOT TRUE');
+      expect(candidateQuery).toContain(
+        "NULLIF(BTRIM(c.title), '') IS NOT NULL",
+      );
+      expect(candidateQuery).toContain(
+        "NULLIF(BTRIM(c.overview), '') IS NOT NULL",
+      );
+      expect(candidateQuery).toContain(
+        "NULLIF(BTRIM(c.poster_url), '') IS NOT NULL",
+      );
+      expect(candidateQuery).toContain('c.release_date IS NOT NULL');
+      expect(candidateQuery).toContain('EXISTS (SELECT 1 FROM reviews');
+      expect(candidateQuery).toContain('EXISTS (SELECT 1 FROM rankings');
+      expect(candidateQuery).toContain('c.watch_providers IS NOT NULL');
+      expect(candidateQuery).toContain('c.vote_count >= $2');
+      expect(candidateParameters).toEqual(['[1,0,0]', 100, 6, 1]);
+    });
+
+    it('source metadata가 없으면 빈 배열을 반환해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue([]);
+
+      await expect(
+        service.findRelatedContents(496243, 'movie', 6),
+      ).resolves.toEqual([]);
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
+    });
+
+    it('쿼리에 transaction-local timeout과 HNSW strict order를 적용해야 한다', async () => {
+      mockDataSource.query.mockResolvedValue([]);
+
+      await service.findRelatedContents(496243, 'movie', 6);
+
+      expect(mockStatementTimeoutQuery).toHaveBeenCalledWith(
+        expect.stringContaining("set_config('statement_timeout'"),
+        ['5000ms'],
+      );
+      expect(mockIterativeScanQuery).toHaveBeenCalledWith(
+        expect.stringContaining("set_config('hnsw.iterative_scan'"),
+        undefined,
+      );
+    });
+
+    it('예상하지 못한 raw row를 신뢰하지 않아야 한다', async () => {
+      mockDataSource.query
+        .mockResolvedValueOnce([{ content_id: 1, embedding: '[1,0,0]' }])
+        .mockResolvedValueOnce([{ ...relatedRow, tmdb_id: '27205' }]);
+
+      await expect(
+        service.findRelatedContents(496243, 'movie', 6),
+      ).rejects.toThrow('관련 작품 조회 결과 형식이 올바르지 않습니다');
     });
   });
 

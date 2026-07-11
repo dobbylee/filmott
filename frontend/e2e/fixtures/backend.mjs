@@ -25,11 +25,21 @@ const content = {
   genres: [{ id: 18, name: '드라마' }],
   runtime: 120,
   adult: false,
+  searchIndexable: true,
   director: 'Fixture 감독',
   watchProviders: null,
   credits: [],
   createdAt: now,
   updatedAt: now,
+};
+
+const relatedContent = {
+  ...content,
+  id: 2,
+  tmdbId: 27205,
+  title: 'Fixture 관련 영화',
+  originalTitle: 'Fixture Related Movie',
+  overview: '관련 작품 카드 이동을 검증하는 fixture입니다.',
 };
 
 const recentReview = {
@@ -101,7 +111,44 @@ const server = createServer((request, response) => {
     return;
   }
 
-  if (request.method === 'GET' && url.pathname === '/api/reviews/1/stats') {
+  if (
+    request.method === 'GET' &&
+    url.pathname === '/api/contents/movie/27205'
+  ) {
+    sendJson(response, 200, relatedContent);
+    return;
+  }
+
+  if (
+    request.method === 'GET' &&
+    url.pathname === '/api/contents/movie/496243/related'
+  ) {
+    sendJson(response, 200, [
+      {
+        tmdbId: relatedContent.tmdbId,
+        contentType: relatedContent.contentType,
+        title: relatedContent.title,
+        posterUrl: null,
+        releaseDate: relatedContent.releaseDate,
+        voteAverage: relatedContent.voteAverage,
+      },
+    ]);
+    return;
+  }
+
+  if (
+    request.method === 'GET' &&
+    url.pathname === '/api/contents/movie/27205/related'
+  ) {
+    sendJson(response, 200, []);
+    return;
+  }
+
+  if (
+    request.method === 'GET' &&
+    (url.pathname === '/api/reviews/1/stats' ||
+      url.pathname === '/api/reviews/2/stats')
+  ) {
     sendJson(response, 200, { averageRating: null, reviewCount: 0 });
     return;
   }

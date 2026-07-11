@@ -7,6 +7,7 @@ import {
   Query,
   Body,
   ParseIntPipe,
+  DefaultValuePipe,
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
@@ -98,5 +99,17 @@ export class ContentsController {
       throw new BadRequestException('type은 "movie" 또는 "tv"만 허용됩니다.');
     }
     return this.contentsService.getContentDetail(tmdbId, type);
+  }
+
+  @Get(':type/:tmdbId/related')
+  async getRelated(
+    @Param('type') type: string,
+    @Param('tmdbId', ParseIntPipe) tmdbId: number,
+    @Query('limit', new DefaultValuePipe(6), ParseIntPipe) limit: number,
+  ) {
+    if (type !== 'movie' && type !== 'tv') {
+      throw new BadRequestException('type은 "movie" 또는 "tv"만 허용됩니다.');
+    }
+    return this.contentsService.getRelatedContents(tmdbId, type, limit);
   }
 }

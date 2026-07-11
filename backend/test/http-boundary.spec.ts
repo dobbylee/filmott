@@ -18,6 +18,7 @@ import { ContentsService } from '../src/contents/contents.service';
 import { Content } from '../src/contents/content.entity';
 import { TmdbService } from '../src/tmdb/tmdb.service';
 import { RevalidateService } from '../src/common/revalidate.service';
+import { EmbeddingService } from '../src/embedding/embedding.service';
 import { ReviewsController } from '../src/reviews/reviews.controller';
 import { ReviewsService } from '../src/reviews/reviews.service';
 import { ReviewCommentsService } from '../src/reviews/review-comments.service';
@@ -96,6 +97,10 @@ describe('HTTP boundary smoke', () => {
         { provide: getRepositoryToken(Content), useValue: contentRepo },
         { provide: TmdbService, useValue: tmdbService },
         { provide: RevalidateService, useValue: revalidateService },
+        {
+          provide: EmbeddingService,
+          useValue: { findRelatedContents: jest.fn() },
+        },
         { provide: ReviewsService, useValue: reviewsService },
         { provide: ReviewCommentsService, useValue: reviewCommentsService },
         {
@@ -212,5 +217,14 @@ describe('HTTP boundary smoke', () => {
 
     expect(tmdbService.getDetails).not.toHaveBeenCalled();
     expect(contentRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('관련 작품 limit은 1에서 6 사이의 정수만 허용해야 한다', async () => {
+    const outOfRange = await requestMemory(
+      'GET',
+      '/api/contents/movie/123/related?limit=7',
+    );
+
+    expect(outOfRange.status).toBe(400);
   });
 });

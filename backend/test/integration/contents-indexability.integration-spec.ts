@@ -5,6 +5,7 @@ import { Content } from '../../src/contents/content.entity';
 import { ContentsService } from '../../src/contents/contents.service';
 import { RevalidateService } from '../../src/common/revalidate.service';
 import { TmdbService } from '../../src/tmdb/tmdb.service';
+import { EmbeddingService } from '../../src/embedding/embedding.service';
 import {
   createIntegrationDataSource,
   hasIntegrationDatabaseConfig,
@@ -36,6 +37,10 @@ describeWithDb('contents indexability integration', () => {
         },
         {
           provide: RevalidateService,
+          useValue: {},
+        },
+        {
+          provide: EmbeddingService,
           useValue: {},
         },
       ],

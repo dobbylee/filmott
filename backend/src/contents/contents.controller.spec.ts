@@ -11,6 +11,7 @@ describe('ContentsController', () => {
   const mockContentsService = {
     searchContents: jest.fn(),
     getContentDetail: jest.fn(),
+    getRelatedContents: jest.fn(),
     discoverContents: jest.fn(),
     getPersonDetail: jest.fn(),
     getPersonCredits: jest.fn(),
@@ -150,6 +151,29 @@ describe('ContentsController', () => {
         ContentsController.prototype.getDetail,
       );
       expect(guards).toBeUndefined();
+    });
+  });
+
+  describe('getRelated', () => {
+    it('파싱된 조회 조건으로 관련 작품 조회를 호출해야 한다', async () => {
+      const related = [{ tmdbId: 124, contentType: 'movie' }];
+      mockContentsService.getRelatedContents.mockResolvedValue(related);
+
+      await expect(controller.getRelated('movie', 123, 6)).resolves.toEqual(
+        related,
+      );
+      expect(mockContentsService.getRelatedContents).toHaveBeenCalledWith(
+        123,
+        'movie',
+        6,
+      );
+    });
+
+    it('type이 movie/tv가 아니면 거부해야 한다', async () => {
+      await expect(controller.getRelated('anime', 123, 6)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockContentsService.getRelatedContents).not.toHaveBeenCalled();
     });
   });
 

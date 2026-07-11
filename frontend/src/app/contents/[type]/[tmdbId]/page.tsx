@@ -10,7 +10,12 @@ import ReviewFormWrapper from '@/components/review/ReviewFormWrapper';
 import WatchlistStatusButton from '@/components/watchlist/WatchlistStatusButton';
 import AdultBlockButton from '@/components/content/AdultBlockButton';
 import ContentDetailTracker from '@/components/content/ContentDetailTracker';
-import type { ContentDetail, WatchProviderData } from '@/types/content';
+import RelatedContents from '@/components/content/RelatedContents';
+import type {
+  ContentDetail,
+  RelatedContent,
+  WatchProviderData,
+} from '@/types/content';
 import type { ReviewsResponse, ContentStats } from '@/types/review';
 import ErrorWithRetry from '@/components/common/ErrorWithRetry';
 import WatchProviders from '@/components/content/WatchProviders';
@@ -31,6 +36,49 @@ async function fetchContentDetail(
   return fetchApi<ContentDetail>(
     `/contents/${type}/${tmdbId}`,
     { next: { revalidate: 3600 } },
+  );
+}
+
+export async function fetchRelatedContents(
+  type: string,
+  tmdbId: string,
+  searchIndexable: boolean | undefined,
+): Promise<RelatedContent[]> {
+  if (searchIndexable !== true) return [];
+
+  try {
+    const related = await fetchApi<RelatedContent[]>(
+      `/contents/${type}/${tmdbId}/related?limit=6`,
+      { next: { revalidate: 3600 } },
+    );
+    return Array.isArray(related) ? related.slice(0, 6) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function RelatedContentsSection({
+  type,
+  tmdbId,
+  searchIndexable,
+}: {
+  type: string;
+  tmdbId: string;
+  searchIndexable: boolean | undefined;
+}) {
+  const relatedContents = await fetchRelatedContents(
+    type,
+    tmdbId,
+    searchIndexable,
+  );
+  if (relatedContents.length === 0) return null;
+
+  return (
+    <RelatedContents
+      items={relatedContents}
+      currentContentType={type}
+      currentTmdbId={tmdbId}
+    />
   );
 }
 
@@ -344,6 +392,14 @@ export default async function ContentDetailPage({
             </p>
           </section>
         )}
+
+        <Suspense fallback={null}>
+          <RelatedContentsSection
+            type={type}
+            tmdbId={tmdbId}
+            searchIndexable={content.searchIndexable}
+          />
+        </Suspense>
 
         {/* 출연진 */}
         {content.credits.length > 0 && (

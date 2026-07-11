@@ -115,6 +115,15 @@ export interface ContentDetail extends ContentItem {
   credits: CastMember[];
 }
 
+export interface RelatedContent {
+  tmdbId: number;
+  contentType: 'movie' | 'tv';
+  title: string;
+  posterUrl: string;
+  releaseDate: string;
+  voteAverage: number;
+}
+
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
 /**

@@ -6,9 +6,11 @@ import OpenAI from 'openai';
 import { CHAT_MODEL } from '../chat/chat.constants';
 import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
+import { buildSearchIndexableContentSql } from '../contents/search-indexable-content';
 
 const OPENAI_EMBEDDING_TIMEOUT_MS = 10_000;
 const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
+const RELATED_CONTENT_QUERY_TIMEOUT_MS = 5_000;
 
 export interface SimilarContent {
   contentId: number;
@@ -29,6 +31,90 @@ export interface BatchResult {
   cached: number;
   skipped: number;
   failed: number;
+}
+
+export interface RelatedContent {
+  tmdbId: number;
+  contentType: 'movie' | 'tv';
+  title: string;
+  posterUrl: string;
+  releaseDate: string;
+  voteAverage: number;
+}
+
+interface RelatedContentRow {
+  tmdb_id: number;
+  content_type: 'movie' | 'tv';
+  title: string;
+  poster_url: string;
+  release_date: string;
+  vote_average: number;
+}
+
+interface SourceEmbeddingRow {
+  content_id: number;
+  embedding: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseRelatedContentRows(value: unknown): RelatedContentRow[] {
+  if (!Array.isArray(value)) {
+    throw new Error('관련 작품 조회 결과 형식이 올바르지 않습니다.');
+  }
+
+  return value.map((row) => {
+    if (
+      !isRecord(row) ||
+      typeof row.tmdb_id !== 'number' ||
+      !Number.isSafeInteger(row.tmdb_id) ||
+      row.tmdb_id <= 0 ||
+      (row.content_type !== 'movie' && row.content_type !== 'tv') ||
+      typeof row.title !== 'string' ||
+      row.title.trim().length === 0 ||
+      typeof row.poster_url !== 'string' ||
+      row.poster_url.length === 0 ||
+      typeof row.release_date !== 'string' ||
+      row.release_date.length === 0 ||
+      typeof row.vote_average !== 'number' ||
+      !Number.isFinite(row.vote_average)
+    ) {
+      throw new Error('관련 작품 조회 결과 형식이 올바르지 않습니다.');
+    }
+
+    return {
+      tmdb_id: row.tmdb_id,
+      content_type: row.content_type,
+      title: row.title.trim(),
+      poster_url: row.poster_url,
+      release_date: row.release_date,
+      vote_average: row.vote_average,
+    };
+  });
+}
+
+function parseSourceEmbeddingRow(value: unknown): SourceEmbeddingRow | null {
+  if (!Array.isArray(value)) {
+    throw new Error('기준 작품 embedding 조회 결과 형식이 올바르지 않습니다.');
+  }
+  if (value.length === 0) return null;
+
+  const rows = value as unknown[];
+  const row = rows[0];
+  if (
+    !isRecord(row) ||
+    typeof row.content_id !== 'number' ||
+    !Number.isSafeInteger(row.content_id) ||
+    row.content_id <= 0 ||
+    typeof row.embedding !== 'string' ||
+    row.embedding.length === 0
+  ) {
+    throw new Error('기준 작품 embedding 조회 결과 형식이 올바르지 않습니다.');
+  }
+
+  return { content_id: row.content_id, embedding: row.embedding };
 }
 
 function stripControlCharacters(value: string | null | undefined): string {
@@ -210,6 +296,77 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     const results = await this.executeSearch(embeddingStr, limit, excludeIds);
     if (signal?.aborted) return [];
     return results;
+  }
+
+  async findRelatedContents(
+    tmdbId: number,
+    contentType: 'movie' | 'tv',
+    limit: number,
+  ): Promise<RelatedContent[]> {
+    const sourceIndexability = buildSearchIndexableContentSql({
+      contentAlias: 'source_content',
+      minVoteCountPlaceholder: '$3',
+      signalSource: { kind: 'exists' },
+    });
+    const candidateIndexability = buildSearchIndexableContentSql({
+      contentAlias: 'c',
+      minVoteCountPlaceholder: '$2',
+      signalSource: { kind: 'exists' },
+    });
+    const sourceQuery = `SELECT source_metadata.content_id,
+           source_metadata.embedding::text AS embedding
+    FROM content_metadata source_metadata
+    JOIN contents source_content ON source_content.id = source_metadata.content_id
+    WHERE source_content.tmdb_id = $1
+      AND source_content.content_type = $2
+      AND ${sourceIndexability.predicate}
+    LIMIT 1`;
+    const candidateQuery = `
+    SELECT c.tmdb_id,
+           c.content_type,
+           c.title,
+           c.poster_url,
+           TO_CHAR(c.release_date, 'YYYY-MM-DD') AS release_date,
+           COALESCE(c.vote_average, 0)::float8 AS vote_average
+    FROM content_metadata cm
+    JOIN contents c ON c.id = cm.content_id
+    WHERE cm.content_id <> $4
+      AND ${candidateIndexability.predicate}
+    ORDER BY cm.embedding <=> $1::vector
+    LIMIT $3`;
+
+    const rows = await this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT set_config('statement_timeout', $1, true)`, [
+        `${RELATED_CONTENT_QUERY_TIMEOUT_MS}ms`,
+      ]);
+      await manager.query(
+        `SELECT set_config('hnsw.iterative_scan', 'strict_order', true)`,
+      );
+      const sourceResult: unknown = await manager.query(sourceQuery, [
+        tmdbId,
+        contentType,
+        sourceIndexability.minVoteCount,
+      ]);
+      const source = parseSourceEmbeddingRow(sourceResult);
+      if (!source) return [];
+
+      const result: unknown = await manager.query(candidateQuery, [
+        source.embedding,
+        candidateIndexability.minVoteCount,
+        limit,
+        source.content_id,
+      ]);
+      return parseRelatedContentRows(result);
+    });
+
+    return rows.map((row) => ({
+      tmdbId: row.tmdb_id,
+      contentType: row.content_type,
+      title: row.title,
+      posterUrl: row.poster_url,
+      releaseDate: row.release_date,
+      voteAverage: row.vote_average,
+    }));
   }
 
   private async executeSearch(

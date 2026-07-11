@@ -9,6 +9,7 @@ import { ContentsService } from './contents.service';
 import { Content } from './content.entity';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { RevalidateService } from '../common/revalidate.service';
+import { EmbeddingService } from '../embedding/embedding.service';
 describe('ContentsService', () => {
   let service: ContentsService;
   let tmdbService: TmdbService;
@@ -52,6 +53,10 @@ describe('ContentsService', () => {
     revalidatePaths: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockEmbeddingService = {
+    findRelatedContents: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -59,6 +64,7 @@ describe('ContentsService', () => {
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },
         { provide: TmdbService, useValue: mockTmdbService },
         { provide: RevalidateService, useValue: mockRevalidateService },
+        { provide: EmbeddingService, useValue: mockEmbeddingService },
       ],
     }).compile();
 
@@ -543,6 +549,49 @@ describe('ContentsService', () => {
       );
 
       expect(mockTmdbService.getDetails).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getRelatedContents', () => {
+    it('저장된 embedding 기반 관련 작품 조회를 위임해야 한다', async () => {
+      const related = [
+        {
+          tmdbId: 124,
+          contentType: 'movie' as const,
+          title: '관련 작품',
+          posterUrl: '/related.jpg',
+          releaseDate: '2026-01-01',
+          voteAverage: 8.2,
+        },
+      ];
+      mockEmbeddingService.findRelatedContents.mockResolvedValue(related);
+
+      await expect(
+        service.getRelatedContents(123, 'movie', 6),
+      ).resolves.toEqual(related);
+      expect(mockEmbeddingService.findRelatedContents).toHaveBeenCalledWith(
+        123,
+        'movie',
+        6,
+      );
+    });
+
+    it.each([0, 7, 1.5])('limit=%s를 거부해야 한다', async (limit) => {
+      await expect(
+        service.getRelatedContents(123, 'movie', limit),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockEmbeddingService.findRelatedContents).not.toHaveBeenCalled();
+    });
+
+    it('지원하지 않는 content type을 거부해야 한다', async () => {
+      await expect(
+        service.getRelatedContents(
+          123,
+          'anime' as unknown as 'movie' | 'tv',
+          6,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockEmbeddingService.findRelatedContents).not.toHaveBeenCalled();
     });
   });
 
@@ -1614,7 +1663,7 @@ describe('ContentsService', () => {
         "NULLIF(BTRIM(c.overview), '') IS NOT NULL",
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'c.poster_url IS NOT NULL',
+        "NULLIF(BTRIM(c.poster_url), '') IS NOT NULL",
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'c.release_date IS NOT NULL',
@@ -1667,7 +1716,7 @@ describe('ContentsService', () => {
           "NULLIF(BTRIM(c.overview), '') IS NOT NULL",
         );
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-          'c.poster_url IS NOT NULL',
+          "NULLIF(BTRIM(c.poster_url), '') IS NOT NULL",
         );
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           'c.release_date IS NOT NULL',

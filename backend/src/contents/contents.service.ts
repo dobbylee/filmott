@@ -22,13 +22,14 @@ import {
 } from '../common/constants';
 import { RevalidateService } from '../common/revalidate.service';
 import { DISCOVER_TMDB_PROVIDER_IDS } from '../common/ott-providers';
+import { EmbeddingService } from '../embedding/embedding.service';
+import { buildSearchIndexableContentSql } from './search-indexable-content';
 
 const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000; // 5분
 const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72시간
 const NEGATIVE_DETAIL_CACHE_TTL_MS = 5 * 60 * 1000; // 5분
 const MAX_TMDB_ID = 20_000_000;
 const SITEMAP_CONTENT_LIMIT = 10_000;
-const SITEMAP_MIN_VOTE_COUNT = 100;
 
 interface CacheEntry<T> {
   data: T;
@@ -65,6 +66,7 @@ export class ContentsService {
     private readonly contentRepo: Repository<Content>,
     private readonly tmdbService: TmdbService,
     private readonly revalidateService: RevalidateService,
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   /**
@@ -301,21 +303,37 @@ export class ContentsService {
   private applySearchIndexableWhere(
     query: SelectQueryBuilder<Content>,
   ): SelectQueryBuilder<Content> {
-    return query
-      .where('c.adult IS NOT TRUE')
-      .andWhere("NULLIF(BTRIM(c.title), '') IS NOT NULL")
-      .andWhere("NULLIF(BTRIM(c.overview), '') IS NOT NULL")
-      .andWhere('c.poster_url IS NOT NULL')
-      .andWhere('c.release_date IS NOT NULL')
-      .andWhere(
-        `(${[
-          'rv.id IS NOT NULL',
-          'rk.id IS NOT NULL',
-          'c.watch_providers IS NOT NULL',
-          'c.vote_count >= :minVoteCount',
-        ].join(' OR ')})`,
-        { minVoteCount: SITEMAP_MIN_VOTE_COUNT },
-      );
+    const { conditions, minVoteCount } = buildSearchIndexableContentSql({
+      contentAlias: 'c',
+      minVoteCountPlaceholder: ':minVoteCount',
+      signalSource: {
+        kind: 'joined',
+        reviewAlias: 'rv',
+        rankingAlias: 'rk',
+      },
+    });
+    const [firstCondition, ...remainingConditions] = conditions;
+    query.where(firstCondition);
+    for (const condition of remainingConditions) {
+      if (condition.includes(':minVoteCount')) {
+        query.andWhere(condition, { minVoteCount });
+      } else {
+        query.andWhere(condition);
+      }
+    }
+    return query;
+  }
+
+  async getRelatedContents(tmdbId: number, type: 'movie' | 'tv', limit = 6) {
+    this.assertValidTmdbId(tmdbId);
+    if (type !== 'movie' && type !== 'tv') {
+      throw new BadRequestException('type은 "movie" 또는 "tv"만 허용됩니다.');
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 6) {
+      throw new BadRequestException('limit은 1에서 6 사이의 정수여야 합니다.');
+    }
+
+    return this.embeddingService.findRelatedContents(tmdbId, type, limit);
   }
 
   private assertValidTmdbId(tmdbId: number): void {
