@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3000';
+const frontendPort = process.env.E2E_FRONTEND_PORT ?? '3000';
+const baseURL =
+  process.env.E2E_BASE_URL ?? `http://127.0.0.1:${frontendPort}`;
 const fixtureBackendURL =
   process.env.E2E_FIXTURE_BACKEND_URL ?? 'http://127.0.0.1:3101';
 
@@ -24,6 +26,7 @@ export default defineConfig({
       url: baseURL,
       env: {
         NEXT_PUBLIC_API_URL: `${fixtureBackendURL}/api`,
+        PORT: frontendPort,
       },
       reuseExistingServer: false,
       timeout: 180_000,
