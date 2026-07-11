@@ -14,7 +14,7 @@ describe('ContentDetail generateMetadata', () => {
     vi.clearAllMocks();
   });
 
-  it('adult=false인 콘텐츠는 robots 필드가 없어야 한다', async () => {
+  it('searchIndexable이 없는 기존 비성인 API 응답은 index 동작을 유지해야 한다', async () => {
     mockFetchApi.mockResolvedValue({
       id: 1,
       tmdbId: 550,
@@ -57,6 +57,7 @@ describe('ContentDetail generateMetadata', () => {
       genres: [],
       runtime: 90,
       adult: true,
+      searchIndexable: true,
       credits: [],
       watchProviders: null,
       createdAt: '2026-01-01',
@@ -68,6 +69,57 @@ describe('ContentDetail generateMetadata', () => {
 
     expect(metadata.title).toBe('성인 콘텐츠');
     expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  it('검색 가치 기준을 만족하지 못한 비성인 작품은 noindex, follow여야 한다', async () => {
+    mockFetchApi.mockResolvedValue({
+      id: 3,
+      tmdbId: 1000,
+      contentType: 'movie',
+      title: '어느 영화',
+      overview: '줄거리가 있지만 검색 가치 기준은 부족합니다.',
+      genres: [],
+      adult: false,
+      searchIndexable: false,
+      credits: [],
+      watchProviders: null,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    });
+
+    const params = Promise.resolve({ type: 'movie', tmdbId: '1000' });
+    const metadata = await generateMetadata({ params });
+
+    expect(metadata.robots).toEqual({ index: false, follow: true });
+  });
+
+  it('줄거리가 공백이면 안정적인 한국어 description을 사용해야 한다', async () => {
+    mockFetchApi.mockResolvedValue({
+      id: 4,
+      tmdbId: 1001,
+      contentType: 'tv',
+      title: '빈 줄거리 작품',
+      overview: '   ',
+      genres: [],
+      adult: false,
+      searchIndexable: true,
+      credits: [],
+      watchProviders: null,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    });
+
+    const params = Promise.resolve({ type: 'tv', tmdbId: '1001' });
+    const metadata = await generateMetadata({ params });
+
+    expect(metadata.description).toBe('빈 줄거리 작품 상세 정보');
+    expect(metadata.openGraph?.description).toBe(
+      '빈 줄거리 작품 상세 정보',
+    );
+    expect(metadata.twitter?.description).toBe(
+      '빈 줄거리 작품 상세 정보',
+    );
+    expect(metadata.robots).toBeUndefined();
   });
 
   it('fetchApi 실패 시 기본 메타데이터를 반환해야 한다', async () => {

@@ -11,6 +11,10 @@ import {
   type PersonCredit,
   type TmdbSearchItem,
 } from '@/types/content';
+import {
+  isPersonSearchIndexable,
+  personMetadataDescription,
+} from '@/lib/search-index';
 
 interface PersonPageProps {
   params: Promise<{
@@ -88,11 +92,20 @@ export async function generateMetadata({
 }: PersonPageProps): Promise<Metadata> {
   const { personId } = await params;
   try {
-    const person = await fetchApi<PersonDetail>(
-      `/contents/person/${personId}`,
-      { next: { revalidate: 21600 } },
+    const [person, credits] = await Promise.all([
+      fetchApi<PersonDetail>(`/contents/person/${personId}`, {
+        next: { revalidate: 21600 },
+      }),
+      fetchApi<PersonCreditsResult>(`/contents/person/${personId}/credits`, {
+        next: { revalidate: 21600 },
+      }),
+    ]);
+    const description = personMetadataDescription(
+      person.name,
+      person.biography,
     );
-    const description = person.biography?.slice(0, 160) ?? `${person.name}의 출연작 목록`;
+    const profilePath = person.profile_path?.trim();
+    const searchIndexable = isPersonSearchIndexable(person, credits);
     return {
       title: `${person.name} 필모그래피`,
       description,
@@ -102,18 +115,21 @@ export async function generateMetadata({
       openGraph: {
         title: `${person.name} 필모그래피`,
         description,
-        images: person.profile_path
-          ? [`${TMDB_IMAGE_BASE}/w500${person.profile_path}`]
+        images: profilePath
+          ? [`${TMDB_IMAGE_BASE}/w500${profilePath}`]
           : [],
       },
       twitter: {
         card: 'summary_large_image',
         title: `${person.name} 필모그래피`,
         description,
-        images: person.profile_path
-          ? [`${TMDB_IMAGE_BASE}/w500${person.profile_path}`]
+        images: profilePath
+          ? [`${TMDB_IMAGE_BASE}/w500${profilePath}`]
           : [],
       },
+      ...(!searchIndexable && {
+        robots: { index: false, follow: true },
+      }),
     };
   } catch {
     return { title: '인물 정보' };

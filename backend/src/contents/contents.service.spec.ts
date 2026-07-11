@@ -24,6 +24,7 @@ describe('ContentsService', () => {
     addOrderBy: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     getMany: jest.fn(),
+    getRawOne: jest.fn().mockResolvedValue(undefined),
     getRawMany: jest.fn(),
   };
 
@@ -65,6 +66,8 @@ describe('ContentsService', () => {
     tmdbService = module.get<TmdbService>(TmdbService);
 
     mockContentRepo.find.mockResolvedValue([]);
+    mockContentRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+    mockQueryBuilder.getRawOne.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -344,6 +347,57 @@ describe('ContentsService', () => {
       expect(result.tmdbId).toBe(456);
       expect(result.watchProviders).toEqual(cachedContent.watchProviders);
       expect(result.credits).toEqual(cachedContent.credits);
+    });
+
+    it('sitemap 품질 판정을 통과한 콘텐츠는 searchIndexable이 true여야 한다', async () => {
+      const cachedContent = {
+        id: 20,
+        tmdbId: 456,
+        contentType: 'movie',
+        title: 'Indexable Movie',
+        overview: '색인 가치가 있는 줄거리',
+        posterUrl: '/poster.jpg',
+        releaseDate: new Date('2026-01-01'),
+        adult: false,
+        voteCount: 100,
+        updatedAt: new Date(),
+        watchProviders: null,
+        credits: [],
+      };
+      mockContentRepo.findOne.mockResolvedValue(cachedContent);
+      mockQueryBuilder.getRawOne.mockResolvedValue({ id: '20' });
+
+      const result = await service.getContentDetail(456, 'movie');
+
+      expect(result.searchIndexable).toBe(true);
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'c.id = :contentId',
+        { contentId: 20 },
+      );
+      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(1);
+    });
+
+    it('sitemap 품질 판정을 통과하지 못한 콘텐츠는 searchIndexable이 false여야 한다', async () => {
+      const cachedContent = {
+        id: 21,
+        tmdbId: 457,
+        contentType: 'movie',
+        title: 'Thin Movie',
+        overview: '',
+        posterUrl: '/poster.jpg',
+        releaseDate: new Date('2026-01-01'),
+        adult: false,
+        voteCount: 0,
+        updatedAt: new Date(),
+        watchProviders: null,
+        credits: [],
+      };
+      mockContentRepo.findOne.mockResolvedValue(cachedContent);
+      mockQueryBuilder.getRawOne.mockResolvedValue(undefined);
+
+      const result = await service.getContentDetail(457, 'movie');
+
+      expect(result.searchIndexable).toBe(false);
     });
 
     it('TTL 초과 시 캐시를 즉시 반환하고 백그라운드에서 갱신해야 한다', async () => {
@@ -1569,6 +1623,22 @@ describe('ContentsService', () => {
         'COALESCE(MAX(rv.updated_at), c.updated_at, c.created_at)',
         'lastModified',
       );
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'COUNT(DISTINCT rv.id)',
+        'DESC',
+      );
+      expect(mockQueryBuilder.addOrderBy).toHaveBeenCalledWith(
+        'COUNT(DISTINCT rk.id)',
+        'DESC',
+      );
+      expect(mockQueryBuilder.addOrderBy).toHaveBeenCalledWith(
+        'CASE WHEN c.watch_providers IS NOT NULL THEN 1 ELSE 0 END',
+        'DESC',
+      );
+      expect(mockQueryBuilder.addOrderBy).toHaveBeenCalledWith(
+        'c.vote_count',
+        'DESC',
+      );
       expect(mockQueryBuilder.addOrderBy).toHaveBeenCalledWith(
         'COALESCE(MAX(rv.updated_at), c.updated_at, c.created_at)',
         'DESC',
@@ -1583,6 +1653,61 @@ describe('ContentsService', () => {
       expect(result[1].lastModified).toEqual(
         new Date('2026-03-14T00:00:00.000Z'),
       );
+    });
+
+    it('상세와 sitemap이 리뷰·랭킹·OTT·투표를 포함한 동일한 품질 판정을 사용해야 한다', async () => {
+      const expectQualityConditions = () => {
+        expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+          'c.adult IS NOT TRUE',
+        );
+        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+          "NULLIF(BTRIM(c.title), '') IS NOT NULL",
+        );
+        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+          "NULLIF(BTRIM(c.overview), '') IS NOT NULL",
+        );
+        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+          'c.poster_url IS NOT NULL',
+        );
+        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+          'c.release_date IS NOT NULL',
+        );
+
+        const signalCall = mockQueryBuilder.andWhere.mock.calls.find(
+          ([condition]) => String(condition).includes('rv.id IS NOT NULL'),
+        );
+        expect(signalCall?.[0]).toEqual(
+          expect.stringContaining('rk.id IS NOT NULL'),
+        );
+        expect(signalCall?.[0]).toEqual(
+          expect.stringContaining('c.watch_providers IS NOT NULL'),
+        );
+        expect(signalCall?.[0]).toEqual(
+          expect.stringContaining('c.vote_count >= :minVoteCount'),
+        );
+        expect(signalCall?.[1]).toEqual({ minVoteCount: 100 });
+      };
+      const cachedContent = {
+        id: 30,
+        tmdbId: 789,
+        contentType: 'movie',
+        title: 'Contract Movie',
+        updatedAt: new Date(),
+        watchProviders: null,
+        credits: [],
+      };
+      mockContentRepo.findOne.mockResolvedValue(cachedContent);
+      mockQueryBuilder.getRawOne.mockResolvedValue({ id: 30 });
+
+      await service.getContentDetail(789, 'movie');
+      expectQualityConditions();
+
+      mockQueryBuilder.where.mockClear();
+      mockQueryBuilder.andWhere.mockClear();
+      mockQueryBuilder.getRawMany.mockResolvedValue([]);
+
+      await service.getSitemapContents();
+      expectQualityConditions();
     });
 
     it('콘텐츠가 없으면 빈 배열을 반환해야 한다', async () => {

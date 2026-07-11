@@ -110,6 +110,7 @@ export interface PersonCreditsResult {
 
 export interface ContentDetail extends ContentItem {
   director?: string | null;
+  searchIndexable?: boolean;
   watchProviders: WatchProviderData | null;
   credits: CastMember[];
 }

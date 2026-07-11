@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Content } from './content.entity';
 import {
   TmdbService,
@@ -39,6 +39,10 @@ interface SitemapContentRow {
   tmdbId: number | string;
   contentType: string;
   lastModified: Date | string;
+}
+
+interface SearchIndexableContentRow {
+  id: number | string;
 }
 
 @Injectable()
@@ -174,20 +178,20 @@ export class ContentsService {
 
       if (age < CONTENT_DETAIL_TTL_MS) {
         // TTL 이내: 캐시 반환
-        return {
-          ...cached,
-          watchProviders: cached.watchProviders,
-          credits: cached.credits,
-        };
+        return this.toDetailResponse(
+          cached,
+          cached.watchProviders,
+          cached.credits,
+        );
       }
 
       // TTL 초과: 캐시 즉시 반환 + 백그라운드 갱신
       this.refreshInBackground(tmdbId, type);
-      return {
-        ...cached,
-        watchProviders: cached.watchProviders,
-        credits: cached.credits,
-      };
+      return this.toDetailResponse(
+        cached,
+        cached.watchProviders,
+        cached.credits,
+      );
     }
 
     // 캐시 미스(신규 콘텐츠): 동기 호출
@@ -259,16 +263,59 @@ export class ContentsService {
     return this.toDetailResponse(content, watchProviders, credits);
   }
 
-  private toDetailResponse(
+  private async toDetailResponse(
     content: Content,
     watchProviders = content.watchProviders ?? null,
     credits = content.credits ?? [],
   ) {
-    return {
+    const response = {
       ...content,
       watchProviders,
       credits,
     };
+    const searchIndexable = await this.isContentSearchIndexable(content.id);
+
+    return {
+      ...response,
+      searchIndexable,
+    };
+  }
+
+  private async isContentSearchIndexable(contentId: number): Promise<boolean> {
+    const query = this.contentRepo
+      .createQueryBuilder('c')
+      .select('c.id', 'id')
+      .leftJoin('reviews', 'rv', 'rv.content_id = c.id')
+      .leftJoin('rankings', 'rk', 'rk.content_id = c.id');
+
+    this.applySearchIndexableWhere(query);
+
+    const row = await query
+      .andWhere('c.id = :contentId', { contentId })
+      .limit(1)
+      .getRawOne<SearchIndexableContentRow>();
+
+    return row !== undefined;
+  }
+
+  private applySearchIndexableWhere(
+    query: SelectQueryBuilder<Content>,
+  ): SelectQueryBuilder<Content> {
+    return query
+      .where('c.adult IS NOT TRUE')
+      .andWhere("NULLIF(BTRIM(c.title), '') IS NOT NULL")
+      .andWhere("NULLIF(BTRIM(c.overview), '') IS NOT NULL")
+      .andWhere('c.poster_url IS NOT NULL')
+      .andWhere('c.release_date IS NOT NULL')
+      .andWhere(
+        `(${[
+          'rv.id IS NOT NULL',
+          'rk.id IS NOT NULL',
+          'c.watch_providers IS NOT NULL',
+          'c.vote_count >= :minVoteCount',
+        ].join(' OR ')})`,
+        { minVoteCount: SITEMAP_MIN_VOTE_COUNT },
+      );
   }
 
   private assertValidTmdbId(tmdbId: number): void {
@@ -427,7 +474,7 @@ export class ContentsService {
   async getSitemapContents(): Promise<
     Array<{ tmdbId: number; contentType: string; lastModified: Date }>
   > {
-    const rows = await this.contentRepo
+    const query = this.contentRepo
       .createQueryBuilder('c')
       .select('c.tmdbId', 'tmdbId')
       .addSelect('c.contentType', 'contentType')
@@ -436,21 +483,11 @@ export class ContentsService {
         'lastModified',
       )
       .leftJoin('reviews', 'rv', 'rv.content_id = c.id')
-      .leftJoin('rankings', 'rk', 'rk.content_id = c.id')
-      .where('c.adult IS NOT TRUE')
-      .andWhere("NULLIF(BTRIM(c.title), '') IS NOT NULL")
-      .andWhere("NULLIF(BTRIM(c.overview), '') IS NOT NULL")
-      .andWhere('c.poster_url IS NOT NULL')
-      .andWhere('c.release_date IS NOT NULL')
-      .andWhere(
-        `(${[
-          'rv.id IS NOT NULL',
-          'rk.id IS NOT NULL',
-          'c.watch_providers IS NOT NULL',
-          'c.vote_count >= :minVoteCount',
-        ].join(' OR ')})`,
-        { minVoteCount: SITEMAP_MIN_VOTE_COUNT },
-      )
+      .leftJoin('rankings', 'rk', 'rk.content_id = c.id');
+
+    this.applySearchIndexableWhere(query);
+
+    const rows = await query
       .groupBy('c.id')
       .orderBy('COUNT(DISTINCT rv.id)', 'DESC')
       .addOrderBy('COUNT(DISTINCT rk.id)', 'DESC')

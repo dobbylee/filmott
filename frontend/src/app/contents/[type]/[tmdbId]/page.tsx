@@ -15,6 +15,7 @@ import type { ReviewsResponse, ContentStats } from '@/types/review';
 import ErrorWithRetry from '@/components/common/ErrorWithRetry';
 import WatchProviders from '@/components/content/WatchProviders';
 import { serializeJsonLd } from '@/lib/json-ld';
+import { contentMetadataDescription } from '@/lib/search-index';
 
 interface ContentDetailPageProps {
   params: Promise<{
@@ -39,7 +40,10 @@ export async function generateMetadata({
   const { type, tmdbId } = await params;
   try {
     const content = await fetchContentDetail(type, tmdbId);
-    const description = content.overview?.slice(0, 160) ?? `${content.title} 상세 정보`;
+    const description = contentMetadataDescription(
+      content.title,
+      content.overview,
+    );
     const metadata: Metadata = {
       title: content.title,
       description,
@@ -65,6 +69,8 @@ export async function generateMetadata({
 
     if (content.adult) {
       metadata.robots = { index: false, follow: false };
+    } else if (content.searchIndexable === false) {
+      metadata.robots = { index: false, follow: true };
     }
 
     return metadata;
