@@ -205,8 +205,7 @@ export function formatRecommendationVisibleLine(line: string): string | null {
 
   const recommendationMatch =
     trimmed.match(/^(?:\d+[.)]\s*|[-*•]\s+)?\*\*(.+?)\*\*\s[—-]\s(.+)$/) ??
-    trimmed.match(/^\*\*[-*•]\s+(.+?)\s[—-]\s(.+)$/) ??
-    trimmed.match(/^(.+\([^)]*\))\s[—-]\s(.+)$/);
+    trimmed.match(/^\*\*[-*•]\s+(.+?)\s[—-]\s(.+)$/);
   if (recommendationMatch) {
     const title = stripRecommendationTitleSuffix(recommendationMatch[1]);
     const reason = stripTrailingRecommendationMeta(recommendationMatch[2]);

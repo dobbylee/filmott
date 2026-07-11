@@ -176,7 +176,7 @@ ${RECOMMENDATIONS_TRAILER_CLOSE}`);
   it('추천 제목의 괄호 수식어를 제거하고 굵은 제목-이유 형식으로 정규화해야 한다', () => {
     expect(
       formatRecommendationVisibleLine(
-        '솔로지옥(같은 결의 예능) - 사람 심리와 선택의 흐름이 좋아요.',
+        '**솔로지옥(같은 결의 예능)** - 사람 심리와 선택의 흐름이 좋아요.',
       ),
     ).toBe('**솔로지옥** - 사람 심리와 선택의 흐름이 좋아요.');
     expect(formatRecommendationVisibleLine('대탈출(예능)')).toBe('**대탈출**');
@@ -185,6 +185,14 @@ ${RECOMMENDATIONS_TRAILER_CLOSE}`);
   it('일반 안내 문장의 대시는 추천 구분자로 오인하지 않아야 한다', () => {
     const guidance =
       '후보가 부족해요 - 선호하는 장르나 분위기를 더 알려주세요.';
+
+    expect(formatRecommendationVisibleLine(guidance)).toBe(guidance);
+    expect(visibleRecommendationsMatchResolvedCards(guidance, [])).toBe(true);
+  });
+
+  it('괄호가 포함된 일반 안내 문장도 추천 제목으로 오인하지 않아야 한다', () => {
+    const guidance =
+      '추천 후보가 없어요(조건 불충족) - 다른 장르를 알려주세요.';
 
     expect(formatRecommendationVisibleLine(guidance)).toBe(guidance);
     expect(visibleRecommendationsMatchResolvedCards(guidance, [])).toBe(true);
