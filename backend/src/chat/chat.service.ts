@@ -23,10 +23,10 @@ import {
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 import {
+  CHAT_RESPONSE_FORMAT,
   extractPreviouslyRecommendedTitles,
-  matchStructuredRecommendationsToCandidates,
-  parseRecommendationTrailer,
-  visibleRecommendationsMatchResolvedCards,
+  parseStructuredChatResponse,
+  resolveStructuredChatResponse,
 } from './structured-chat-response';
 import { ChatContextService } from './chat-context.service';
 import {
@@ -36,6 +36,25 @@ import {
 import { ChatResponseStreamService } from './chat-response-stream.service';
 
 const OPENAI_CHAT_TIMEOUT_MS = 30_000;
+const OPENAI_CHAT_MAX_ATTEMPTS = 2;
+const STRUCTURED_RESPONSE_RETRY_INSTRUCTION = `
+
+## 응답 재생성
+직전 응답은 JSON 형식 또는 확정 후보 ID 계약을 위반했습니다. 이번에는 schema를 정확히 지키고 recommendations에는 위 확정 후보 목록의 tmdbId와 contentType 조합만 사용하세요.`;
+
+function isExplicitRecommendationRequest(content: string): boolean {
+  if (
+    /보고\s*싶지\s*않|추천(?:은|이)?\s*(?:필요\s*없|하지\s*마|말고)|추천\s*말고/.test(
+      content,
+    )
+  ) {
+    return false;
+  }
+
+  return /추천|골라|보고\s*싶|볼\s*만한|볼거리|뭐\s*(?:볼|봐)|볼까|(?:더|다른).*(?:거|작품).*(?:없어|있어|줘)/.test(
+    content,
+  );
+}
 
 type SseEmitter = (event: string, data: unknown) => void;
 
@@ -320,57 +339,77 @@ export class ChatService {
     ];
     if (signal?.aborted) return;
 
-    // 12. GPT 스트리밍 응답 호출
-    const stream = await this.openai.chat.completions.create(
-      {
-        model: CHAT_MODEL,
-        reasoning_effort: 'low',
-        max_completion_tokens: 4096,
-        stream: true,
-        messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      },
-      { timeout: OPENAI_CHAT_TIMEOUT_MS, signal },
-    );
-
-    if (signal?.aborted) {
-      return;
-    }
-
-    const streamedResponse =
-      await this.chatResponseStreamService.emitStreamingText(
-        stream,
-        emit,
-        signal,
+    // 12. GPT 구조화 응답 호출. 형식 또는 후보 ID 계약 위반은 노출 전에 한 번 재생성한다.
+    let resolvedResponse: ReturnType<
+      typeof resolveStructuredChatResponse
+    > | null = null;
+    for (let attempt = 0; attempt < OPENAI_CHAT_MAX_ATTEMPTS; attempt += 1) {
+      const attemptSystemPrompt =
+        attempt === 0
+          ? systemPrompt
+          : `${systemPrompt}${STRUCTURED_RESPONSE_RETRY_INSTRUCTION}`;
+      const stream = await this.openai.chat.completions.create(
+        {
+          model: CHAT_MODEL,
+          reasoning_effort: 'low',
+          max_completion_tokens: 4096,
+          stream: true,
+          response_format: CHAT_RESPONSE_FORMAT,
+          messages: [
+            { role: 'system', content: attemptSystemPrompt },
+            ...messages,
+          ],
+        },
+        { timeout: OPENAI_CHAT_TIMEOUT_MS, signal },
       );
 
-    if (signal?.aborted) {
-      return;
+      if (signal?.aborted) return;
+
+      try {
+        const structuredResponseText =
+          await this.chatResponseStreamService.collectStructuredResponse(
+            stream,
+            signal,
+          );
+        if (signal?.aborted) return;
+
+        resolvedResponse = resolveStructuredChatResponse(
+          parseStructuredChatResponse(structuredResponseText),
+          confirmedRecommendationCandidates,
+          {
+            requireRecommendations:
+              isExplicitRecommendationRequest(content) &&
+              confirmedRecommendationCandidates.length > 0,
+          },
+        );
+        break;
+      } catch (error) {
+        if (
+          !(error instanceof BadRequestException) ||
+          attempt === OPENAI_CHAT_MAX_ATTEMPTS - 1
+        ) {
+          throw error;
+        }
+      }
     }
 
-    const trailerRecommendations = parseRecommendationTrailer(
-      streamedResponse.trailerText,
-    );
-    const matched = matchStructuredRecommendationsToCandidates(
-      trailerRecommendations,
-      confirmedRecommendationCandidates,
-    );
-    if (
-      !visibleRecommendationsMatchResolvedCards(
-        streamedResponse.visibleText,
-        matched,
-      )
-    ) {
+    if (!resolvedResponse) {
       throw new BadRequestException(
-        '추천 본문과 카드 정보가 일치하지 않습니다. 다시 시도해주세요.',
+        'AI 응답을 생성하지 못했습니다. 다시 시도해주세요.',
       );
     }
     if (signal?.aborted) return;
 
-    if (matched.length > 0) {
-      emit('recommendations', { recommendations: matched });
+    emit('text', { content: resolvedResponse.text });
+    if (signal?.aborted) return;
+
+    if (resolvedResponse.recommendations.length > 0) {
+      emit('recommendations', {
+        recommendations: resolvedResponse.recommendations,
+      });
       if (signal?.aborted) return;
       const matchedKeys = new Set(
-        matched.map(
+        resolvedResponse.recommendations.map(
           (recommendation) =>
             `${recommendation.contentType}:${recommendation.tmdbId}`,
         ),

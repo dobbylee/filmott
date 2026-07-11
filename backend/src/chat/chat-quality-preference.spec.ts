@@ -41,7 +41,17 @@ function hasPreferenceFixture(
 
 async function* createResponseStream() {
   yield {
-    choices: [{ delta: { content: '추천 결과입니다.' } }],
+    choices: [
+      {
+        delta: {
+          content: JSON.stringify({
+            message: '추천 결과입니다.',
+            recommendations: [],
+            followUpQuestion: '',
+          }),
+        },
+      },
+    ],
   };
   yield {
     choices: [{ delta: {}, finish_reason: 'stop' }],

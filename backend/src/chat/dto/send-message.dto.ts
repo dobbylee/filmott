@@ -20,6 +20,7 @@ export class ChatHistoryRecommendationDto {
   contentType!: 'movie' | 'tv';
 
   @IsString()
+  @MinLength(1)
   @MaxLength(120)
   title!: string;
 }

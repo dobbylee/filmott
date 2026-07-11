@@ -120,10 +120,11 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('반드시 모두 추천');
     expect(prompt).toContain('확정 후보');
     expect(prompt).not.toContain('검색 후보');
-    expect(prompt).toContain('<filmott_recommendations>');
-    expect(prompt).toContain('[{"tmdbId":2002,"contentType":"movie"}]');
-    expect(prompt).toContain('실제로 본문에 추천한 작품만 같은 순서');
-    expect(prompt).toContain('trailer 밖에는 JSON, ID 배열, 내부 데이터');
+    expect(prompt).toContain('지정된 JSON schema만 사용');
+    expect(prompt).toContain('tmdbId, contentType과 추천 이유만 같은 순서');
+    expect(prompt).toContain(
+      '작품 제목은 서버가 붙이므로 reason에 반복하지 마세요',
+    );
     expect(prompt).toContain('괄호 단서로 붙이지 마세요');
     expect(prompt).toContain('(넷플릭스 가능)');
   });
@@ -134,8 +135,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('(확정 추천 후보가 없습니다)');
     expect(prompt).toContain('작품명을 새로 만들지 말고');
     expect(prompt).toContain('작품 추천을 만들지 말고');
-    expect(prompt).toContain('<filmott_recommendations>');
-    expect(prompt).toContain('[]');
+    expect(prompt).toContain('recommendations는 빈 배열');
   });
 
   it('확정 후보가 없을 때는 작품을 만들지 않도록 안내해야 한다', () => {

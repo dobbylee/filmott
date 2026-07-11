@@ -6,7 +6,7 @@ import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
 import {
   extractPreviouslyRecommendedTitles,
-  matchStructuredRecommendationsToCandidates,
+  resolveStructuredChatResponse,
 } from './structured-chat-response';
 
 type FilterQualityCase = ChatQualityCase & {
@@ -112,7 +112,7 @@ describe('채팅 추천 downstream contract 평가셋 (LLM-free)', () => {
     }
   });
 
-  it('본문 trailer가 선택한 확정 후보와의 교집합만 카드 계약으로 유지해야 한다', () => {
+  it('구조화 추천이 선택한 확정 후보만 카드 계약으로 유지해야 한다', () => {
     const cases = CHAT_QUALITY_CASES.filter(hasCandidateFixture);
 
     for (const testCase of cases) {
@@ -125,19 +125,21 @@ describe('채팅 추천 downstream contract 평가셋 (LLM-free)', () => {
           fixture.rerankContext,
         );
       const selected = confirmed.slice(0, 1);
-      const trailerRecommendations = [
-        ...selected.map((candidate) => ({
-          tmdbId: candidate.tmdbId,
-          contentType: candidate.contentType as 'movie' | 'tv',
-        })),
-        { tmdbId: 999999, contentType: 'movie' as const },
-      ];
+      const structuredRecommendations = selected.map((candidate) => ({
+        tmdbId: candidate.tmdbId,
+        contentType: candidate.contentType as 'movie' | 'tv',
+        reason: '테스트 추천 이유예요.',
+      }));
 
       expect(
-        matchStructuredRecommendationsToCandidates(
-          trailerRecommendations,
+        resolveStructuredChatResponse(
+          {
+            message: '',
+            recommendations: structuredRecommendations,
+            followUpQuestion: '',
+          },
           confirmed,
-        ).map((recommendation) => recommendation.title),
+        ).recommendations.map((recommendation) => recommendation.title),
       ).toEqual(selected.map((candidate) => candidate.title));
     }
   });

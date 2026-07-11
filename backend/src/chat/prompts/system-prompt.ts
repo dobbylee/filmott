@@ -2,10 +2,6 @@ import { OttProvider } from '../../common/ott-providers';
 import { getKoreaDateString } from '../../common/date.util';
 import { SimilarContent } from '../../embedding/embedding.service';
 import { ParsedIntent } from '../intent-analyzer';
-import {
-  RECOMMENDATIONS_TRAILER_CLOSE,
-  RECOMMENDATIONS_TRAILER_OPEN,
-} from '../structured-chat-response';
 
 export interface FavoriteContent {
   title: string;
@@ -178,16 +174,6 @@ export function buildSystemPrompt(
       : '';
 
   const today = getKoreaDateString();
-  const trailerExample =
-    recommendationCandidates.length > 0
-      ? JSON.stringify([
-          {
-            tmdbId: recommendationCandidates[0].tmdbId,
-            contentType: recommendationCandidates[0].contentType,
-          },
-        ])
-      : '[]';
-
   return `당신은 filmott의 AI 영화 큐레이터입니다. 한국어로 친근하되 반드시 존댓말(해요체)로 대화합니다. 대화가 이어져도 절대 반말로 전환하지 마세요.
 오늘 날짜: ${today}. "최신", "요즘", "올해" 등의 표현은 이 날짜를 기준으로 판단하세요.
 
@@ -221,16 +207,10 @@ ${recommendationCountRule}
 - 추천과 무관한 질문은 영화/시리즈 대화로 유도.
 
 ## 응답 형식 (반드시 준수)
-- 사용자에게 보여줄 Markdown 본문을 먼저 작성하세요. 별도 제목/소제목을 쓰지 마세요.
-- 각 추천작은 반드시 빈 줄로 구분하고, 정확히 \`**작품 제목** - 추천 이유\` 형식으로 작성하세요.
-- 각 추천 줄 앞에 숫자, 하이픈, 불릿을 붙이지 마세요.
-- 굵게 표시한 작품 제목에는 부가정보, 시즌 설명, 장르 설명, 괄호 수식어를 넣지 마세요.
-- 추천 이유 끝에 플랫폼명, 장르 조합, 톤 분석 같은 메타 정보를 괄호로 덧붙이지 마세요. 예: "(넷플릭스 가능)", "(wavve/Watcha/TVING 가능)", "(코미디+사랑 이야기 톤)" 금지.
-- 작품 추천 끝에 대화와 연결된 간단한 질문을 덧붙여 대화를 이어가세요.
-- 본문을 모두 작성한 뒤, 실제로 본문에 추천한 작품만 같은 순서로 아래 trailer에 기록하세요. 본문에서 제외한 후보는 trailer에도 넣지 마세요.
-- 추천 작품이 없으면 trailer 배열은 반드시 빈 배열이어야 합니다.
-- trailer 밖에는 JSON, ID 배열, 내부 데이터를 출력하지 마세요.
-${RECOMMENDATIONS_TRAILER_OPEN}
-${trailerExample}
-${RECOMMENDATIONS_TRAILER_CLOSE}`;
+- 응답은 지정된 JSON schema만 사용하세요. Markdown 본문을 직접 만들지 마세요.
+- message에는 추천 작품별 설명을 넣지 말고, 필요한 일반 안내나 짧은 도입만 넣으세요. 추천만 답할 때는 빈 문자열이어도 됩니다.
+- recommendations에는 실제로 선택한 확정 후보의 tmdbId, contentType과 추천 이유만 같은 순서로 넣으세요. 작품 제목은 서버가 붙이므로 reason에 반복하지 마세요.
+- reason 끝에 플랫폼명, 장르 조합, 톤 분석 같은 메타 정보를 괄호로 덧붙이지 마세요. 예: "(넷플릭스 가능)", "(wavve/Watcha/TVING 가능)", "(코미디+사랑 이야기 톤)" 금지.
+- followUpQuestion에는 대화와 연결된 간단한 질문을 넣고, 필요 없으면 빈 문자열을 사용하세요.
+- 추천 작품이 없으면 recommendations는 빈 배열이어야 하며 message 또는 followUpQuestion으로 사용자에게 답하세요.`;
 }
