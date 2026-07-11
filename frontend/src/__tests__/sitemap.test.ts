@@ -1,19 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import sitemap from '@/app/sitemap';
-
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+import { apiUrl } from '@/test/msw/handlers';
+import { server } from '@/test/msw/server';
 
 describe('sitemap', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  function respondWith(body: unknown, status = 200): void {
+    server.use(
+      http.get(apiUrl('/contents/sitemap'), () =>
+        HttpResponse.json(body, { status }),
+      ),
+    );
+  }
 
   it('정적 페이지 4개를 항상 포함해야 한다', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => [],
-    });
+    respondWith([]);
 
     const result = await sitemap();
 
@@ -25,10 +26,7 @@ describe('sitemap', () => {
   });
 
   it('메인 페이지의 priority가 1.0이어야 한다', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => [],
-    });
+    respondWith([]);
 
     const result = await sitemap();
 
@@ -42,10 +40,7 @@ describe('sitemap', () => {
       { tmdbId: 123, contentType: 'movie', lastModified: '2026-03-15T00:00:00.000Z' },
       { tmdbId: 456, contentType: 'tv', lastModified: '2026-03-14T00:00:00.000Z' },
     ];
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockContents,
-    });
+    respondWith(mockContents);
 
     const result = await sitemap();
 
@@ -59,10 +54,7 @@ describe('sitemap', () => {
     const mockContents = [
       { tmdbId: 123, contentType: 'movie', lastModified: '2026-03-15T00:00:00.000Z' },
     ];
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockContents,
-    });
+    respondWith(mockContents);
 
     const result = await sitemap();
 
@@ -76,10 +68,7 @@ describe('sitemap', () => {
     const mockContents = [
       { tmdbId: 123, contentType: 'movie', updatedAt: '2026-03-13T00:00:00.000Z' },
     ];
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockContents,
-    });
+    respondWith(mockContents);
 
     const result = await sitemap();
 
@@ -88,7 +77,9 @@ describe('sitemap', () => {
   });
 
   it('API 호출 실패 시 정적 페이지만 반환해야 한다', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'));
+    server.use(
+      http.get(apiUrl('/contents/sitemap'), () => HttpResponse.error()),
+    );
 
     const result = await sitemap();
 
@@ -99,9 +90,7 @@ describe('sitemap', () => {
   });
 
   it('API가 ok: false를 반환하면 정적 페이지만 반환해야 한다', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-    });
+    respondWith({}, 500);
 
     const result = await sitemap();
 

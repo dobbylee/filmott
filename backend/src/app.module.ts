@@ -22,7 +22,11 @@ import { ChatModule } from './chat/chat.module';
     // Load .env file globally
     ConfigModule.forRoot({ isGlobal: true }),
 
-    ScheduleModule.forRoot(),
+    ScheduleModule.forRoot({
+      cronJobs: process.env.NODE_ENV !== 'test',
+      intervals: process.env.NODE_ENV !== 'test',
+      timeouts: process.env.NODE_ENV !== 'test',
+    }),
 
     // PostgreSQL connection via TypeORM using ConfigService
     TypeOrmModule.forRootAsync({

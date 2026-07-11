@@ -31,4 +31,22 @@ describe('AppModule', () => {
     expect(appScheduleImports).toHaveLength(1);
     expect(rankingsScheduleImports).toHaveLength(0);
   });
+
+  it('테스트 환경에서는 예약 작업을 등록하지 않아야 한다', () => {
+    const appScheduleImport = getModuleImports(AppModule).find(
+      isScheduleModuleImport,
+    );
+
+    expect(appScheduleImport).toMatchObject({
+      providers: expect.arrayContaining([
+        expect.objectContaining({
+          useValue: expect.objectContaining({
+            cronJobs: false,
+            intervals: false,
+            timeouts: false,
+          }),
+        }),
+      ]),
+    });
+  });
 });

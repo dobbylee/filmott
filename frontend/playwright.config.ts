@@ -20,13 +20,13 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      command: 'npm run dev -- --hostname 127.0.0.1 --port 3000',
+      command: 'npm run test:e2e:app',
       url: baseURL,
       env: {
         NEXT_PUBLIC_API_URL: `${fixtureBackendURL}/api`,
       },
       reuseExistingServer: false,
-      timeout: 120_000,
+      timeout: 180_000,
     },
   ],
   use: {

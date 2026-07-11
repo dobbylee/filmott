@@ -37,18 +37,6 @@ export const INTEGRATION_ENTITIES = [
   ContentMetadata,
 ];
 
-const DATA_TABLES = [
-  'review_comments',
-  'review_likes',
-  'reviews',
-  'watchlist',
-  'rankings',
-  'content_metadata',
-  'refresh_tokens',
-  'contents',
-  'users',
-];
-
 function readRequiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -140,8 +128,22 @@ export async function resetIntegrationDatabase(
   }
   assertSafeTestDatabase(database);
 
+  const tablePaths = [
+    ...new Set(
+      dataSource.entityMetadatas.map((metadata) =>
+        [metadata.schema, metadata.tableName]
+          .filter((part): part is string => Boolean(part))
+          .map((part) => dataSource.driver.escape(part))
+          .join('.'),
+      ),
+    ),
+  ];
+  if (tablePaths.length === 0) {
+    throw new Error('초기화할 통합 테스트 테이블이 없습니다.');
+  }
+
   await dataSource.query(
-    `TRUNCATE TABLE ${DATA_TABLES.join(', ')} RESTART IDENTITY`,
+    `TRUNCATE TABLE ${tablePaths.join(', ')} RESTART IDENTITY`,
   );
 }
 
