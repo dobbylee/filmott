@@ -13,7 +13,7 @@ interface SimilarRecommendationCtaProps {
 }
 
 export function buildSimilarRecommendationPrompt(title: string): string {
-  const suffix = ' 같은 느낌을 좋아한다면 볼 만한 작품 추천해줘';
+  const suffix = ' 같은 느낌의 작품 추천해줘';
   const titleLengthLimit = MAX_CHAT_MESSAGE_LENGTH - Array.from(suffix).length;
   const safeTitle = Array.from(title.trim())
     .slice(0, titleLengthLimit)

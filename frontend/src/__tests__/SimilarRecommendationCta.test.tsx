@@ -33,7 +33,7 @@ describe('SimilarRecommendationCta', () => {
     });
     expect(link).toHaveAttribute(
       'href',
-      `/?chatPrompt=${encodeURIComponent('기생충 & 가족 같은 느낌을 좋아한다면 볼 만한 작품 추천해줘')}#chat-section`,
+      `/?chatPrompt=${encodeURIComponent('기생충 & 가족 같은 느낌의 작품 추천해줘')}#chat-section`,
     );
     expect(link).toHaveClass('focus-visible:ring-2');
   });
@@ -61,7 +61,7 @@ describe('SimilarRecommendationCta', () => {
 
   it('질문 생성 시 작품명 양끝 공백을 제거해야 한다', () => {
     expect(buildSimilarRecommendationPrompt('  기생충  ')).toBe(
-      '기생충 같은 느낌을 좋아한다면 볼 만한 작품 추천해줘',
+      '기생충 같은 느낌의 작품 추천해줘',
     );
   });
 
@@ -69,7 +69,7 @@ describe('SimilarRecommendationCta', () => {
     const prompt = buildSimilarRecommendationPrompt('가'.repeat(500));
 
     expect(Array.from(prompt)).toHaveLength(500);
-    expect(prompt).toMatch(/같은 느낌을 좋아한다면 볼 만한 작품 추천해줘$/);
+    expect(prompt).toMatch(/같은 느낌의 작품 추천해줘$/);
   });
 
   it('로그인 사용자의 클릭은 authenticated를 1로 기록해야 한다', () => {

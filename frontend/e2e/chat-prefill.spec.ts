@@ -30,7 +30,7 @@ test('상세의 AI 추천 CTA는 기존 대화 없이 질문만 채우고 자동
 
   const input = page.getByPlaceholder('메시지를 입력하세요.');
   await expect(input).toHaveValue(
-    'Fixture 영화 같은 느낌을 좋아한다면 볼 만한 작품 추천해줘',
+    'Fixture 영화 같은 느낌의 작품 추천해줘',
   );
   await expect(page).toHaveURL(/\/#chat-section$/);
   expect(chatRequestCount).toBe(0);
