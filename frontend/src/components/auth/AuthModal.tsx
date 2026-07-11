@@ -7,7 +7,7 @@ import SocialLoginButton from '@/components/auth/SocialLoginButton';
 
 export default function AuthModal() {
   const { authModal, closeAuthModal } = useAuth();
-  const { isOpen } = authModal;
+  const { isOpen, reason } = authModal;
   const backdropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,6 +29,12 @@ export default function AuthModal() {
 
   if (!isOpen) return null;
 
+  const description = reason === 'want_to_watch'
+    ? '이 작품을 보고 싶은 작품으로 저장하려면 로그인하세요.'
+    : reason === 'watched'
+      ? '이 작품을 기록하고 별점을 남기려면 로그인하세요.'
+      : '로그인하면 취향에 맞는 추천을 받을 수 있어요';
+
   return (
     <div
       ref={backdropRef}
@@ -45,7 +51,7 @@ export default function AuthModal() {
         </button>
 
         <div className="mb-6">
-          <p className="text-sm text-center text-white/50">로그인하면 취향에 맞는 추천을 받을 수 있어요</p>
+          <p className="text-center text-sm text-white/50">{description}</p>
         </div>
 
         <div className="space-y-3">

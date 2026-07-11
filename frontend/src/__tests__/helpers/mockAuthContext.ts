@@ -22,6 +22,6 @@ export function createMockAuth(overrides: MockAuthOverrides = {}) {
     openAuthModal: overrides.openAuthModal ?? vi.fn(),
     closeAuthModal: vi.fn(),
     clearLogoutError: vi.fn(),
-    authModal: { isOpen: false },
+    authModal: { isOpen: false, reason: null },
   };
 }

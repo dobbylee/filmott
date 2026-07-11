@@ -5,6 +5,7 @@ import AuthModal from '@/components/auth/AuthModal';
 
 const mockCloseAuthModal = vi.fn();
 let mockIsOpen = false;
+let mockReason: 'want_to_watch' | 'watched' | null = null;
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -15,7 +16,7 @@ vi.mock('@/contexts/AuthContext', () => ({
     updateUser: vi.fn(),
     openAuthModal: vi.fn(),
     closeAuthModal: mockCloseAuthModal,
-    authModal: { isOpen: mockIsOpen },
+    authModal: { isOpen: mockIsOpen, reason: mockReason },
   }),
 }));
 
@@ -25,6 +26,7 @@ const originalLocation = window.location;
 beforeEach(() => {
   vi.clearAllMocks();
   mockIsOpen = false;
+  mockReason = null;
   Object.defineProperty(window, 'location', {
     writable: true,
     value: { ...originalLocation, href: '' },
@@ -61,6 +63,26 @@ describe('AuthModal', () => {
     expect(screen.getByText('Google로 계속하기')).toBeInTheDocument();
     expect(screen.getByText('카카오로 계속하기')).toBeInTheDocument();
     expect(screen.getByText('네이버로 계속하기')).toBeInTheDocument();
+  });
+
+  it('보고 싶은 작품 저장에서 열면 선택한 행동을 안내해야 한다', () => {
+    mockIsOpen = true;
+    mockReason = 'want_to_watch';
+    render(<AuthModal />);
+
+    expect(
+      screen.getByText('이 작품을 보고 싶은 작품으로 저장하려면 로그인하세요.'),
+    ).toBeInTheDocument();
+  });
+
+  it('감상 기록에서 열면 별점 행동을 안내해야 한다', () => {
+    mockIsOpen = true;
+    mockReason = 'watched';
+    render(<AuthModal />);
+
+    expect(
+      screen.getByText('이 작품을 기록하고 별점을 남기려면 로그인하세요.'),
+    ).toBeInTheDocument();
   });
 
   it('Google 버튼 클릭 시 올바른 URL로 이동한다', async () => {

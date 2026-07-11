@@ -90,9 +90,11 @@ function AuthConsumer() {
       <div data-testid="isLoggingOut">{isLoggingOut ? 'true' : 'false'}</div>
       <div data-testid="logoutError">{logoutError ?? 'null'}</div>
       <div data-testid="modalOpen">{authModal.isOpen ? 'true' : 'false'}</div>
+      <div data-testid="modalReason">{authModal.reason ?? 'null'}</div>
       <button onClick={() => handleAuthSuccess(mockAuthResponse)}>handleAuthSuccess</button>
       <button onClick={logout}>logout</button>
       <button onClick={() => openAuthModal()}>openModal</button>
+      <button onClick={() => openAuthModal('want_to_watch')}>openWantToWatchModal</button>
       <button onClick={closeAuthModal}>closeModal</button>
       <button onClick={clearLogoutError}>clearLogoutError</button>
     </div>
@@ -373,6 +375,25 @@ describe('AuthContext', () => {
 
       await user.click(screen.getByText('closeModal'));
       expect(screen.getByTestId('modalOpen')).toHaveTextContent('false');
+      expect(screen.getByTestId('modalReason')).toHaveTextContent('null');
+    });
+
+    it('모달을 연 행동을 닫을 때까지 유지해야 한다', async () => {
+      const user = userEvent.setup();
+      mockRefreshGet.mockRejectedValueOnce(createAxiosError(401));
+      mockRefreshPost.mockRejectedValueOnce(createAxiosError(401));
+
+      render(
+        <AuthProvider>
+          <AuthConsumer />
+        </AuthProvider>,
+      );
+
+      await user.click(screen.getByText('openWantToWatchModal'));
+      expect(screen.getByTestId('modalReason')).toHaveTextContent('want_to_watch');
+
+      await user.click(screen.getByText('closeModal'));
+      expect(screen.getByTestId('modalReason')).toHaveTextContent('null');
     });
   });
 

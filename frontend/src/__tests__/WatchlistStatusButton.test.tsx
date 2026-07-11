@@ -40,14 +40,17 @@ describe('WatchlistStatusButton', () => {
     mockUser = null;
   });
 
-  it('미등록 상태에서 "기록하기"를 표시해야 한다', async () => {
+  it('미등록 상태에서 두 기록 행동을 직접 표시해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
 
     render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+      expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+        '봤어요 · 별점 남기기',
+        '보고 싶어요',
+      ]);
     });
   });
 
@@ -73,46 +76,50 @@ describe('WatchlistStatusButton', () => {
     });
   });
 
-  it('비로그인 상태에서 클릭 시 인증 모달을 열어야 한다', async () => {
+  it('비로그인 상태에서 "보고 싶어요" 클릭 시 행동을 유지한 인증 모달을 열어야 한다', async () => {
     mockUser = null;
     const user = userEvent.setup();
 
     render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
-    await user.click(screen.getByText('기록하기'));
-    expect(mockOpenAuthModal).toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '보고 싶어요' }));
+    expect(mockOpenAuthModal).toHaveBeenCalledWith('want_to_watch');
     expect(mockTrackEvent).toHaveBeenCalledWith('detail_action_clicked', {
-      action: 'watchlist_menu',
+      action: 'want_to_watch',
       content_type: 'movie',
       tmdb_id: 123,
       authenticated: 0,
     });
     expect(mockTrackEvent).toHaveBeenCalledWith('login_prompt_shown', {
       source: 'content_detail',
-      action: 'watchlist_menu',
+      action: 'want_to_watch',
       content_type: 'movie',
       tmdb_id: 123,
     });
   });
 
-  it('미등록 상태에서 클릭 시 드롭다운 옵션을 표시해야 한다', async () => {
-    mockUser = { nickname: 'testuser' };
-    mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
+  it('비로그인 상태에서 "봤어요 · 별점 남기기" 클릭 시 행동을 유지한 인증 모달을 열어야 한다', async () => {
+    mockUser = null;
     const user = userEvent.setup();
 
     render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
-    await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: '봤어요 · 별점 남기기' }),
+    );
+    expect(mockOpenAuthModal).toHaveBeenCalledWith('watched');
+    expect(mockTrackEvent).toHaveBeenCalledWith('detail_action_clicked', {
+      action: 'watched',
+      content_type: 'movie',
+      tmdb_id: 123,
+      authenticated: 0,
     });
-
-    await user.click(screen.getByText('기록하기'));
-
-    // 드롭다운에 "감상할 작품"과 "감상한 작품" 옵션이 나타남
-    const dropdownItems = screen.getAllByText('감상할 작품');
-    expect(dropdownItems.length).toBeGreaterThan(0);
-    const watchedItems = screen.getAllByText('감상한 작품');
-    expect(watchedItems.length).toBeGreaterThan(0);
+    expect(mockTrackEvent).toHaveBeenCalledWith('login_prompt_shown', {
+      source: 'content_detail',
+      action: 'watched',
+      content_type: 'movie',
+      tmdb_id: 123,
+    });
   });
 
   it('want_to_watch 상태에서 "감상한 작품"과 "제거" 드롭다운을 표시해야 한다', async () => {
@@ -150,7 +157,7 @@ describe('WatchlistStatusButton', () => {
     expect(screen.getByText('제거')).toBeInTheDocument();
   });
 
-  it('미등록 상태에서 "감상할 작품" 클릭 시 POST API를 호출해야 한다', async () => {
+  it('미등록 상태에서 "보고 싶어요" 클릭 시 POST API를 호출해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
     mockPost.mockResolvedValue({ data: { id: 10 } });
@@ -159,13 +166,10 @@ describe('WatchlistStatusButton', () => {
     render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '보고 싶어요' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('기록하기'));
-    // 드롭다운에서 "감상할 작품" 클릭
-    const options = screen.getAllByText('감상할 작품');
-    await user.click(options[options.length - 1]);
+    await user.click(screen.getByRole('button', { name: '보고 싶어요' }));
 
     await waitFor(() => {
       expect(mockPost).toHaveBeenCalledWith('/watchlist', expect.objectContaining({
@@ -182,7 +186,7 @@ describe('WatchlistStatusButton', () => {
     });
   });
 
-  it('미등록 상태에서 "감상한 작품" 클릭 시 리뷰 작성 모달을 열어야 한다', async () => {
+  it('미등록 상태에서 "봤어요 · 별점 남기기" 클릭 시 리뷰 작성 모달을 열어야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
     const user = userEvent.setup();
@@ -190,12 +194,14 @@ describe('WatchlistStatusButton', () => {
     render(<WatchlistStatusButton contentId={11} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: '봤어요 · 별점 남기기' }),
+      ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('기록하기'));
-    const watchedOptions = screen.getAllByText('감상한 작품');
-    await user.click(watchedOptions[watchedOptions.length - 1]);
+    await user.click(
+      screen.getByRole('button', { name: '봤어요 · 별점 남기기' }),
+    );
 
     await waitFor(() => {
       expect(screen.getByText('감상 날짜')).toBeInTheDocument();
@@ -238,12 +244,14 @@ describe('WatchlistStatusButton', () => {
     render(<WatchlistStatusButton contentId={11} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: '봤어요 · 별점 남기기' }),
+      ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('기록하기'));
-    const watchedOptions = screen.getAllByText('감상한 작품');
-    await user.click(watchedOptions[watchedOptions.length - 1]);
+    await user.click(
+      screen.getByRole('button', { name: '봤어요 · 별점 남기기' }),
+    );
 
     await waitFor(() => {
       expect(screen.getByText('리뷰 수정')).toBeInTheDocument();
@@ -353,7 +361,7 @@ describe('WatchlistStatusButton', () => {
     });
   });
 
-  it('제거 후 상태가 미등록("기록하기")으로 변경되어야 한다', async () => {
+  it('제거 후 상태가 미등록 직접 행동으로 변경되어야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     let removed = false;
     mockGet.mockImplementation((url: string) => {
@@ -382,7 +390,10 @@ describe('WatchlistStatusButton', () => {
     await user.click(screen.getByText('제거'));
 
     await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '보고 싶어요' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: '봤어요 · 별점 남기기' }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -405,7 +416,7 @@ describe('WatchlistStatusButton', () => {
     expect(mockGet).not.toHaveBeenCalled();
   });
 
-  it('"감상할 작품"으로 추가 성공 시 watchlist_added 이벤트를 호출해야 한다', async () => {
+  it('"보고 싶어요"로 추가 성공 시 watchlist_added 이벤트를 호출해야 한다', async () => {
     mockUser = { nickname: 'testuser' };
     mockGet.mockResolvedValue({ data: { status: null, watchlistId: null } });
     mockPost.mockResolvedValue({ data: { id: 10 } });
@@ -414,12 +425,10 @@ describe('WatchlistStatusButton', () => {
     render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '보고 싶어요' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('기록하기'));
-    const options = screen.getAllByText('감상할 작품');
-    await user.click(options[options.length - 1]);
+    await user.click(screen.getByRole('button', { name: '보고 싶어요' }));
 
     await waitFor(() => {
       expect(mockTrackEvent).toHaveBeenCalledWith('watchlist_added', {
@@ -438,15 +447,13 @@ describe('WatchlistStatusButton', () => {
     render(<WatchlistStatusButton contentId={1} tmdbId={123} contentType="movie" />);
 
     await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '보고 싶어요' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('기록하기'));
-    const options = screen.getAllByText('감상할 작품');
-    await user.click(options[options.length - 1]);
+    await user.click(screen.getByRole('button', { name: '보고 싶어요' }));
 
     await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '보고 싶어요' })).toBeEnabled();
     });
 
     expect(mockTrackEvent).not.toHaveBeenCalledWith(
@@ -464,12 +471,10 @@ describe('WatchlistStatusButton', () => {
     render(<WatchlistStatusButton contentId={2} tmdbId={456} contentType="tv" />);
 
     await waitFor(() => {
-      expect(screen.getByText('기록하기')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '보고 싶어요' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('기록하기'));
-    const options = screen.getAllByText('감상할 작품');
-    await user.click(options[options.length - 1]);
+    await user.click(screen.getByRole('button', { name: '보고 싶어요' }));
 
     await waitFor(() => {
       expect(mockTrackEvent).toHaveBeenCalledWith('watchlist_added', {

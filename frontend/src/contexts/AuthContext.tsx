@@ -23,6 +23,8 @@ import { clearLegacyAuthStorage } from '@/lib/auth-storage';
 import { AUTH_REQUIRED_EVENT } from '@/lib/constants';
 import type { User, AuthResponse } from '@/types/auth';
 
+export type AuthModalReason = 'want_to_watch' | 'watched' | null;
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
@@ -31,8 +33,8 @@ interface AuthContextType {
   handleAuthSuccess: (data: AuthResponse) => void;
   logout: () => Promise<boolean>;
   updateUser: (user: User) => void;
-  authModal: { isOpen: boolean };
-  openAuthModal: () => void;
+  authModal: { isOpen: boolean; reason: AuthModalReason };
+  openAuthModal: (reason?: AuthModalReason) => void;
   closeAuthModal: () => void;
   clearLogoutError: () => void;
 }
@@ -42,8 +44,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [authModal, setAuthModal] = useState<{ isOpen: boolean }>({
+  const [authModal, setAuthModal] = useState<{
+    isOpen: boolean;
+    reason: AuthModalReason;
+  }>({
     isOpen: false,
+    reason: null,
   });
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -57,14 +63,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setIsLoading(false);
       setLogoutError(null);
-      setAuthModal({ isOpen: true });
+      setAuthModal({ isOpen: true, reason: null });
     };
     const handleSessionCleared = () => {
       sessionGenerationRef.current += 1;
       setUser(null);
       setIsLoading(false);
       setLogoutError(null);
-      setAuthModal({ isOpen: false });
+      setAuthModal({ isOpen: false, reason: null });
     };
     const handleSessionEstablished = () => {
       sessionGenerationRef.current += 1;
@@ -75,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (isActive && sessionGenerationRef.current === generation) {
             setUser(data);
             setLogoutError(null);
-            setAuthModal({ isOpen: false });
+            setAuthModal({ isOpen: false, reason: null });
           }
         })
         .catch(() => undefined)
@@ -164,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
     setIsLoading(false);
     setLogoutError(null);
-    setAuthModal({ isOpen: false });
+    setAuthModal({ isOpen: false, reason: null });
     notifySessionEstablished();
   }, []);
 
@@ -173,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoggingOut(true);
     setLogoutError(null);
     setUser(null);
-    setAuthModal({ isOpen: false });
+    setAuthModal({ isOpen: false, reason: null });
     try {
       await clearServerSession();
       return true;
@@ -191,12 +197,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updatedUser);
   }, []);
 
-  const openAuthModal = useCallback(() => {
-    setAuthModal({ isOpen: true });
+  const openAuthModal = useCallback((reason: AuthModalReason = null) => {
+    setAuthModal({ isOpen: true, reason });
   }, []);
 
   const closeAuthModal = useCallback(() => {
-    setAuthModal({ isOpen: false });
+    setAuthModal({ isOpen: false, reason: null });
   }, []);
 
   const clearLogoutError = useCallback(() => {
