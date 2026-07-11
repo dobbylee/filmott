@@ -175,6 +175,18 @@ describe('ContentsController', () => {
       );
       expect(mockContentsService.getRelatedContents).not.toHaveBeenCalled();
     });
+
+    it('TV 관련 작품의 작은 limit도 그대로 서비스에 전달해야 한다', async () => {
+      mockContentsService.getRelatedContents.mockResolvedValue([]);
+
+      await controller.getRelated('tv', 456, 1);
+
+      expect(mockContentsService.getRelatedContents).toHaveBeenCalledWith(
+        456,
+        'tv',
+        1,
+      );
+    });
   });
 
   describe('toggleAdult', () => {

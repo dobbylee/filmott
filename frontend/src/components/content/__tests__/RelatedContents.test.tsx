@@ -78,13 +78,23 @@ describe('RelatedContents', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: '이 작품과 비슷한 작품' }),
+      screen.getByRole('heading', { name: '연관 작품' }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('장르와 작품 정보를 바탕으로 골랐어요'),
+    ).toBeInTheDocument();
+    const section = screen.getByRole('region', { name: '연관 작품' });
+    expect(section).toHaveAttribute(
+      'aria-describedby',
+      'related-contents-description',
+    );
     expect(screen.getAllByRole('link')).toHaveLength(6);
-    expect(screen.getByText('비슷한 작품 1').closest('a')).toHaveAttribute(
+    const firstLink = screen.getByText('비슷한 작품 1').closest('a');
+    expect(firstLink).toHaveAttribute(
       'href',
       '/contents/movie/1',
     );
+    expect(firstLink).toHaveClass('focus-visible:ring-2');
     expect(screen.getByText('비슷한 작품 6').closest('a')).toHaveAttribute(
       'href',
       '/contents/tv/6',

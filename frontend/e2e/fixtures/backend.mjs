@@ -132,6 +132,22 @@ const server = createServer((request, response) => {
         releaseDate: relatedContent.releaseDate,
         voteAverage: relatedContent.voteAverage,
       },
+      {
+        tmdbId: 27206,
+        contentType: 'movie',
+        title: 'Fixture 연관 영화 2',
+        posterUrl: null,
+        releaseDate: '2014-11-05',
+        voteAverage: 8.1,
+      },
+      {
+        tmdbId: 27207,
+        contentType: 'tv',
+        title: 'Fixture 연관 시리즈 3',
+        posterUrl: null,
+        releaseDate: '2016-07-15',
+        voteAverage: 7.9,
+      },
     ]);
     return;
   }

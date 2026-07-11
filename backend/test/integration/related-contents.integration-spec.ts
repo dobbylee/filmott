@@ -115,6 +115,18 @@ describeWithDb('related contents integration', () => {
       title: '공백 포스터',
       posterUrl: '   ',
     });
+    const wrongType = await fixtures.content({
+      ...common,
+      tmdbId: 620008,
+      contentType: 'tv',
+      title: '다른 타입',
+    });
+    const wrongGenre = await fixtures.content({
+      ...common,
+      tmdbId: 620009,
+      title: '다른 장르',
+      genres: [{ id: 35, name: '코미디' }],
+    });
 
     await Promise.all([
       fixtures.contentMetadata({
@@ -145,6 +157,14 @@ describeWithDb('related contents integration', () => {
         contentId: withBlankPoster.id,
         embedding: createDirectionalVector(0, 6),
       }),
+      fixtures.contentMetadata({
+        contentId: wrongType.id,
+        embedding: createDirectionalVector(0),
+      }),
+      fixtures.contentMetadata({
+        contentId: wrongGenre.id,
+        embedding: createDirectionalVector(0),
+      }),
     ]);
 
     const result = await service.findRelatedContents(source.tmdbId, 'movie', 6);
@@ -161,18 +181,54 @@ describeWithDb('related contents integration', () => {
       releaseDate: '2026-01-01',
       voteAverage: 8.8,
     });
+    expect(result.map((item) => item.tmdbId)).not.toContain(wrongType.tmdbId);
+    expect(result.map((item) => item.tmdbId)).not.toContain(wrongGenre.tmdbId);
   });
 
-  it('source metadata가 없으면 빈 배열을 반환해야 한다', async () => {
+  it('source metadata가 없어도 인기 후보와 최신 무메타 후보를 최대 두 개 반환해야 한다', async () => {
     const fixtures = createIntegrationFixtures(dataSource);
     const source = await fixtures.content({
       tmdbId: 620010,
       posterUrl: '/source.jpg',
+      releaseDate: new Date('2025-01-01T00:00:00.000Z'),
+    });
+    const freshNewest = await fixtures.content({
+      tmdbId: 620011,
+      title: '최신 무메타 1',
+      posterUrl: '/fresh-1.jpg',
+      releaseDate: new Date('2026-03-01T00:00:00.000Z'),
+    });
+    const freshSecond = await fixtures.content({
+      tmdbId: 620012,
+      title: '최신 무메타 2',
+      posterUrl: '/fresh-2.jpg',
+      releaseDate: new Date('2026-02-01T00:00:00.000Z'),
+    });
+    const freshThird = await fixtures.content({
+      tmdbId: 620013,
+      title: '최신 무메타 3',
+      posterUrl: '/fresh-3.jpg',
+      releaseDate: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    const popular = await fixtures.content({
+      tmdbId: 620014,
+      title: '인기 메타 작품',
+      posterUrl: '/popular.jpg',
+      voteCount: 50_000,
+    });
+    await fixtures.contentMetadata({
+      contentId: popular.id,
+      embedding: createDirectionalVector(1),
     });
 
-    await expect(
-      service.findRelatedContents(source.tmdbId, 'movie', 6),
-    ).resolves.toEqual([]);
+    const result = await service.findRelatedContents(source.tmdbId, 'movie', 6);
+
+    expect(result.map((item) => item.tmdbId)).toEqual([
+      popular.tmdbId,
+      freshNewest.tmdbId,
+      freshSecond.tmdbId,
+    ]);
+    expect(result.map((item) => item.tmdbId)).not.toContain(freshThird.tmdbId);
   });
 
   it('source가 색인 기준 미달이면 embedding이 있어도 조회하지 않아야 한다', async () => {

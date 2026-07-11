@@ -11,6 +11,13 @@ import { buildSearchIndexableContentSql } from '../contents/search-indexable-con
 const OPENAI_EMBEDDING_TIMEOUT_MS = 10_000;
 const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
 const RELATED_CONTENT_QUERY_TIMEOUT_MS = 5_000;
+const RELATED_CONTENT_CACHE_TTL_MS = 60 * 60 * 1000;
+const RELATED_CONTENT_CACHE_MAX_ENTRIES = 500;
+const RELATED_CONTENT_RESULT_LIMIT = 6;
+const RELATED_FRESH_POOL_SIZE = 600;
+const RELATED_POPULAR_POOL_SIZE = 600;
+const RELATED_FRESH_SLOT_LIMIT = 2;
+const RELATED_POPULAR_FETCH_LIMIT = 12;
 
 export interface SimilarContent {
   contentId: number;
@@ -51,9 +58,15 @@ interface RelatedContentRow {
   vote_average: number;
 }
 
-interface SourceEmbeddingRow {
+interface RelatedContentSourceRow {
   content_id: number;
-  embedding: string;
+  genres: unknown;
+  embedding: string | null;
+}
+
+interface RelatedContentCacheEntry {
+  data: RelatedContent[];
+  expiresAt: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -95,9 +108,28 @@ function parseRelatedContentRows(value: unknown): RelatedContentRow[] {
   });
 }
 
-function parseSourceEmbeddingRow(value: unknown): SourceEmbeddingRow | null {
+function parseGenreIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+
+  const genreIds = new Set<number>();
+  for (const genre of value as unknown[]) {
+    if (
+      isRecord(genre) &&
+      typeof genre.id === 'number' &&
+      Number.isSafeInteger(genre.id) &&
+      genre.id > 0
+    ) {
+      genreIds.add(genre.id);
+    }
+  }
+  return [...genreIds];
+}
+
+function parseRelatedContentSourceRow(
+  value: unknown,
+): RelatedContentSourceRow | null {
   if (!Array.isArray(value)) {
-    throw new Error('기준 작품 embedding 조회 결과 형식이 올바르지 않습니다.');
+    throw new Error('기준 작품 조회 결과 형식이 올바르지 않습니다.');
   }
   if (value.length === 0) return null;
 
@@ -108,13 +140,18 @@ function parseSourceEmbeddingRow(value: unknown): SourceEmbeddingRow | null {
     typeof row.content_id !== 'number' ||
     !Number.isSafeInteger(row.content_id) ||
     row.content_id <= 0 ||
-    typeof row.embedding !== 'string' ||
-    row.embedding.length === 0
+    !('genres' in row) ||
+    (row.embedding !== null &&
+      (typeof row.embedding !== 'string' || row.embedding.length === 0))
   ) {
-    throw new Error('기준 작품 embedding 조회 결과 형식이 올바르지 않습니다.');
+    throw new Error('기준 작품 조회 결과 형식이 올바르지 않습니다.');
   }
 
-  return { content_id: row.content_id, embedding: row.embedding };
+  return {
+    content_id: row.content_id,
+    genres: row.genres,
+    embedding: row.embedding,
+  };
 }
 
 function stripControlCharacters(value: string | null | undefined): string {
@@ -136,6 +173,14 @@ export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
   private readonly openai: OpenAI | null;
   private hasMetadataCache: boolean | null = null;
+  private readonly relatedContentCache = new Map<
+    string,
+    RelatedContentCacheEntry
+  >();
+  private readonly relatedContentInFlight = new Map<
+    string,
+    Promise<RelatedContent[]>
+  >();
 
   constructor(
     @InjectRepository(ContentMetadata)
@@ -303,25 +348,130 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     contentType: 'movie' | 'tv',
     limit: number,
   ): Promise<RelatedContent[]> {
+    const cacheKey = `${contentType}:${tmdbId}`;
+    const cached = this.getCachedRelatedContents(cacheKey);
+    if (cached !== null) return cached.slice(0, limit);
+
+    let inFlight = this.relatedContentInFlight.get(cacheKey);
+    if (!inFlight) {
+      inFlight = this.loadRelatedContents(tmdbId, contentType)
+        .then((relatedContents) => {
+          this.setRelatedContentCache(cacheKey, relatedContents);
+          return relatedContents;
+        })
+        .finally(() => {
+          this.relatedContentInFlight.delete(cacheKey);
+        });
+      this.relatedContentInFlight.set(cacheKey, inFlight);
+    }
+
+    return (await inFlight).slice(0, limit);
+  }
+
+  private getCachedRelatedContents(cacheKey: string): RelatedContent[] | null {
+    const cached = this.relatedContentCache.get(cacheKey);
+    if (!cached) return null;
+
+    if (cached.expiresAt <= Date.now()) {
+      this.relatedContentCache.delete(cacheKey);
+      return null;
+    }
+
+    this.relatedContentCache.delete(cacheKey);
+    this.relatedContentCache.set(cacheKey, cached);
+    return [...cached.data];
+  }
+
+  private setRelatedContentCache(
+    cacheKey: string,
+    relatedContents: RelatedContent[],
+  ): void {
+    this.relatedContentCache.delete(cacheKey);
+    while (this.relatedContentCache.size >= RELATED_CONTENT_CACHE_MAX_ENTRIES) {
+      const oldestKey = this.relatedContentCache.keys().next().value as
+        | string
+        | undefined;
+      if (oldestKey === undefined) break;
+      this.relatedContentCache.delete(oldestKey);
+    }
+    this.relatedContentCache.set(cacheKey, {
+      data: [...relatedContents],
+      expiresAt: Date.now() + RELATED_CONTENT_CACHE_TTL_MS,
+    });
+  }
+
+  private async loadRelatedContents(
+    tmdbId: number,
+    contentType: 'movie' | 'tv',
+  ): Promise<RelatedContent[]> {
     const sourceIndexability = buildSearchIndexableContentSql({
       contentAlias: 'source_content',
       minVoteCountPlaceholder: '$3',
       signalSource: { kind: 'exists' },
     });
-    const candidateIndexability = buildSearchIndexableContentSql({
+    const freshIndexability = buildSearchIndexableContentSql({
+      contentAlias: 'c',
+      minVoteCountPlaceholder: '$5',
+      signalSource: { kind: 'exists' },
+    });
+    const vectorIndexability = buildSearchIndexableContentSql({
       contentAlias: 'c',
       minVoteCountPlaceholder: '$2',
       signalSource: { kind: 'exists' },
     });
-    const sourceQuery = `SELECT source_metadata.content_id,
+    const popularIndexability = buildSearchIndexableContentSql({
+      contentAlias: 'c',
+      minVoteCountPlaceholder: '$5',
+      signalSource: { kind: 'exists' },
+    });
+    const sourceQuery = `SELECT source_content.id AS content_id,
+           source_content.genres AS genres,
            source_metadata.embedding::text AS embedding
-    FROM content_metadata source_metadata
-    JOIN contents source_content ON source_content.id = source_metadata.content_id
+    FROM contents source_content
+    LEFT JOIN content_metadata source_metadata
+      ON source_metadata.content_id = source_content.id
     WHERE source_content.tmdb_id = $1
       AND source_content.content_type = $2
       AND ${sourceIndexability.predicate}
     LIMIT 1`;
-    const candidateQuery = `
+    const freshQuery = `
+    WITH recent_pool AS MATERIALIZED (
+      SELECT recent.id
+      FROM contents recent
+      WHERE recent.release_date IS NOT NULL
+        AND recent.release_date <= CURRENT_DATE
+      ORDER BY recent.release_date DESC
+      LIMIT $1
+    )
+    SELECT c.tmdb_id,
+           c.content_type,
+           c.title,
+           c.poster_url,
+           TO_CHAR(c.release_date, 'YYYY-MM-DD') AS release_date,
+           COALESCE(c.vote_average, 0)::float8 AS vote_average
+    FROM recent_pool
+    JOIN contents c ON c.id = recent_pool.id
+    CROSS JOIN LATERAL (
+      SELECT COUNT(*)::int AS overlap_count
+      FROM jsonb_array_elements(COALESCE(c.genres, '[]'::jsonb)) genre
+      WHERE (genre ->> 'id') ~ '^[0-9]+$'
+        AND (genre ->> 'id')::int = ANY($4::int[])
+    ) genre_match
+    WHERE c.id <> $2
+      AND c.content_type = $3
+      AND genre_match.overlap_count > 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM content_metadata fresh_metadata
+        WHERE fresh_metadata.content_id = c.id
+      )
+      AND ${freshIndexability.predicate}
+    ORDER BY genre_match.overlap_count DESC,
+             c.release_date DESC,
+             c.vote_count DESC,
+             c.id DESC
+    LIMIT $6`;
+    const vectorQuery = `
     SELECT c.tmdb_id,
            c.content_type,
            c.title,
@@ -330,10 +480,53 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
            COALESCE(c.vote_average, 0)::float8 AS vote_average
     FROM content_metadata cm
     JOIN contents c ON c.id = cm.content_id
+    CROSS JOIN LATERAL (
+      SELECT COUNT(*)::int AS overlap_count
+      FROM jsonb_array_elements(COALESCE(c.genres, '[]'::jsonb)) genre
+      WHERE (genre ->> 'id') ~ '^[0-9]+$'
+        AND (genre ->> 'id')::int = ANY($6::int[])
+    ) genre_match
     WHERE cm.content_id <> $4
-      AND ${candidateIndexability.predicate}
+      AND c.content_type = $5
+      AND genre_match.overlap_count > 0
+      AND ${vectorIndexability.predicate}
     ORDER BY cm.embedding <=> $1::vector
     LIMIT $3`;
+    const popularQuery = `
+    WITH popular_pool AS MATERIALIZED (
+      SELECT popular.id
+      FROM contents popular
+      ORDER BY popular.vote_count DESC
+      LIMIT $1
+    )
+    SELECT c.tmdb_id,
+           c.content_type,
+           c.title,
+           c.poster_url,
+           TO_CHAR(c.release_date, 'YYYY-MM-DD') AS release_date,
+           COALESCE(c.vote_average, 0)::float8 AS vote_average
+    FROM popular_pool
+    JOIN contents c ON c.id = popular_pool.id
+    CROSS JOIN LATERAL (
+      SELECT COUNT(*)::int AS overlap_count
+      FROM jsonb_array_elements(COALESCE(c.genres, '[]'::jsonb)) genre
+      WHERE (genre ->> 'id') ~ '^[0-9]+$'
+        AND (genre ->> 'id')::int = ANY($4::int[])
+    ) genre_match
+    WHERE c.id <> $2
+      AND c.content_type = $3
+      AND genre_match.overlap_count > 0
+      AND EXISTS (
+        SELECT 1
+        FROM content_metadata popular_metadata
+        WHERE popular_metadata.content_id = c.id
+      )
+      AND ${popularIndexability.predicate}
+    ORDER BY genre_match.overlap_count DESC,
+             c.vote_count DESC,
+             c.release_date DESC,
+             c.id DESC
+    LIMIT $6`;
 
     const rows = await this.dataSource.transaction(async (manager) => {
       await manager.query(`SELECT set_config('statement_timeout', $1, true)`, [
@@ -347,16 +540,61 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
         contentType,
         sourceIndexability.minVoteCount,
       ]);
-      const source = parseSourceEmbeddingRow(sourceResult);
+      const source = parseRelatedContentSourceRow(sourceResult);
       if (!source) return [];
 
-      const result: unknown = await manager.query(candidateQuery, [
-        source.embedding,
-        candidateIndexability.minVoteCount,
-        limit,
+      const genreIds = parseGenreIds(source.genres);
+      if (genreIds.length === 0) return [];
+
+      const freshResult: unknown = await manager.query(freshQuery, [
+        RELATED_FRESH_POOL_SIZE,
         source.content_id,
+        contentType,
+        genreIds,
+        freshIndexability.minVoteCount,
+        RELATED_FRESH_SLOT_LIMIT,
       ]);
-      return parseRelatedContentRows(result);
+      const freshRows = parseRelatedContentRows(freshResult);
+      const establishedLimit = RELATED_CONTENT_RESULT_LIMIT - freshRows.length;
+      const establishedRows: RelatedContentRow[] = [];
+
+      if (source.embedding !== null && establishedLimit > 0) {
+        const vectorResult: unknown = await manager.query(vectorQuery, [
+          source.embedding,
+          vectorIndexability.minVoteCount,
+          establishedLimit,
+          source.content_id,
+          contentType,
+          genreIds,
+        ]);
+        establishedRows.push(...parseRelatedContentRows(vectorResult));
+      }
+
+      if (establishedRows.length < establishedLimit) {
+        const popularResult: unknown = await manager.query(popularQuery, [
+          RELATED_POPULAR_POOL_SIZE,
+          source.content_id,
+          contentType,
+          genreIds,
+          popularIndexability.minVoteCount,
+          RELATED_POPULAR_FETCH_LIMIT,
+        ]);
+        const seen = new Set(
+          establishedRows.map((row) => `${row.content_type}:${row.tmdb_id}`),
+        );
+        for (const row of parseRelatedContentRows(popularResult)) {
+          const key = `${row.content_type}:${row.tmdb_id}`;
+          if (seen.has(key)) continue;
+          establishedRows.push(row);
+          seen.add(key);
+          if (establishedRows.length >= establishedLimit) break;
+        }
+      }
+
+      return [...establishedRows, ...freshRows].slice(
+        0,
+        RELATED_CONTENT_RESULT_LIMIT,
+      );
     });
 
     return rows.map((row) => ({

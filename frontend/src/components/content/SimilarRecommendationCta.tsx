@@ -13,7 +13,7 @@ interface SimilarRecommendationCtaProps {
 }
 
 export function buildSimilarRecommendationPrompt(title: string): string {
-  const suffix = ' 같은 느낌의 작품 추천해줘';
+  const suffix = ' 같은 느낌을 좋아한다면 볼 만한 작품 추천해줘';
   const titleLengthLimit = MAX_CHAT_MESSAGE_LENGTH - Array.from(suffix).length;
   const safeTitle = Array.from(title.trim())
     .slice(0, titleLengthLimit)
@@ -41,7 +41,7 @@ export default function SimilarRecommendationCta({
           authenticated: user ? 1 : 0,
         });
       }}
-      className="group block rounded-2xl bg-gradient-to-r from-fuchsia-700 to-indigo-600 p-px"
+      className="group block rounded-2xl bg-gradient-to-r from-fuchsia-700 to-indigo-600 p-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <div className="flex items-center gap-3 rounded-[15px] bg-[#0b0b0d] px-4 py-4 transition-colors group-hover:bg-[#111116] sm:px-5">
         <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-700/30 to-indigo-600/30">
@@ -52,7 +52,7 @@ export default function SimilarRecommendationCta({
             이 작품이 마음에 들었다면
           </span>
           <span className="mt-0.5 block text-sm font-semibold text-white sm:text-base">
-            내 취향에 맞는 비슷한 작품 추천받기
+            이 작품을 바탕으로 취향 추천받기
           </span>
         </span>
       </div>

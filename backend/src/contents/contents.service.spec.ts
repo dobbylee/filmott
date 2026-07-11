@@ -583,6 +583,18 @@ describe('ContentsService', () => {
       expect(mockEmbeddingService.findRelatedContents).not.toHaveBeenCalled();
     });
 
+    it('limit을 생략하면 최대 조회 개수 6을 사용해야 한다', async () => {
+      mockEmbeddingService.findRelatedContents.mockResolvedValue([]);
+
+      await service.getRelatedContents(123, 'tv');
+
+      expect(mockEmbeddingService.findRelatedContents).toHaveBeenCalledWith(
+        123,
+        'tv',
+        6,
+      );
+    });
+
     it('지원하지 않는 content type을 거부해야 한다', async () => {
       await expect(
         service.getRelatedContents(

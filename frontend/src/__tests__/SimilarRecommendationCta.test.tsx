@@ -29,12 +29,13 @@ describe('SimilarRecommendationCta', () => {
     );
 
     const link = screen.getByRole('link', {
-      name: /내 취향에 맞는 비슷한 작품 추천받기/,
+      name: /이 작품을 바탕으로 취향 추천받기/,
     });
     expect(link).toHaveAttribute(
       'href',
-      `/?chatPrompt=${encodeURIComponent('기생충 & 가족 같은 느낌의 작품 추천해줘')}#chat-section`,
+      `/?chatPrompt=${encodeURIComponent('기생충 & 가족 같은 느낌을 좋아한다면 볼 만한 작품 추천해줘')}#chat-section`,
     );
+    expect(link).toHaveClass('focus-visible:ring-2');
   });
 
   it('클릭하면 현재 상세의 AI 추천 행동을 기록해야 한다', () => {
@@ -60,7 +61,7 @@ describe('SimilarRecommendationCta', () => {
 
   it('질문 생성 시 작품명 양끝 공백을 제거해야 한다', () => {
     expect(buildSimilarRecommendationPrompt('  기생충  ')).toBe(
-      '기생충 같은 느낌의 작품 추천해줘',
+      '기생충 같은 느낌을 좋아한다면 볼 만한 작품 추천해줘',
     );
   });
 
@@ -68,7 +69,7 @@ describe('SimilarRecommendationCta', () => {
     const prompt = buildSimilarRecommendationPrompt('가'.repeat(500));
 
     expect(Array.from(prompt)).toHaveLength(500);
-    expect(prompt).toMatch(/같은 느낌의 작품 추천해줘$/);
+    expect(prompt).toMatch(/같은 느낌을 좋아한다면 볼 만한 작품 추천해줘$/);
   });
 
   it('로그인 사용자의 클릭은 authenticated를 1로 기록해야 한다', () => {

@@ -33,11 +33,25 @@ export default function RelatedContents({
   };
 
   return (
-    <section aria-labelledby="related-contents-heading">
-      <h2 id="related-contents-heading" className="mb-4 text-lg font-bold">
-        이 작품과 비슷한 작품
-      </h2>
-      <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 lg:grid-cols-6">
+    <section
+      aria-labelledby="related-contents-heading"
+      aria-describedby="related-contents-description"
+    >
+      <div className="mb-4">
+        <h2 id="related-contents-heading" className="text-lg font-bold">
+          연관 작품
+        </h2>
+        <p
+          id="related-contents-description"
+          className="mt-1 text-xs text-muted-foreground"
+        >
+          장르와 작품 정보를 바탕으로 골랐어요
+        </p>
+      </div>
+      <div
+        data-testid="related-contents-scroll"
+        className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 lg:grid-cols-6"
+      >
         {visibleItems.map((item) => {
           const year = item.releaseDate?.slice(0, 4);
           const rating =
@@ -50,7 +64,7 @@ export default function RelatedContents({
               key={`${item.contentType}:${item.tmdbId}`}
               href={`/contents/${item.contentType}/${item.tmdbId}`}
               onClick={trackRelatedClick}
-              className="group w-36 shrink-0 md:w-auto"
+              className="group w-36 shrink-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:w-auto"
             >
               <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-white/5">
                 {item.posterUrl ? (
