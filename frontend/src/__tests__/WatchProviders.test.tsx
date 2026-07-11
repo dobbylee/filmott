@@ -71,8 +71,8 @@ describe('WatchProviders', () => {
 
     render(<WatchProviders data={data} compact />);
 
-    expect(screen.getByText('구독')).toBeInTheDocument();
-    expect(screen.getByText('대여·구매')).toBeInTheDocument();
+    expect(screen.getByText('구독')).toHaveClass('text-right');
+    expect(screen.getByText('대여·구매')).toHaveClass('text-right');
     expect(screen.getByAltText('넷플릭스')).toBeInTheDocument();
     expect(screen.getByAltText('구글 플레이')).toBeInTheDocument();
     expect(screen.getByAltText('애플 TV')).toBeInTheDocument();
