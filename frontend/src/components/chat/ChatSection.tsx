@@ -126,7 +126,7 @@ export default function ChatSection() {
     if (messages.length > 0 || isStreaming) {
       scrollToBottom();
     }
-  }, [messages, streamingText, isStreaming, scrollToBottom]);
+  }, [messages, streamingText, isStreaming, error, scrollToBottom]);
 
   // localStorage에서 메시지 복원
   useEffect(() => {
@@ -373,15 +373,17 @@ export default function ChatSection() {
               </div>
             )}
 
-          </div>
-        </div>
-      )}
+            {error && (
+              <div className="flex justify-start">
+                <div
+                  role="alert"
+                  className="max-w-[85%] sm:max-w-[75%] rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+                >
+                  {error}
+                </div>
+              </div>
+            )}
 
-      {/* 에러 메시지 */}
-      {error && (
-        <div className="px-4 pb-2">
-          <div className="max-w-2xl mx-auto rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-400">
-            {error}
           </div>
         </div>
       )}

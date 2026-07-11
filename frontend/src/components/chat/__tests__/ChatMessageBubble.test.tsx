@@ -55,6 +55,22 @@ describe('ChatMessageBubble', () => {
     expect(screen.getByText('비 오는 날에 어울리는 영화를 추천해드릴게요.')).toBeInTheDocument();
   });
 
+  it('어시스턴트 메시지의 Markdown 문단 사이에 명시적인 간격을 적용한다', () => {
+    const { container } = render(
+      <ChatMessageBubble
+        message={{
+          ...assistantMessage,
+          content: '첫 번째 추천 이유입니다.\n\n두 번째 추천 이유입니다.',
+        }}
+      />,
+    );
+
+    const paragraphs = container.querySelectorAll('p');
+    expect(paragraphs).toHaveLength(2);
+    expect(paragraphs[0]).toHaveClass('mb-4', 'last:mb-0');
+    expect(paragraphs[1]).toHaveClass('mb-4', 'last:mb-0');
+  });
+
   it('어시스턴트 메시지에 bg-white/5 스타일이 적용된다', () => {
     const { container } = render(<ChatMessageBubble message={assistantMessage} />);
     const bubble = container.querySelector('.bg-white\\/5');

@@ -313,6 +313,26 @@ describe('ChatSection', () => {
     });
   });
 
+  it('텍스트 없는 오류를 메시지 스크롤 영역의 마지막 버블로 표시한다', async () => {
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        callbacks.onError('추천 응답을 만들지 못했습니다.');
+        return Promise.resolve();
+      },
+    );
+
+    render(<ChatSection />);
+
+    fireEvent.click(screen.getByText('통쾌한 액션 영화 추천해줘'));
+
+    const errorBubble = await screen.findByRole('alert');
+    const messagesContainer = errorBubble.parentElement?.parentElement?.parentElement;
+
+    expect(errorBubble).toHaveTextContent('추천 응답을 만들지 못했습니다.');
+    expect(messagesContainer).toHaveClass('overflow-y-auto');
+    expect(errorBubble.parentElement).toBe(messagesContainer?.lastElementChild?.lastElementChild);
+  });
+
   it('일부 응답 뒤 onError가 오면 불완전 응답을 보존한다', async () => {
     mockSendChatMessage.mockImplementationOnce(
       (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
