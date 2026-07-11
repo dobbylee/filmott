@@ -11,6 +11,7 @@ import WatchlistStatusButton from '@/components/watchlist/WatchlistStatusButton'
 import AdultBlockButton from '@/components/content/AdultBlockButton';
 import ContentDetailTracker from '@/components/content/ContentDetailTracker';
 import RelatedContents from '@/components/content/RelatedContents';
+import SimilarRecommendationCta from '@/components/content/SimilarRecommendationCta';
 import type {
   ContentDetail,
   RelatedContent,
@@ -400,6 +401,12 @@ export default async function ContentDetailPage({
             searchIndexable={content.searchIndexable}
           />
         </Suspense>
+
+        <SimilarRecommendationCta
+          title={content.title}
+          tmdbId={content.tmdbId}
+          contentType={content.contentType}
+        />
 
         {/* 출연진 */}
         {content.credits.length > 0 && (

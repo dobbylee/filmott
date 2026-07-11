@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ChatSection from '@/components/chat/ChatSection';
 import type {
@@ -42,6 +43,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 describe('ChatSection', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/');
     mockAuthUser = null;
     mockSendChatMessage.mockReset();
     mockTrackEvent.mockReset();
@@ -660,5 +662,106 @@ describe('ChatSection', () => {
   it('id="chat-section" 속성이 부여된다', () => {
     const { container } = render(<ChatSection />);
     expect(container.querySelector('#chat-section')).toBeInTheDocument();
+  });
+
+  it('상세 CTA 질문을 자동 전송하지 않고 입력 필드에만 채운 뒤 query를 제거한다', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/?from=detail&chatPrompt=%EA%B8%B0%EC%83%9D%EC%B6%A9%20%EA%B0%99%EC%9D%80%20%EB%8A%90%EB%82%8C%EC%9D%98%20%EC%9E%91%ED%92%88%20%EC%B6%94%EC%B2%9C%ED%95%B4%EC%A4%98#chat-section',
+    );
+
+    render(<ChatSection />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('메시지를 입력하세요.')).toHaveValue(
+        '기생충 같은 느낌의 작품 추천해줘',
+      );
+    });
+    expect(mockSendChatMessage).not.toHaveBeenCalled();
+    expect(window.location.search).toBe('?from=detail');
+    expect(window.location.hash).toBe('#chat-section');
+  });
+
+  it('React Strict Mode에서도 상세 CTA 질문을 유지해야 한다', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/?chatPrompt=%EC%97%84%EA%B2%A9%20%EB%AA%A8%EB%93%9C%20%EC%B6%94%EC%B2%9C#chat-section',
+    );
+
+    render(
+      <StrictMode>
+        <ChatSection />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('메시지를 입력하세요.')).toHaveValue(
+        '엄격 모드 추천',
+      );
+    });
+    expect(window.location.search).toBe('');
+  });
+
+  it('상세 CTA에서 채운 질문을 보내면 content_detail 진입점으로 기록한다', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/?chatPrompt=%EA%B8%B0%EC%83%9D%EC%B6%A9%20%EA%B0%99%EC%9D%80%20%EB%8A%90%EB%82%8C%EC%9D%98%20%EC%9E%91%ED%92%88%20%EC%B6%94%EC%B2%9C%ED%95%B4%EC%A4%98#chat-section',
+    );
+    mockSendChatMessage.mockImplementationOnce(
+      (
+        _content: string,
+        _history: ChatHistoryMessage[],
+        callbacks: ChatStreamCallbacks,
+      ) => {
+        callbacks.onDone();
+        return Promise.resolve();
+      },
+    );
+
+    render(<ChatSection />);
+
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    await waitFor(() => {
+      expect(textarea).toHaveValue('기생충 같은 느낌의 작품 추천해줘');
+    });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(mockTrackEvent).toHaveBeenCalledWith('chat_message_sent', {
+        turn_number: 1,
+        entry_point: 'content_detail',
+        authenticated: 0,
+      });
+    });
+  });
+
+  it('상세 CTA 질문을 채워도 저장된 기존 대화를 유지한다', async () => {
+    const savedMessages = [
+      {
+        id: 1,
+        role: 'user',
+        content: '기존 질문',
+        recommendations: null,
+        createdAt: '2026-07-11T00:00:00.000Z',
+      },
+    ];
+    localStorageMock.getItem.mockReturnValue(JSON.stringify(savedMessages));
+    window.history.replaceState(
+      {},
+      '',
+      '/?chatPrompt=%EC%83%88%EB%A1%9C%EC%9A%B4%20%EC%B6%94%EC%B2%9C%20%EC%A7%88%EB%AC%B8#chat-section',
+    );
+
+    render(<ChatSection />);
+
+    await waitFor(() => {
+      expect(screen.getByText('기존 질문')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('메시지를 입력하세요.')).toHaveValue(
+        '새로운 추천 질문',
+      );
+    });
   });
 });

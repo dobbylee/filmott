@@ -1,14 +1,23 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Send } from 'lucide-react';
+import {
+  MAX_CHAT_MESSAGE_LENGTH,
+  truncateChatMessage,
+} from '@/lib/chat-constraints';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  initialText?: string;
 }
 
-export default function ChatInput({ onSend, disabled = false }: ChatInputProps) {
+export default function ChatInput({
+  onSend,
+  disabled = false,
+  initialText = '',
+}: ChatInputProps) {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -20,6 +29,20 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
     const maxHeight = 72;
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
   }, []);
+
+  useEffect(() => {
+    if (!initialText) return;
+
+    const frameId = requestAnimationFrame(() => {
+      setText(
+        (currentText) => currentText || truncateChatMessage(initialText),
+      );
+      autoResize();
+      textareaRef.current?.focus();
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [autoResize, initialText]);
 
   const handleSubmit = () => {
     const trimmed = text.trim();
@@ -48,12 +71,13 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
         ref={textareaRef}
         value={text}
         onChange={(e) => {
-          setText(e.target.value);
+          setText(truncateChatMessage(e.target.value));
           autoResize();
         }}
         onKeyDown={handleKeyDown}
         placeholder="메시지를 입력하세요."
         disabled={disabled}
+        maxLength={MAX_CHAT_MESSAGE_LENGTH}
         rows={1}
         className="flex-1 resize-none bg-transparent text-base text-white placeholder-white/40 outline-none disabled:opacity-50 leading-8"
         style={{ minHeight: '32px' }}

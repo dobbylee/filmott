@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ChatInput from '@/components/chat/ChatInput';
 
 describe('ChatInput', () => {
@@ -73,5 +73,29 @@ describe('ChatInput', () => {
     fireEvent.click(screen.getByLabelText('전송'));
 
     expect(onSend).toHaveBeenCalledWith('테스트 메시지');
+  });
+
+  it('initialText가 있으면 자동 전송 없이 입력 필드만 채워야 한다', async () => {
+    const onSend = vi.fn();
+    render(<ChatInput onSend={onSend} initialText="기생충과 비슷한 작품 추천해줘" />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('메시지를 입력하세요.')).toHaveValue(
+        '기생충과 비슷한 작품 추천해줘',
+      );
+    });
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('백엔드 계약에 맞춰 입력을 500자로 제한해야 한다', () => {
+    render(<ChatInput onSend={() => {}} />);
+    const textarea = screen.getByPlaceholderText(
+      '메시지를 입력하세요.',
+    ) as HTMLTextAreaElement;
+
+    fireEvent.change(textarea, { target: { value: '가'.repeat(501) } });
+
+    expect(Array.from(textarea.value)).toHaveLength(500);
+    expect(textarea).toHaveAttribute('maxlength', '500');
   });
 });

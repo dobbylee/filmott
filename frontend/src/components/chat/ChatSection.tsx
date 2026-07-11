@@ -12,8 +12,10 @@ import StreamingText from './StreamingText';
 import RecommendationCards from './RecommendationCards';
 import type { ChatMessageData, ChatRecommendationWithPoster } from '@/types/chat';
 import { trackEvent } from '@/lib/ga';
+import { truncateChatMessage } from '@/lib/chat-constraints';
 
 const STORAGE_KEY = 'filmott_chat_messages';
+const PREFILL_QUERY_KEY = 'chatPrompt';
 const MAX_STORED_MESSAGES = 50;
 const MAX_HISTORY_MESSAGES = 20;
 
@@ -53,6 +55,7 @@ export default function ChatSection() {
   const [streamingText, setStreamingText] = useState('');
   const [streamingRecs, setStreamingRecs] = useState<ChatRecommendationWithPoster[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [initialInputText, setInitialInputText] = useState('');
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // onDone 콜백에서 최신 streaming 상태를 참조하기 위한 ref
@@ -63,6 +66,26 @@ export default function ChatSection() {
   const nextMessageIdRef = useRef(1);
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeRequestIdRef = useRef(0);
+  const inputEntryPointRef = useRef<ChatEntryPoint>('typed');
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const prompt = url.searchParams.get(PREFILL_QUERY_KEY)?.trim();
+    if (!prompt) return;
+
+    inputEntryPointRef.current = 'content_detail';
+    const prefillTimer = setTimeout(() => {
+      setInitialInputText(truncateChatMessage(prompt));
+      url.searchParams.delete(PREFILL_QUERY_KEY);
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }, 0);
+
+    return () => clearTimeout(prefillTimer);
+  }, []);
 
   const getNextMessageId = useCallback(() => {
     const nextId = nextMessageIdRef.current;
@@ -333,6 +356,13 @@ export default function ChatSection() {
     });
   };
 
+  const handleInputSend = (content: string) => {
+    const entryPoint = inputEntryPointRef.current;
+    inputEntryPointRef.current = 'typed';
+    setInitialInputText('');
+    void handleSend(content, { entryPoint });
+  };
+
   const hasConversation = messages.length > 0 || isStreaming;
 
   return (
@@ -445,7 +475,11 @@ export default function ChatSection() {
       {/* 입력 영역 */}
       <div className="px-4 pb-4 pt-2">
         <div className="max-w-2xl mx-auto">
-          <ChatInput onSend={handleSend} disabled={isStreaming} />
+          <ChatInput
+            onSend={handleInputSend}
+            disabled={isStreaming}
+            initialText={initialInputText}
+          />
         </div>
       </div>
     </section>
