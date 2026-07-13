@@ -9,6 +9,13 @@ export interface ExternalApiErrorSummary {
   message: string;
 }
 
+export class SanitizedExternalApiError extends Error {
+  constructor(public readonly summary: ExternalApiErrorSummary) {
+    super(summary.message);
+    this.name = 'SanitizedExternalApiError';
+  }
+}
+
 const SENSITIVE_QUERY_KEYS = new Set([
   'api_key',
   'apikey',
@@ -47,6 +54,11 @@ function redactSensitiveText(value: string): string {
     },
   );
 
+  redacted = redacted.replace(
+    /\b(api_key|apikey|key|token|access_token|auth|authorization)=([^&#\s]+)/gi,
+    '$1=[REDACTED]',
+  );
+
   return redacted.replace(/https?:\/\/[^\s]+/g, (match) => {
     try {
       const parsed = new URL(match);
@@ -62,6 +74,10 @@ export function summarizeExternalApiError(
   error: unknown,
   fallbackEndpointPath?: string,
 ): ExternalApiErrorSummary {
+  if (error instanceof SanitizedExternalApiError) {
+    return { ...error.summary };
+  }
+
   if (isAxiosError(error)) {
     const endpointPath =
       extractPath(error.config?.url) ??
@@ -86,4 +102,14 @@ export function summarizeExternalApiError(
         ? redactSensitiveText(error.message)
         : 'Unknown external API error',
   };
+}
+
+export function sanitizeExternalApiError(
+  service: string,
+  error: unknown,
+  fallbackEndpointPath?: string,
+): SanitizedExternalApiError {
+  return new SanitizedExternalApiError(
+    summarizeExternalApiError(service, error, fallbackEndpointPath),
+  );
 }

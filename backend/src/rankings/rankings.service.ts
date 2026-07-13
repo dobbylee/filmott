@@ -1,5 +1,10 @@
 import * as Sentry from '@sentry/nestjs';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
@@ -22,6 +27,8 @@ type DailyBoxOfficeTrigger =
   | 'daily-box-office-backfill'
   | 'daily-box-office-noon'
   | 'manual-refresh';
+
+type DailyBoxOfficeFailurePolicy = 'warn' | 'report' | 'throw';
 
 @Injectable()
 export class RankingsService {
@@ -48,7 +55,7 @@ export class RankingsService {
     timeZone: 'Asia/Seoul',
   })
   async scheduleDailyBoxOfficeMidnight(): Promise<Ranking[]> {
-    return this.fetchDailyBoxOffice('daily-box-office-midnight');
+    return this.fetchDailyBoxOffice('daily-box-office-midnight', 'report');
   }
 
   /**
@@ -89,7 +96,7 @@ export class RankingsService {
         existingCount,
       },
     );
-    return this.fetchDailyBoxOffice('daily-box-office-backfill');
+    return this.fetchDailyBoxOffice('daily-box-office-backfill', 'report');
   }
 
   /**
@@ -101,7 +108,7 @@ export class RankingsService {
     timeZone: 'Asia/Seoul',
   })
   async scheduleDailyBoxOfficeNoon(): Promise<Ranking[]> {
-    return this.fetchDailyBoxOffice('daily-box-office-noon');
+    return this.fetchDailyBoxOffice('daily-box-office-noon', 'report');
   }
 
   /**
@@ -110,6 +117,7 @@ export class RankingsService {
    */
   async fetchDailyBoxOffice(
     trigger: DailyBoxOfficeTrigger = 'manual-refresh',
+    failurePolicy: DailyBoxOfficeFailurePolicy = 'throw',
   ): Promise<Ranking[]> {
     const startedAt = Date.now();
     const yesterday = this.getYesterdayDate();
@@ -201,9 +209,20 @@ export class RankingsService {
         targetDate,
         durationMs: Date.now() - startedAt,
       };
-      this.logger.error('Failed to fetch daily box office', errorSummary);
-      Sentry.captureException(errorSummary);
-      throw error;
+      if (failurePolicy === 'warn') {
+        this.logger.warn('Failed to fetch daily box office', errorSummary);
+      } else {
+        this.logger.error('Failed to fetch daily box office', errorSummary);
+        Sentry.captureException(errorSummary);
+      }
+
+      if (failurePolicy === 'throw') {
+        throw new BadGatewayException(
+          'KOBIS 일별 박스오피스 조회에 실패했습니다.',
+        );
+      }
+
+      return [];
     }
   }
 
@@ -286,7 +305,9 @@ export class RankingsService {
       const errorSummary = summarizeExternalApiError('KOBIS', error);
       this.logger.error('Failed to fetch weekly box office', errorSummary);
       Sentry.captureException(errorSummary);
-      throw error;
+      throw new BadGatewayException(
+        'KOBIS 주간 박스오피스 조회에 실패했습니다.',
+      );
     }
   }
 

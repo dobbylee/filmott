@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nestjs';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { BadGatewayException, NotFoundException } from '@nestjs/common';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { RankingsService } from './rankings.service';
 import { Ranking } from './ranking.entity';
@@ -216,7 +216,10 @@ describe('RankingsService', () => {
       await service.scheduleDailyBoxOfficeMidnight();
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-midnight');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'daily-box-office-midnight',
+        'report',
+      );
     });
 
     it('정오 스케줄러가 fetchDailyBoxOffice를 호출해야 한다', async () => {
@@ -227,7 +230,7 @@ describe('RankingsService', () => {
       await service.scheduleDailyBoxOfficeNoon();
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-noon');
+      expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-noon', 'report');
     });
 
     it('백필 스케줄러는 전일 데이터가 없을 때만 fetchDailyBoxOffice를 호출해야 한다', async () => {
@@ -246,7 +249,10 @@ describe('RankingsService', () => {
         }),
       });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-backfill');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'daily-box-office-backfill',
+        'report',
+      );
     });
 
     it('백필 스케줄러는 전일 데이터가 이미 있으면 호출하지 않아야 한다', async () => {
@@ -258,6 +264,35 @@ describe('RankingsService', () => {
       await service.backfillDailyBoxOfficeIfMissing();
 
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('자정 스케줄러 실패는 원본 오류를 다시 던지지 않고 정제된 정보만 보고해야 한다', async () => {
+      const error = new AxiosError(
+        'Request failed with key=kobis-message-key',
+        'ECONNABORTED',
+        {
+          headers: new AxiosHeaders({
+            Authorization: 'Bearer kobis-auth-token',
+          }),
+          url: '/boxoffice/searchDailyBoxOfficeList.json?key=kobis-query-key',
+          params: { key: 'kobis-param-key', targetDt: '20260429' },
+        },
+      );
+      mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
+
+      await expect(service.scheduleDailyBoxOfficeMidnight()).resolves.toEqual(
+        [],
+      );
+
+      const payload = JSON.stringify(
+        (Sentry.captureException as jest.Mock).mock.calls,
+      );
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      expect(payload).not.toContain('kobis-message-key');
+      expect(payload).not.toContain('kobis-auth-token');
+      expect(payload).not.toContain('kobis-query-key');
+      expect(payload).not.toContain('kobis-param-key');
+      expect(payload).not.toContain('Authorization');
     });
   });
 
@@ -425,12 +460,12 @@ describe('RankingsService', () => {
   });
 
   describe('fetchDailyBoxOffice - 에러 처리', () => {
-    it('KOBIS 서비스 실패 시 에러를 던져야 한다', async () => {
+    it('KOBIS 서비스 실패 시 정제된 BadGatewayException을 던져야 한다', async () => {
       const error = new Error('KOBIS API error');
       mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
 
-      await expect(service.fetchDailyBoxOffice()).rejects.toThrow(
-        'KOBIS API error',
+      await expect(service.fetchDailyBoxOffice()).rejects.toBeInstanceOf(
+        BadGatewayException,
       );
     });
 
@@ -466,11 +501,16 @@ describe('RankingsService', () => {
       );
       mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
 
-      await expect(service.fetchDailyBoxOffice()).rejects.toThrow();
-
-      const payload = JSON.stringify(
-        (Sentry.captureException as jest.Mock).mock.calls,
+      const thrownError = await service.fetchDailyBoxOffice().then(
+        () => undefined,
+        (caught: unknown) => caught,
       );
+
+      const payload = JSON.stringify({
+        sentry: (Sentry.captureException as jest.Mock).mock.calls,
+        thrownError,
+      });
+      expect(thrownError).toBeInstanceOf(BadGatewayException);
       expect(payload).not.toContain('kobis-auth-token');
       expect(payload).not.toContain('kobis-query-key');
       expect(payload).not.toContain('kobis-param-key');
@@ -500,7 +540,9 @@ describe('RankingsService', () => {
       const error = new Error('KOBIS Weekly API error');
       mockKobisService.getWeeklyBoxOffice.mockRejectedValue(error);
 
-      await expect(service.fetchWeeklyBoxOffice()).rejects.toThrow();
+      await expect(service.fetchWeeklyBoxOffice()).rejects.toBeInstanceOf(
+        BadGatewayException,
+      );
 
       expect(Sentry.captureException).toHaveBeenCalledWith(
         expect.objectContaining({

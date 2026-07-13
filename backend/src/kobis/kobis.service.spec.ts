@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
-import { BadGatewayException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { KobisService } from './kobis.service';
 import { AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
+import { SanitizedExternalApiError } from '../common/external-api-error.util';
 
 describe('KobisService', () => {
   let service: KobisService;
@@ -106,19 +107,19 @@ describe('KobisService', () => {
       expect(result).toEqual([]);
     });
 
-    it('API 실패 시 에러를 던져야 한다', async () => {
+    it('API 실패 시 안전한 오류를 던져야 한다', async () => {
       mockHttpService.get.mockReturnValue(
         throwError(() => new Error('API Error')),
       );
 
-      await expect(service.getDailyBoxOffice('20260309')).rejects.toThrow(
-        'API Error',
-      );
+      await expect(
+        service.getDailyBoxOffice('20260309'),
+      ).rejects.toBeInstanceOf(SanitizedExternalApiError);
     });
 
-    it('KOBIS 응답에 boxOfficeResult가 없으면 BadGatewayException을 던져야 한다', async () => {
+    it('KOBIS 응답에 boxOfficeResult가 없으면 안전한 오류를 던져야 한다', async () => {
       const loggerSpy = jest
-        .spyOn(Logger.prototype, 'error')
+        .spyOn(Logger.prototype, 'warn')
         .mockImplementation();
       jest
         .spyOn(Date, 'now')
@@ -137,9 +138,9 @@ describe('KobisService', () => {
       };
       mockHttpService.get.mockReturnValue(of(response));
 
-      await expect(service.getDailyBoxOffice('20260309')).rejects.toThrow(
-        BadGatewayException,
-      );
+      await expect(
+        service.getDailyBoxOffice('20260309'),
+      ).rejects.toBeInstanceOf(SanitizedExternalApiError);
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to fetch daily box office for 20260309',
@@ -153,7 +154,7 @@ describe('KobisService', () => {
       );
     });
 
-    it('KOBIS 일일 목록이 배열이 아니면 BadGatewayException을 던져야 한다', async () => {
+    it('KOBIS 일일 목록이 배열이 아니면 안전한 오류를 던져야 한다', async () => {
       const response: AxiosResponse = {
         data: {
           boxOfficeResult: {
@@ -169,14 +170,14 @@ describe('KobisService', () => {
       };
       mockHttpService.get.mockReturnValue(of(response));
 
-      await expect(service.getDailyBoxOffice('20260309')).rejects.toThrow(
-        BadGatewayException,
-      );
+      await expect(
+        service.getDailyBoxOffice('20260309'),
+      ).rejects.toBeInstanceOf(SanitizedExternalApiError);
     });
 
-    it('API 실패 로그에 key와 Authorization을 포함하지 않아야 한다', async () => {
+    it('API 실패 로그와 안전한 오류에 key와 Authorization을 포함하지 않아야 한다', async () => {
       const loggerSpy = jest
-        .spyOn(Logger.prototype, 'error')
+        .spyOn(Logger.prototype, 'warn')
         .mockImplementation();
       jest
         .spyOn(Date, 'now')
@@ -195,9 +196,16 @@ describe('KobisService', () => {
       );
       mockHttpService.get.mockReturnValue(throwError(() => error));
 
-      await expect(service.getDailyBoxOffice('20260309')).rejects.toThrow();
+      const thrownError = await service.getDailyBoxOffice('20260309').then(
+        () => undefined,
+        (caught: unknown) => caught,
+      );
 
-      const payload = JSON.stringify(loggerSpy.mock.calls);
+      const payload = JSON.stringify({
+        logs: loggerSpy.mock.calls,
+        thrownError,
+      });
+      expect(thrownError).toBeInstanceOf(SanitizedExternalApiError);
       expect(payload).not.toContain('kobis-auth-token');
       expect(payload).not.toContain('kobis-query-key');
       expect(payload).not.toContain('kobis-param-key');
@@ -254,7 +262,7 @@ describe('KobisService', () => {
       );
     });
 
-    it('KOBIS 주간 응답에 boxOfficeResult가 없으면 BadGatewayException을 던져야 한다', async () => {
+    it('KOBIS 주간 응답에 boxOfficeResult가 없으면 안전한 오류를 던져야 한다', async () => {
       const response: AxiosResponse = {
         data: { faultInfo: { message: 'temporary upstream response' } },
         status: 200,
@@ -264,9 +272,9 @@ describe('KobisService', () => {
       };
       mockHttpService.get.mockReturnValue(of(response));
 
-      await expect(service.getWeeklyBoxOffice('20260309', '0')).rejects.toThrow(
-        BadGatewayException,
-      );
+      await expect(
+        service.getWeeklyBoxOffice('20260309', '0'),
+      ).rejects.toBeInstanceOf(SanitizedExternalApiError);
     });
   });
 });

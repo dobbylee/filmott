@@ -1,7 +1,10 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { summarizeExternalApiError } from '../common/external-api-error.util';
+import {
+  sanitizeExternalApiError,
+  summarizeExternalApiError,
+} from '../common/external-api-error.util';
 
 export interface KobisBoxOfficeItem {
   rank: string;
@@ -103,16 +106,17 @@ export class KobisService {
       });
       return items;
     } catch (error) {
-      this.logger.error(`Failed to fetch daily box office for ${targetDt}`, {
-        ...summarizeExternalApiError(
-          'KOBIS',
-          error,
-          '/boxoffice/searchDailyBoxOfficeList.json',
-        ),
+      const sanitizedError = sanitizeExternalApiError(
+        'KOBIS',
+        error,
+        '/boxoffice/searchDailyBoxOfficeList.json',
+      );
+      this.logger.warn(`Failed to fetch daily box office for ${targetDt}`, {
+        ...summarizeExternalApiError('KOBIS', sanitizedError),
         targetDt,
         durationMs: getElapsedMs(startedAt),
       });
-      throw error;
+      throw sanitizedError;
     }
   }
 
@@ -148,17 +152,18 @@ export class KobisService {
       });
       return items;
     } catch (error) {
-      this.logger.error(`Failed to fetch weekly box office for ${targetDt}`, {
-        ...summarizeExternalApiError(
-          'KOBIS',
-          error,
-          '/boxoffice/searchWeeklyBoxOfficeList.json',
-        ),
+      const sanitizedError = sanitizeExternalApiError(
+        'KOBIS',
+        error,
+        '/boxoffice/searchWeeklyBoxOfficeList.json',
+      );
+      this.logger.warn(`Failed to fetch weekly box office for ${targetDt}`, {
+        ...summarizeExternalApiError('KOBIS', sanitizedError),
         targetDt,
         weekGb,
         durationMs: getElapsedMs(startedAt),
       });
-      throw error;
+      throw sanitizedError;
     }
   }
 }
