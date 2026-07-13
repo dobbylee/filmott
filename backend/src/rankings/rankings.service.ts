@@ -24,6 +24,7 @@ const RANKINGS_REVALIDATE_TAGS = ['rankings'];
 
 type DailyBoxOfficeTrigger =
   | 'daily-box-office-midnight'
+  | 'daily-box-office-stabilization'
   | 'daily-box-office-backfill'
   | 'daily-box-office-noon'
   | 'manual-refresh';
@@ -47,15 +48,27 @@ export class RankingsService {
   ) {}
 
   /**
-   * KOBIS 일별 박스오피스 1차 수집
-   * 매일 00:20 실행 (전일자 데이터)
+   * KOBIS 일별 박스오피스 조기 1차 수집
+   * 매일 00:05 실행 (전일자 데이터)
    */
-  @Cron('20 0 * * *', {
+  @Cron('5 0 * * *', {
     name: 'daily-box-office-midnight',
     timeZone: 'Asia/Seoul',
   })
   async scheduleDailyBoxOfficeMidnight(): Promise<Ranking[]> {
-    return this.fetchDailyBoxOffice('daily-box-office-midnight', 'report');
+    return this.fetchDailyBoxOffice('daily-box-office-midnight', 'warn');
+  }
+
+  /**
+   * KOBIS 일별 박스오피스 안정화 수집
+   * 매일 00:25 실행 (전일자 데이터 재수집/업서트)
+   */
+  @Cron('25 0 * * *', {
+    name: 'daily-box-office-stabilization',
+    timeZone: 'Asia/Seoul',
+  })
+  async scheduleDailyBoxOfficeStabilization(): Promise<Ranking[]> {
+    return this.fetchDailyBoxOffice('daily-box-office-stabilization', 'report');
   }
 
   /**

@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nestjs';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadGatewayException, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, Logger, NotFoundException } from '@nestjs/common';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { RankingsService } from './rankings.service';
 import { Ranking } from './ranking.entity';
@@ -71,6 +71,7 @@ describe('RankingsService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('fetchDailyBoxOffice', () => {
@@ -196,19 +197,31 @@ describe('RankingsService', () => {
   });
 
   describe('daily box office schedulers', () => {
-    it('자정 스케줄러가 매일 00:20에 실행되도록 설정되어야 한다', () => {
+    it('조기 수집 스케줄러가 매일 00:05에 실행되도록 설정되어야 한다', () => {
       const cronMetadata = Reflect.getMetadata(
         'SCHEDULE_CRON_OPTIONS',
         service.scheduleDailyBoxOfficeMidnight,
       ) as { cronTime?: unknown; timeZone?: unknown };
 
       expect(cronMetadata).toMatchObject({
-        cronTime: '20 0 * * *',
+        cronTime: '5 0 * * *',
         timeZone: 'Asia/Seoul',
       });
     });
 
-    it('자정 스케줄러가 fetchDailyBoxOffice를 호출해야 한다', async () => {
+    it('안정화 수집 스케줄러가 매일 00:25에 실행되도록 설정되어야 한다', () => {
+      const cronMetadata = Reflect.getMetadata(
+        'SCHEDULE_CRON_OPTIONS',
+        service.scheduleDailyBoxOfficeStabilization,
+      ) as { cronTime?: unknown; timeZone?: unknown };
+
+      expect(cronMetadata).toMatchObject({
+        cronTime: '25 0 * * *',
+        timeZone: 'Asia/Seoul',
+      });
+    });
+
+    it('조기 수집 스케줄러가 warning 정책으로 수집해야 한다', async () => {
       const fetchSpy = jest
         .spyOn(service, 'fetchDailyBoxOffice')
         .mockResolvedValue([]);
@@ -218,6 +231,22 @@ describe('RankingsService', () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       expect(fetchSpy).toHaveBeenCalledWith(
         'daily-box-office-midnight',
+        'warn',
+      );
+    });
+
+    it('안정화 수집 스케줄러가 기존 데이터와 무관하게 항상 수집해야 한다', async () => {
+      mockRankingRepo.count.mockResolvedValue(10);
+      const fetchSpy = jest
+        .spyOn(service, 'fetchDailyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.scheduleDailyBoxOfficeStabilization();
+
+      expect(mockRankingRepo.count).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'daily-box-office-stabilization',
         'report',
       );
     });
@@ -266,7 +295,10 @@ describe('RankingsService', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('자정 스케줄러 실패는 원본 오류를 다시 던지지 않고 정제된 정보만 보고해야 한다', async () => {
+    it('조기 수집 실패는 warning만 남기고 Sentry에 보고하지 않아야 한다', async () => {
+      const loggerSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation();
       const error = new AxiosError(
         'Request failed with key=kobis-message-key',
         'ECONNABORTED',
@@ -284,15 +316,97 @@ describe('RankingsService', () => {
         [],
       );
 
-      const payload = JSON.stringify(
-        (Sentry.captureException as jest.Mock).mock.calls,
+      const payload = JSON.stringify(loggerSpy.mock.calls);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Failed to fetch daily box office',
+        expect.objectContaining({
+          trigger: 'daily-box-office-midnight',
+          code: 'ECONNABORTED',
+        }),
       );
-      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).not.toHaveBeenCalled();
       expect(payload).not.toContain('kobis-message-key');
       expect(payload).not.toContain('kobis-auth-token');
       expect(payload).not.toContain('kobis-query-key');
       expect(payload).not.toContain('kobis-param-key');
       expect(payload).not.toContain('Authorization');
+    });
+
+    it('안정화 수집 실패는 원본 오류를 던지지 않고 정제된 정보만 보고해야 한다', async () => {
+      const error = new AxiosError(
+        'Request failed with key=kobis-message-key',
+        'ECONNABORTED',
+        {
+          headers: new AxiosHeaders({
+            Authorization: 'Bearer kobis-auth-token',
+          }),
+          url: '/boxoffice/searchDailyBoxOfficeList.json?key=kobis-query-key',
+          params: { key: 'kobis-param-key', targetDt: '20260429' },
+        },
+      );
+      mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
+
+      await expect(
+        service.scheduleDailyBoxOfficeStabilization(),
+      ).resolves.toEqual([]);
+
+      const payload = JSON.stringify(
+        (Sentry.captureException as jest.Mock).mock.calls,
+      );
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trigger: 'daily-box-office-stabilization',
+          code: 'ECONNABORTED',
+        }),
+      );
+      expect(payload).not.toContain('kobis-message-key');
+      expect(payload).not.toContain('kobis-auth-token');
+      expect(payload).not.toContain('kobis-query-key');
+      expect(payload).not.toContain('kobis-param-key');
+      expect(payload).not.toContain('Authorization');
+    });
+
+    it('조기 수집 실패 후 안정화 수집이 성공하면 전일 랭킹을 저장하고 캐시를 갱신해야 한다', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: '복구 영화',
+          movieCd: '20260001',
+          openDt: '2026-07-01',
+          audiCnt: '10000',
+          audiAcc: '50000',
+          salesAmt: '100000000',
+          salesAcc: '500000000',
+        },
+      ];
+      mockKobisService.getDailyBoxOffice
+        .mockRejectedValueOnce(new Error('KOBIS 일시 지연'))
+        .mockResolvedValueOnce(kobisItems);
+      mockTmdbService.searchByType.mockResolvedValue({ results: [] });
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await expect(service.scheduleDailyBoxOfficeMidnight()).resolves.toEqual(
+        [],
+      );
+      await expect(
+        service.scheduleDailyBoxOfficeStabilization(),
+      ).resolves.toHaveLength(1);
+
+      expect(mockKobisService.getDailyBoxOffice).toHaveBeenCalledTimes(2);
+      expect(mockRankingRepo.upsert).toHaveBeenCalledWith(expect.any(Array), [
+        'source',
+        'category',
+        'rank',
+        'targetDate',
+      ]);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/', [
+        'rankings',
+      ]);
+      expect(Sentry.captureException).not.toHaveBeenCalled();
     });
   });
 
