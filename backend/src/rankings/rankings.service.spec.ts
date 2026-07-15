@@ -209,14 +209,26 @@ describe('RankingsService', () => {
       });
     });
 
-    it('안정화 수집 스케줄러가 매일 00:25에 실행되도록 설정되어야 한다', () => {
+    it('1차 재시도 스케줄러가 매일 00:25에 실행되도록 설정되어야 한다', () => {
+      const cronMetadata = Reflect.getMetadata(
+        'SCHEDULE_CRON_OPTIONS',
+        service.retryDailyBoxOfficeIfMissing,
+      ) as { cronTime?: unknown; timeZone?: unknown };
+
+      expect(cronMetadata).toMatchObject({
+        cronTime: '25 0 * * *',
+        timeZone: 'Asia/Seoul',
+      });
+    });
+
+    it('안정화 수집 스케줄러가 매일 01:00에 실행되도록 설정되어야 한다', () => {
       const cronMetadata = Reflect.getMetadata(
         'SCHEDULE_CRON_OPTIONS',
         service.scheduleDailyBoxOfficeStabilization,
       ) as { cronTime?: unknown; timeZone?: unknown };
 
       expect(cronMetadata).toMatchObject({
-        cronTime: '25 0 * * *',
+        cronTime: '0 1 * * *',
         timeZone: 'Asia/Seoul',
       });
     });
@@ -235,20 +247,34 @@ describe('RankingsService', () => {
       );
     });
 
-    it('안정화 수집 스케줄러가 기존 데이터와 무관하게 항상 수집해야 한다', async () => {
+    it('1차 재시도 스케줄러는 전일 데이터가 이미 있으면 수집하지 않아야 한다', async () => {
       mockRankingRepo.count.mockResolvedValue(10);
       const fetchSpy = jest
         .spyOn(service, 'fetchDailyBoxOffice')
         .mockResolvedValue([]);
 
-      await service.scheduleDailyBoxOfficeStabilization();
+      await service.retryDailyBoxOfficeIfMissing();
 
-      expect(mockRankingRepo.count).not.toHaveBeenCalled();
+      expect(mockRankingRepo.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          source: 'kobis',
+          category: 'daily-box-office',
+          targetDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        }),
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('1차 재시도 스케줄러는 전일 데이터가 없을 때만 수집해야 한다', async () => {
+      mockRankingRepo.count.mockResolvedValue(0);
+      const fetchSpy = jest
+        .spyOn(service, 'fetchDailyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.retryDailyBoxOfficeIfMissing();
+
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      expect(fetchSpy).toHaveBeenCalledWith(
-        'daily-box-office-stabilization',
-        'report',
-      );
+      expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-retry', 'warn');
     });
 
     it('정오 스케줄러가 fetchDailyBoxOffice를 호출해야 한다', async () => {
@@ -262,37 +288,20 @@ describe('RankingsService', () => {
       expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-noon', 'report');
     });
 
-    it('백필 스케줄러는 전일 데이터가 없을 때만 fetchDailyBoxOffice를 호출해야 한다', async () => {
-      mockRankingRepo.count.mockResolvedValue(0);
-      const fetchSpy = jest
-        .spyOn(service, 'fetchDailyBoxOffice')
-        .mockResolvedValue([]);
-
-      await service.backfillDailyBoxOfficeIfMissing();
-
-      expect(mockRankingRepo.count).toHaveBeenCalledWith({
-        where: expect.objectContaining({
-          source: 'kobis',
-          category: 'daily-box-office',
-          targetDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-        }),
-      });
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-      expect(fetchSpy).toHaveBeenCalledWith(
-        'daily-box-office-backfill',
-        'report',
-      );
-    });
-
-    it('백필 스케줄러는 전일 데이터가 이미 있으면 호출하지 않아야 한다', async () => {
+    it('01:00 안정화 수집은 전일 데이터 존재 여부와 무관하게 항상 실행해야 한다', async () => {
       mockRankingRepo.count.mockResolvedValue(10);
       const fetchSpy = jest
         .spyOn(service, 'fetchDailyBoxOffice')
         .mockResolvedValue([]);
 
-      await service.backfillDailyBoxOfficeIfMissing();
+      await service.scheduleDailyBoxOfficeStabilization();
 
-      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(mockRankingRepo.count).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'daily-box-office-stabilization',
+        'report',
+      );
     });
 
     it('조기 수집 실패는 warning만 남기고 Sentry에 보고하지 않아야 한다', async () => {
@@ -332,7 +341,43 @@ describe('RankingsService', () => {
       expect(payload).not.toContain('Authorization');
     });
 
-    it('안정화 수집 실패는 원본 오류를 던지지 않고 정제된 정보만 보고해야 한다', async () => {
+    it('1차 재시도 실패는 warning만 남기고 Sentry에 보고하지 않아야 한다', async () => {
+      mockRankingRepo.count.mockResolvedValue(0);
+      const loggerSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation();
+      const error = new AxiosError(
+        'Request failed with key=kobis-message-key',
+        'ECONNABORTED',
+        {
+          headers: new AxiosHeaders({
+            Authorization: 'Bearer kobis-auth-token',
+          }),
+          url: '/boxoffice/searchDailyBoxOfficeList.json?key=kobis-query-key',
+          params: { key: 'kobis-param-key', targetDt: '20260429' },
+        },
+      );
+      mockKobisService.getDailyBoxOffice.mockRejectedValue(error);
+
+      await expect(service.retryDailyBoxOfficeIfMissing()).resolves.toEqual([]);
+
+      const payload = JSON.stringify(loggerSpy.mock.calls);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Failed to fetch daily box office',
+        expect.objectContaining({
+          trigger: 'daily-box-office-retry',
+          code: 'ECONNABORTED',
+        }),
+      );
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+      expect(payload).not.toContain('kobis-message-key');
+      expect(payload).not.toContain('kobis-auth-token');
+      expect(payload).not.toContain('kobis-query-key');
+      expect(payload).not.toContain('kobis-param-key');
+      expect(payload).not.toContain('Authorization');
+    });
+
+    it('01:00 안정화 수집 실패는 정제된 정보만 Sentry에 보고해야 한다', async () => {
       const error = new AxiosError(
         'Request failed with key=kobis-message-key',
         'ECONNABORTED',
@@ -366,8 +411,9 @@ describe('RankingsService', () => {
       expect(payload).not.toContain('Authorization');
     });
 
-    it('조기 수집 실패 후 안정화 수집이 성공하면 전일 랭킹을 저장하고 캐시를 갱신해야 한다', async () => {
+    it('조기 수집 실패 후 1차 재시도가 성공하면 전일 랭킹을 저장하고 캐시를 갱신해야 한다', async () => {
       jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      mockRankingRepo.count.mockResolvedValue(0);
       const kobisItems = [
         {
           rank: '1',
@@ -393,7 +439,7 @@ describe('RankingsService', () => {
         [],
       );
       await expect(
-        service.scheduleDailyBoxOfficeStabilization(),
+        service.retryDailyBoxOfficeIfMissing(),
       ).resolves.toHaveLength(1);
 
       expect(mockKobisService.getDailyBoxOffice).toHaveBeenCalledTimes(2);
@@ -407,6 +453,62 @@ describe('RankingsService', () => {
         'rankings',
       ]);
       expect(Sentry.captureException).not.toHaveBeenCalled();
+    });
+
+    it('조기 수집과 1차 재시도가 모두 실패해도 01:00 안정화 수집으로 다시 시도해야 한다', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      mockRankingRepo.count.mockResolvedValue(0);
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: '안정화 영화',
+          movieCd: '20260002',
+          openDt: '2026-07-01',
+          audiCnt: '20000',
+          audiAcc: '60000',
+          salesAmt: '200000000',
+          salesAcc: '600000000',
+        },
+      ];
+      mockKobisService.getDailyBoxOffice
+        .mockRejectedValueOnce(new Error('00:05 수집 실패'))
+        .mockRejectedValueOnce(new Error('00:25 재시도 실패'))
+        .mockResolvedValueOnce(kobisItems);
+      mockTmdbService.searchByType.mockResolvedValue({ results: [] });
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await expect(service.scheduleDailyBoxOfficeMidnight()).resolves.toEqual(
+        [],
+      );
+      await expect(service.retryDailyBoxOfficeIfMissing()).resolves.toEqual([]);
+      await expect(
+        service.scheduleDailyBoxOfficeStabilization(),
+      ).resolves.toHaveLength(1);
+
+      expect(mockKobisService.getDailyBoxOffice).toHaveBeenCalledTimes(3);
+      expect(mockRankingRepo.count).toHaveBeenCalledTimes(1);
+      expect(mockRankingRepo.upsert).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+    });
+
+    it('조기 수집 데이터가 있으면 00:25는 건너뛰고 01:00은 안정화 수집해야 한다', async () => {
+      mockRankingRepo.count.mockResolvedValue(10);
+      const fetchSpy = jest
+        .spyOn(service, 'fetchDailyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.retryDailyBoxOfficeIfMissing();
+      await service.scheduleDailyBoxOfficeStabilization();
+
+      expect(mockRankingRepo.count).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'daily-box-office-stabilization',
+        'report',
+      );
     });
   });
 

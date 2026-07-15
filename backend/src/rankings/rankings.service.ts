@@ -24,8 +24,8 @@ const RANKINGS_REVALIDATE_TAGS = ['rankings'];
 
 type DailyBoxOfficeTrigger =
   | 'daily-box-office-midnight'
+  | 'daily-box-office-retry'
   | 'daily-box-office-stabilization'
-  | 'daily-box-office-backfill'
   | 'daily-box-office-noon'
   | 'manual-refresh';
 
@@ -60,26 +60,14 @@ export class RankingsService {
   }
 
   /**
-   * KOBIS 일별 박스오피스 안정화 수집
-   * 매일 00:25 실행 (전일자 데이터 재수집/업서트)
+   * KOBIS 일별 박스오피스 1차 재시도
+   * 매일 00:25 실행 (00:05 수집 실패 시에만 재시도)
    */
   @Cron('25 0 * * *', {
-    name: 'daily-box-office-stabilization',
+    name: 'daily-box-office-retry',
     timeZone: 'Asia/Seoul',
   })
-  async scheduleDailyBoxOfficeStabilization(): Promise<Ranking[]> {
-    return this.fetchDailyBoxOffice('daily-box-office-stabilization', 'report');
-  }
-
-  /**
-   * 자정 배치 누락/실패 시 보정
-   * 매일 01:00 실행, 전일자 데이터가 없을 때만 백필
-   */
-  @Cron('0 1 * * *', {
-    name: 'daily-box-office-backfill',
-    timeZone: 'Asia/Seoul',
-  })
-  async backfillDailyBoxOfficeIfMissing(): Promise<Ranking[] | void> {
+  async retryDailyBoxOfficeIfMissing(): Promise<Ranking[] | void> {
     const targetDate = this.getYesterdayTargetDate();
     const existingCount = await this.rankingRepo.count({
       where: {
@@ -91,9 +79,9 @@ export class RankingsService {
 
     if (existingCount > 0) {
       this.logger.log(
-        `Daily box office already exists for ${targetDate}, skipping backfill`,
+        `Daily box office already exists for ${targetDate}, skipping retry`,
         {
-          trigger: 'daily-box-office-backfill',
+          trigger: 'daily-box-office-retry',
           targetDate,
           existingCount,
         },
@@ -102,14 +90,26 @@ export class RankingsService {
     }
 
     this.logger.warn(
-      `Daily box office missing for ${targetDate}, running backfill`,
+      `Daily box office missing for ${targetDate}, running retry`,
       {
-        trigger: 'daily-box-office-backfill',
+        trigger: 'daily-box-office-retry',
         targetDate,
         existingCount,
       },
     );
-    return this.fetchDailyBoxOffice('daily-box-office-backfill', 'report');
+    return this.fetchDailyBoxOffice('daily-box-office-retry', 'warn');
+  }
+
+  /**
+   * KOBIS 일별 박스오피스 안정화 수집
+   * 매일 01:00 실행 (데이터 존재 여부와 무관하게 재수집/업서트)
+   */
+  @Cron('0 1 * * *', {
+    name: 'daily-box-office-stabilization',
+    timeZone: 'Asia/Seoul',
+  })
+  async scheduleDailyBoxOfficeStabilization(): Promise<Ranking[]> {
+    return this.fetchDailyBoxOffice('daily-box-office-stabilization', 'report');
   }
 
   /**
