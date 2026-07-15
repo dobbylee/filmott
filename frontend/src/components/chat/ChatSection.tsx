@@ -77,8 +77,9 @@ export default function ChatSection() {
     const prefillTimer = setTimeout(() => {
       setInitialInputText(truncateChatMessage(prompt));
       url.searchParams.delete(PREFILL_QUERY_KEY);
+      // Next.js가 외부 history 변경으로 인식해 canonical URL도 동기화하도록 빈 state를 전달한다.
       window.history.replaceState(
-        window.history.state,
+        {},
         '',
         `${url.pathname}${url.search}${url.hash}`,
       );

@@ -665,11 +665,13 @@ describe('ChatSection', () => {
   });
 
   it('상세 CTA 질문을 자동 전송하지 않고 입력 필드에만 채운 뒤 query를 제거한다', async () => {
+    // Next.js App Router가 현재 history에 넣는 내부 marker를 재현한다.
     window.history.replaceState(
-      {},
+      { __NA: true },
       '',
       '/?from=detail&chatPrompt=%EA%B8%B0%EC%83%9D%EC%B6%A9%20%EA%B0%99%EC%9D%80%20%EB%8A%90%EB%82%8C%EC%9D%98%20%EC%9E%91%ED%92%88%20%EC%B6%94%EC%B2%9C%ED%95%B4%EC%A4%98#chat-section',
     );
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
 
     render(<ChatSection />);
 
@@ -679,8 +681,14 @@ describe('ChatSection', () => {
       );
     });
     expect(mockSendChatMessage).not.toHaveBeenCalled();
+    expect(replaceStateSpy).toHaveBeenCalledWith(
+      {},
+      '',
+      '/?from=detail#chat-section',
+    );
     expect(window.location.search).toBe('?from=detail');
     expect(window.location.hash).toBe('#chat-section');
+    replaceStateSpy.mockRestore();
   });
 
   it('React Strict Mode에서도 상세 CTA 질문을 유지해야 한다', async () => {
