@@ -1,18 +1,32 @@
 import { BadRequestException } from '@nestjs/common';
+import { zodResponseFormat } from 'openai/helpers/zod';
+import { z } from 'zod';
 import type { SimilarContent } from '../embedding/embedding.service';
 import type { ChatHistoryMessageDto } from './dto/send-message.dto';
 
-export interface StructuredChatRecommendation {
-  tmdbId: number;
-  contentType: 'movie' | 'tv';
-  reason: string;
-}
+export const STRUCTURED_CHAT_RESPONSE_SCHEMA = z
+  .object({
+    recommendations: z
+      .array(
+        z
+          .object({
+            tmdbId: z.number().int().min(1),
+            contentType: z.enum(['movie', 'tv']),
+            reason: z.string().min(1).max(300),
+          })
+          .strict(),
+      )
+      .max(5),
+    message: z.string().max(500),
+    followUpQuestion: z.string().max(300),
+  })
+  .strict();
 
-export interface StructuredChatResponse {
-  message: string;
-  recommendations: StructuredChatRecommendation[];
-  followUpQuestion: string;
-}
+export type StructuredChatResponse = z.infer<
+  typeof STRUCTURED_CHAT_RESPONSE_SCHEMA
+>;
+export type StructuredChatRecommendation =
+  StructuredChatResponse['recommendations'][number];
 
 export interface ResolvedChatRecommendation {
   tmdbId: number;
@@ -26,57 +40,16 @@ interface ResolvedRecommendationWithReason {
   reason: string;
 }
 
-export const CHAT_RESPONSE_FORMAT = {
-  type: 'json_schema',
-  json_schema: {
-    name: 'filmott_chat_response',
-    strict: true,
-    schema: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['message', 'recommendations', 'followUpQuestion'],
-      properties: {
-        message: { type: 'string', maxLength: 500 },
-        recommendations: {
-          type: 'array',
-          maxItems: 5,
-          items: {
-            type: 'object',
-            additionalProperties: false,
-            required: ['tmdbId', 'contentType', 'reason'],
-            properties: {
-              tmdbId: { type: 'integer', minimum: 1 },
-              contentType: { type: 'string', enum: ['movie', 'tv'] },
-              reason: { type: 'string', minLength: 1, maxLength: 300 },
-            },
-          },
-        },
-        followUpQuestion: { type: 'string', maxLength: 300 },
-      },
-    },
-  },
-} as const;
+export const CHAT_RESPONSE_FORMAT = zodResponseFormat(
+  STRUCTURED_CHAT_RESPONSE_SCHEMA,
+  'filmott_chat_response',
+);
 
 const INVALID_RESPONSE_MESSAGE =
   'AI 응답 형식이 올바르지 않습니다. 다시 시도해주세요.';
 
 function invalidResponse(): never {
   throw new BadRequestException(INVALID_RESPONSE_MESSAGE);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hasOnlyKeys(
-  value: Record<string, unknown>,
-  expectedKeys: readonly string[],
-): boolean {
-  const keys = Object.keys(value);
-  return (
-    keys.length === expectedKeys.length &&
-    keys.every((key) => expectedKeys.includes(key))
-  );
 }
 
 export function parseStructuredChatResponse(
@@ -89,35 +62,14 @@ export function parseStructuredChatResponse(
     invalidResponse();
   }
 
-  if (
-    !isRecord(parsed) ||
-    !hasOnlyKeys(parsed, ['message', 'recommendations', 'followUpQuestion']) ||
-    typeof parsed.message !== 'string' ||
-    parsed.message.length > 500 ||
-    !Array.isArray(parsed.recommendations) ||
-    typeof parsed.followUpQuestion !== 'string' ||
-    parsed.followUpQuestion.length > 300 ||
-    parsed.recommendations.length > 5
-  ) {
-    invalidResponse();
-  }
+  const result = STRUCTURED_CHAT_RESPONSE_SCHEMA.safeParse(parsed);
+  if (!result.success) invalidResponse();
 
   const recommendations: StructuredChatRecommendation[] = [];
   const usedKeys = new Set<string>();
-  for (const value of parsed.recommendations) {
-    if (
-      !isRecord(value) ||
-      !hasOnlyKeys(value, ['tmdbId', 'contentType', 'reason']) ||
-      typeof value.tmdbId !== 'number' ||
-      !Number.isSafeInteger(value.tmdbId) ||
-      value.tmdbId <= 0 ||
-      (value.contentType !== 'movie' && value.contentType !== 'tv') ||
-      typeof value.reason !== 'string' ||
-      value.reason.trim().length === 0 ||
-      value.reason.length > 300
-    ) {
+  for (const value of result.data.recommendations) {
+    if (!Number.isSafeInteger(value.tmdbId) || value.reason.trim().length === 0)
       invalidResponse();
-    }
 
     const key = `${value.contentType}:${value.tmdbId}`;
     if (usedKeys.has(key)) invalidResponse();
@@ -129,8 +81,8 @@ export function parseStructuredChatResponse(
     });
   }
 
-  const message = parsed.message.trim();
-  const followUpQuestion = parsed.followUpQuestion.trim();
+  const message = result.data.message.trim();
+  const followUpQuestion = result.data.followUpQuestion.trim();
   if (
     message.length === 0 &&
     recommendations.length === 0 &&

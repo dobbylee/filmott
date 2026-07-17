@@ -1,5 +1,6 @@
 import type { SimilarContent } from '../embedding/embedding.service';
 import {
+  CHAT_RESPONSE_FORMAT,
   extractPreviouslyRecommendedTitles,
   parseStructuredChatResponse,
   resolveStructuredChatResponse,
@@ -38,6 +39,17 @@ const candidates: SimilarContent[] = [
 ];
 
 describe('구조화 채팅 응답', () => {
+  it('스트리밍 검증 순서대로 추천을 먼저 생성하는 schema여야 한다', () => {
+    const schemaText = JSON.stringify(CHAT_RESPONSE_FORMAT.json_schema.schema);
+
+    expect(schemaText.indexOf('"recommendations"')).toBeLessThan(
+      schemaText.indexOf('"message"'),
+    );
+    expect(schemaText.indexOf('"message"')).toBeLessThan(
+      schemaText.indexOf('"followUpQuestion"'),
+    );
+  });
+
   it('strict 응답을 unknown에서 검증해 파싱해야 한다', () => {
     expect(
       parseStructuredChatResponse(
