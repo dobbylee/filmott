@@ -234,6 +234,8 @@ export default function ChatSection() {
       messages.filter((message) => message.role === 'user').length + 1;
     const authenticated = user ? 1 : 0;
     const startedAt = getCurrentTimestamp();
+    let firstTextAt: number | null = null;
+    let resetCount = 0;
     let terminalAnalyticsSent = false;
     const commonAnalyticsParams = {
       turn_number: turnNumber,
@@ -288,11 +290,15 @@ export default function ChatSection() {
       await sendChatMessage(content, history, {
         onText: (text) => {
           if (!isActiveRequest(requestId)) return;
+          if (firstTextAt === null && text.length > 0) {
+            firstTextAt = getCurrentTimestamp();
+          }
           streamingTextRef.current += text;
           setStreamingText((prev) => prev + text);
         },
         onReset: () => {
           if (!isActiveRequest(requestId)) return;
+          resetCount += 1;
           streamingTextRef.current = '';
           streamingRecsRef.current = null;
           setStreamingText('');
@@ -307,10 +313,16 @@ export default function ChatSection() {
           if (!isActiveRequest(requestId)) return;
           if (!terminalAnalyticsSent) {
             terminalAnalyticsSent = true;
+            const completedAt = getCurrentTimestamp();
             trackEvent('chat_response_completed', {
               ...commonAnalyticsParams,
               recommendation_count: streamingRecsRef.current?.length ?? 0,
-              latency_ms: Math.max(0, getCurrentTimestamp() - startedAt),
+              latency_ms: Math.max(0, completedAt - startedAt),
+              first_text_latency_ms: Math.max(
+                0,
+                (firstTextAt ?? completedAt) - startedAt,
+              ),
+              reset_count: resetCount,
             });
           }
           isDoneCalledRef.current = true;

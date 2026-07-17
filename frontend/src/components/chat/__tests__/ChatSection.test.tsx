@@ -43,6 +43,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 describe('ChatSection', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     window.history.replaceState({}, '', '/');
     mockAuthUser = null;
     mockSendChatMessage.mockReset();
@@ -184,24 +185,13 @@ describe('ChatSection', () => {
   });
 
   it('정상 완료 시 추천 수와 지연 시간을 chat_response_completed로 기록한다', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    let streamCallbacks: ChatStreamCallbacks | undefined;
     mockSendChatMessage.mockImplementationOnce(
       (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
-        callbacks.onRecommendations([
-          {
-            tmdbId: 1,
-            contentType: 'movie',
-            title: '첫 작품',
-            posterUrl: null,
-          },
-          {
-            tmdbId: 2,
-            contentType: 'tv',
-            title: '두 번째 작품',
-            posterUrl: null,
-          },
-        ]);
-        callbacks.onDone();
-        return Promise.resolve();
+        streamCallbacks = callbacks;
+        return new Promise(() => {});
       },
     );
 
@@ -210,22 +200,81 @@ describe('ChatSection', () => {
     fireEvent.change(textarea, { target: { value: '추천 완료 테스트' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
-    await waitFor(() => {
-      expect(mockTrackEvent).toHaveBeenCalledWith(
-        'chat_response_completed',
+    if (!streamCallbacks) throw new Error('스트림 콜백이 필요합니다.');
+    vi.setSystemTime(1_250);
+    act(() => streamCallbacks?.onText('첫 응답'));
+    vi.setSystemTime(1_700);
+    act(() =>
+      streamCallbacks?.onRecommendations([
         {
-          turn_number: 1,
-          entry_point: 'typed',
-          authenticated: 0,
-          recommendation_count: 2,
-          latency_ms: expect.any(Number),
+          tmdbId: 1,
+          contentType: 'movie',
+          title: '첫 작품',
+          posterUrl: null,
         },
-      );
+        {
+          tmdbId: 2,
+          contentType: 'tv',
+          title: '두 번째 작품',
+          posterUrl: null,
+        },
+      ]),
+    );
+    vi.setSystemTime(1_800);
+    act(() => streamCallbacks?.onDone());
+
+    expect(mockTrackEvent).toHaveBeenCalledWith('chat_response_completed', {
+      turn_number: 1,
+      entry_point: 'typed',
+      authenticated: 0,
+      recommendation_count: 2,
+      latency_ms: 800,
+      first_text_latency_ms: 250,
+      reset_count: 0,
     });
     expect(mockTrackEvent).not.toHaveBeenCalledWith(
       'chat_response_failed',
       expect.anything(),
     );
+    vi.useRealTimers();
+  });
+
+  it('reset 뒤 두 번째 text가 와도 최초 text 지연과 reset 횟수를 유지해야 한다', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(2_000);
+    let streamCallbacks: ChatStreamCallbacks | undefined;
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        streamCallbacks = callbacks;
+        return new Promise(() => {});
+      },
+    );
+
+    render(<ChatSection />);
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '재시도 지연 테스트' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    if (!streamCallbacks) throw new Error('스트림 콜백이 필요합니다.');
+    vi.setSystemTime(2_200);
+    act(() => streamCallbacks?.onText('첫 시도'));
+    vi.setSystemTime(2_300);
+    act(() => streamCallbacks?.onReset());
+    vi.setSystemTime(2_500);
+    act(() => streamCallbacks?.onText('두 번째 시도'));
+    vi.setSystemTime(2_900);
+    act(() => streamCallbacks?.onDone());
+
+    expect(mockTrackEvent).toHaveBeenCalledWith('chat_response_completed', {
+      turn_number: 1,
+      entry_point: 'typed',
+      authenticated: 0,
+      recommendation_count: 0,
+      latency_ms: 900,
+      first_text_latency_ms: 200,
+      reset_count: 1,
+    });
+    vi.useRealTimers();
   });
 
   it('네트워크 예외는 chat_response_failed를 한 번만 기록해야 한다', async () => {
@@ -492,6 +541,13 @@ describe('ChatSection', () => {
     });
     expect(screen.queryByText('첫 시도 응답')).not.toBeInTheDocument();
     expect(screen.queryByText('첫 시도 작품')).not.toBeInTheDocument();
+    expect(mockTrackEvent).toHaveBeenCalledWith(
+      'chat_response_completed',
+      expect.objectContaining({
+        first_text_latency_ms: expect.any(Number),
+        reset_count: 1,
+      }),
+    );
   });
 
   it('세션 만료 에러가 나도 기존 대화 localStorage는 지우지 않는다', async () => {
