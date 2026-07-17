@@ -8,6 +8,7 @@ import type { ChatRecommendationWithPoster } from '@/types/chat';
 
 export interface ChatStreamCallbacks {
   onText: (content: string) => void;
+  onReset: () => void;
   onRecommendations: (recs: ChatRecommendationWithPoster[]) => void;
   onDone: () => void;
   onError: (message: string) => void;
@@ -91,6 +92,9 @@ function handleSseData(
           callbacks.onText(data.content);
         }
         break;
+      case 'reset':
+        callbacks.onReset();
+        break;
       case 'recommendations':
         if (
           isRecord(data) &&
@@ -143,6 +147,9 @@ export async function sendChatMessage(
   const guardedCallbacks: ChatStreamCallbacks = {
     onText: (text) => {
       if (!hasTerminalEvent) callbacks.onText(text);
+    },
+    onReset: () => {
+      if (!hasTerminalEvent) callbacks.onReset();
     },
     onRecommendations: (recommendations) => {
       if (!hasTerminalEvent) callbacks.onRecommendations(recommendations);

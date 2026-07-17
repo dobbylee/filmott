@@ -26,8 +26,8 @@ import {
   CHAT_RESPONSE_FORMAT,
   extractPreviouslyRecommendedTitles,
   parseStructuredChatResponse,
-  resolveStructuredChatResponse,
 } from './structured-chat-response';
+import { StructuredChatStreamAccumulator } from './structured-chat-stream';
 import { ChatContextService } from './chat-context.service';
 import {
   RecommendationCandidateService,
@@ -339,21 +339,24 @@ export class ChatService {
     ];
     if (signal?.aborted) return;
 
-    // 12. GPT 구조화 응답 호출. 형식 또는 후보 ID 계약 위반은 노출 전에 한 번 재생성한다.
-    let resolvedResponse: ReturnType<
-      typeof resolveStructuredChatResponse
-    > | null = null;
+    // 12. GPT 구조화 응답 호출. 부분 응답 뒤 검증 실패 시 client를 reset하고 한 번 재생성한다.
+    let resolvedResponse: {
+      text: string;
+      recommendations: ReturnType<
+        StructuredChatStreamAccumulator['finalize']
+      >['recommendations'];
+    } | null = null;
     for (let attempt = 0; attempt < OPENAI_CHAT_MAX_ATTEMPTS; attempt += 1) {
       const attemptSystemPrompt =
         attempt === 0
           ? systemPrompt
           : `${systemPrompt}${STRUCTURED_RESPONSE_RETRY_INSTRUCTION}`;
-      const stream = await this.openai.chat.completions.create(
+      const accumulator = new StructuredChatStreamAccumulator();
+      const stream = this.openai.chat.completions.stream(
         {
           model: CHAT_MODEL,
           reasoning_effort: 'low',
           max_completion_tokens: 4096,
-          stream: true,
           response_format: CHAT_RESPONSE_FORMAT,
           messages: [
             { role: 'system', content: attemptSystemPrompt },
@@ -367,13 +370,16 @@ export class ChatService {
 
       try {
         const structuredResponseText =
-          await this.chatResponseStreamService.collectStructuredResponse(
+          await this.chatResponseStreamService.collectAndEmitStructuredResponse(
             stream,
+            accumulator,
+            confirmedRecommendationCandidates,
+            (text) => emit('text', { content: text }),
             signal,
           );
         if (signal?.aborted) return;
 
-        resolvedResponse = resolveStructuredChatResponse(
+        const finalized = accumulator.finalize(
           parseStructuredChatResponse(structuredResponseText),
           confirmedRecommendationCandidates,
           {
@@ -382,8 +388,18 @@ export class ChatService {
               confirmedRecommendationCandidates.length > 0,
           },
         );
+        if (finalized.remainingText) {
+          emit('text', { content: finalized.remainingText });
+        }
+        resolvedResponse = {
+          text: finalized.text,
+          recommendations: finalized.recommendations,
+        };
         break;
       } catch (error) {
+        if (accumulator.getEmittedText() && !signal?.aborted) {
+          emit('reset', {});
+        }
         if (
           !(error instanceof BadRequestException) ||
           attempt === OPENAI_CHAT_MAX_ATTEMPTS - 1
@@ -398,9 +414,6 @@ export class ChatService {
         'AI 응답을 생성하지 못했습니다. 다시 시도해주세요.',
       );
     }
-    if (signal?.aborted) return;
-
-    emit('text', { content: resolvedResponse.text });
     if (signal?.aborted) return;
 
     if (resolvedResponse.recommendations.length > 0) {

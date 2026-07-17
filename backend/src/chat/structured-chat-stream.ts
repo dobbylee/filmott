@@ -137,15 +137,19 @@ export class StructuredChatStreamAccumulator {
       if (this.usedRecommendationKeys.has(key)) invalidResponse();
 
       const candidate = findCandidate(recommendation, candidates);
-      const reason = sanitizeRecommendationReason(recommendation.reason);
-      if (!reason) invalidResponse();
-
-      const section = `**${candidate.title}** - ${reason}`;
-      const delta = `${this.emittedText.length > 0 ? '\n\n' : ''}${section}`;
-      this.emittedText += delta;
+      if (!sanitizeRecommendationReason(recommendation.reason)) {
+        invalidResponse();
+      }
       this.emittedRecommendations.push(recommendation);
       this.usedRecommendationKeys.add(key);
-      deltas.push(delta);
+
+      // finish_reason을 확인하기 전에는 모델이 생성한 reason/message를 노출하지 않는다.
+      // 첫 canonical 제목만 서버의 신뢰 가능한 후보 데이터에서 조기 출력한다.
+      if (this.emittedText.length === 0) {
+        const title = `**${candidate.title}**`;
+        this.emittedText = title;
+        deltas.push(title);
+      }
     }
 
     return deltas;

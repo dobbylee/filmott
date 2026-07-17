@@ -462,6 +462,38 @@ describe('ChatSection', () => {
     });
   });
 
+  it('재시도 reset 이벤트가 오면 첫 시도 내용을 지우고 새 응답만 보존한다', async () => {
+    mockSendChatMessage.mockImplementationOnce(
+      (_content: string, _history: ChatHistoryMessage[], callbacks: ChatStreamCallbacks) => {
+        callbacks.onText('첫 시도 응답');
+        callbacks.onRecommendations([
+          {
+            tmdbId: 1,
+            contentType: 'movie',
+            title: '첫 시도 작품',
+            posterUrl: null,
+          },
+        ]);
+        callbacks.onReset();
+        callbacks.onText('두 번째 시도 응답');
+        callbacks.onDone();
+        return Promise.resolve();
+      },
+    );
+
+    render(<ChatSection />);
+
+    const textarea = screen.getByPlaceholderText('메시지를 입력하세요.');
+    fireEvent.change(textarea, { target: { value: '재시도 테스트' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => {
+      expect(screen.getByText('두 번째 시도 응답')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('첫 시도 응답')).not.toBeInTheDocument();
+    expect(screen.queryByText('첫 시도 작품')).not.toBeInTheDocument();
+  });
+
   it('세션 만료 에러가 나도 기존 대화 localStorage는 지우지 않는다', async () => {
     const savedMessages = [
       { id: 1, role: 'user', content: '기존 메시지', recommendations: null, createdAt: '2026-03-25T00:00:00Z' },

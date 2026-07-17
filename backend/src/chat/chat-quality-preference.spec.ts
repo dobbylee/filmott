@@ -18,7 +18,7 @@ jest.mock('openai', () => ({
   default: jest.fn().mockImplementation(() => ({
     chat: {
       completions: {
-        create: mockStreamCreate,
+        stream: mockStreamCreate,
       },
     },
   })),
@@ -115,7 +115,7 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         userRepository,
         configService,
       );
-      mockStreamCreate.mockResolvedValueOnce(createResponseStream());
+      mockStreamCreate.mockReturnValueOnce(createResponseStream());
 
       await service.sendMessageStream(
         1,

@@ -33,6 +33,7 @@ describe('sendChatMessage', () => {
   beforeEach(() => {
     callbacks = {
       onText: vi.fn(),
+      onReset: vi.fn(),
       onRecommendations: vi.fn(),
       onDone: vi.fn(),
       onError: vi.fn(),
@@ -67,6 +68,20 @@ describe('sendChatMessage', () => {
     await sendChatMessage('추천해줘', [], callbacks);
 
     expect(callbacks.onRecommendations).toHaveBeenCalledWith(recs);
+    expect(callbacks.onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('reset 이벤트를 올바르게 파싱한다', async () => {
+    const sseData =
+      'event: text\ndata: {"content":"첫 시도"}\n\nevent: reset\ndata: {}\n\nevent: text\ndata: {"content":"두 번째 시도"}\n\nevent: done\ndata: {}\n\n';
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(createMockResponse([sseData]));
+
+    await sendChatMessage('추천해줘', [], callbacks);
+
+    expect(callbacks.onReset).toHaveBeenCalledTimes(1);
+    expect(callbacks.onText).toHaveBeenNthCalledWith(1, '첫 시도');
+    expect(callbacks.onText).toHaveBeenNthCalledWith(2, '두 번째 시도');
     expect(callbacks.onDone).toHaveBeenCalledTimes(1);
   });
 

@@ -38,7 +38,7 @@ jest.mock('openai', () => {
     default: jest.fn().mockImplementation(() => ({
       chat: {
         completions: {
-          create: mockStreamCreate,
+          stream: mockStreamCreate,
         },
       },
     })),
@@ -137,10 +137,47 @@ describe('ChatService', () => {
     }
   }
 
+  function createParsedChatStream(
+    chunks: Array<{ content: string; parsed: unknown }>,
+    finishReason: 'stop' | 'length' | 'content_filter' | null = 'stop',
+  ) {
+    const listeners = new Set<(event: { parsed: unknown }) => void>();
+    let aborted = false;
+
+    return {
+      on(event: string, listener: (event: { parsed: unknown }) => void) {
+        if (event === 'content.delta') listeners.add(listener);
+        return this;
+      },
+      off(event: string, listener: (event: { parsed: unknown }) => void) {
+        if (event === 'content.delta') listeners.delete(listener);
+        return this;
+      },
+      abort() {
+        aborted = true;
+      },
+      async *[Symbol.asyncIterator]() {
+        for (const chunk of chunks) {
+          if (aborted) return;
+          for (const listener of listeners) {
+            listener({ parsed: chunk.parsed });
+          }
+          if (aborted) return;
+          yield {
+            choices: [{ delta: { content: chunk.content } }],
+          };
+        }
+        if (finishReason && !aborted) {
+          yield {
+            choices: [{ delta: {}, finish_reason: finishReason }],
+          };
+        }
+      },
+    };
+  }
+
   const mockStreamingResponse = (chunks: string[]) => {
-    mockStreamCreate.mockImplementation(() =>
-      Promise.resolve(createChatStream(chunks)),
-    );
+    mockStreamCreate.mockImplementation(() => createChatStream(chunks));
   };
 
   const structuredResponse = (
@@ -151,14 +188,14 @@ describe('ChatService', () => {
     }> = [],
     message = '추천 결과입니다.',
     followUpQuestion = '',
-  ) => JSON.stringify({ message, recommendations, followUpQuestion });
+  ) => JSON.stringify({ recommendations, message, followUpQuestion });
 
   const mockIncompleteStreamingResponse = (
     chunks: string[],
     finishReason: 'length' | 'content_filter' | null,
   ) => {
     mockStreamCreate.mockImplementation(() =>
-      Promise.resolve(createChatStream(chunks, finishReason)),
+      createChatStream(chunks, finishReason),
     );
   };
 
@@ -916,6 +953,47 @@ describe('ChatService', () => {
       expect(text).not.toContain('recommendations');
     });
 
+    it('추천이 없는 일반 답변은 finish_reason 확인 후 한 text 이벤트로 전송해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      const finalResponse = structuredResponse(
+        [],
+        '일반 답변을 이어서 전송합니다.',
+        '다른 질문도 있으세요?',
+      );
+      mockStreamCreate.mockReturnValueOnce(
+        createParsedChatStream([
+          {
+            content: finalResponse.slice(0, 20),
+            parsed: {
+              recommendations: [],
+              message: '일반 답변을',
+            },
+          },
+          {
+            content: finalResponse.slice(20),
+            parsed: {
+              recommendations: [],
+              message: '일반 답변을 이어서 전송합니다.',
+              followUpQuestion: '다른 질문도 있으세요?',
+            },
+          },
+        ]),
+      );
+      const emittedEvents: { event: string; data: unknown }[] = [];
+
+      await service.sendMessageStream(1, '영화 이야기해줘', [], (event, data) =>
+        emittedEvents.push({ event, data }),
+      );
+
+      expect(emittedEvents.map(({ event }) => event)).toEqual(['text', 'done']);
+      expect(
+        emittedEvents
+          .filter(({ event }) => event === 'text')
+          .map(({ data }) => (data as { content: string }).content),
+      ).toEqual(['일반 답변을 이어서 전송합니다.\n\n다른 질문도 있으세요?']);
+    });
+
     it('잘못된 JSON은 어떤 본문도 먼저 노출하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
@@ -954,36 +1032,32 @@ describe('ChatService', () => {
       ]);
       mockStreamCreate
         .mockImplementationOnce(() =>
-          Promise.resolve(
-            createChatStream([
-              structuredResponse(
-                [
-                  {
-                    tmdbId: 999,
-                    contentType: 'movie',
-                    reason: '첫 응답의 잘못된 이유입니다.',
-                  },
-                ],
-                '',
-              ),
-            ]),
-          ),
+          createChatStream([
+            structuredResponse(
+              [
+                {
+                  tmdbId: 999,
+                  contentType: 'movie',
+                  reason: '첫 응답의 잘못된 이유입니다.',
+                },
+              ],
+              '',
+            ),
+          ]),
         )
         .mockImplementationOnce(() =>
-          Promise.resolve(
-            createChatStream([
-              structuredResponse(
-                [
-                  {
-                    tmdbId: 123,
-                    contentType: 'movie',
-                    reason: '두 번째 응답의 정상 이유입니다.',
-                  },
-                ],
-                '',
-              ),
-            ]),
-          ),
+          createChatStream([
+            structuredResponse(
+              [
+                {
+                  tmdbId: 123,
+                  contentType: 'movie',
+                  reason: '두 번째 응답의 정상 이유입니다.',
+                },
+              ],
+              '',
+            ),
+          ]),
         );
       const emittedEvents: { event: string; data: unknown }[] = [];
 
@@ -1007,6 +1081,158 @@ describe('ChatService', () => {
       expect(text).not.toContain('첫 응답');
     });
 
+    it('부분 응답을 노출한 시도가 최종 검증에 실패하면 reset 후 재시도 응답만 완료해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([
+        {
+          contentId: 1,
+          tmdbId: 123,
+          contentType: 'movie',
+          title: '청춘',
+          posterUrl: '/youth.jpg',
+          genres: [{ id: 18, name: '드라마' }],
+          voteAverage: 7.5,
+          description: '청춘 영화',
+          similarity: 0.8,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+      ]);
+      const firstParsedSnapshot = {
+        recommendations: [
+          {
+            tmdbId: 123,
+            contentType: 'movie',
+            reason: '첫 시도에서 먼저 보인 이유입니다.',
+          },
+        ],
+        message: '',
+      };
+      const secondParsedSnapshot = {
+        recommendations: [
+          {
+            tmdbId: 123,
+            contentType: 'movie',
+            reason: '두 번째 시도의 정상 이유입니다.',
+          },
+        ],
+        message: '',
+      };
+      mockStreamCreate
+        .mockImplementationOnce(() =>
+          createParsedChatStream([
+            {
+              content: structuredResponse(
+                [
+                  {
+                    tmdbId: 999,
+                    contentType: 'movie',
+                    reason: '최종 스냅샷에서 바뀐 잘못된 이유입니다.',
+                  },
+                ],
+                '',
+              ),
+              parsed: firstParsedSnapshot,
+            },
+          ]),
+        )
+        .mockImplementationOnce(() =>
+          createParsedChatStream([
+            {
+              content: structuredResponse(
+                secondParsedSnapshot.recommendations,
+                '',
+              ),
+              parsed: secondParsedSnapshot,
+            },
+          ]),
+        );
+      const emittedEvents: { event: string; data: unknown }[] = [];
+
+      await service.sendMessageStream(
+        1,
+        '청춘 영화 추천해줘',
+        [],
+        (event, data) => emittedEvents.push({ event, data }),
+      );
+
+      expect(emittedEvents.map(({ event }) => event)).toEqual([
+        'text',
+        'reset',
+        'text',
+        'text',
+        'recommendations',
+        'done',
+      ]);
+      expect(
+        emittedEvents
+          .filter(({ event }) => event === 'text')
+          .map(({ data }) => (data as { content: string }).content),
+      ).toEqual(['**청춘**', '**청춘**', ' - 두 번째 시도의 정상 이유입니다.']);
+    });
+
+    it('두 번째 시도도 부분 출력 뒤 실패하면 reset하고 done 없이 종료해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([
+        {
+          contentId: 1,
+          tmdbId: 123,
+          contentType: 'movie',
+          title: '청춘',
+          posterUrl: '/youth.jpg',
+          genres: [{ id: 18, name: '드라마' }],
+          voteAverage: 7.5,
+          description: '청춘 영화',
+          similarity: 0.8,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+      ]);
+      mockStreamCreate.mockImplementation(() =>
+        createParsedChatStream([
+          {
+            content: structuredResponse(
+              [
+                {
+                  tmdbId: 999,
+                  contentType: 'movie',
+                  reason: '후보 밖 최종 답변입니다.',
+                },
+              ],
+              '',
+            ),
+            parsed: {
+              recommendations: [
+                {
+                  tmdbId: 123,
+                  contentType: 'movie',
+                  reason: '아직 최종 검증 전인 이유입니다.',
+                },
+              ],
+              message: '',
+            },
+          },
+        ]),
+      );
+      const emittedEvents: { event: string; data: unknown }[] = [];
+
+      await expect(
+        service.sendMessageStream(1, '영화 이야기해줘', [], (event, data) =>
+          emittedEvents.push({ event, data }),
+        ),
+      ).rejects.toThrow('AI 응답 형식이 올바르지 않습니다');
+
+      expect(emittedEvents.map(({ event }) => event)).toEqual([
+        'text',
+        'reset',
+        'text',
+        'reset',
+      ]);
+      expect(emittedEvents.some(({ event }) => event === 'done')).toBe(false);
+    });
+
     it('finish_reason이 stop이 아니면 부분 본문을 노출하지 않고 완료 처리하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
@@ -1021,6 +1247,76 @@ describe('ChatService', () => {
 
       expect(emittedEvents).toHaveLength(0);
       expect(emittedEvents.some((event) => event.event === 'done')).toBe(false);
+    });
+
+    it('content_filter 전 partial snapshot에서는 서버 canonical 제목만 노출하고 생성 텍스트는 차단해야 한다', async () => {
+      setupEmptyUserContext();
+      mockEmbeddingService.searchSimilar.mockResolvedValue([
+        {
+          contentId: 1,
+          tmdbId: 123,
+          contentType: 'movie',
+          title: '청춘',
+          posterUrl: '/youth.jpg',
+          genres: [{ id: 18, name: '드라마' }],
+          voteAverage: 7.5,
+          description: '청춘 영화',
+          similarity: 0.8,
+          director: null,
+          originCountry: 'KR',
+          overview: null,
+        },
+      ]);
+      const filteredReason = '필터로 차단되어야 하는 모델 생성 문장';
+      mockStreamCreate.mockImplementation(() =>
+        createParsedChatStream(
+          [
+            {
+              content: structuredResponse(
+                [
+                  {
+                    tmdbId: 123,
+                    contentType: 'movie',
+                    reason: filteredReason,
+                  },
+                ],
+                '',
+              ),
+              parsed: {
+                recommendations: [
+                  {
+                    tmdbId: 123,
+                    contentType: 'movie',
+                    reason: filteredReason,
+                  },
+                ],
+                message: '',
+              },
+            },
+          ],
+          'content_filter',
+        ),
+      );
+      const emittedEvents: { event: string; data: unknown }[] = [];
+
+      await expect(
+        service.sendMessageStream(1, '청춘 영화 추천해줘', [], (event, data) =>
+          emittedEvents.push({ event, data }),
+        ),
+      ).rejects.toThrow('AI 응답이 완성되기 전에 종료되었습니다');
+
+      const exposedText = emittedEvents
+        .filter(({ event }) => event === 'text')
+        .map(({ data }) => (data as { content: string }).content)
+        .join('');
+      expect(exposedText).toBe('**청춘****청춘**');
+      expect(exposedText).not.toContain(filteredReason);
+      expect(emittedEvents.map(({ event }) => event)).toEqual([
+        'text',
+        'reset',
+        'text',
+        'reset',
+      ]);
     });
 
     it('완성되지 않은 JSON은 검증 전에 어떤 이벤트도 emit하지 않아야 한다', async () => {
@@ -1082,31 +1378,27 @@ describe('ChatService', () => {
         ]);
         mockStreamCreate
           .mockImplementationOnce(() =>
-            Promise.resolve(
-              createChatStream([
-                structuredResponse(
-                  [],
-                  '청춘 키워드 중심으로 골라봤어요.',
-                  '원하는 분위기를 더 알려주세요.',
-                ),
-              ]),
-            ),
+            createChatStream([
+              structuredResponse(
+                [],
+                '청춘 키워드 중심으로 골라봤어요.',
+                '원하는 분위기를 더 알려주세요.',
+              ),
+            ]),
           )
           .mockImplementationOnce(() =>
-            Promise.resolve(
-              createChatStream([
-                structuredResponse(
-                  [
-                    {
-                      tmdbId: 123,
-                      contentType: 'movie',
-                      reason: '두 번째 응답의 정상 이유입니다.',
-                    },
-                  ],
-                  '',
-                ),
-              ]),
-            ),
+            createChatStream([
+              structuredResponse(
+                [
+                  {
+                    tmdbId: 123,
+                    contentType: 'movie',
+                    reason: '두 번째 응답의 정상 이유입니다.',
+                  },
+                ],
+                '',
+              ),
+            ]),
           );
 
         const emittedEvents: { event: string; data: unknown }[] = [];
@@ -1180,7 +1472,7 @@ describe('ChatService', () => {
     it('모델이 안전상 거절하면 재시도하거나 이벤트를 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
-      mockStreamCreate.mockImplementation(async () => ({
+      mockStreamCreate.mockImplementation(() => ({
         async *[Symbol.asyncIterator]() {
           yield {
             choices: [
@@ -1343,18 +1635,14 @@ describe('ChatService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('OpenAI 스트리밍 응답 호출에 30초 timeout 옵션이 전달되어야 한다', async () => {
+    it('OpenAI 구조화 스트림 호출에 response format과 30초 timeout이 전달되어야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
       const createParams = mockStreamCreate.mock.calls[0][0];
-      expect(createParams).toEqual(
-        expect.objectContaining({
-          stream: true,
-        }),
-      );
+      expect(createParams).not.toHaveProperty('stream');
       expect(createParams.response_format).toEqual(CHAT_RESPONSE_FORMAT);
       expect(mockStreamCreate.mock.calls[0][1]).toEqual(
         expect.objectContaining({ timeout: 30_000, signal: undefined }),

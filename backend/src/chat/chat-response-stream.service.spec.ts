@@ -1,5 +1,10 @@
 import type OpenAI from 'openai';
+import { OpenAIError } from 'openai';
+import { LengthFinishReasonError } from 'openai/error';
+import type { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { ChatResponseStreamService } from './chat-response-stream.service';
+import type { StructuredChatResponse } from './structured-chat-response';
+import { StructuredChatStreamAccumulator } from './structured-chat-stream';
 
 function createStream(
   chunks: string[],
@@ -19,6 +24,21 @@ function createStream(
       }
     },
   };
+}
+
+function createFailingStructuredStream(
+  error: Error,
+): ChatCompletionStream<StructuredChatResponse> {
+  return {
+    on: jest.fn(),
+    off: jest.fn(),
+    abort: jest.fn(),
+    [Symbol.asyncIterator]() {
+      return {
+        next: () => Promise.reject(error),
+      };
+    },
+  } as unknown as ChatCompletionStream<StructuredChatResponse>;
 }
 
 describe('ChatResponseStreamService', () => {
@@ -73,5 +93,30 @@ describe('ChatResponseStreamService', () => {
     ).rejects.toThrow(
       '요청하신 내용에는 답변을 제공할 수 없습니다. 다른 조건으로 질문해주세요.',
     );
+  });
+
+  it('SDK의 길이 종료 오류는 기존 재생성 가능한 불완전 응답 오류로 변환해야 한다', async () => {
+    await expect(
+      service.collectAndEmitStructuredResponse(
+        createFailingStructuredStream(new LengthFinishReasonError()),
+        new StructuredChatStreamAccumulator(),
+        [],
+        jest.fn(),
+      ),
+    ).rejects.toThrow('AI 응답이 완성되기 전에 종료되었습니다');
+  });
+
+  it('SDK가 감싼 최종 JSON 파싱 오류는 기존 재생성 가능한 형식 오류로 변환해야 한다', async () => {
+    const sdkError = new OpenAIError('structured parse failed');
+    sdkError.cause = new SyntaxError('invalid JSON');
+
+    await expect(
+      service.collectAndEmitStructuredResponse(
+        createFailingStructuredStream(sdkError),
+        new StructuredChatStreamAccumulator(),
+        [],
+        jest.fn(),
+      ),
+    ).rejects.toThrow('AI 응답 형식이 올바르지 않습니다');
   });
 });

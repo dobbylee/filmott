@@ -291,6 +291,13 @@ export default function ChatSection() {
           streamingTextRef.current += text;
           setStreamingText((prev) => prev + text);
         },
+        onReset: () => {
+          if (!isActiveRequest(requestId)) return;
+          streamingTextRef.current = '';
+          streamingRecsRef.current = null;
+          setStreamingText('');
+          setStreamingRecs(null);
+        },
         onRecommendations: (recs) => {
           if (!isActiveRequest(requestId)) return;
           streamingRecsRef.current = recs;

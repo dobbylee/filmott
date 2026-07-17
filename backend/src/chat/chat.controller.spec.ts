@@ -85,6 +85,7 @@ describe('ChatController', () => {
           emit: (event: string, data: unknown) => void,
         ) => {
           emit('text', { content: '응답' });
+          emit('reset', {});
           emit('done', {});
         },
       );
@@ -101,6 +102,10 @@ describe('ChatController', () => {
       );
       expect(mockRes.write).toHaveBeenNthCalledWith(
         2,
+        'event: reset\ndata: {}\n\n',
+      );
+      expect(mockRes.write).toHaveBeenNthCalledWith(
+        3,
         'event: done\ndata: {}\n\n',
       );
     });

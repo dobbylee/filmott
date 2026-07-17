@@ -33,7 +33,7 @@ const candidates: SimilarContent[] = [
 ];
 
 describe('StructuredChatStreamAccumulator', () => {
-  it('다음 추천이 시작되면 완성된 이전 추천만 점진 출력해야 한다', () => {
+  it('다음 추천이 시작되면 첫 추천의 canonical 제목만 조기 출력해야 한다', () => {
     const accumulator = new StructuredChatStreamAccumulator();
 
     expect(
@@ -69,7 +69,7 @@ describe('StructuredChatStreamAccumulator', () => {
         },
         candidates,
       ),
-    ).toEqual(['**기생충** - 한국 사회를 날카롭게 보여줘요.']);
+    ).toEqual(['**기생충**']);
 
     expect(
       accumulator.consume(
@@ -90,7 +90,7 @@ describe('StructuredChatStreamAccumulator', () => {
         },
         candidates,
       ),
-    ).toEqual(['\n\n**인셉션** - 꿈과 현실을 오가는 전개가 인상적이에요. 🎬']);
+    ).toEqual([]);
   });
 
   it('추천 배열이 끝나기 전의 마지막 미완성 객체는 노출하지 않아야 한다', () => {
@@ -111,6 +111,72 @@ describe('StructuredChatStreamAccumulator', () => {
       ),
     ).toEqual([]);
     expect(accumulator.getEmittedText()).toBe('');
+  });
+
+  it('추천이 없으면 finish_reason 확인 전 모델 생성 텍스트를 노출하지 않아야 한다', () => {
+    const accumulator = new StructuredChatStreamAccumulator();
+
+    expect(
+      accumulator.consume(
+        {
+          recommendations: [],
+          message: '  조건에 맞는 후보',
+        },
+        candidates,
+      ),
+    ).toEqual([]);
+    expect(
+      accumulator.finalize(
+        {
+          recommendations: [],
+          message: '조건에 맞는 후보가 부족해요.',
+          followUpQuestion: '선호 장르를 알려주시겠어요?',
+        },
+        candidates,
+      ),
+    ).toEqual({
+      remainingText:
+        '조건에 맞는 후보가 부족해요.\n\n선호 장르를 알려주시겠어요?',
+      text: '조건에 맞는 후보가 부족해요.\n\n선호 장르를 알려주시겠어요?',
+      recommendations: [],
+    });
+  });
+
+  it('추천 뒤 모델 생성 reason과 follow-up은 최종 검증 전 노출하지 않아야 한다', () => {
+    const accumulator = new StructuredChatStreamAccumulator();
+
+    expect(
+      accumulator.consume(
+        {
+          recommendations: [
+            {
+              tmdbId: 496243,
+              contentType: 'movie',
+              reason: '강렬해요.',
+            },
+          ],
+          message: '',
+          followUpQuestion: '다른 분위기도',
+        },
+        candidates,
+      ),
+    ).toEqual(['**기생충**']);
+    expect(
+      accumulator.consume(
+        {
+          recommendations: [
+            {
+              tmdbId: 496243,
+              contentType: 'movie',
+              reason: '강렬해요.',
+            },
+          ],
+          message: '',
+          followUpQuestion: '다른 분위기도 원하세요?',
+        },
+        candidates,
+      ),
+    ).toEqual([]);
   });
 
   it('후보 밖 추천은 사용자에게 노출하기 전에 거부해야 한다', () => {
@@ -265,7 +331,7 @@ describe('StructuredChatStreamAccumulator', () => {
         candidates,
       ),
     ).toEqual({
-      remainingText: '\n\n다른 분위기도 원하세요?',
+      remainingText: ' - 강렬해요.\n\n다른 분위기도 원하세요?',
       text: '**기생충** - 강렬해요.\n\n다른 분위기도 원하세요?',
       recommendations: [
         {
