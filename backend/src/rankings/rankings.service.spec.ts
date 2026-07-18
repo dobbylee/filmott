@@ -265,8 +265,20 @@ describe('RankingsService', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('1차 재시도 스케줄러는 전일 데이터가 없을 때만 수집해야 한다', async () => {
+    it('1차 재시도 스케줄러는 전일 데이터가 없으면 수집해야 한다', async () => {
       mockRankingRepo.count.mockResolvedValue(0);
+      const fetchSpy = jest
+        .spyOn(service, 'fetchDailyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.retryDailyBoxOfficeIfMissing();
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith('daily-box-office-retry', 'warn');
+    });
+
+    it('1차 재시도 스케줄러는 전일 데이터가 9건이면 다시 수집해야 한다', async () => {
+      mockRankingRepo.count.mockResolvedValue(9);
       const fetchSpy = jest
         .spyOn(service, 'fetchDailyBoxOffice')
         .mockResolvedValue([]);

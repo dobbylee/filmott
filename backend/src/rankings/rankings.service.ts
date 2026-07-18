@@ -61,7 +61,7 @@ export class RankingsService {
 
   /**
    * KOBIS 일별 박스오피스 1차 재시도
-   * 매일 00:25 실행 (00:05 수집 실패 시에만 재시도)
+   * 매일 00:25 실행 (전일 랭킹이 10건 미만일 때 재시도)
    */
   @Cron('25 0 * * *', {
     name: 'daily-box-office-retry',
@@ -77,7 +77,7 @@ export class RankingsService {
       },
     });
 
-    if (existingCount > 0) {
+    if (existingCount >= 10) {
       this.logger.log(
         `Daily box office already exists for ${targetDate}, skipping retry`,
         {
