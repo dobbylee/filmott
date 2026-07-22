@@ -74,6 +74,8 @@ describe('ContentsService', () => {
     mockContentRepo.find.mockResolvedValue([]);
     mockContentRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
     mockQueryBuilder.getRawOne.mockResolvedValue(undefined);
+    mockQueryBuilder.getRawMany.mockResolvedValue([]);
+    mockQueryBuilder.getMany.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -735,6 +737,55 @@ describe('ContentsService', () => {
   });
 
   describe('getPersonCredits', () => {
+    it('차단 콘텐츠를 partial index 조건과 같은 리터럴로 조회하고 캐시해야 한다', async () => {
+      const creditsData = {
+        cast: [
+          {
+            id: 1,
+            media_type: 'movie',
+            title: 'Blocked Movie',
+            release_date: '2024-01-01',
+            vote_average: 7.0,
+          },
+          {
+            id: 2,
+            media_type: 'movie',
+            title: 'Visible Movie',
+            release_date: '2023-01-01',
+            vote_average: 8.0,
+          },
+        ],
+        crew: [],
+      };
+      mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
+      mockQueryBuilder.getRawMany.mockResolvedValue([
+        { tmdbId: 1, contentType: 'movie' },
+      ]);
+
+      const firstResult = await service.getPersonCredits(17419);
+      const secondResult = await service.getPersonCredits(17419);
+
+      expect(mockContentRepo.createQueryBuilder).toHaveBeenCalledWith(
+        'content',
+      );
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith(
+        'content.tmdbId',
+        'tmdbId',
+      );
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalledWith(
+        'content.contentType',
+        'contentType',
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'content.adult = true',
+      );
+      expect(mockQueryBuilder.where.mock.calls[0]).toHaveLength(1);
+      expect(mockQueryBuilder.getRawMany).toHaveBeenCalledTimes(1);
+      expect(mockTmdbService.getPersonCredits).toHaveBeenCalledTimes(1);
+      expect(firstResult.cast.map((item) => item.id)).toEqual([2]);
+      expect(secondResult.cast.map((item) => item.id)).toEqual([2]);
+    });
+
     it('movie/tv로 필터링하고 날짜 내림차순으로 정렬해야 한다', async () => {
       const creditsData = {
         cast: [
@@ -1565,7 +1616,7 @@ describe('ContentsService', () => {
 
   describe('searchContents - 차단 필터링', () => {
     it('타입 지정 검색 시 차단된 콘텐츠를 결과에서 제외해야 한다', async () => {
-      mockContentRepo.find.mockResolvedValue([
+      mockQueryBuilder.getRawMany.mockResolvedValue([
         { tmdbId: 2, contentType: 'movie' },
       ]);
 
@@ -1584,7 +1635,7 @@ describe('ContentsService', () => {
     });
 
     it('전체 검색 시 같은 타입의 차단된 콘텐츠만 제외해야 한다', async () => {
-      mockContentRepo.find.mockResolvedValue([
+      mockQueryBuilder.getRawMany.mockResolvedValue([
         { tmdbId: 5, contentType: 'tv' },
       ]);
 
@@ -1628,7 +1679,7 @@ describe('ContentsService', () => {
 
   describe('discoverContents - 차단 필터링', () => {
     it('차단된 콘텐츠를 탐색 결과에서 제외해야 한다', async () => {
-      mockContentRepo.find.mockResolvedValue([
+      mockQueryBuilder.getRawMany.mockResolvedValue([
         { tmdbId: 10, contentType: 'movie' },
       ]);
 

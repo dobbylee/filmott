@@ -46,6 +46,11 @@ interface SearchIndexableContentRow {
   id: number | string;
 }
 
+interface BlockedContentRow {
+  tmdbId: number | string;
+  contentType: string;
+}
+
 @Injectable()
 export class ContentsService {
   private readonly logger = new Logger(ContentsService.name);
@@ -738,10 +743,12 @@ export class ContentsService {
     if (this.blockedIdsCache && Date.now() < this.blockedIdsCache.expiresAt) {
       return this.blockedIdsCache.data;
     }
-    const blocked = await this.contentRepo.find({
-      where: { adult: true },
-      select: ['tmdbId', 'contentType'],
-    });
+    const blocked = await this.contentRepo
+      .createQueryBuilder('content')
+      .select('content.tmdbId', 'tmdbId')
+      .addSelect('content.contentType', 'contentType')
+      .where('content.adult = true')
+      .getRawMany<BlockedContentRow>();
     const data = new Set(blocked.map((c) => `${c.contentType}:${c.tmdbId}`));
     this.blockedIdsCache = { data, expiresAt: Date.now() + BLOCKED_IDS_TTL_MS };
     return data;
