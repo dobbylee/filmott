@@ -70,6 +70,7 @@ describe('RankingsService', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
     jest.restoreAllMocks();
   });
@@ -521,6 +522,221 @@ describe('RankingsService', () => {
         'daily-box-office-stabilization',
         'report',
       );
+    });
+  });
+
+  describe('weekly box office schedulers', () => {
+    it('1차 수집 스케줄러가 매주 월요일 00:30에 실행되도록 설정되어야 한다', () => {
+      const cronMetadata = Reflect.getMetadata(
+        'SCHEDULE_CRON_OPTIONS',
+        service.scheduleWeeklyBoxOffice,
+      ) as { cronTime?: unknown; name?: unknown; timeZone?: unknown };
+
+      expect(cronMetadata).toMatchObject({
+        cronTime: '30 0 * * 1',
+        name: 'weekly-box-office',
+        timeZone: 'Asia/Seoul',
+      });
+    });
+
+    it('조건부 재시도 스케줄러가 매주 월요일 01:30에 실행되도록 설정되어야 한다', () => {
+      const cronMetadata = Reflect.getMetadata(
+        'SCHEDULE_CRON_OPTIONS',
+        service.retryWeeklyBoxOfficeIfMissing,
+      ) as { cronTime?: unknown; name?: unknown; timeZone?: unknown };
+
+      expect(cronMetadata).toMatchObject({
+        cronTime: '30 1 * * 1',
+        name: 'weekly-box-office-retry',
+        timeZone: 'Asia/Seoul',
+      });
+    });
+
+    it('1차 수집 스케줄러가 warning 정책으로 수집해야 한다', async () => {
+      const fetchSpy = jest
+        .spyOn(service, 'fetchWeeklyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.scheduleWeeklyBoxOffice();
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'weekly-box-office-primary',
+        'warn',
+      );
+    });
+
+    it('조건부 재시도는 전주 랭킹이 10건 이상이면 수집하지 않아야 한다', async () => {
+      mockRankingRepo.count.mockResolvedValue(10);
+      const fetchSpy = jest
+        .spyOn(service, 'fetchWeeklyBoxOffice')
+        .mockResolvedValue([]);
+
+      await service.retryWeeklyBoxOfficeIfMissing();
+
+      expect(mockRankingRepo.count).toHaveBeenCalledWith({
+        where: {
+          source: 'kobis',
+          category: 'weekly-box-office',
+          targetDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        },
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('조건부 재시도 전 완성도 조회 실패는 Sentry에 한 번 보고하고 예외를 던지지 않아야 한다', async () => {
+      mockRankingRepo.count.mockRejectedValue(
+        new Error('주간 랭킹 완성도 조회 실패'),
+      );
+      const fetchSpy = jest
+        .spyOn(service, 'fetchWeeklyBoxOffice')
+        .mockResolvedValue([]);
+
+      await expect(service.retryWeeklyBoxOfficeIfMissing()).resolves.toEqual(
+        [],
+      );
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'DATABASE',
+          trigger: 'weekly-box-office-retry',
+          operation: 'weekly-box-office-completeness-check',
+          targetDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        }),
+      );
+    });
+
+    it.each([0, 9])(
+      '조건부 재시도는 전주 랭킹이 %i건이면 다시 수집해야 한다',
+      async (existingCount) => {
+        mockRankingRepo.count.mockResolvedValue(existingCount);
+        const fetchSpy = jest
+          .spyOn(service, 'fetchWeeklyBoxOffice')
+          .mockResolvedValue([]);
+
+        await service.retryWeeklyBoxOfficeIfMissing();
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        expect(fetchSpy).toHaveBeenCalledWith(
+          'weekly-box-office-retry',
+          'report',
+        );
+      },
+    );
+
+    it('1차 수집 실패는 warning만 남기고 Sentry에 보고하지 않아야 한다', async () => {
+      const loggerSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation();
+      mockKobisService.getWeeklyBoxOffice.mockRejectedValue(
+        new Error('KOBIS 주간 조회 일시 지연'),
+      );
+
+      await expect(service.scheduleWeeklyBoxOffice()).resolves.toEqual([]);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Failed to fetch weekly box office',
+        expect.objectContaining({
+          trigger: 'weekly-box-office-primary',
+          targetDt: expect.stringMatching(/^\d{8}$/),
+          targetDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        }),
+      );
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+    });
+
+    it('조건부 재시도 실패는 Sentry에 한 번 보고하고 예외를 던지지 않아야 한다', async () => {
+      mockRankingRepo.count.mockResolvedValue(0);
+      mockKobisService.getWeeklyBoxOffice.mockRejectedValue(
+        new Error('KOBIS 주간 조회 재시도 실패'),
+      );
+
+      await expect(service.retryWeeklyBoxOfficeIfMissing()).resolves.toEqual(
+        [],
+      );
+
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trigger: 'weekly-box-office-retry',
+          message: 'KOBIS 주간 조회 재시도 실패',
+          targetDt: expect.stringMatching(/^\d{8}$/),
+          targetDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        }),
+      );
+    });
+
+    it('1차 수집 실패 후 조건부 재시도가 성공하면 전주 랭킹을 저장해야 한다', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      mockRankingRepo.count.mockResolvedValue(0);
+      const kobisItems = [
+        {
+          rank: '1',
+          movieNm: '주간 복구 영화',
+          movieCd: '20260003',
+          openDt: '2026-07-01',
+          audiCnt: '30000',
+          audiAcc: '70000',
+          salesAmt: '300000000',
+          salesAcc: '700000000',
+        },
+      ];
+      mockKobisService.getWeeklyBoxOffice
+        .mockRejectedValueOnce(new Error('00:30 수집 실패'))
+        .mockResolvedValueOnce(kobisItems);
+      mockTmdbService.searchByType.mockResolvedValue({ results: [] });
+      mockRankingRepo.create.mockImplementation((data: object) => ({
+        ...data,
+      }));
+      mockRankingRepo.upsert.mockResolvedValue(undefined);
+
+      await expect(service.scheduleWeeklyBoxOffice()).resolves.toEqual([]);
+      await expect(
+        service.retryWeeklyBoxOfficeIfMissing(),
+      ).resolves.toHaveLength(1);
+
+      expect(mockKobisService.getWeeklyBoxOffice).toHaveBeenCalledTimes(2);
+      expect(mockRankingRepo.upsert).toHaveBeenCalledWith(expect.any(Array), [
+        'source',
+        'category',
+        'rank',
+        'targetDate',
+      ]);
+      expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/', [
+        'rankings',
+      ]);
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+    });
+
+    it('월요일 00:30과 01:30 수집은 동일한 전주 날짜를 사용해야 한다', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-07-26T15:30:00.000Z'));
+      mockKobisService.getWeeklyBoxOffice.mockRejectedValue(
+        new Error('고정 시각 KOBIS 실패'),
+      );
+
+      await expect(service.scheduleWeeklyBoxOffice()).resolves.toEqual([]);
+
+      jest.setSystemTime(new Date('2026-07-26T16:30:00.000Z'));
+      mockRankingRepo.count.mockResolvedValue(0);
+
+      await expect(service.retryWeeklyBoxOfficeIfMissing()).resolves.toEqual(
+        [],
+      );
+
+      expect(mockRankingRepo.count).toHaveBeenCalledWith({
+        where: {
+          source: 'kobis',
+          category: 'weekly-box-office',
+          targetDate: '2026-07-20',
+        },
+      });
+      expect(mockKobisService.getWeeklyBoxOffice.mock.calls).toEqual([
+        ['20260720'],
+        ['20260720'],
+      ]);
     });
   });
 

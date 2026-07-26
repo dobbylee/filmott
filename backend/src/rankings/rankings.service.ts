@@ -31,10 +31,18 @@ type DailyBoxOfficeTrigger =
 
 type DailyBoxOfficeFailurePolicy = 'warn' | 'report' | 'throw';
 
+type WeeklyBoxOfficeTrigger =
+  | 'weekly-box-office-primary'
+  | 'weekly-box-office-retry'
+  | 'manual-refresh';
+
+type WeeklyBoxOfficeFailurePolicy = 'warn' | 'report' | 'throw';
+
 @Injectable()
 export class RankingsService {
   private readonly logger = new Logger(RankingsService.name);
   private static readonly DAILY_BOX_OFFICE_CATEGORY = 'daily-box-office';
+  private static readonly WEEKLY_BOX_OFFICE_CATEGORY = 'weekly-box-office';
   private static readonly KOBIS_SOURCE = 'kobis';
 
   constructor(
@@ -240,14 +248,90 @@ export class RankingsService {
   }
 
   /**
-   * KOBIS 주간 박스오피스를 가져와 rankings에 저장
+   * KOBIS 주간 박스오피스 1차 수집
    * 매주 월요일 00:30 실행 (전주 데이터)
    */
-  @Cron('30 0 * * 1', { name: 'weekly-box-office', timeZone: 'Asia/Seoul' })
-  async fetchWeeklyBoxOffice(): Promise<Ranking[]> {
+  @Cron('30 0 * * 1', {
+    name: 'weekly-box-office',
+    timeZone: 'Asia/Seoul',
+  })
+  async scheduleWeeklyBoxOffice(): Promise<Ranking[]> {
+    return this.fetchWeeklyBoxOffice('weekly-box-office-primary', 'warn');
+  }
+
+  /**
+   * KOBIS 주간 박스오피스 조건부 재시도
+   * 매주 월요일 01:30 실행 (전주 랭킹이 10건 미만일 때 재시도)
+   */
+  @Cron('30 1 * * 1', {
+    name: 'weekly-box-office-retry',
+    timeZone: 'Asia/Seoul',
+  })
+  async retryWeeklyBoxOfficeIfMissing(): Promise<Ranking[] | void> {
+    const targetDate = this.getLastWeekTargetDate();
+    let existingCount: number;
+    try {
+      existingCount = await this.rankingRepo.count({
+        where: {
+          source: RankingsService.KOBIS_SOURCE,
+          category: RankingsService.WEEKLY_BOX_OFFICE_CATEGORY,
+          targetDate,
+        },
+      });
+    } catch (error) {
+      const errorSummary = {
+        ...summarizeExternalApiError('DATABASE', error),
+        trigger: 'weekly-box-office-retry',
+        operation: 'weekly-box-office-completeness-check',
+        targetDate,
+      };
+      this.logger.error(
+        'Failed to check weekly box office completeness',
+        errorSummary,
+      );
+      Sentry.captureException(errorSummary);
+      return [];
+    }
+
+    if (existingCount >= 10) {
+      this.logger.log(
+        `Weekly box office already exists for ${targetDate}, skipping retry`,
+        {
+          trigger: 'weekly-box-office-retry',
+          targetDate,
+          existingCount,
+        },
+      );
+      return;
+    }
+
+    this.logger.warn(
+      `Weekly box office incomplete for ${targetDate}, running retry`,
+      {
+        trigger: 'weekly-box-office-retry',
+        targetDate,
+        existingCount,
+      },
+    );
+    return this.fetchWeeklyBoxOffice('weekly-box-office-retry', 'report');
+  }
+
+  /**
+   * KOBIS 주간 박스오피스를 가져와 rankings에 저장
+   * 수동 실행 및 스케줄러 공용
+   */
+  async fetchWeeklyBoxOffice(
+    trigger: WeeklyBoxOfficeTrigger = 'manual-refresh',
+    failurePolicy: WeeklyBoxOfficeFailurePolicy = 'throw',
+  ): Promise<Ranking[]> {
+    const startedAt = Date.now();
     const lastWeek = this.getLastWeekDate();
     const targetDate = this.formatDateWithDashes(lastWeek);
-    this.logger.log(`Fetching weekly box office for ${lastWeek}`);
+    this.logger.log(`Fetching weekly box office for ${lastWeek}`, {
+      trigger,
+      targetDt: lastWeek,
+      targetDate,
+    });
 
     try {
       const boxOfficeItems =
@@ -300,6 +384,14 @@ export class RankingsService {
 
       this.logger.log(
         `Saved ${rankingsToUpsert.length} weekly box office rankings`,
+        {
+          trigger,
+          targetDt: lastWeek,
+          targetDate,
+          itemCount: boxOfficeItems.length,
+          savedCount: rankingsToUpsert.length,
+          durationMs: Date.now() - startedAt,
+        },
       );
 
       const contentIds = rankingsToUpsert
@@ -315,12 +407,27 @@ export class RankingsService {
       );
       return rankingsToUpsert;
     } catch (error) {
-      const errorSummary = summarizeExternalApiError('KOBIS', error);
-      this.logger.error('Failed to fetch weekly box office', errorSummary);
-      Sentry.captureException(errorSummary);
-      throw new BadGatewayException(
-        'KOBIS 주간 박스오피스 조회에 실패했습니다.',
-      );
+      const errorSummary = {
+        ...summarizeExternalApiError('KOBIS', error),
+        trigger,
+        targetDt: lastWeek,
+        targetDate,
+        durationMs: Date.now() - startedAt,
+      };
+      if (failurePolicy === 'warn') {
+        this.logger.warn('Failed to fetch weekly box office', errorSummary);
+      } else {
+        this.logger.error('Failed to fetch weekly box office', errorSummary);
+        Sentry.captureException(errorSummary);
+      }
+
+      if (failurePolicy === 'throw') {
+        throw new BadGatewayException(
+          'KOBIS 주간 박스오피스 조회에 실패했습니다.',
+        );
+      }
+
+      return [];
     }
   }
 
@@ -602,6 +709,10 @@ export class RankingsService {
     return date
       .toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
       .replace(/-/g, '');
+  }
+
+  private getLastWeekTargetDate(): string {
+    return this.formatDateWithDashes(this.getLastWeekDate());
   }
 
   private getYesterdayDate(): string {
