@@ -52,8 +52,8 @@ jobs:
             }
 
             print_diagnostics() {
-              echo "=== docker compose ps ==="
-              compose ps || true
+              echo "=== docker compose ps -a ==="
+              compose ps -a || true
               echo "=== frontend/backend/nginx logs ==="
               compose logs --tail=160 frontend backend nginx || true
             }
@@ -90,6 +90,7 @@ jobs:
             cutover_started=0
             checkout_changed=0
             rollback_ready=0
+            recovery_in_progress=0
             previous_head=""
             previous_frontend_ref=""
             previous_backend_ref=""
@@ -118,10 +119,55 @@ jobs:
               echo "Previous frontend/backend release restored"
             }
 
-            handle_deploy_error() {
-              status=$?
-              trap - ERR
-              echo "Deploy failed"
+            apps_are_running() {
+              local service
+              local container_id
+
+              for service in frontend backend; do
+                container_id=$(compose ps -q "$service")
+                if [ -z "$container_id" ] ||
+                  [ "$(docker inspect -f '{{.State.Running}}' "$container_id" 2>/dev/null)" != "true" ]; then
+                  return 1
+                fi
+              done
+            }
+
+            restore_interrupted_release() {
+              echo "Restoring frontend/backend from rollback images left by an interrupted deploy"
+              if ! docker image inspect filmott-frontend:rollback filmott-backend:rollback > /dev/null 2>&1; then
+                echo "Both frontend/backend rollback images are required for interrupted deploy recovery"
+                return 1
+              fi
+
+              docker image tag filmott-frontend:rollback filmott-frontend:latest || return 1
+              docker image tag filmott-backend:rollback filmott-backend:latest || return 1
+              compose up -d --no-deps --force-recreate frontend backend || return 1
+              wait_for_backend || return 1
+              wait_for_frontend || return 1
+              compose restart nginx || return 1
+              echo "Interrupted frontend/backend release restored"
+            }
+
+            recover_deploy() {
+              local status="$1"
+              local reason="$2"
+              local redirect_output="$3"
+              local recovery_log=""
+
+              if [ "$recovery_in_progress" = "1" ]; then
+                exit "$status"
+              fi
+              recovery_in_progress=1
+              trap - ERR HUP INT TERM
+              set +e
+              if [ "$redirect_output" = "1" ]; then
+                trap '' PIPE
+                recovery_log=$(mktemp /tmp/filmott-deploy-recovery.XXXXXX.log 2>/dev/null || true)
+                if [ -n "$recovery_log" ]; then
+                  exec >> "$recovery_log" 2>&1
+                fi
+              fi
+              echo "$reason"
               print_diagnostics
 
               if [ "$cutover_started" = "1" ] && [ "$rollback_ready" = "1" ]; then
@@ -142,7 +188,21 @@ jobs:
               exit "$status"
             }
 
+            handle_deploy_error() {
+              local status=$?
+              recover_deploy "$status" "Deploy failed" 0
+            }
+
+            handle_deploy_signal() {
+              local signal="$1"
+              local status="$2"
+              recover_deploy "$status" "Deploy interrupted by ${signal}" 1
+            }
+
             trap handle_deploy_error ERR
+            trap 'handle_deploy_signal HUP 129' HUP
+            trap 'handle_deploy_signal INT 130' INT
+            trap 'handle_deploy_signal TERM 143' TERM
 
             fail_deploy() {
               echo "$1"
@@ -182,6 +242,13 @@ jobs:
             fi
 
             compose config > /dev/null
+            if ! apps_are_running; then
+              echo "frontend/backend is not running; attempting interrupted deploy recovery"
+              if ! restore_interrupted_release; then
+                fail_deploy "Cannot recover interrupted frontend/backend release"
+              fi
+            fi
+
             previous_frontend_container=$(compose ps -q frontend)
             previous_backend_container=$(compose ps -q backend)
             if [ -z "$previous_frontend_container" ] || [ -z "$previous_backend_container" ]; then
