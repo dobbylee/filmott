@@ -24,6 +24,10 @@ jest.mock('@sentry/nestjs', () => ({
   captureException: jest.fn(),
 }));
 
+const VALID_OAUTH_STATE = 'a'.repeat(32);
+const SECOND_OAUTH_STATE = 'b'.repeat(32);
+const oauthStateCookieName = (state: string) => `oauth_state_${state}`;
+
 describe('AuthController', () => {
   let controller: AuthController;
 
@@ -304,9 +308,11 @@ describe('AuthController', () => {
 
       controller.googleRedirect(mockRes as never);
 
+      const state = mockGoogleService.getAuthUrl.mock.calls[0]?.[0] as string;
+      expect(state).toMatch(/^[a-f0-9]{32}$/);
       expect(mockRes.cookie).toHaveBeenCalledWith(
-        'oauth_state',
-        expect.any(String),
+        oauthStateCookieName(state),
+        'google',
         expect.objectContaining({
           httpOnly: true,
           sameSite: 'lax',
@@ -315,10 +321,50 @@ describe('AuthController', () => {
           path: '/',
         }),
       );
-      expect(mockGoogleService.getAuthUrl).toHaveBeenCalledWith(
-        expect.any(String),
-      );
+      expect(mockGoogleService.getAuthUrl).toHaveBeenCalledWith(state);
       expect(mockRes.redirect).toHaveBeenCalled();
+    });
+
+    it('연속된 OAuth 요청마다 독립적인 state 쿠키를 설정해야 한다', () => {
+      const mockRes = createMockResponse();
+
+      controller.googleRedirect(mockRes as never);
+      controller.googleRedirect(mockRes as never);
+      controller.kakaoRedirect(mockRes as never);
+      controller.naverRedirect(mockRes as never);
+
+      const googleState = mockGoogleService.getAuthUrl.mock
+        .calls[0]?.[0] as string;
+      const secondGoogleState = mockGoogleService.getAuthUrl.mock
+        .calls[1]?.[0] as string;
+      const kakaoState = mockKakaoService.getAuthUrl.mock
+        .calls[0]?.[0] as string;
+      const naverState = mockNaverService.getAuthUrl.mock
+        .calls[0]?.[0] as string;
+
+      expect(
+        new Set([googleState, secondGoogleState, kakaoState, naverState]).size,
+      ).toBe(4);
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        oauthStateCookieName(googleState),
+        'google',
+        expect.any(Object),
+      );
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        oauthStateCookieName(secondGoogleState),
+        'google',
+        expect.any(Object),
+      );
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        oauthStateCookieName(kakaoState),
+        'kakao',
+        expect.any(Object),
+      );
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        oauthStateCookieName(naverState),
+        'naver',
+        expect.any(Object),
+      );
     });
   });
 
@@ -331,9 +377,10 @@ describe('AuthController', () => {
 
       controller.googleRedirect(mockRes as never);
 
+      const state = mockGoogleService.getAuthUrl.mock.calls[0]?.[0] as string;
       expect(mockRes.cookie).toHaveBeenCalledWith(
-        'oauth_state',
-        expect.any(String),
+        oauthStateCookieName(state),
+        'google',
         expect.objectContaining({ secure: false }),
       );
     });
@@ -360,9 +407,10 @@ describe('AuthController', () => {
       const mockRes = { cookie: jest.fn(), redirect: jest.fn() };
       prodController.googleRedirect(mockRes as never);
 
+      const state = mockGoogleService.getAuthUrl.mock.calls[0]?.[0] as string;
       expect(mockRes.cookie).toHaveBeenCalledWith(
-        'oauth_state',
-        expect.any(String),
+        oauthStateCookieName(state),
+        'google',
         expect.objectContaining({ secure: true }),
       );
     });
@@ -394,17 +442,27 @@ describe('AuthController', () => {
       });
       mockAuthService.handleSocialCallback.mockResolvedValue(existingResult);
 
-      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      const mockReq = {
+        cookies: {
+          [oauthStateCookieName(VALID_OAUTH_STATE)]: 'google',
+          [oauthStateCookieName(SECOND_OAUTH_STATE)]: 'kakao',
+        },
+      };
       await controller.googleCallback(
         'code123',
-        'valid-state',
+        VALID_OAUTH_STATE,
         mockReq as never,
         mockRes as never,
       );
 
-      expect(mockRes.clearCookie).toHaveBeenCalledWith('oauth_state', {
-        path: '/',
-      });
+      expect(mockRes.clearCookie).toHaveBeenCalledWith(
+        oauthStateCookieName(VALID_OAUTH_STATE),
+        { path: '/' },
+      );
+      expect(mockRes.clearCookie).not.toHaveBeenCalledWith(
+        oauthStateCookieName(SECOND_OAUTH_STATE),
+        expect.any(Object),
+      );
       expectAuthCookies(mockRes, 'access-token', 'refresh-token');
       expectSignupCookieCleared(mockRes);
       expect(mockRes.redirect).toHaveBeenCalledWith(
@@ -430,10 +488,14 @@ describe('AuthController', () => {
       });
       mockAuthService.handleSocialCallback.mockResolvedValue(newResult);
 
-      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      const mockReq = {
+        cookies: {
+          [oauthStateCookieName(VALID_OAUTH_STATE)]: 'google',
+        },
+      };
       await controller.googleCallback(
         'code456',
-        'valid-state',
+        VALID_OAUTH_STATE,
         mockReq as never,
         mockRes as never,
       );
@@ -454,10 +516,14 @@ describe('AuthController', () => {
         clearCookie: jest.fn(),
       };
 
-      const mockReq = { cookies: { oauth_state: 'different-state' } };
+      const mockReq = {
+        cookies: {
+          [oauthStateCookieName(SECOND_OAUTH_STATE)]: 'google',
+        },
+      };
       await controller.googleCallback(
         'code123',
-        'wrong-state',
+        VALID_OAUTH_STATE,
         mockReq as never,
         mockRes as never,
       );
@@ -474,15 +540,145 @@ describe('AuthController', () => {
             auth_flow: 'social_callback',
             provider: 'google',
             auth_error_reason: 'invalid_state',
+            auth_state_failure_reason: 'missing_state_cookie',
           }),
           contexts: {
             auth: expect.objectContaining({
               flow: 'social_callback',
               provider: 'google',
               reason: 'invalid_state',
+              stateFailureReason: 'missing_state_cookie',
             }),
           },
         }),
+      );
+      expect(mockRes.clearCookie).not.toHaveBeenCalled();
+      expect(mockGoogleService.getProfile).not.toHaveBeenCalled();
+    });
+
+    it('state provider가 다르면 해당 state만 소비하고 실패해야 한다', async () => {
+      const mockRes = createMockResponse();
+      const mockReq = {
+        cookies: {
+          [oauthStateCookieName(VALID_OAUTH_STATE)]: 'kakao',
+          [oauthStateCookieName(SECOND_OAUTH_STATE)]: 'google',
+        },
+      };
+
+      await controller.googleCallback(
+        'code123',
+        VALID_OAUTH_STATE,
+        mockReq as never,
+        mockRes as never,
+      );
+
+      expect(mockRes.clearCookie).toHaveBeenCalledWith(
+        oauthStateCookieName(VALID_OAUTH_STATE),
+        { path: '/' },
+      );
+      expect(mockRes.clearCookie).not.toHaveBeenCalledWith(
+        oauthStateCookieName(SECOND_OAUTH_STATE),
+        expect.any(Object),
+      );
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            auth_state_failure_reason: 'provider_mismatch',
+          }),
+        }),
+      );
+      expect(mockGoogleService.getProfile).not.toHaveBeenCalled();
+    });
+
+    it('형식이 잘못된 state는 쿠키에 접근하지 않고 실패해야 한다', async () => {
+      const mockRes = createMockResponse();
+      const mockReq = {
+        cookies: {
+          [oauthStateCookieName(VALID_OAUTH_STATE)]: 'google',
+        },
+      };
+
+      await controller.googleCallback(
+        'code123',
+        '../invalid',
+        mockReq as never,
+        mockRes as never,
+      );
+
+      expect(mockRes.clearCookie).not.toHaveBeenCalled();
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            auth_state_failure_reason: 'invalid_state_format',
+          }),
+        }),
+      );
+      expect(mockGoogleService.getProfile).not.toHaveBeenCalled();
+    });
+
+    it('state query가 없으면 원인을 구분해 실패해야 한다', async () => {
+      const mockRes = createMockResponse();
+
+      await controller.googleCallback(
+        'code123',
+        undefined as unknown as string,
+        { cookies: {} } as never,
+        mockRes as never,
+      );
+
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            auth_state_failure_reason: 'missing_query_state',
+          }),
+        }),
+      );
+      expect(mockRes.clearCookie).not.toHaveBeenCalled();
+      expect(mockGoogleService.getProfile).not.toHaveBeenCalled();
+    });
+
+    it('배포 전에 발급한 단일 state 쿠키를 한 번 허용해야 한다', async () => {
+      const mockRes = createMockResponse();
+      const mockReq = { cookies: { oauth_state: VALID_OAUTH_STATE } };
+      const existingResult: SocialCallbackResult = {
+        type: 'existing',
+        session: {
+          access_token: 'access-token',
+          refresh_token: 'refresh-token',
+          user: {
+            id: 1,
+            nickname: 'existinguser',
+            role: 'USER',
+            profileImage: null,
+            subscribedOtts: [],
+          },
+        },
+      };
+      mockGoogleService.getProfile.mockResolvedValue({
+        provider: AuthProvider.GOOGLE,
+        providerId: 'google-legacy',
+        email: null,
+        nickname: null,
+        profileImage: null,
+      });
+      mockAuthService.handleSocialCallback.mockResolvedValue(existingResult);
+
+      await controller.googleCallback(
+        'legacy-code',
+        VALID_OAUTH_STATE,
+        mockReq as never,
+        mockRes as never,
+      );
+
+      expect(mockRes.clearCookie).toHaveBeenCalledWith('oauth_state', {
+        path: '/',
+      });
+      expect(mockGoogleService.getProfile).toHaveBeenCalledWith('legacy-code');
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        expect.stringContaining('status=success'),
       );
     });
 
@@ -493,10 +689,14 @@ describe('AuthController', () => {
         clearCookie: jest.fn(),
       };
 
-      const mockReq = { cookies: { oauth_state: 'state' } };
+      const mockReq = {
+        cookies: {
+          [oauthStateCookieName(VALID_OAUTH_STATE)]: 'google',
+        },
+      };
       await controller.googleCallback(
         undefined as unknown as string,
-        'state',
+        VALID_OAUTH_STATE,
         mockReq as never,
         mockRes as never,
       );
@@ -541,10 +741,14 @@ describe('AuthController', () => {
         new UnauthorizedException('정지된 계정입니다.'),
       );
 
-      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      const mockReq = {
+        cookies: {
+          [oauthStateCookieName(VALID_OAUTH_STATE)]: 'google',
+        },
+      };
       await controller.googleCallback(
         'code-sus',
-        'valid-state',
+        VALID_OAUTH_STATE,
         mockReq as never,
         mockRes as never,
       );
@@ -595,10 +799,14 @@ describe('AuthController', () => {
         new UnauthorizedException('탈퇴한 계정입니다.'),
       );
 
-      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      const mockReq = {
+        cookies: {
+          [oauthStateCookieName(VALID_OAUTH_STATE)]: 'google',
+        },
+      };
       await controller.googleCallback(
         'code-del',
-        'valid-state',
+        VALID_OAUTH_STATE,
         mockReq as never,
         mockRes as never,
       );
@@ -618,10 +826,14 @@ describe('AuthController', () => {
         new Error('network error'),
       );
 
-      const mockReq = { cookies: { oauth_state: 'valid-state' } };
+      const mockReq = {
+        cookies: {
+          [oauthStateCookieName(VALID_OAUTH_STATE)]: 'google',
+        },
+      };
       await controller.googleCallback(
         'code-err',
-        'valid-state',
+        VALID_OAUTH_STATE,
         mockReq as never,
         mockRes as never,
       );

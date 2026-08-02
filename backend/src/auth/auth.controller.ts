@@ -34,7 +34,9 @@ import {
   setSocialSignupCookie,
 } from './auth-cookie.util';
 
-const OAUTH_STATE_COOKIE = 'oauth_state';
+const LEGACY_OAUTH_STATE_COOKIE = 'oauth_state';
+const OAUTH_STATE_COOKIE_PREFIX = 'oauth_state_';
+const OAUTH_STATE_PATTERN = /^[a-f0-9]{32}$/;
 const STATE_COOKIE_MAX_AGE = 5 * 60 * 1000; // 5분
 const INTERNAL_FRONTEND_HOSTNAMES = new Set([
   'frontend',
@@ -44,6 +46,14 @@ const INTERNAL_FRONTEND_HOSTNAMES = new Set([
 ]);
 
 type SocialLoginProvider = 'google' | 'kakao' | 'naver';
+type OAuthStateFailureReason =
+  | 'invalid_state_format'
+  | 'missing_query_state'
+  | 'missing_state_cookie'
+  | 'provider_mismatch';
+type OAuthStateVerificationResult =
+  | { valid: true }
+  | { valid: false; reason: OAuthStateFailureReason };
 type AuthFailureReason =
   | 'deleted'
   | 'invalid_state'
@@ -120,7 +130,7 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   googleRedirect(@Res() res: Response) {
     const state = randomBytes(16).toString('hex');
-    this.setStateCookie(res, state);
+    this.setStateCookie(res, 'google', state);
     const url = this.googleService.getAuthUrl(state);
     return res.redirect(url);
   }
@@ -149,7 +159,7 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   kakaoRedirect(@Res() res: Response) {
     const state = randomBytes(16).toString('hex');
-    this.setStateCookie(res, state);
+    this.setStateCookie(res, 'kakao', state);
     const url = this.kakaoService.getAuthUrl(state);
     return res.redirect(url);
   }
@@ -178,7 +188,7 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   naverRedirect(@Res() res: Response) {
     const state = randomBytes(16).toString('hex');
-    this.setStateCookie(res, state);
+    this.setStateCookie(res, 'naver', state);
     const url = this.naverService.getAuthUrl(state);
     return res.redirect(url);
   }
@@ -236,8 +246,12 @@ export class AuthController {
 
   // --- Private helpers ---
 
-  private setStateCookie(res: Response, state: string): void {
-    res.cookie(OAUTH_STATE_COOKIE, state, {
+  private setStateCookie(
+    res: Response,
+    provider: SocialLoginProvider,
+    state: string,
+  ): void {
+    res.cookie(this.getStateCookieName(state), provider, {
       httpOnly: true,
       sameSite: 'lax',
       secure: this.isProduction,
@@ -246,16 +260,41 @@ export class AuthController {
     });
   }
 
-  private verifyState(req: Request, res: Response, urlState: string): boolean {
-    const cookieState = this.getCookieValue(req, OAUTH_STATE_COOKIE);
-
-    // state 쿠키 삭제
-    res.clearCookie(OAUTH_STATE_COOKIE, { path: '/' });
-
-    if (!cookieState || !urlState || cookieState !== urlState) {
-      return false;
+  private verifyState(
+    provider: SocialLoginProvider,
+    req: Request,
+    res: Response,
+    urlState: unknown,
+  ): OAuthStateVerificationResult {
+    if (urlState === undefined || urlState === null || urlState === '') {
+      return { valid: false, reason: 'missing_query_state' };
     }
-    return true;
+
+    if (typeof urlState !== 'string' || !OAUTH_STATE_PATTERN.test(urlState)) {
+      return { valid: false, reason: 'invalid_state_format' };
+    }
+
+    const stateCookieName = this.getStateCookieName(urlState);
+    const cookieProvider = this.getCookieValue(req, stateCookieName);
+    if (cookieProvider) {
+      res.clearCookie(stateCookieName, { path: '/' });
+      if (cookieProvider !== provider) {
+        return { valid: false, reason: 'provider_mismatch' };
+      }
+      return { valid: true };
+    }
+
+    const legacyState = this.getCookieValue(req, LEGACY_OAUTH_STATE_COOKIE);
+    if (legacyState === urlState) {
+      res.clearCookie(LEGACY_OAUTH_STATE_COOKIE, { path: '/' });
+      return { valid: true };
+    }
+
+    return { valid: false, reason: 'missing_state_cookie' };
+  }
+
+  private getStateCookieName(state: string): string {
+    return `${OAUTH_STATE_COOKIE_PREFIX}${state}`;
   }
 
   private getRefreshToken(req: Request): string | undefined {
@@ -297,6 +336,7 @@ export class AuthController {
     provider: SocialLoginProvider,
     reason: AuthFailureReason,
     error?: unknown,
+    stateFailureReason?: OAuthStateFailureReason,
   ): void {
     const statusCode =
       error instanceof HttpException ? error.getStatus() : undefined;
@@ -305,6 +345,7 @@ export class AuthController {
       flow: 'social_callback',
       provider,
       reason,
+      ...(stateFailureReason ? { stateFailureReason } : {}),
       ...(statusCode ? { statusCode } : {}),
       ...(originalName ? { originalName } : {}),
     };
@@ -320,6 +361,9 @@ export class AuthController {
         auth_flow: 'social_callback',
         provider,
         auth_error_reason: reason,
+        ...(stateFailureReason
+          ? { auth_state_failure_reason: stateFailureReason }
+          : {}),
       },
       contexts: {
         auth: context,
@@ -363,8 +407,14 @@ export class AuthController {
         return;
       }
 
-      if (!this.verifyState(req, res, state)) {
-        this.reportAuthFailure(provider, 'invalid_state');
+      const stateVerification = this.verifyState(provider, req, res, state);
+      if (!stateVerification.valid) {
+        this.reportAuthFailure(
+          provider,
+          'invalid_state',
+          undefined,
+          stateVerification.reason,
+        );
         res.redirect(`${callbackUrl}?error=invalid_state`);
         return;
       }
