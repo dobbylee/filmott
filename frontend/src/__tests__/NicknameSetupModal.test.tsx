@@ -14,6 +14,7 @@ vi.mock('@/lib/auth-error-reporting', () => ({
 }));
 
 const mockHandleAuthSuccess = vi.fn();
+const mockRouterReplace = vi.fn();
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -23,7 +24,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    replace: vi.fn(),
+    replace: mockRouterReplace,
     push: vi.fn(),
     back: vi.fn(),
     forward: vi.fn(),
@@ -67,6 +68,7 @@ const expectedOttOrder = [
 describe('NicknameSetupModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   it('닉네임 입력 단계를 렌더링해야 한다', () => {
@@ -243,6 +245,34 @@ describe('NicknameSetupModal', () => {
     await user.click(screen.getByRole('button', { name: '시작하기' }));
 
     expect(mockTrackEvent).toHaveBeenCalledWith('signup_completed', { provider: 'google' });
+  });
+
+  it('회원가입과 세션 설정 완료 후 로그인 시작 페이지로 이동해야 한다', async () => {
+    const user = userEvent.setup();
+    mockApiGet.mockResolvedValue({ data: { available: true } });
+    const authResponse = {
+      user: { id: 1, nickname: 'testuser', provider: 'Google' },
+    };
+    mockApiPost.mockResolvedValue({ data: authResponse });
+    window.sessionStorage.setItem(
+      'filmott_auth_return_path',
+      '/search?q=movie#results',
+    );
+
+    render(<NicknameSetupModal />);
+
+    await user.type(screen.getByPlaceholderText('2자 이상 닉네임'), 'testuser');
+    await waitFor(() => {
+      expect(screen.getByText('사용 가능한 닉네임입니다.')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await user.click(screen.getByRole('button', { name: '건너뛰기' }));
+
+    expect(mockHandleAuthSuccess).toHaveBeenCalledWith(authResponse);
+    expect(mockRouterReplace).toHaveBeenCalledWith('/search?q=movie#results');
+    expect(
+      window.sessionStorage.getItem('filmott_auth_return_path'),
+    ).toBeNull();
   });
 
   it('provider가 없을 때 signup_completed 이벤트를 provider="unknown"으로 호출해야 한다', async () => {

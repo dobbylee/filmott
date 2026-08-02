@@ -5,6 +5,7 @@ import {
   captureAuthFailureMessage,
 } from '@/lib/auth-error-reporting';
 import { trackEvent } from '@/lib/ga';
+import { consumeAuthReturnPath } from '@/lib/auth-return-path';
 import { persistSocialSignupTokenFromHash } from '@/lib/social-signup-storage';
 import type { AuthResponse, User } from '@/types/auth';
 
@@ -86,7 +87,7 @@ export function useAuthCallback({
             provider: data.provider?.toLowerCase() ?? 'unknown',
           });
           setAsyncState({ type: 'success' });
-          onRedirectRef.current('/');
+          onRedirectRef.current(consumeAuthReturnPath());
         } catch (err) {
           if (!active) return;
 

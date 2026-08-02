@@ -11,6 +11,7 @@ import { OTT_PROVIDERS } from '@/lib/ott-providers';
 import api from '@/lib/api';
 import { captureAuthFailure } from '@/lib/auth-error-reporting';
 import { trackEvent } from '@/lib/ga';
+import { consumeAuthReturnPath } from '@/lib/auth-return-path';
 import {
   clearStoredSocialSignupToken,
   getStoredSocialSignupToken,
@@ -104,7 +105,7 @@ export default function NicknameSetupModal() {
         provider: response.data.user.provider?.toLowerCase() ?? 'unknown',
       });
       handleAuthSuccess(response.data);
-      router.replace('/');
+      router.replace(consumeAuthReturnPath());
     } catch (err) {
       captureAuthFailure(err, { flow: 'social_signup_complete' });
       setError(getErrorMessage(err));

@@ -29,6 +29,7 @@ describe('useAuthCallback', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -92,6 +93,39 @@ describe('useAuthCallback', () => {
       expect(mockCaptureAuthFailure).toHaveBeenCalledWith(error, {
         flow: 'social_session_restore',
       });
+    });
+
+    it('세션 확인 성공 후 저장된 로그인 시작 페이지로 이동해야 한다', async () => {
+      const mockUser = {
+        id: 1,
+        nickname: 'testuser',
+        role: 'USER',
+        provider: 'GOOGLE',
+      };
+      mockSessionGet.mockResolvedValue({ data: mockUser });
+      window.sessionStorage.setItem(
+        'filmott_auth_return_path',
+        '/contents/123?tab=reviews#comments',
+      );
+
+      renderHook(() =>
+        useAuthCallback({
+          status: 'success',
+          isNew: null,
+          error: null,
+          onAuthSuccess: mockOnAuthSuccess,
+          onRedirect: mockOnRedirect,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(mockOnRedirect).toHaveBeenCalledWith(
+          '/contents/123?tab=reviews#comments',
+        );
+      });
+      expect(
+        window.sessionStorage.getItem('filmott_auth_return_path'),
+      ).toBeNull();
     });
   });
 

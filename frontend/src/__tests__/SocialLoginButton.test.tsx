@@ -13,9 +13,15 @@ describe('SocialLoginButton', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     Object.defineProperty(window, 'location', {
       writable: true,
-      value: { href: '' },
+      value: {
+        href: '',
+        pathname: '/contents/123',
+        search: '?tab=reviews',
+        hash: '#comments',
+      },
     });
   });
 
@@ -62,6 +68,9 @@ describe('SocialLoginButton', () => {
       value: {
         get href() { return ''; },
         set href(_v: string) { callOrder.push('redirect'); },
+        pathname: '/contents/123',
+        search: '',
+        hash: '',
       },
     });
 
@@ -80,6 +89,21 @@ describe('SocialLoginButton', () => {
     await user.click(screen.getByText('Google로 계속하기'));
 
     expect(window.location.href).toContain('/auth/google');
+  });
+
+  it.each([
+    { provider: 'google' as const, label: 'Google로 계속하기' },
+    { provider: 'kakao' as const, label: '카카오로 계속하기' },
+    { provider: 'naver' as const, label: '네이버로 계속하기' },
+  ])('$provider 로그인 전에 현재 페이지를 저장해야 한다', async ({ provider, label }) => {
+    const user = userEvent.setup();
+    render(<SocialLoginButton provider={provider} />);
+
+    await user.click(screen.getByText(label));
+
+    expect(window.sessionStorage.getItem('filmott_auth_return_path')).toBe(
+      '/contents/123?tab=reviews#comments',
+    );
   });
 
   it('data-testid 속성이 올바르게 설정되어야 한다', () => {
