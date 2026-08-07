@@ -1,10 +1,15 @@
 import Image, { type ImageProps } from 'next/image';
 
 /**
- * TMDB CDN URL의 사이즈 세그먼트를 교체한다.
+ * TMDB 이미지 경로를 CDN 절대 URL로 정규화하고 사이즈 세그먼트를 교체한다.
  * 예: 'https://image.tmdb.org/t/p/w500/xxx.jpg' -> 'https://image.tmdb.org/t/p/w342/xxx.jpg'
+ * 예: '/xxx.jpg' -> 'https://image.tmdb.org/t/p/w342/xxx.jpg'
  */
 export function replaceTmdbSize(url: string, targetSize: string): string {
+  if (url.startsWith('/')) {
+    return `https://image.tmdb.org/t/p/${targetSize}${url}`;
+  }
+
   return url.replace(
     /https:\/\/image\.tmdb\.org\/t\/p\/[^/]+/,
     `https://image.tmdb.org/t/p/${targetSize}`,

@@ -32,6 +32,12 @@ describe('replaceTmdbSize', () => {
     );
   });
 
+  it('경로형 TMDB 이미지를 대상 크기의 CDN 절대 URL로 변환한다', () => {
+    expect(replaceTmdbSize('/abc.jpg', 'w342')).toBe(
+      'https://image.tmdb.org/t/p/w342/abc.jpg',
+    );
+  });
+
   it('TMDB URL이 아닌 경우 원본을 반환한다', () => {
     const url = 'https://example.com/image.jpg';
     expect(replaceTmdbSize(url, 'w342')).toBe(url);

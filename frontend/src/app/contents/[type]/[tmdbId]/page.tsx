@@ -104,7 +104,12 @@ export async function generateMetadata({
         title: content.title,
         description,
         images: content.backdropUrl
-          ? [{ url: content.backdropUrl, width: 1280, height: 720, alt: content.title }]
+          ? [{
+              url: replaceTmdbSize(content.backdropUrl, 'w1280'),
+              width: 1280,
+              height: 720,
+              alt: content.title,
+            }]
           : [],
         url: `/contents/${type}/${tmdbId}`,
       },
@@ -112,7 +117,9 @@ export async function generateMetadata({
         card: 'summary_large_image',
         title: content.title,
         description,
-        images: content.backdropUrl ? [content.backdropUrl] : [],
+        images: content.backdropUrl
+          ? [replaceTmdbSize(content.backdropUrl, 'w1280')]
+          : [],
       },
     };
 

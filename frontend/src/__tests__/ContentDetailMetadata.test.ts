@@ -122,6 +122,39 @@ describe('ContentDetail generateMetadata', () => {
     expect(metadata.robots).toBeUndefined();
   });
 
+  it('경로형 백드롭을 Open Graph와 Twitter의 CDN 절대 URL로 변환해야 한다', async () => {
+    mockFetchApi.mockResolvedValue({
+      id: 5,
+      tmdbId: 1002,
+      contentType: 'movie',
+      title: '상대 이미지 작품',
+      overview: '상대 경로 이미지 정규화 테스트입니다.',
+      backdropUrl: '/backdrop.jpg',
+      genres: [],
+      adult: false,
+      searchIndexable: true,
+      credits: [],
+      watchProviders: null,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    });
+
+    const params = Promise.resolve({ type: 'movie', tmdbId: '1002' });
+    const metadata = await generateMetadata({ params });
+
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: 'https://image.tmdb.org/t/p/w1280/backdrop.jpg',
+        width: 1280,
+        height: 720,
+        alt: '상대 이미지 작품',
+      },
+    ]);
+    expect(metadata.twitter?.images).toEqual([
+      'https://image.tmdb.org/t/p/w1280/backdrop.jpg',
+    ]);
+  });
+
   it('fetchApi 실패 시 기본 메타데이터를 반환해야 한다', async () => {
     mockFetchApi.mockRejectedValue(new Error('API error'));
 
