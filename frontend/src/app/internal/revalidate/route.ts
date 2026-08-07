@@ -2,6 +2,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 
 const ALLOWED_TAGS = new Set(['rankings', 'recent-reviews']);
+const CONTENT_REVIEWS_TAG_PATTERN = /^content-reviews:[1-9]\d*$/;
 
 function isAllowedPath(path: string): boolean {
   return path === '/' || path === '/contents' || path.startsWith('/contents/');
@@ -9,7 +10,11 @@ function isAllowedPath(path: string): boolean {
 
 function getAllowedTags(tags: unknown): string[] {
   if (!Array.isArray(tags)) return [];
-  return tags.filter((tag): tag is string => typeof tag === 'string' && ALLOWED_TAGS.has(tag));
+  return tags.filter(
+    (tag): tag is string =>
+      typeof tag === 'string' &&
+      (ALLOWED_TAGS.has(tag) || CONTENT_REVIEWS_TAG_PATTERN.test(tag)),
+  );
 }
 
 export async function POST(request: NextRequest) {

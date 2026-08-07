@@ -126,6 +126,7 @@ describeWithDb('reviews integration', () => {
     expect(watchlist.watchedAt).toBe('2026-05-01');
     expect(revalidateService.revalidatePath).toHaveBeenCalledWith('/', [
       'recent-reviews',
+      `content-reviews:${content.id}`,
     ]);
   });
 

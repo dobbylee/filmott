@@ -125,6 +125,33 @@ describe('revalidate route', () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith('/');
   });
 
+  it('양의 정수 contentId 리뷰 태그만 동적 태그로 허용해야 한다', async () => {
+    const req = createRequest({
+      authorization: 'Bearer test-secret',
+      body: {
+        path: '/',
+        tags: [
+          'content-reviews:42',
+          'content-reviews:0',
+          'content-reviews:-1',
+          'content-reviews:1:admin',
+        ],
+      },
+    });
+
+    const res = await POST(req);
+
+    expect(res.body).toEqual({
+      revalidated: true,
+      path: '/',
+      tags: ['content-reviews:42'],
+    });
+    expect(mockRevalidateTag).toHaveBeenCalledTimes(1);
+    expect(mockRevalidateTag).toHaveBeenCalledWith('content-reviews:42', {
+      expire: 0,
+    });
+  });
+
   it('허용되지 않은 경로는 기본값 /로 fallback해야 한다', async () => {
     const req = createRequest({
       authorization: 'Bearer test-secret',

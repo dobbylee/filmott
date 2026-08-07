@@ -11,7 +11,11 @@ vi.mock('@/lib/fetcher', () => ({
 }));
 
 import { fetchApi } from '@/lib/fetcher';
-import { generateMetadata } from '@/app/person/[personId]/page';
+import PersonPage, {
+  generateMetadata,
+  generateStaticParams,
+  revalidate,
+} from '@/app/person/[personId]/page';
 
 const mockFetchApi = vi.mocked(fetchApi);
 
@@ -136,5 +140,20 @@ describe('Person generateMetadata', () => {
         googleBot: { index: false, follow: false },
       },
     });
+  });
+});
+
+describe('Person ISR cache', () => {
+  it('동적 인물 경로를 최초 요청 시 생성하고 6시간 주기로 재검증해야 한다', () => {
+    expect(generateStaticParams()).toEqual([]);
+    expect(revalidate).toBe(21600);
+  });
+
+  it('인물 조회의 일시적 실패를 전파해 정상 ISR 결과를 보호해야 한다', async () => {
+    mockFetchApi.mockRejectedValueOnce(new Error('temporary person failure'));
+
+    await expect(
+      PersonPage({ params: Promise.resolve({ personId: '1' }) }),
+    ).rejects.toThrow('temporary person failure');
   });
 });

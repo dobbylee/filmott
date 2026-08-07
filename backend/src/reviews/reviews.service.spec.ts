@@ -18,7 +18,10 @@ import { RevalidateService } from '../common/revalidate.service';
 
 describe('ReviewsService', () => {
   let service: ReviewsService;
-  const recentReviewsTags = ['recent-reviews'];
+  const reviewTags = (contentId: number) => [
+    'recent-reviews',
+    `content-reviews:${contentId}`,
+  ];
   const safeUserSelect = [
     'user.id',
     'user.nickname',
@@ -152,7 +155,7 @@ describe('ReviewsService', () => {
       ).toHaveBeenCalledWith(mockManager, 1, 1, 'watched', undefined);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
         '/',
-        recentReviewsTags,
+        reviewTags(1),
       );
     });
 
@@ -172,7 +175,7 @@ describe('ReviewsService', () => {
       expect(result.id).toBe(2);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
         '/',
-        recentReviewsTags,
+        reviewTags(1),
       );
     });
 
@@ -328,7 +331,7 @@ describe('ReviewsService', () => {
       });
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
         '/',
-        recentReviewsTags,
+        reviewTags(1),
       );
     });
 
@@ -423,7 +426,7 @@ describe('ReviewsService', () => {
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
         '/',
-        recentReviewsTags,
+        reviewTags(1),
       );
     });
 
@@ -463,7 +466,7 @@ describe('ReviewsService', () => {
       ).toHaveBeenCalledWith(mockManager, 1, 5, 'watched', watchedAt);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
         '/',
-        recentReviewsTags,
+        reviewTags(5),
       );
     });
 
@@ -591,7 +594,7 @@ describe('ReviewsService', () => {
 
   describe('delete', () => {
     it('소유자가 리뷰를 삭제할 수 있어야 한다', async () => {
-      const review = { id: 1, userId: 1 };
+      const review = { id: 1, userId: 1, contentId: 7 };
       mockReviewRepo.findOne.mockResolvedValue(review);
       mockReviewRepo.remove.mockResolvedValue(review);
 
@@ -600,7 +603,7 @@ describe('ReviewsService', () => {
       expect(mockReviewRepo.remove).toHaveBeenCalledWith(review);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
         '/',
-        recentReviewsTags,
+        reviewTags(7),
       );
     });
 
@@ -617,7 +620,7 @@ describe('ReviewsService', () => {
     });
 
     it('ADMIN은 모든 리뷰를 삭제할 수 있어야 한다', async () => {
-      const review = { id: 1, userId: 2 };
+      const review = { id: 1, userId: 2, contentId: 8 };
       mockReviewRepo.findOne.mockResolvedValue(review);
       mockReviewRepo.remove.mockResolvedValue(review);
 
@@ -626,7 +629,7 @@ describe('ReviewsService', () => {
       expect(mockReviewRepo.remove).toHaveBeenCalledWith(review);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith(
         '/',
-        recentReviewsTags,
+        reviewTags(8),
       );
     });
 

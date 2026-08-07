@@ -22,6 +22,12 @@ interface PersonPageProps {
   }>;
 }
 
+export const revalidate = 21600;
+
+export function generateStaticParams(): Array<{ personId: string }> {
+  return [];
+}
+
 const DEPARTMENT_MAP: Record<string, string> = {
   Acting: '배우',
   Directing: '감독',
@@ -164,11 +170,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
       notFound();
     }
 
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">인물 정보를 불러올 수 없습니다.</p>
-      </div>
-    );
+    throw error;
   }
 
   const items = deduplicateCredits(credits.cast, credits.crew);

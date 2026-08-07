@@ -18,7 +18,6 @@ import type {
   WatchProviderData,
 } from '@/types/content';
 import type { ReviewsResponse, ContentStats } from '@/types/review';
-import ErrorWithRetry from '@/components/common/ErrorWithRetry';
 import WatchProviders from '@/components/content/WatchProviders';
 import { serializeJsonLd } from '@/lib/json-ld';
 import { contentMetadataDescription } from '@/lib/search-index';
@@ -28,6 +27,18 @@ interface ContentDetailPageProps {
     type: string;
     tmdbId: string;
   }>;
+}
+
+export const revalidate = 300;
+
+const CONTENT_DETAIL_REVALIDATE_SECONDS = revalidate;
+
+export function generateStaticParams(): Array<{ type: string; tmdbId: string }> {
+  return [];
+}
+
+function contentReviewsCacheTag(contentId: number): string {
+  return `content-reviews:${contentId}`;
 }
 
 async function fetchContentDetail(
@@ -187,24 +198,36 @@ export function createTmdbAggregateRating(
   };
 }
 
-async function ReviewsSection({ contentId }: { contentId: number }) {
-  const reviewsSectionData = await Promise.all([
+export async function fetchReviewsSectionData(contentId: number): Promise<{
+  reviewsData: ReviewsResponse;
+  stats: ContentStats;
+}> {
+  const [reviewsData, stats] = await Promise.all([
     fetchApi<ReviewsResponse>(
       `/reviews?contentId=${contentId}&page=1&sort=latest`,
-      { cache: 'no-store' },
+      {
+        next: {
+          revalidate: CONTENT_DETAIL_REVALIDATE_SECONDS,
+          tags: [contentReviewsCacheTag(contentId)],
+        },
+      },
     ),
     fetchApi<ContentStats>(
       `/reviews/${contentId}/stats`,
-      { cache: 'no-store' },
+      {
+        next: {
+          revalidate: CONTENT_DETAIL_REVALIDATE_SECONDS,
+          tags: [contentReviewsCacheTag(contentId)],
+        },
+      },
     ),
-  ])
-    .then(([reviewsData, stats]) => ({ reviewsData, stats }))
-    .catch(() => null);
+  ]);
 
-  if (!reviewsSectionData) {
-    return <ErrorWithRetry title="리뷰" message="리뷰를 불러올 수 없습니다." />;
-  }
+  return { reviewsData, stats };
+}
 
+async function ReviewsSection({ contentId }: { contentId: number }) {
+  const reviewsSectionData = await fetchReviewsSectionData(contentId);
   const { reviewsData, stats } = reviewsSectionData;
 
   return (

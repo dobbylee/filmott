@@ -19,6 +19,7 @@ import { Watchlist } from '../watchlist/watchlist.entity';
 import { RevalidateService } from '../common/revalidate.service';
 
 const RECENT_REVIEWS_REVALIDATE_TAGS = ['recent-reviews'];
+const contentReviewsTag = (contentId: number) => `content-reviews:${contentId}`;
 const REVIEW_USER_SELECT = [
   'user.id',
   'user.nickname',
@@ -73,7 +74,7 @@ export class ReviewsService {
       return createdReview;
     });
 
-    await this.revalidateRecentReviews();
+    await this.revalidateReviews(dto.contentId);
     return saved;
   }
 
@@ -131,12 +132,12 @@ export class ReviewsService {
 
         return savedReview;
       });
-      await this.revalidateRecentReviews();
+      await this.revalidateReviews(review.contentId);
       return result;
     }
 
     const result = await this.reviewRepo.save(review);
-    await this.revalidateRecentReviews();
+    await this.revalidateReviews(review.contentId);
     return result;
   }
 
@@ -157,14 +158,14 @@ export class ReviewsService {
     }
 
     await this.reviewRepo.remove(review);
-    await this.revalidateRecentReviews();
+    await this.revalidateReviews(review.contentId);
   }
 
-  private async revalidateRecentReviews(): Promise<void> {
-    await this.revalidateService.revalidatePath(
-      '/',
-      RECENT_REVIEWS_REVALIDATE_TAGS,
-    );
+  private async revalidateReviews(contentId: number): Promise<void> {
+    await this.revalidateService.revalidatePath('/', [
+      ...RECENT_REVIEWS_REVALIDATE_TAGS,
+      contentReviewsTag(contentId),
+    ]);
   }
 
   async findMyReview(

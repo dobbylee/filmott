@@ -5,7 +5,12 @@ vi.mock('@/lib/fetcher', () => ({
 }));
 
 import { fetchApi } from '@/lib/fetcher';
-import { generateMetadata } from '@/app/contents/[type]/[tmdbId]/page';
+import {
+  fetchReviewsSectionData,
+  generateMetadata,
+  generateStaticParams,
+  revalidate,
+} from '@/app/contents/[type]/[tmdbId]/page';
 
 const mockFetchApi = vi.mocked(fetchApi);
 
@@ -167,5 +172,53 @@ describe('ContentDetail generateMetadata', () => {
 
     expect(metadata.title).toBe('작품 상세');
     expect(metadata.robots).toBeUndefined();
+  });
+});
+
+describe('ContentDetail ISR cache', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('동적 작품 경로를 최초 요청 시 생성하고 5분 주기로 재검증해야 한다', () => {
+    expect(generateStaticParams()).toEqual([]);
+    expect(revalidate).toBe(300);
+  });
+
+  it('리뷰 목록과 통계를 작품별 캐시 태그로 함께 조회해야 한다', async () => {
+    const reviewsData = { data: [], total: 0, page: 1, totalPages: 0 };
+    const stats = { averageRating: null, reviewCount: 0 };
+    mockFetchApi
+      .mockResolvedValueOnce(reviewsData)
+      .mockResolvedValueOnce(stats);
+
+    await expect(fetchReviewsSectionData(42)).resolves.toEqual({
+      reviewsData,
+      stats,
+    });
+    expect(mockFetchApi).toHaveBeenNthCalledWith(
+      1,
+      '/reviews?contentId=42&page=1&sort=latest',
+      {
+        next: {
+          revalidate: 300,
+          tags: ['content-reviews:42'],
+        },
+      },
+    );
+    expect(mockFetchApi).toHaveBeenNthCalledWith(2, '/reviews/42/stats', {
+      next: {
+        revalidate: 300,
+        tags: ['content-reviews:42'],
+      },
+    });
+  });
+
+  it('리뷰 조회의 일시적 실패를 전파해 정상 ISR 결과를 보호해야 한다', async () => {
+    mockFetchApi.mockRejectedValueOnce(new Error('temporary review failure'));
+
+    await expect(fetchReviewsSectionData(42)).rejects.toThrow(
+      'temporary review failure',
+    );
   });
 });
