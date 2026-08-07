@@ -61,7 +61,9 @@ describe('Person generateMetadata', () => {
 
     expect(metadata.title).toBe('홍길동 필모그래피');
     expect(metadata.description).toBe('한국의 배우입니다.');
-    expect(metadata.robots).toBeUndefined();
+    expect(metadata.robots).toEqual({
+      googleBot: { index: false, follow: false },
+    });
   });
 
   it('소개가 공백이어도 프로필과 품질 작품이 있으면 index하고 description은 대체해야 한다', async () => {
@@ -77,7 +79,9 @@ describe('Person generateMetadata', () => {
     expect(metadata.description).toBe('홍길동의 출연작 목록');
     expect(metadata.openGraph?.description).toBe('홍길동의 출연작 목록');
     expect(metadata.twitter?.description).toBe('홍길동의 출연작 목록');
-    expect(metadata.robots).toBeUndefined();
+    expect(metadata.robots).toEqual({
+      googleBot: { index: false, follow: false },
+    });
   });
 
   it('소개와 프로필이 모두 비어 있으면 noindex, follow여야 한다', async () => {
@@ -90,7 +94,11 @@ describe('Person generateMetadata', () => {
       params: Promise.resolve({ personId: '1' }),
     });
 
-    expect(metadata.robots).toEqual({ index: false, follow: true });
+    expect(metadata.robots).toEqual({
+      index: false,
+      follow: true,
+      googleBot: { index: false, follow: false },
+    });
   });
 
   it('포스터와 공개일이 있는 고유 작품이 3개 미만이면 noindex, follow여야 한다', async () => {
@@ -108,7 +116,11 @@ describe('Person generateMetadata', () => {
       params: Promise.resolve({ personId: '1' }),
     });
 
-    expect(metadata.robots).toEqual({ index: false, follow: true });
+    expect(metadata.robots).toEqual({
+      index: false,
+      follow: true,
+      googleBot: { index: false, follow: false },
+    });
   });
 
   it('인물 또는 필모그래피 조회가 실패하면 기본 metadata를 반환해야 한다', async () => {
@@ -118,6 +130,11 @@ describe('Person generateMetadata', () => {
       params: Promise.resolve({ personId: '0' }),
     });
 
-    expect(metadata).toEqual({ title: '인물 정보' });
+    expect(metadata).toEqual({
+      title: '인물 정보',
+      robots: {
+        googleBot: { index: false, follow: false },
+      },
+    });
   });
 });

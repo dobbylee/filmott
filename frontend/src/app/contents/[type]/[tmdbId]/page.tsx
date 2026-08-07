@@ -126,7 +126,11 @@ export async function generateMetadata({
     if (content.adult) {
       metadata.robots = { index: false, follow: false };
     } else if (content.searchIndexable === false) {
-      metadata.robots = { index: false, follow: true };
+      metadata.robots = {
+        index: false,
+        follow: true,
+        googleBot: { index: false, follow: false },
+      };
     }
 
     return metadata;

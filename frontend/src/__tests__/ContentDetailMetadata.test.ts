@@ -90,7 +90,11 @@ describe('ContentDetail generateMetadata', () => {
     const params = Promise.resolve({ type: 'movie', tmdbId: '1000' });
     const metadata = await generateMetadata({ params });
 
-    expect(metadata.robots).toEqual({ index: false, follow: true });
+    expect(metadata.robots).toEqual({
+      index: false,
+      follow: true,
+      googleBot: { index: false, follow: false },
+    });
   });
 
   it('줄거리가 공백이면 안정적인 한국어 description을 사용해야 한다', async () => {

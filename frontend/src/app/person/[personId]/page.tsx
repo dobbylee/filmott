@@ -127,12 +127,18 @@ export async function generateMetadata({
           ? [`${TMDB_IMAGE_BASE}/w500${profilePath}`]
           : [],
       },
-      ...(!searchIndexable && {
-        robots: { index: false, follow: true },
-      }),
+      robots: {
+        ...(!searchIndexable && { index: false, follow: true }),
+        googleBot: { index: false, follow: false },
+      },
     };
   } catch {
-    return { title: '인물 정보' };
+    return {
+      title: '인물 정보',
+      robots: {
+        googleBot: { index: false, follow: false },
+      },
+    };
   }
 }
 
