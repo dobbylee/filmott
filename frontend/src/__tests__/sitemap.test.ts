@@ -35,6 +35,18 @@ describe('sitemap', () => {
     expect(mainPage?.changeFrequency).toBe('daily');
   });
 
+  it('정적 페이지는 요청 시각을 lastModified로 사용하지 않아야 한다', async () => {
+    respondWith([]);
+
+    const first = await sitemap();
+    const second = await sitemap();
+
+    const firstStatic = first.slice(0, 4);
+    const secondStatic = second.slice(0, 4);
+    expect(firstStatic).toEqual(secondStatic);
+    expect(firstStatic.every((entry) => entry.lastModified == null)).toBe(true);
+  });
+
   it('API에서 콘텐츠를 가져와 동적 페이지를 포함해야 한다', async () => {
     const mockContents = [
       { tmdbId: 123, contentType: 'movie', lastModified: '2026-03-15T00:00:00.000Z' },
@@ -48,6 +60,23 @@ describe('sitemap', () => {
     expect(urls).toContain('https://filmott.kr/contents/movie/123');
     expect(urls).toContain('https://filmott.kr/contents/tv/456');
     expect(result.length).toBe(6); // 4 static + 2 dynamic
+  });
+
+  it('백엔드의 10,000개 작품 순서를 보존해 총 10,004개 URL을 반환해야 한다', async () => {
+    const mockContents = Array.from({ length: 10000 }, (_, index) => ({
+      tmdbId: 100000 + index,
+      contentType: index % 2 === 0 ? 'movie' : 'tv',
+      lastModified: '2026-03-15T00:00:00.000Z',
+    }));
+    respondWith(mockContents);
+
+    const result = await sitemap();
+
+    expect(result).toHaveLength(10004);
+    expect(result[4]?.url).toBe('https://filmott.kr/contents/movie/100000');
+    expect(result.at(-1)?.url).toBe(
+      'https://filmott.kr/contents/tv/109999',
+    );
   });
 
   it('동적 콘텐츠 페이지의 priority가 0.7이어야 한다', async () => {

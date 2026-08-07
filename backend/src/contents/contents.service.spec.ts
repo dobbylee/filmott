@@ -1755,6 +1755,7 @@ describe('ContentsService', () => {
         'COALESCE(MAX(rv.updated_at), c.updated_at, c.created_at)',
         'DESC',
       );
+      expect(mockQueryBuilder.addOrderBy).toHaveBeenCalledWith('c.id', 'DESC');
       expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10000);
       expect(result).toHaveLength(2);
       expect(result[0]).toHaveProperty('tmdbId', 123);

@@ -523,6 +523,7 @@ export class ContentsService {
         'COALESCE(MAX(rv.updated_at), c.updated_at, c.created_at)',
         'DESC',
       )
+      .addOrderBy('c.id', 'DESC')
       .limit(SITEMAP_CONTENT_LIMIT)
       .getRawMany<SitemapContentRow>();
 
