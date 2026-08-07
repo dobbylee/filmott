@@ -14,6 +14,7 @@ export interface ContentItem {
   overview?: string;
   releaseDate?: string;
   voteAverage?: number;
+  voteCount?: number;
   genres: Genre[];
   runtime?: number;
   adult?: boolean;

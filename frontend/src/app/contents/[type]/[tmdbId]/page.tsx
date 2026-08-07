@@ -152,6 +152,37 @@ function formatRuntime(minutes?: number): string {
   return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
 }
 
+interface TmdbAggregateRating {
+  '@type': 'AggregateRating';
+  ratingValue: number;
+  ratingCount: number;
+  bestRating: 10;
+}
+
+export function createTmdbAggregateRating(
+  voteAverage: number | undefined,
+  voteCount: number | undefined,
+): TmdbAggregateRating | undefined {
+  const ratingValue = Number(voteAverage);
+  const ratingCount = Number(voteCount);
+
+  if (
+    !Number.isFinite(ratingValue) ||
+    ratingValue <= 0 ||
+    !Number.isFinite(ratingCount) ||
+    ratingCount <= 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    '@type': 'AggregateRating',
+    ratingValue,
+    ratingCount,
+    bestRating: 10,
+  };
+}
+
 async function ReviewsSection({ contentId }: { contentId: number }) {
   const reviewsSectionData = await Promise.all([
     fetchApi<ReviewsResponse>(
@@ -211,6 +242,10 @@ export default async function ContentDetailPage({
   const genres = Array.isArray(content.genres)
     ? content.genres
     : [];
+  const tmdbAggregateRating = createTmdbAggregateRating(
+    content.voteAverage,
+    content.voteCount,
+  );
 
   const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
@@ -231,12 +266,8 @@ export default async function ContentDetailPage({
     };
   }
 
-  if (content.voteAverage != null && Number(content.voteAverage) > 0) {
-    jsonLd.aggregateRating = {
-      '@type': 'AggregateRating',
-      ratingValue: Number(content.voteAverage),
-      bestRating: 10,
-    };
+  if (tmdbAggregateRating) {
+    jsonLd.aggregateRating = tmdbAggregateRating;
   }
 
   return (
@@ -336,10 +367,13 @@ export default async function ContentDetailPage({
                     {formatRuntime(content.runtime)}
                   </span>
                 )}
-                {content.voteAverage != null && Number(content.voteAverage) > 0 && (
+                {tmdbAggregateRating && (
                   <span className="group relative flex items-center gap-1 cursor-default">
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    {Number(content.voteAverage).toFixed(1)}
+                    {tmdbAggregateRating.ratingValue.toFixed(1)}
+                    <span className="text-xs">
+                      ({tmdbAggregateRating.ratingCount.toLocaleString('ko-KR')}명)
+                    </span>
                     <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/80 px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
                       TMDB 평점
                     </span>
