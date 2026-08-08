@@ -102,8 +102,12 @@ export interface TmdbPersonCreditsResult {
   crew: TmdbPersonCredit[];
 }
 
-const TMDB_TIMEOUT_RETRY_COUNT = 1;
-const TMDB_TIMEOUT_RETRY_DELAY_MS = 250;
+const TMDB_RETRY_COUNT = 1;
+const TMDB_RETRY_DELAY_MS = 250;
+
+export function isTmdbConnectionResetError(error: unknown): boolean {
+  return isAxiosError(error) && error.code === 'ECONNRESET';
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -119,14 +123,14 @@ export class TmdbService {
     return isAxiosError(error) && error.code === 'ECONNABORTED';
   }
 
-  private async getWithTimeoutRetry<T>(
+  private async getWithTransientRetry<T>(
     path: string,
     config: AxiosRequestConfig | undefined,
     context: string,
   ): Promise<T> {
     let lastError: unknown;
 
-    for (let attempt = 0; attempt <= TMDB_TIMEOUT_RETRY_COUNT; attempt += 1) {
+    for (let attempt = 0; attempt <= TMDB_RETRY_COUNT; attempt += 1) {
       try {
         const { data } = await firstValueFrom(
           this.httpService.get<T>(path, config),
@@ -135,11 +139,17 @@ export class TmdbService {
       } catch (error) {
         lastError = error;
 
-        if (this.isTimeoutError(error) && attempt < TMDB_TIMEOUT_RETRY_COUNT) {
+        const retryReason = this.isTimeoutError(error)
+          ? '타임아웃'
+          : isTmdbConnectionResetError(error)
+            ? '연결 재설정'
+            : null;
+
+        if (retryReason && attempt < TMDB_RETRY_COUNT) {
           this.logger.warn(
-            `TMDB ${context} 타임아웃, ${TMDB_TIMEOUT_RETRY_DELAY_MS}ms 후 재시도`,
+            `TMDB ${context} ${retryReason}, ${TMDB_RETRY_DELAY_MS}ms 후 재시도`,
           );
-          await sleep(TMDB_TIMEOUT_RETRY_DELAY_MS);
+          await sleep(TMDB_RETRY_DELAY_MS);
           continue;
         }
 
@@ -261,7 +271,7 @@ export class TmdbService {
   }
 
   async getPersonDetail(personId: number): Promise<TmdbPersonDetail> {
-    return this.getWithTimeoutRetry<TmdbPersonDetail>(
+    return this.getWithTransientRetry<TmdbPersonDetail>(
       `/person/${personId}`,
       {
         params: { language: 'ko-KR' },
@@ -271,7 +281,7 @@ export class TmdbService {
   }
 
   async getPersonCredits(personId: number): Promise<TmdbPersonCreditsResult> {
-    return this.getWithTimeoutRetry<TmdbPersonCreditsResult>(
+    return this.getWithTransientRetry<TmdbPersonCreditsResult>(
       `/person/${personId}/combined_credits`,
       {
         params: { language: 'ko-KR' },

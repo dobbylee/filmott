@@ -10,6 +10,7 @@ import { Content } from './content.entity';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { RevalidateService } from '../common/revalidate.service';
 import { EmbeddingService } from '../embedding/embedding.service';
+import { AxiosError, AxiosHeaders } from 'axios';
 describe('ContentsService', () => {
   let service: ContentsService;
   let tmdbService: TmdbService;
@@ -56,6 +57,11 @@ describe('ContentsService', () => {
   const mockEmbeddingService = {
     findRelatedContents: jest.fn(),
   };
+
+  const makeConnectionResetError = () =>
+    new AxiosError('read ECONNRESET', 'ECONNRESET', {
+      headers: new AxiosHeaders(),
+    });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -734,6 +740,40 @@ describe('ContentsService', () => {
       expect(result).toEqual(personData);
       expect(mockTmdbService.getPersonDetail).toHaveBeenCalledTimes(2);
     });
+
+    it('연결 재설정이면 만료된 stale cache를 반환해야 한다', async () => {
+      const personData = {
+        id: 17419,
+        name: 'Bryan Cranston',
+        profile_path: '/profile.jpg',
+        biography: 'An actor.',
+        birthday: '1956-03-07',
+        place_of_birth: 'Hollywood, California, USA',
+        known_for_department: 'Acting',
+      };
+      mockTmdbService.getPersonDetail.mockResolvedValueOnce(personData);
+      await service.getPersonDetail(17419);
+
+      const detailCache = (
+        service as unknown as {
+          personDetailCache: Map<
+            number,
+            { data: typeof personData; expiresAt: number }
+          >;
+        }
+      ).personDetailCache;
+      const cached = detailCache.get(17419);
+      if (cached) cached.expiresAt = Date.now() - 1000;
+
+      mockTmdbService.getPersonDetail.mockRejectedValueOnce(
+        makeConnectionResetError(),
+      );
+
+      const result = await service.getPersonDetail(17419);
+
+      expect(result).toEqual(personData);
+      expect(mockTmdbService.getPersonDetail).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('getPersonCredits', () => {
@@ -891,6 +931,46 @@ describe('ContentsService', () => {
         new GatewayTimeoutException(
           'TMDB person/combined_credits 응답 시간이 초과되었습니다.',
         ),
+      );
+
+      const result = await service.getPersonCredits(100);
+
+      expect(result.cast).toHaveLength(1);
+      expect(result.cast[0].id).toBe(1);
+      expect(mockTmdbService.getPersonCredits).toHaveBeenCalledTimes(2);
+    });
+
+    it('크레딧 연결 재설정이면 만료된 stale cache를 사용해야 한다', async () => {
+      const creditsData = {
+        cast: [
+          {
+            id: 1,
+            media_type: 'movie',
+            title: 'A Movie',
+            release_date: '2020-01-01',
+            vote_average: 7.0,
+          },
+        ],
+        crew: [],
+      };
+
+      mockContentRepo.find.mockResolvedValue([]);
+      mockTmdbService.getPersonCredits.mockResolvedValueOnce(creditsData);
+      await service.getPersonCredits(100);
+
+      const creditsCache = (
+        service as unknown as {
+          personCreditsCache: Map<
+            number,
+            { data: typeof creditsData; expiresAt: number }
+          >;
+        }
+      ).personCreditsCache;
+      const cached = creditsCache.get(100);
+      if (cached) cached.expiresAt = Date.now() - 1000;
+
+      mockTmdbService.getPersonCredits.mockRejectedValueOnce(
+        makeConnectionResetError(),
       );
 
       const result = await service.getPersonCredits(100);

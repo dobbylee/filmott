@@ -26,6 +26,11 @@ describe('TmdbService', () => {
       headers: new AxiosHeaders(),
     });
 
+  const makeConnectionResetError = () =>
+    new AxiosError('read ECONNRESET', 'ECONNRESET', {
+      headers: new AxiosHeaders(),
+    });
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -295,6 +300,39 @@ describe('TmdbService', () => {
       );
       expect(mockHttpService.get).toHaveBeenCalledTimes(2);
     });
+
+    it('연결 재설정이면 한 번 재시도 후 성공해야 한다', async () => {
+      const mockData = {
+        id: 17419,
+        name: 'Bryan Cranston',
+        profile_path: '/profile.jpg',
+        biography: 'An actor.',
+        birthday: '1956-03-07',
+        place_of_birth: 'Hollywood, California, USA',
+        known_for_department: 'Acting',
+      };
+      mockHttpService.get
+        .mockReturnValueOnce(throwError(() => makeConnectionResetError()))
+        .mockReturnValueOnce(of(makeAxiosResponse(mockData)));
+
+      const result = await service.getPersonDetail(17419);
+
+      expect(result).toEqual(mockData);
+      expect(mockHttpService.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('연결 재설정이 반복되면 마지막 원본 오류를 던져야 한다', async () => {
+      const firstConnectionResetError = makeConnectionResetError();
+      const lastConnectionResetError = makeConnectionResetError();
+      mockHttpService.get
+        .mockReturnValueOnce(throwError(() => firstConnectionResetError))
+        .mockReturnValueOnce(throwError(() => lastConnectionResetError));
+
+      await expect(service.getPersonDetail(17419)).rejects.toBe(
+        lastConnectionResetError,
+      );
+      expect(mockHttpService.get).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('getPersonCredits', () => {
@@ -342,6 +380,28 @@ describe('TmdbService', () => {
       };
       mockHttpService.get
         .mockReturnValueOnce(throwError(() => makeTimeoutError()))
+        .mockReturnValueOnce(of(makeAxiosResponse(mockData)));
+
+      const result = await service.getPersonCredits(17419);
+
+      expect(result).toEqual(mockData);
+      expect(mockHttpService.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('크레딧 호출도 연결 재설정이면 한 번 재시도해야 한다', async () => {
+      const mockData = {
+        cast: [
+          {
+            id: 1396,
+            media_type: 'tv',
+            name: 'Breaking Bad',
+            character: 'Walter White',
+          },
+        ],
+        crew: [],
+      };
+      mockHttpService.get
+        .mockReturnValueOnce(throwError(() => makeConnectionResetError()))
         .mockReturnValueOnce(of(makeAxiosResponse(mockData)));
 
       const result = await service.getPersonCredits(17419);

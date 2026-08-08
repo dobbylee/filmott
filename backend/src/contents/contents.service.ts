@@ -10,6 +10,7 @@ import { Cron } from '@nestjs/schedule';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Content } from './content.entity';
 import {
+  isTmdbConnectionResetError,
   TmdbService,
   TmdbItem,
   TmdbPersonDetail,
@@ -73,6 +74,13 @@ export class ContentsService {
     private readonly revalidateService: RevalidateService,
     private readonly embeddingService: EmbeddingService,
   ) {}
+
+  private canUseStalePersonCache(error: unknown): boolean {
+    return (
+      error instanceof GatewayTimeoutException ||
+      isTmdbConnectionResetError(error)
+    );
+  }
 
   /**
    * DB에서 캐시 히트 시 반환, 미스 시 TMDB에서 fetch하여 저장 후 반환
@@ -426,9 +434,9 @@ export class ContentsService {
       });
       return data;
     } catch (error) {
-      if (cached && error instanceof GatewayTimeoutException) {
+      if (cached && this.canUseStalePersonCache(error)) {
         this.logger.warn(
-          `TMDB 인물 상세 타임아웃, stale cache 사용 (${personId})`,
+          `TMDB 인물 상세 일시적 요청 실패, stale cache 사용 (${personId})`,
         );
         return cached.data;
       }
@@ -455,9 +463,9 @@ export class ContentsService {
           expiresAt: Date.now() + PERSON_CACHE_TTL_MS,
         });
       } catch (error) {
-        if (cached && error instanceof GatewayTimeoutException) {
+        if (cached && this.canUseStalePersonCache(error)) {
           this.logger.warn(
-            `TMDB 인물 크레딧 타임아웃, stale cache 사용 (${personId})`,
+            `TMDB 인물 크레딧 일시적 요청 실패, stale cache 사용 (${personId})`,
           );
           raw = cached.data;
         } else {
