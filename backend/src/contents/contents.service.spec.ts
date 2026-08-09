@@ -63,6 +63,21 @@ describe('ContentsService', () => {
       headers: new AxiosHeaders(),
     });
 
+  const makeTmdbResponseError = (status: number) =>
+    new AxiosError(
+      `Request failed with status code ${status}`,
+      status === 404 ? 'ERR_BAD_REQUEST' : 'ERR_BAD_RESPONSE',
+      { headers: new AxiosHeaders() },
+      null,
+      {
+        status,
+        statusText: status === 404 ? 'Not Found' : 'Internal Server Error',
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+        data: {},
+      },
+    );
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -707,6 +722,23 @@ describe('ContentsService', () => {
       expect(result).toEqual(personData);
     });
 
+    it('TMDB 인물 상세가 404이면 NotFoundException으로 변환해야 한다', async () => {
+      mockTmdbService.getPersonDetail.mockRejectedValueOnce(
+        makeTmdbResponseError(404),
+      );
+
+      await expect(service.getPersonDetail(1682487)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('TMDB 인물 상세의 404가 아닌 응답 오류는 그대로 유지해야 한다', async () => {
+      const error = makeTmdbResponseError(500);
+      mockTmdbService.getPersonDetail.mockRejectedValueOnce(error);
+
+      await expect(service.getPersonDetail(17419)).rejects.toBe(error);
+    });
+
     it('타임아웃이면 만료된 stale cache를 반환해야 한다', async () => {
       const personData = {
         id: 17419,
@@ -777,6 +809,23 @@ describe('ContentsService', () => {
   });
 
   describe('getPersonCredits', () => {
+    it('TMDB 인물 크레딧이 404이면 NotFoundException으로 변환해야 한다', async () => {
+      mockTmdbService.getPersonCredits.mockRejectedValueOnce(
+        makeTmdbResponseError(404),
+      );
+
+      await expect(service.getPersonCredits(1682487)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('TMDB 인물 크레딧의 404가 아닌 응답 오류는 그대로 유지해야 한다', async () => {
+      const error = makeTmdbResponseError(500);
+      mockTmdbService.getPersonCredits.mockRejectedValueOnce(error);
+
+      await expect(service.getPersonCredits(17419)).rejects.toBe(error);
+    });
+
     it('차단 콘텐츠를 partial index 조건과 같은 리터럴로 조회하고 캐시해야 한다', async () => {
       const creditsData = {
         cast: [

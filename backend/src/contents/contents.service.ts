@@ -11,6 +11,7 @@ import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Content } from './content.entity';
 import {
   isTmdbConnectionResetError,
+  isTmdbNotFoundError,
   TmdbService,
   TmdbItem,
   TmdbPersonDetail,
@@ -434,6 +435,10 @@ export class ContentsService {
       });
       return data;
     } catch (error) {
+      if (isTmdbNotFoundError(error)) {
+        throw new NotFoundException(`인물을 찾을 수 없습니다: ${personId}`);
+      }
+
       if (cached && this.canUseStalePersonCache(error)) {
         this.logger.warn(
           `TMDB 인물 상세 일시적 요청 실패, stale cache 사용 (${personId})`,
@@ -463,6 +468,10 @@ export class ContentsService {
           expiresAt: Date.now() + PERSON_CACHE_TTL_MS,
         });
       } catch (error) {
+        if (isTmdbNotFoundError(error)) {
+          throw new NotFoundException(`인물을 찾을 수 없습니다: ${personId}`);
+        }
+
         if (cached && this.canUseStalePersonCache(error)) {
           this.logger.warn(
             `TMDB 인물 크레딧 일시적 요청 실패, stale cache 사용 (${personId})`,

@@ -109,6 +109,10 @@ export function isTmdbConnectionResetError(error: unknown): boolean {
   return isAxiosError(error) && error.code === 'ECONNRESET';
 }
 
+export function isTmdbNotFoundError(error: unknown): boolean {
+  return isAxiosError(error) && error.response?.status === 404;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
