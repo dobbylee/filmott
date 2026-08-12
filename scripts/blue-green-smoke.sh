@@ -215,7 +215,7 @@ blue_green_smoke_sse() (
   wait "$curl_pid" || return 1
   curl_pid=''
   tr -d '\r' < "$headers" |
-    grep -Eq '^HTTP/(1\.1|2) 200([[:space:]].*)?$' || return 1
+    grep -Eq '^HTTP/(1\.1|2) (200|201)([[:space:]].*)?$' || return 1
   tr -d '\r' < "$headers" | grep -qi '^content-type: text/event-stream' || return 1
   if grep -q '^event: error$' "$body"; then
     return 1

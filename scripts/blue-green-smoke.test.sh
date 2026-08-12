@@ -56,7 +56,8 @@ blue_green_smoke_curl() {
       fi
       ;;
     sse)
-      printf 'HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nX-Filmott-Slot: blue\r\n\r\n' > "$headers"
+      printf 'HTTP/1.1 %s OK\r\nContent-Type: text/event-stream\r\nX-Filmott-Slot: blue\r\n\r\n' \
+        "${SSE_STATUS:-200}" > "$headers"
       if [ "${FAIL_SSE:-0}" = 1 ]; then
         printf 'event: error\ndata: {}\n\n' > "$body"
       elif [ "${MOCK_COORDINATED_SSE:-0}" = 1 ]; then
@@ -113,6 +114,8 @@ unset FAIL_API
 
 MOCK_MODE=sse
 FILMOTT_EXPECTED_SLOT=blue blue_green_smoke_sse https://filmott.kr > /dev/null
+SSE_STATUS=201 FILMOTT_EXPECTED_SLOT=blue \
+  blue_green_smoke_sse https://filmott.kr > /dev/null
 export FILMOTT_SSE_READY_FILE="${test_root}/sse.ready"
 export FILMOTT_SSE_CUTOVER_FILE="${test_root}/sse.cutover"
 export FILMOTT_SSE_SUCCESS_FILE="${test_root}/sse.success"
