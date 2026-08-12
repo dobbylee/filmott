@@ -88,13 +88,16 @@ export class StructuredChatStreamAccumulator {
   private completedRecommendationCount: number | null = null;
   private emittedText = '';
 
-  consume(snapshot: unknown, candidates: SimilarContent[]): string[] {
+  consume(
+    snapshot: unknown,
+    candidates: SimilarContent[],
+    isRecommendationArrayComplete = false,
+  ): string[] {
     if (!isRecord(snapshot) || !hasOwn(snapshot, 'recommendations')) return [];
     if (!Array.isArray(snapshot.recommendations)) invalidResponse();
 
     const recommendations = snapshot.recommendations;
     if (recommendations.length > 5) invalidResponse();
-    const isRecommendationArrayComplete = hasOwn(snapshot, 'message');
     if (isRecommendationArrayComplete) {
       if (this.completedRecommendationCount === null) {
         this.completedRecommendationCount = recommendations.length;

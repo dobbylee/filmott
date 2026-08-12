@@ -3,12 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { CHAT_MODEL } from '../chat/chat.constants';
 import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
 import { buildSearchIndexableContentSql } from '../contents/search-indexable-content';
 
 const OPENAI_EMBEDDING_TIMEOUT_MS = 10_000;
+const CONTENT_DESCRIPTION_MODEL = 'gpt-5.4-nano';
 const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
 const RELATED_CONTENT_QUERY_TIMEOUT_MS = 5_000;
 const RELATED_CONTENT_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -265,7 +265,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 
     const response = await openai.chat.completions.create(
       {
-        model: CHAT_MODEL,
+        model: CONTENT_DESCRIPTION_MODEL,
         reasoning_effort: 'low',
         max_completion_tokens: 2048,
         messages: [{ role: 'user', content: prompt }],

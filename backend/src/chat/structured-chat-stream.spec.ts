@@ -89,6 +89,7 @@ describe('StructuredChatStreamAccumulator', () => {
           message: '',
         },
         candidates,
+        true,
       ),
     ).toEqual([]);
   });
@@ -159,6 +160,7 @@ describe('StructuredChatStreamAccumulator', () => {
           followUpQuestion: '다른 분위기도',
         },
         candidates,
+        true,
       ),
     ).toEqual(['**기생충**']);
     expect(
@@ -175,6 +177,7 @@ describe('StructuredChatStreamAccumulator', () => {
           followUpQuestion: '다른 분위기도 원하세요?',
         },
         candidates,
+        true,
       ),
     ).toEqual([]);
   });
@@ -195,6 +198,7 @@ describe('StructuredChatStreamAccumulator', () => {
           message: '',
         },
         candidates,
+        true,
       ),
     ).toThrow('AI 응답 형식이 올바르지 않습니다');
     expect(accumulator.getEmittedText()).toBe('');
@@ -214,6 +218,7 @@ describe('StructuredChatStreamAccumulator', () => {
         message: '',
       },
       candidates,
+      true,
     );
 
     expect(() =>
@@ -229,6 +234,7 @@ describe('StructuredChatStreamAccumulator', () => {
           message: '',
         },
         candidates,
+        true,
       ),
     ).toThrow('AI 응답 형식이 올바르지 않습니다');
   });
@@ -254,6 +260,7 @@ describe('StructuredChatStreamAccumulator', () => {
           message: '',
         },
         candidates,
+        true,
       ),
     ).toThrow('AI 응답 형식이 올바르지 않습니다');
   });
@@ -263,6 +270,7 @@ describe('StructuredChatStreamAccumulator', () => {
     accumulator.consume(
       { recommendations: [], message: '일반 답변을 생성 중이에요.' },
       candidates,
+      true,
     );
 
     expect(() =>
@@ -278,6 +286,7 @@ describe('StructuredChatStreamAccumulator', () => {
           message: '',
         },
         candidates,
+        true,
       ),
     ).toThrow('AI 응답 형식이 올바르지 않습니다');
   });
@@ -313,6 +322,7 @@ describe('StructuredChatStreamAccumulator', () => {
         message: '',
       },
       candidates,
+      true,
     );
 
     expect(

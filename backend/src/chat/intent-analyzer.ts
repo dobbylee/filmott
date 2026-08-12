@@ -264,7 +264,7 @@ export class IntentAnalyzerService {
       const response = await this.openai.chat.completions.create(
         {
           model: CHAT_MODEL,
-          reasoning_effort: 'low',
+          reasoning_effort: 'medium',
           max_completion_tokens: 1024,
           response_format: CHAT_INTENT_RESPONSE_FORMAT,
           messages: [

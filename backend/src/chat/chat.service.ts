@@ -355,7 +355,7 @@ export class ChatService {
       const stream = this.openai.chat.completions.stream(
         {
           model: CHAT_MODEL,
-          reasoning_effort: 'low',
+          reasoning_effort: 'medium',
           max_completion_tokens: 4096,
           response_format: CHAT_RESPONSE_FORMAT,
           messages: [

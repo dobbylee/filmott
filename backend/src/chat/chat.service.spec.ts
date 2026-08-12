@@ -141,15 +141,23 @@ describe('ChatService', () => {
     chunks: Array<{ content: string; parsed: unknown }>,
     finishReason: 'stop' | 'length' | 'content_filter' | null = 'stop',
   ) {
-    const listeners = new Set<(event: { parsed: unknown }) => void>();
+    const listeners = new Set<
+      (event: { delta: string; parsed: unknown }) => void
+    >();
     let aborted = false;
 
     return {
-      on(event: string, listener: (event: { parsed: unknown }) => void) {
+      on(
+        event: string,
+        listener: (event: { delta: string; parsed: unknown }) => void,
+      ) {
         if (event === 'content.delta') listeners.add(listener);
         return this;
       },
-      off(event: string, listener: (event: { parsed: unknown }) => void) {
+      off(
+        event: string,
+        listener: (event: { delta: string; parsed: unknown }) => void,
+      ) {
         if (event === 'content.delta') listeners.delete(listener);
         return this;
       },
@@ -160,7 +168,7 @@ describe('ChatService', () => {
         for (const chunk of chunks) {
           if (aborted) return;
           for (const listener of listeners) {
-            listener({ parsed: chunk.parsed });
+            listener({ delta: chunk.content, parsed: chunk.parsed });
           }
           if (aborted) return;
           yield {
@@ -1643,6 +1651,8 @@ describe('ChatService', () => {
 
       const createParams = mockStreamCreate.mock.calls[0][0];
       expect(createParams).not.toHaveProperty('stream');
+      expect(createParams.model).toBe('gpt-5.6-luna');
+      expect(createParams.reasoning_effort).toBe('medium');
       expect(createParams.response_format).toEqual(CHAT_RESPONSE_FORMAT);
       expect(mockStreamCreate.mock.calls[0][1]).toEqual(
         expect.objectContaining({ timeout: 30_000, signal: undefined }),

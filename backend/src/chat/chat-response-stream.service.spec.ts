@@ -3,6 +3,7 @@ import { OpenAIError } from 'openai';
 import { LengthFinishReasonError } from 'openai/error';
 import type { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { ChatResponseStreamService } from './chat-response-stream.service';
+import type { SimilarContent } from '../embedding/embedding.service';
 import type { StructuredChatResponse } from './structured-chat-response';
 import { StructuredChatStreamAccumulator } from './structured-chat-stream';
 
@@ -41,6 +42,95 @@ function createFailingStructuredStream(
   } as unknown as ChatCompletionStream<StructuredChatResponse>;
 }
 
+function createLunaOrderedStructuredStream(): ChatCompletionStream<StructuredChatResponse> {
+  type ContentDeltaListener = (event: {
+    delta: string;
+    parsed: unknown;
+  }) => void;
+  const listeners = new Set<ContentDeltaListener>();
+  const events = [
+    {
+      delta:
+        '{"followUpQuestion":"다른 분위기도 원하세요?","message":"","recommendations":[',
+      parsed: {
+        followUpQuestion: '다른 분위기도 원하세요?',
+        message: '',
+        recommendations: [],
+      },
+    },
+    {
+      delta: '{"contentType":"movie","reason":"강렬해요.","tmdbId":496243}',
+      parsed: {
+        followUpQuestion: '다른 분위기도 원하세요?',
+        message: '',
+        recommendations: [
+          {
+            contentType: 'movie',
+            reason: '강렬해요.',
+            tmdbId: 496243,
+          },
+        ],
+      },
+    },
+    {
+      delta: ']}',
+      parsed: {
+        followUpQuestion: '다른 분위기도 원하세요?',
+        message: '',
+        recommendations: [
+          {
+            contentType: 'movie',
+            reason: '강렬해요.',
+            tmdbId: 496243,
+          },
+        ],
+      },
+    },
+  ];
+
+  return {
+    on: jest.fn((event: string, listener: ContentDeltaListener) => {
+      if (event === 'content.delta') listeners.add(listener);
+      return undefined;
+    }),
+    off: jest.fn((event: string, listener: ContentDeltaListener) => {
+      if (event === 'content.delta') listeners.delete(listener);
+      return undefined;
+    }),
+    abort: jest.fn(),
+    async *[Symbol.asyncIterator]() {
+      for (const event of events) {
+        for (const listener of listeners) listener(event);
+        yield {
+          choices: [
+            { delta: { content: event.delta }, finish_reason: null, index: 0 },
+          ],
+        } as OpenAI.Chat.ChatCompletionChunk;
+      }
+      yield {
+        choices: [{ delta: {}, finish_reason: 'stop', index: 0 }],
+      } as OpenAI.Chat.ChatCompletionChunk;
+    },
+  } as unknown as ChatCompletionStream<StructuredChatResponse>;
+}
+
+const candidates: SimilarContent[] = [
+  {
+    contentId: 1,
+    tmdbId: 496243,
+    contentType: 'movie',
+    title: '기생충',
+    posterUrl: '/parasite.jpg',
+    genres: [],
+    voteAverage: 8.5,
+    description: '',
+    similarity: 0.9,
+    director: null,
+    originCountry: 'KR',
+    overview: null,
+  },
+];
+
 describe('ChatResponseStreamService', () => {
   const service = new ChatResponseStreamService();
 
@@ -56,6 +146,22 @@ describe('ChatResponseStreamService', () => {
     ).resolves.toBe(
       '{"message":"안녕","recommendations":[],"followUpQuestion":""}',
     );
+  });
+
+  it('recommendations가 마지막인 Luna snapshot도 배열이 닫힐 때 검증해야 한다', async () => {
+    const emitText = jest.fn();
+
+    await expect(
+      service.collectAndEmitStructuredResponse(
+        createLunaOrderedStructuredStream(),
+        new StructuredChatStreamAccumulator(),
+        candidates,
+        emitText,
+      ),
+    ).resolves.toBe(
+      '{"followUpQuestion":"다른 분위기도 원하세요?","message":"","recommendations":[{"contentType":"movie","reason":"강렬해요.","tmdbId":496243}]}',
+    );
+    expect(emitText).toHaveBeenCalledWith('**기생충**');
   });
 
   it('finish_reason이 stop이 아니면 불완전 응답으로 거부해야 한다', async () => {

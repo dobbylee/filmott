@@ -17,6 +17,88 @@ import { StructuredChatStreamAccumulator } from './structured-chat-stream';
 const INCOMPLETE_RESPONSE_MESSAGE =
   'AI 응답이 완성되기 전에 종료되었습니다. 다시 시도해주세요.';
 
+function hasCompletedRecommendationsArray(json: string): boolean {
+  let objectDepth = 0;
+  let arrayDepth = 0;
+  let inString = false;
+  let escaping = false;
+  let stringStart = -1;
+  let recommendationsArrayStart = -1;
+
+  for (let index = 0; index < json.length; index += 1) {
+    const character = json[index];
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+        continue;
+      }
+      if (character === '\\') {
+        escaping = true;
+        continue;
+      }
+      if (character !== '"') continue;
+
+      inString = false;
+      if (objectDepth !== 1 || arrayDepth !== 0) continue;
+      if (json.slice(stringStart, index) !== 'recommendations') continue;
+
+      let cursor = index + 1;
+      while (/\s/.test(json[cursor] ?? '')) cursor += 1;
+      if (json[cursor] !== ':') continue;
+      cursor += 1;
+      while (/\s/.test(json[cursor] ?? '')) cursor += 1;
+      if (json[cursor] === '[') {
+        recommendationsArrayStart = cursor;
+        break;
+      }
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+      stringStart = index + 1;
+    } else if (character === '{') {
+      objectDepth += 1;
+    } else if (character === '}') {
+      objectDepth -= 1;
+    } else if (character === '[') {
+      arrayDepth += 1;
+    } else if (character === ']') {
+      arrayDepth -= 1;
+    }
+  }
+
+  if (recommendationsArrayStart < 0) return false;
+
+  let depth = 0;
+  inString = false;
+  escaping = false;
+  for (let index = recommendationsArrayStart; index < json.length; index += 1) {
+    const character = json[index];
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+      } else if (character === '\\') {
+        escaping = true;
+      } else if (character === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+    } else if (character === '[') {
+      depth += 1;
+    } else if (character === ']') {
+      depth -= 1;
+      if (depth === 0) return true;
+    }
+  }
+
+  return false;
+}
+
 @Injectable()
 export class ChatResponseStreamService {
   async collectAndEmitStructuredResponse(
@@ -27,11 +109,23 @@ export class ChatResponseStreamService {
     signal?: AbortSignal,
   ): Promise<string> {
     let accumulatorErrorMessage: string | null = null;
-    const handleContentDelta = ({ parsed }: { parsed: unknown }) => {
+    let partialResponseText = '';
+    const handleContentDelta = ({
+      delta,
+      parsed,
+    }: {
+      delta: string;
+      parsed: unknown;
+    }) => {
       if (accumulatorErrorMessage || signal?.aborted) return;
+      partialResponseText += delta;
 
       try {
-        for (const content of accumulator.consume(parsed, candidates)) {
+        for (const content of accumulator.consume(
+          parsed,
+          candidates,
+          hasCompletedRecommendationsArray(partialResponseText),
+        )) {
           emitText(content);
         }
       } catch (error) {
