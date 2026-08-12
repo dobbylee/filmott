@@ -151,7 +151,7 @@ blue_green_assert_slot() {
     container="$(blue_green_compose ps -q "$service")" || return 1
     [ -n "$container" ] || return 1
     [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null)" = true ] || return 1
-    [ "$(docker inspect -f '{{index .Config.Labels \"com.docker.compose.service\"}}' "$container" 2>/dev/null)" = "$service" ] || return 1
+    [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' "$container" 2>/dev/null)" = "$service" ] || return 1
     expected_image="$(docker image inspect -f '{{.Id}}' "filmott-${app}:${sha}")" || return 1
     [ "$(docker inspect -f '{{.Image}}' "$container")" = "$expected_image" ] || return 1
   done

@@ -121,7 +121,7 @@ bootstrap_running_container() {
   container="$(bootstrap_compose ps -q "$service")" || return 1
   bootstrap_validate_container_id "$container" || return 1
   [ "$(docker inspect -f '{{.State.Running}}' "$container")" = true ] || return 1
-  [ "$(docker inspect -f '{{index .Config.Labels \"com.docker.compose.service\"}}' "$container")" = "$service" ] || return 1
+  [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' "$container")" = "$service" ] || return 1
   printf '%s\n' "$container"
 }
 

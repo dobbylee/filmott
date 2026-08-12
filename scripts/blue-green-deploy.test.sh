@@ -144,6 +144,7 @@ docker() {
   elif [[ "$*" == *'.State.Running'* ]]; then
     printf 'true\n'
   elif [[ "$*" == *'com.docker.compose.service'* ]]; then
+    [ "$3" = '{{index .Config.Labels "com.docker.compose.service"}}' ] || return 1
     printf '%s\n' "${last#container-}"
   else
     printf '%s\n' "$test_container_image"

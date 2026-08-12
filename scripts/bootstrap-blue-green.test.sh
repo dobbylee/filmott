@@ -48,6 +48,22 @@ BOOTSTRAP_POSTGRES="$postgres_id"
 bootstrap_write_state prepared
 bootstrap_read_state
 [ "$BOOTSTRAP_PHASE" = prepared ] && [ "$BOOTSTRAP_TARGET_SHA" = "$target_sha" ]
+
+# Docker service label template은 Go template parser에 quote를 그대로 전달한다.
+(
+  bootstrap_compose() { printf '%s\n' "$frontend_id"; }
+  docker() {
+    if [ "$3" = '{{.State.Running}}' ]; then
+      printf 'true\n'
+    elif [ "$3" = '{{index .Config.Labels "com.docker.compose.service"}}' ]; then
+      printf 'frontend\n'
+    else
+      return 1
+    fi
+  }
+  [ "$(bootstrap_running_container frontend)" = "$frontend_id" ]
+)
+
 printf 'extra=1\n' >> "$FILMOTT_BOOTSTRAP_FILE"
 if bootstrap_read_state 2>/dev/null; then
   echo 'Malformed bootstrap state was accepted' >&2
