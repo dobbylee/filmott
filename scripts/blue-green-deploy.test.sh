@@ -361,7 +361,7 @@ assert_status 1 "$status" 'pre-cutover static capture failure'
 
 status="$(run_deploy verify_observers)"
 assert_status 1 "$status" 'pre-cutover observer failure'
-[[ "$(<"$event_log")" == *$'abort_probe' ]]
+[[ "$(<"$event_log")" == *$'abort_probe'* ]]
 [[ "$(<"$event_log")" != *'mark_uncertain'* ]] && [[ "$(<"$event_log")" != *$'reload' ]]
 
 status="$(run_deploy static:check-static)"
