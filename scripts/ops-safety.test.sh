@@ -124,6 +124,34 @@ if [[ "$deploy_workflow" != *'recover_deploy "$status" "Deploy failed" 0'* ]] ||
   exit 1
 fi
 
+if [[ "$deploy_workflow" == *'scripts/deploy-blue-green.sh'* ]]; then
+  echo 'Phase 2 전에는 production workflow가 blue-green 상태 머신을 실행하면 안 됩니다.' >&2
+  exit 1
+fi
+
+blue_green_script="$(<"${repo_root}/scripts/deploy-blue-green.sh")"
+for required_fragment in \
+  "trap '' PIPE" \
+  'mktemp "${FILMOTT_RECOVERY_LOG_DIR:-/tmp}/filmott-blue-green-recovery.XXXXXX"' \
+  'Blue-green automatic rollback failed; preserving both slots' \
+  'New active slot is already committed; preserving both slots'; do
+  if [[ "$blue_green_script" != *"$required_fragment"* ]]; then
+    echo "Blue-green 복구 안전 계약이 누락됐습니다: ${required_fragment}" >&2
+    exit 1
+  fi
+done
+
+for forbidden_fragment in \
+  'compose down' \
+  'docker volume' \
+  '--volumes' \
+  'postgres'; do
+  if [[ "$blue_green_script" == *"$forbidden_fragment"* ]]; then
+    echo "Blue-green app 배포 상태 머신에 금지된 lifecycle 범위가 있습니다: ${forbidden_fragment}" >&2
+    exit 1
+  fi
+done
+
 if [[ "$deploy_workflow" != *'recovery_in_progress=1'* ]] ||
   [[ "$deploy_workflow" != *'trap - ERR HUP INT TERM'* ]] ||
   [[ "$deploy_workflow" != *$'trap - ERR HUP INT TERM\n              set +e'* ]] ||
@@ -200,5 +228,7 @@ if [[ "$pre_cutover" == *'exit 1'* ]]; then
   echo 'checkout 변경 후 cutover 전 오류가 복구 handler를 우회합니다.' >&2
   exit 1
 fi
+
+bash "${repo_root}/scripts/blue-green-deploy.test.sh"
 
 echo '운영 스크립트 안전 회귀 검증 통과'
