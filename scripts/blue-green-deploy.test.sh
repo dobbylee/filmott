@@ -409,4 +409,72 @@ set -e
 assert_status 64 "$status" 'direct execution guard'
 [[ "$direct_output" == *'Usage: deploy-blue-green.sh deploy <40-character SHA>'* ]]
 
+# manual cutover는 stale/no-op을 성공으로 취급하지 않고 최종 active SHA까지 확인한다.
+run_main_contract() (
+  local strict="$1"
+  local origin_sha="$2"
+  local initial_active_sha="$3"
+  local final_active_sha="$4"
+  local expected_status="$5"
+  local expected_events="$6"
+  local actual_status
+  local actual_events
+
+  # shellcheck source=scripts/deploy-blue-green.sh
+  source "${repo_root}/scripts/deploy-blue-green.sh"
+  : > "$event_log"
+  export FILMOTT_REQUIRE_CUTOVER="$strict"
+  export FILMOTT_OPS_LOCK_FILE="${test_root}/main-contract.lock"
+  blue_green_require_files() { return 0; }
+  flock() { return 0; }
+  git() {
+    if [[ "$*" == *'rev-parse origin/main'* ]]; then
+      printf '%s\n' "$origin_sha"
+    elif [[ "$*" == *'reset --hard'* ]]; then
+      record reset
+    fi
+  }
+  blue_green_preflight() {
+    record preflight
+    BLUE_GREEN_ACTIVE_SLOT=blue
+    BLUE_GREEN_ACTIVE_SHA="$initial_active_sha"
+    export BLUE_GREEN_ACTIVE_SLOT BLUE_GREEN_ACTIVE_SHA
+  }
+  blue_green_compose() { record compose_config; }
+  blue_green_deploy() { record deploy; }
+  blue_green_read_release() {
+    record read_release
+    BLUE_GREEN_ACTIVE_SHA="$final_active_sha"
+    export BLUE_GREEN_ACTIVE_SHA
+  }
+  set +e
+  blue_green_main "$target_sha" > /dev/null 2>&1
+  actual_status=$?
+  set -e
+  actual_events="$(<"$event_log")"
+  [ "$actual_status" -eq "$expected_status" ] || {
+    echo "manual main status mismatch: expected=${expected_status} actual=${actual_status}" >&2
+    exit 1
+  }
+  [ "$actual_events" = "$expected_events" ] || {
+    echo "manual main events mismatch: expected=${expected_events} actual=${actual_events}" >&2
+    exit 1
+  }
+)
+
+run_main_contract 0 "$active_sha" "$active_sha" "$active_sha" 0 ''
+run_main_contract 1 "$active_sha" "$active_sha" "$active_sha" 1 ''
+run_main_contract 1 "$target_sha" "$target_sha" "$target_sha" 1 'preflight'
+run_main_contract 1 "$target_sha" "$active_sha" "$target_sha" 0 'preflight
+reset
+compose_config
+deploy
+read_release'
+run_main_contract 1 "$target_sha" "$active_sha" "$active_sha" 1 'preflight
+reset
+compose_config
+deploy
+read_release'
+rm -f "${test_root}/main-contract.lock"
+
 echo 'Blue-green 배포 상태 전이 검증 통과'

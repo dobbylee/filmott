@@ -19,6 +19,10 @@ FILMOTT_SSE_CUTOVER_FILE="${FILMOTT_SSE_CUTOVER_FILE:-${FILMOTT_DEPLOY_STATE_DIR
 FILMOTT_SSE_SUCCESS_FILE="${FILMOTT_SSE_SUCCESS_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/sse-smoke.success}"
 FILMOTT_SSE_FAILURE_FILE="${FILMOTT_SSE_FAILURE_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/sse-smoke.failed}"
 FILMOTT_SSE_LOG_FILE="${FILMOTT_SSE_LOG_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/sse-smoke.log}"
+FILMOTT_COMPOSE_FILE="${FILMOTT_COMPOSE_FILE:-${FILMOTT_REPO_ROOT}/docker-compose.prod.yml}"
+FILMOTT_NGINX_CONFIG_FILE="${FILMOTT_NGINX_CONFIG_FILE:-${FILMOTT_REPO_ROOT}/nginx/nginx.conf}"
+FILMOTT_SECURITY_HEADERS_FILE="${FILMOTT_SECURITY_HEADERS_FILE:-${FILMOTT_REPO_ROOT}/nginx/security-headers.conf}"
+FILMOTT_SMOKE_SCRIPT="${FILMOTT_SMOKE_SCRIPT:-${FILMOTT_REPO_ROOT}/scripts/blue-green-smoke.sh}"
 
 blue_green_error() {
   echo "$1" >&2
@@ -103,7 +107,8 @@ blue_green_write_upstream() {
 blue_green_compose() {
   (
     cd "$FILMOTT_REPO_ROOT" || exit 1
-    docker compose --env-file .env -f docker-compose.prod.yml "$@" || exit 1
+    docker compose --project-directory "$FILMOTT_REPO_ROOT" \
+      --env-file "${FILMOTT_REPO_ROOT}/.env" -f "$FILMOTT_COMPOSE_FILE" "$@" || exit 1
   )
 }
 
@@ -233,8 +238,8 @@ blue_green_test_candidate() {
   network="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' "$nginx_container" | head -1)" || return 1
   [ -n "$network" ] || return 1
   docker run --rm --network "$network" \
-    -v "${FILMOTT_REPO_ROOT}/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
-    -v "${FILMOTT_REPO_ROOT}/nginx/security-headers.conf:/etc/nginx/security-headers.conf:ro" \
+    -v "${FILMOTT_NGINX_CONFIG_FILE}:/etc/nginx/conf.d/default.conf:ro" \
+    -v "${FILMOTT_SECURITY_HEADERS_FILE}:/etc/nginx/security-headers.conf:ro" \
     -v "${FILMOTT_CANDIDATE_FILE}:/etc/nginx/runtime/upstreams.conf:ro" \
     -v "${FILMOTT_REPO_ROOT}/certbot/conf:/etc/letsencrypt:ro" \
     "$nginx_image" nginx -t || return 1
@@ -274,7 +279,7 @@ blue_green_static_smoke() {
   local command="$1"
 
   FILMOTT_SMOKE_RESOLVE=filmott.kr:443:127.0.0.1 \
-    bash "${FILMOTT_REPO_ROOT}/scripts/blue-green-smoke.sh" \
+    bash "$FILMOTT_SMOKE_SCRIPT" \
     "$command" "$FILMOTT_STATIC_ASSET_FILE" https://filmott.kr
 }
 
@@ -284,7 +289,7 @@ blue_green_abort_sse_smoke() { return 0; }
 
 blue_green_load_smoke_helpers() {
   declare -F blue_green_start_probe > /dev/null ||
-    source "${FILMOTT_REPO_ROOT}/scripts/blue-green-smoke.sh"
+    source "$FILMOTT_SMOKE_SCRIPT"
 }
 
 blue_green_mark_uncertain() {
@@ -520,11 +525,20 @@ blue_green_main() {
   git -C "$FILMOTT_REPO_ROOT" cat-file -e "${target_sha}^{commit}" || return 1
   latest_sha="$(git -C "$FILMOTT_REPO_ROOT" rev-parse origin/main)" || return 1
   if [ "$target_sha" != "$latest_sha" ]; then
+    if [ "${FILMOTT_REQUIRE_CUTOVER:-0}" = 1 ]; then
+      blue_green_error "Manual cutover target is stale: target=${target_sha} origin=${latest_sha}"
+      return 1
+    fi
     printf 'Skipping stale deploy target %s; origin/main is %s\n' "$target_sha" "$latest_sha"
     return 0
   fi
 
   blue_green_preflight || return 1
+  if [ "${FILMOTT_REQUIRE_CUTOVER:-0}" = 1 ] &&
+    [ "$target_sha" = "$BLUE_GREEN_ACTIVE_SHA" ]; then
+    blue_green_error "Manual cutover target is already active: ${target_sha}"
+    return 1
+  fi
   BLUE_GREEN_TARGET_SHA="$target_sha"
   export BLUE_GREEN_TARGET_SHA
   trap 'blue_green_on_signal 129 HUP' HUP
@@ -534,7 +548,14 @@ blue_green_main() {
   # Checkout은 빌드 입력일 뿐 active release 상태가 아니다. 실패 시 실행 중 슬롯은 유지한다.
   git -C "$FILMOTT_REPO_ROOT" reset --hard "$target_sha" || return 1
   blue_green_compose config > /dev/null || return 1
-  blue_green_deploy
+  blue_green_deploy || return 1
+  if [ "${FILMOTT_REQUIRE_CUTOVER:-0}" = 1 ]; then
+    blue_green_read_release || return 1
+    [ "$BLUE_GREEN_ACTIVE_SHA" = "$target_sha" ] || {
+      blue_green_error "Manual cutover did not activate target: ${target_sha}"
+      return 1
+    }
+  fi
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

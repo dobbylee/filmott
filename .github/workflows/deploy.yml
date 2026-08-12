@@ -1,34 +1,151 @@
 name: Deploy
-run-name: Deploy ${{ github.event.workflow_run.display_title }}
+run-name: Deploy ${{ github.event.workflow_run.display_title || inputs.operation }}
 
 on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Production operation
+        required: true
+        type: choice
+        options:
+          - bootstrap-prepare
+          - bootstrap-cutover
+          - bootstrap-rollback
+          - deploy
+      expected_active_sha:
+        description: Exact legacy SHA required for bootstrap
+        required: false
+        type: string
+      require_sse:
+        description: Verify one existing chat SSE across cutover
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: production-deploy
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
+  bootstrap:
+    if: ${{ github.event_name == 'workflow_dispatch' && startsWith(inputs.operation, 'bootstrap-') }}
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy verified commit
+      - name: Verify exact SHA CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFY_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+
+          success_count=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${VERIFY_SHA}&event=push&status=completed&per_page=20" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')
+          [ "$success_count" -ge 1 ] || {
+            echo "No successful CI run for ${VERIFY_SHA}"
+            exit 1
+          }
+      - name: Bootstrap legacy release into blue slot
         # v1.2.5
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         env:
-          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEPLOY_SHA: ${{ github.sha }}
+          EXPECTED_ACTIVE_SHA: ${{ inputs.expected_active_sha }}
+          BOOTSTRAP_OPERATION: ${{ inputs.operation }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DEPLOY_SHA
+          envs: DEPLOY_SHA,EXPECTED_ACTIVE_SHA,BOOTSTRAP_OPERATION
+          command_timeout: 20m
+          script: |
+            set -Eeuo pipefail
+
+            cd ~/filmott
+
+            bootstrap_script=$(mktemp /tmp/filmott-blue-green-bootstrap.XXXXXX)
+            trap 'rm -f "$bootstrap_script"' EXIT
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            if ! git cat-file -e "${DEPLOY_SHA}^{commit}"; then
+              echo "Bootstrap target is not a commit: ${DEPLOY_SHA}"
+              exit 1
+            fi
+            git show "${DEPLOY_SHA}:scripts/bootstrap-blue-green.sh" > "$bootstrap_script"
+            chmod 700 "$bootstrap_script"
+            case "$BOOTSTRAP_OPERATION" in
+              bootstrap-prepare)
+                FILMOTT_REPO_ROOT="$PWD" bash "$bootstrap_script" \
+                  prepare "$DEPLOY_SHA" "$EXPECTED_ACTIVE_SHA"
+                ;;
+              bootstrap-cutover)
+                FILMOTT_REPO_ROOT="$PWD" bash "$bootstrap_script" cutover "$DEPLOY_SHA"
+                ;;
+              bootstrap-rollback)
+                FILMOTT_REPO_ROOT="$PWD" bash "$bootstrap_script" rollback
+                ;;
+              *)
+                echo "Invalid bootstrap operation: ${BOOTSTRAP_OPERATION}"
+                exit 64
+                ;;
+            esac
+
+      - name: Verify bootstrapped site through Cloudflare
+        run: |
+          set -Eeuo pipefail
+
+          status=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' https://filmott.kr)
+          [ "$status" = "200" ]
+          www_status=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' https://www.filmott.kr)
+          [ "$www_status" = "301" ]
+
+  deploy:
+    if: >-
+      ${{
+        (github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          vars.FILMOTT_BLUE_GREEN_READY == '1') ||
+        (github.event_name == 'workflow_dispatch' && inputs.operation == 'deploy')
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify exact SHA CI for manual deploy
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFY_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+
+          success_count=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${VERIFY_SHA}&event=push&status=completed&per_page=20" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')
+          [ "$success_count" -ge 1 ] || {
+            echo "No successful CI run for ${VERIFY_SHA}"
+            exit 1
+          }
+      - name: Deploy verified commit
+        # v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          FILMOTT_REQUIRE_SSE_SMOKE: ${{ github.event_name == 'workflow_dispatch' && inputs.require_sse && '1' || '0' }}
+          FILMOTT_REQUIRE_CUTOVER: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DEPLOY_SHA,FILMOTT_REQUIRE_SSE_SMOKE,FILMOTT_REQUIRE_CUTOVER
           command_timeout: 20m
           script: |
             set -Eeuo pipefail

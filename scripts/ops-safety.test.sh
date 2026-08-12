@@ -98,10 +98,19 @@ fi
 
 deploy_workflow="$(<"${repo_root}/.github/workflows/deploy.yml")"
 for required_fragment in \
+  'workflow_dispatch:' \
+  'bootstrap-prepare' \
+  'bootstrap-cutover' \
+  'bootstrap-rollback' \
+  "vars.FILMOTT_BLUE_GREEN_READY == '1'" \
+  'actions: read' \
+  'No successful CI run for ${VERIFY_SHA}' \
   'git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main' \
   'git cat-file -e "${DEPLOY_SHA}^{commit}"' \
+  'git show "${DEPLOY_SHA}:scripts/bootstrap-blue-green.sh" > "$bootstrap_script"' \
   'git show "${DEPLOY_SHA}:scripts/deploy-blue-green.sh" > "$deploy_script"' \
   'command_timeout: 20m' \
+  'envs: DEPLOY_SHA,FILMOTT_REQUIRE_SSE_SMOKE,FILMOTT_REQUIRE_CUTOVER' \
   'FILMOTT_REPO_ROOT="$PWD" bash "$deploy_script" deploy "$DEPLOY_SHA"'; do
   if [[ "$deploy_workflow" != *"$required_fragment"* ]]; then
     echo "검증된 SHA의 blue-green 스크립트 실행 계약이 누락됐습니다: ${required_fragment}" >&2
@@ -133,6 +142,9 @@ for required_fragment in \
   'blue_green_wait_drain' \
   'blue_green_finish_probe' \
   'blue_green_signal_sse_cutover' \
+  'FILMOTT_REQUIRE_CUTOVER' \
+  'Manual cutover target is stale' \
+  'Manual cutover did not activate target' \
   'blue-green-smoke.sh' \
   'git -C "$FILMOTT_REPO_ROOT" reset --hard "$target_sha"'; do
   if [[ "$blue_green_script" != *"$required_fragment"* ]]; then
@@ -149,6 +161,64 @@ for required_fragment in \
   'openssl rand -hex 16'; do
   if [[ "$blue_green_smoke_script" != *"$required_fragment"* ]]; then
     echo "Blue-green 관측 helper 계약이 누락됐습니다: ${required_fragment}" >&2
+    exit 1
+  fi
+done
+
+bootstrap_script="$(<"${repo_root}/scripts/bootstrap-blue-green.sh")"
+for required_fragment in \
+  'flock -w 900 9' \
+  'bootstrap_prepare "$target_sha" "$active_sha"' \
+  'bootstrap_cutover "$target_sha"' \
+  'bootstrap_rollback' \
+  'bootstrap_refresh_target "$target_sha"' \
+  'bootstrap_validate_prepared_files' \
+  'bootstrap_extract_target_files "$target_sha"' \
+  'bootstrap_verify_target_files "$target_sha"' \
+  'bash "$FILMOTT_BOOTSTRAP_SMOKE_SCRIPT" probe 180 https://filmott.kr' \
+  'legacy-nginx.override.yml' \
+  'docker image tag "$image" "filmott-${app}:bootstrap-rollback"' \
+  'blue_green_compose up -d --no-deps --force-recreate frontend-blue backend-blue' \
+  'bootstrap_compose up -d --no-deps --force-recreate nginx' \
+  'bootstrap_legacy_compose up -d --no-deps --force-recreate nginx' \
+  'Bootstrap rollback is no longer valid for the active release' \
+  'Maintenance probe observed an interruption during the approved nginx recreate' \
+  'blue_green_wait_for_identity blue "$BOOTSTRAP_ACTIVE_SHA"' \
+  'docker stop "$BOOTSTRAP_LEGACY_BACKEND" "$BOOTSTRAP_LEGACY_FRONTEND"' \
+  'bootstrap_write_state cutover'; do
+  if [[ "$bootstrap_script" != *"$required_fragment"* ]]; then
+    echo "Blue-green bootstrap 안전 계약이 누락됐습니다: ${required_fragment}" >&2
+    exit 1
+  fi
+done
+
+for required_fragment in \
+  "trap 'bootstrap_on_signal 143 TERM' TERM" \
+  'mktemp "${FILMOTT_RECOVERY_LOG_DIR:-/tmp}/filmott-bootstrap-recovery.XXXXXX"' \
+  'rm -f "$FILMOTT_RELEASE_FILE" || return 1' \
+  'git -C "$FILMOTT_REPO_ROOT" reset --hard "$BOOTSTRAP_ACTIVE_SHA"'; do
+  if [[ "$bootstrap_script" != *"$required_fragment"* ]]; then
+    echo "Blue-green bootstrap 중단/rollback 계약이 누락됐습니다: ${required_fragment}" >&2
+    exit 1
+  fi
+done
+
+bootstrap_prepare_source="$(sed -n '/^bootstrap_prepare_run() {$/,/^bootstrap_prepare() {$/p' \
+  "${repo_root}/scripts/bootstrap-blue-green.sh")"
+if [[ "$bootstrap_prepare_source" == *'reset --hard "$target_sha"'* ]]; then
+  echo 'Bootstrap prepare가 운영 checkout을 target으로 전환합니다.' >&2
+  exit 1
+fi
+
+for forbidden_fragment in \
+  'docker compose down' \
+  'docker volume' \
+  '--volumes' \
+  'docker stop "$BOOTSTRAP_POSTGRES"' \
+  'blue_green_compose stop postgres' \
+  'blue_green_compose rm -sf postgres'; do
+  if [[ "$bootstrap_script" == *"$forbidden_fragment"* ]]; then
+    echo "Blue-green bootstrap이 금지된 DB/volume lifecycle을 변경합니다: ${forbidden_fragment}" >&2
     exit 1
   fi
 done
@@ -173,5 +243,6 @@ fi
 
 bash "${repo_root}/scripts/blue-green-deploy.test.sh"
 bash "${repo_root}/scripts/blue-green-smoke.test.sh"
+bash "${repo_root}/scripts/bootstrap-blue-green.test.sh"
 
 echo '운영 스크립트 안전 회귀 검증 통과'
