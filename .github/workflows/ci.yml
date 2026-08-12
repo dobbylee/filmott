@@ -127,6 +127,7 @@ jobs:
           printf '%s\n' \
             'map $host $filmott_active_slot { default "blue"; }' \
             'map $host $filmott_active_sha { default "0000000000000000000000000000000000000000"; }' \
+            'map $host $filmott_previous_frontend { default "frontend-blue:3000"; }' \
             'upstream frontend { server frontend-blue:3000; }' \
             'upstream backend { server backend-blue:3001; }' \
             > "$runtime_dir/upstreams.conf"

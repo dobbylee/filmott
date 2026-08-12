@@ -101,6 +101,7 @@ for required_fragment in \
   'git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main' \
   'git cat-file -e "${DEPLOY_SHA}^{commit}"' \
   'git show "${DEPLOY_SHA}:scripts/deploy-blue-green.sh" > "$deploy_script"' \
+  'command_timeout: 20m' \
   'FILMOTT_REPO_ROOT="$PWD" bash "$deploy_script" deploy "$DEPLOY_SHA"'; do
   if [[ "$deploy_workflow" != *"$required_fragment"* ]]; then
     echo "검증된 SHA의 blue-green 스크립트 실행 계약이 누락됐습니다: ${required_fragment}" >&2
@@ -126,9 +127,28 @@ for required_fragment in \
   'blue_green_compose build "frontend-${slot}" "backend-${slot}"' \
   'blue_green_compose up -d --no-deps --force-recreate' \
   'blue_green_compose exec -T nginx nginx -s reload' \
+  'FILMOTT_BLUE_GREEN_DRAIN_SECONDS:-300' \
+  'blue_green_start_probe' \
+  'blue_green_verify_observers' \
+  'blue_green_wait_drain' \
+  'blue_green_finish_probe' \
+  'blue_green_signal_sse_cutover' \
+  'blue-green-smoke.sh' \
   'git -C "$FILMOTT_REPO_ROOT" reset --hard "$target_sha"'; do
   if [[ "$blue_green_script" != *"$required_fragment"* ]]; then
     echo "Blue-green 복구 안전 계약이 누락됐습니다: ${required_fragment}" >&2
+    exit 1
+  fi
+done
+
+blue_green_smoke_script="$(<"${repo_root}/scripts/blue-green-smoke.sh")"
+for required_fragment in \
+  'blue_green_wait_probe_ready' \
+  'FILMOTT_SMOKE_READY_FILE' \
+  'blue_green_sse_marker_matches' \
+  'openssl rand -hex 16'; do
+  if [[ "$blue_green_smoke_script" != *"$required_fragment"* ]]; then
+    echo "Blue-green 관측 helper 계약이 누락됐습니다: ${required_fragment}" >&2
     exit 1
   fi
 done
@@ -152,5 +172,6 @@ if [[ "$pre_recovery_output" != *"trap '' PIPE"* ]] ||
 fi
 
 bash "${repo_root}/scripts/blue-green-deploy.test.sh"
+bash "${repo_root}/scripts/blue-green-smoke.test.sh"
 
 echo '운영 스크립트 안전 회귀 검증 통과'

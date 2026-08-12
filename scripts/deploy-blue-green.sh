@@ -9,6 +9,16 @@ FILMOTT_UNCERTAIN_FILE="${FILMOTT_UNCERTAIN_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/de
 FILMOTT_UPSTREAM_FILE="${FILMOTT_UPSTREAM_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/nginx/upstreams.conf}"
 FILMOTT_CANDIDATE_FILE="${FILMOTT_CANDIDATE_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/nginx/candidate.conf}"
 FILMOTT_ROLLBACK_FILE="${FILMOTT_ROLLBACK_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/nginx/rollback.conf}"
+FILMOTT_STATIC_ASSET_FILE="${FILMOTT_STATIC_ASSET_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/previous-static-assets}"
+FILMOTT_PROBE_LOG_FILE="${FILMOTT_PROBE_LOG_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/availability-probe.log}"
+FILMOTT_PROBE_READY_FILE="${FILMOTT_PROBE_READY_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/availability-probe.ready}"
+FILMOTT_PROBE_STOP_FILE="${FILMOTT_PROBE_STOP_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/availability-probe.stop}"
+FILMOTT_PROBE_FAILURE_FILE="${FILMOTT_PROBE_FAILURE_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/availability-probe.failed}"
+FILMOTT_SSE_READY_FILE="${FILMOTT_SSE_READY_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/sse-smoke.ready}"
+FILMOTT_SSE_CUTOVER_FILE="${FILMOTT_SSE_CUTOVER_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/sse-smoke.cutover}"
+FILMOTT_SSE_SUCCESS_FILE="${FILMOTT_SSE_SUCCESS_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/sse-smoke.success}"
+FILMOTT_SSE_FAILURE_FILE="${FILMOTT_SSE_FAILURE_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/sse-smoke.failed}"
+FILMOTT_SSE_LOG_FILE="${FILMOTT_SSE_LOG_FILE:-${FILMOTT_DEPLOY_STATE_DIR}/sse-smoke.log}"
 
 blue_green_error() {
   echo "$1" >&2
@@ -73,14 +83,17 @@ blue_green_write_upstream() {
   local destination="$1"
   local slot="$2"
   local sha="$3"
+  local previous_slot="${4:-$slot}"
   local temporary="${destination}.tmp"
 
   blue_green_other_slot "$slot" > /dev/null || return 1
+  blue_green_other_slot "$previous_slot" > /dev/null || return 1
   blue_green_validate_sha "$sha" || return 1
   mkdir -p "$(dirname "$destination")" || return 1
   {
     printf 'map $host $filmott_active_slot { default "%s"; }\n' "$slot"
     printf 'map $host $filmott_active_sha { default "%s"; }\n' "$sha"
+    printf 'map $host $filmott_previous_frontend { default "frontend-%s:3000"; }\n' "$previous_slot"
     printf 'upstream frontend { server frontend-%s:3000; }\n' "$slot"
     printf 'upstream backend { server backend-%s:3001; }\n' "$slot"
   } > "$temporary" || return 1
@@ -232,6 +245,18 @@ blue_green_reload_nginx() {
   blue_green_compose exec -T nginx nginx -s reload || return 1
 }
 
+blue_green_finalize_upstream() {
+  local temporary="${FILMOTT_UPSTREAM_FILE}.final"
+
+  blue_green_write_upstream "$FILMOTT_CANDIDATE_FILE" \
+    "$BLUE_GREEN_INACTIVE_SLOT" "$BLUE_GREEN_TARGET_SHA" \
+    "$BLUE_GREEN_INACTIVE_SLOT" || return 1
+  cp "$FILMOTT_CANDIDATE_FILE" "$temporary" || return 1
+  mv "$temporary" "$FILMOTT_UPSTREAM_FILE" || return 1
+  blue_green_reload_nginx || return 1
+  blue_green_wait_for_identity "$BLUE_GREEN_INACTIVE_SLOT" "$BLUE_GREEN_TARGET_SHA" || return 1
+}
+
 blue_green_revalidate() {
   local slot="$1"
   local secret
@@ -243,6 +268,23 @@ blue_green_revalidate() {
       method:'POST', headers:{'Authorization':'Bearer '+process.env.REVALIDATE_SECRET,
       'Content-Type':'application/json'}, body:JSON.stringify({path:'/',tags:['rankings','recent-reviews']})
     }).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" || return 1
+}
+
+blue_green_static_smoke() {
+  local command="$1"
+
+  FILMOTT_SMOKE_RESOLVE=filmott.kr:443:127.0.0.1 \
+    bash "${FILMOTT_REPO_ROOT}/scripts/blue-green-smoke.sh" \
+    "$command" "$FILMOTT_STATIC_ASSET_FILE" https://filmott.kr
+}
+
+# checkout 전 signal에는 관측 child가 아직 없으며, helper 로드가 이 함수를 덮어쓴다.
+blue_green_abort_probe() { return 0; }
+blue_green_abort_sse_smoke() { return 0; }
+
+blue_green_load_smoke_helpers() {
+  declare -F blue_green_start_probe > /dev/null ||
+    source "${FILMOTT_REPO_ROOT}/scripts/blue-green-smoke.sh"
 }
 
 blue_green_mark_uncertain() {
@@ -268,6 +310,8 @@ blue_green_rollback() {
 
 blue_green_fail_after_cutover() {
   blue_green_error "$1"
+  blue_green_abort_probe || true
+  blue_green_abort_sse_smoke || true
   if ! blue_green_rollback; then
     blue_green_error 'Rollback failed; preserving both slots and uncertainty marker'
   fi
@@ -276,6 +320,8 @@ blue_green_fail_after_cutover() {
 
 blue_green_fail_before_cutover() {
   blue_green_error "$1"
+  blue_green_abort_probe || true
+  blue_green_abort_sse_smoke || true
   if [ "${BLUE_GREEN_INACTIVE_STARTED:-0}" = 1 ]; then
     blue_green_compose rm -sf \
       "frontend-${BLUE_GREEN_INACTIVE_SLOT}" "backend-${BLUE_GREEN_INACTIVE_SLOT}" || true
@@ -294,6 +340,8 @@ blue_green_on_signal() {
   recovery_log="$(mktemp "${FILMOTT_RECOVERY_LOG_DIR:-/tmp}/filmott-blue-green-recovery.XXXXXX" 2>/dev/null || true)"
   [ -z "$recovery_log" ] || exec >> "$recovery_log" 2>&1
   blue_green_error "Deploy interrupted by ${signal}"
+  blue_green_abort_probe || true
+  blue_green_abort_sse_smoke || true
   if [ "${BLUE_GREEN_CUTOVER_STARTED:-0}" = 1 ] && [ "${BLUE_GREEN_COMMITTED:-0}" = 0 ]; then
     blue_green_rollback || true
   elif [ "${BLUE_GREEN_INACTIVE_STARTED:-0}" = 1 ] && [ "${BLUE_GREEN_CUTOVER_STARTED:-0}" = 0 ]; then
@@ -310,12 +358,21 @@ blue_green_deploy() {
     printf 'Deploy target is already active: %s\n' "$BLUE_GREEN_TARGET_SHA"
     return 0
   fi
+  blue_green_load_smoke_helpers || return 1
+  BLUE_GREEN_DRAIN_SECONDS="${FILMOTT_BLUE_GREEN_DRAIN_SECONDS:-300}"
+  [[ "$BLUE_GREEN_DRAIN_SECONDS" =~ ^[0-9]+$ ]] || return 1
+  BLUE_GREEN_PROBE_SECONDS="${FILMOTT_BLUE_GREEN_PROBE_SECONDS:-$((BLUE_GREEN_DRAIN_SECONDS + 120))}"
+  [[ "$BLUE_GREEN_PROBE_SECONDS" =~ ^[1-9][0-9]*$ ]] || return 1
+  [ "$BLUE_GREEN_PROBE_SECONDS" -gt "$BLUE_GREEN_DRAIN_SECONDS" ] || return 1
   BLUE_GREEN_INACTIVE_SLOT="$(blue_green_other_slot "$BLUE_GREEN_ACTIVE_SLOT")" || return 1
   BLUE_GREEN_INACTIVE_STARTED=0
   BLUE_GREEN_CUTOVER_STARTED=0
   BLUE_GREEN_COMMITTED=0
+  BLUE_GREEN_PROBE_PID=''
+  BLUE_GREEN_SSE_PID=''
   export BLUE_GREEN_INACTIVE_SLOT BLUE_GREEN_INACTIVE_STARTED \
-    BLUE_GREEN_CUTOVER_STARTED BLUE_GREEN_COMMITTED
+    BLUE_GREEN_CUTOVER_STARTED BLUE_GREEN_COMMITTED BLUE_GREEN_DRAIN_SECONDS \
+    BLUE_GREEN_PROBE_SECONDS BLUE_GREEN_PROBE_PID BLUE_GREEN_SSE_PID
 
   blue_green_build_inactive "$BLUE_GREEN_INACTIVE_SLOT" || return 1
   BLUE_GREEN_INACTIVE_STARTED=1
@@ -338,12 +395,17 @@ blue_green_deploy() {
     return 1
   }
   blue_green_write_upstream "$FILMOTT_CANDIDATE_FILE" \
-    "$BLUE_GREEN_INACTIVE_SLOT" "$BLUE_GREEN_TARGET_SHA" || {
+    "$BLUE_GREEN_INACTIVE_SLOT" "$BLUE_GREEN_TARGET_SHA" \
+    "$BLUE_GREEN_ACTIVE_SLOT" || {
       blue_green_fail_before_cutover 'Candidate upstream rendering failed'
       return 1
     }
   blue_green_test_candidate || {
     blue_green_fail_before_cutover 'Candidate nginx validation failed'
+    return 1
+  }
+  blue_green_static_smoke capture-static || {
+    blue_green_fail_before_cutover 'Current static asset capture failed'
     return 1
   }
   cp "$FILMOTT_UPSTREAM_FILE" "$FILMOTT_ROLLBACK_FILE" || {
@@ -352,6 +414,18 @@ blue_green_deploy() {
   }
   cmp -s "$FILMOTT_UPSTREAM_FILE" "$FILMOTT_ROLLBACK_FILE" || {
     blue_green_fail_before_cutover 'Current upstream snapshot verification failed'
+    return 1
+  }
+  blue_green_start_probe || {
+    blue_green_fail_before_cutover 'Availability probe start failed'
+    return 1
+  }
+  blue_green_start_sse_smoke || {
+    blue_green_fail_before_cutover 'SSE smoke did not confirm the active slot'
+    return 1
+  }
+  blue_green_verify_observers || {
+    blue_green_fail_before_cutover 'Availability observer failed before cutover'
     return 1
   }
   blue_green_mark_uncertain || {
@@ -370,14 +444,41 @@ blue_green_deploy() {
     return 1
   }
   blue_green_reload_nginx || { blue_green_fail_after_cutover 'Nginx reload failed'; return 1; }
+  blue_green_signal_sse_cutover || {
+    blue_green_fail_after_cutover 'SSE cutover signal failed'
+    return 1
+  }
   blue_green_wait_for_identity "$BLUE_GREEN_INACTIVE_SLOT" "$BLUE_GREEN_TARGET_SHA" || {
     blue_green_fail_after_cutover 'New slot identity check failed'
+    return 1
+  }
+  blue_green_static_smoke check-static || {
+    blue_green_fail_after_cutover 'Previous static asset check failed'
     return 1
   }
   blue_green_revalidate "$BLUE_GREEN_INACTIVE_SLOT" || {
     blue_green_fail_after_cutover 'ISR revalidation failed'
     return 1
   }
+  printf 'Draining previous slot for up to %s seconds\n' \
+    "$BLUE_GREEN_DRAIN_SECONDS" >&2
+  blue_green_wait_drain || {
+    blue_green_fail_after_cutover 'Availability probe failed during drain'
+    return 1
+  }
+  blue_green_finalize_upstream || {
+    blue_green_fail_after_cutover 'Previous static fallback cleanup failed'
+    return 1
+  }
+  blue_green_finish_probe || {
+    blue_green_fail_after_cutover 'Availability probe did not complete cleanly'
+    return 1
+  }
+  blue_green_finish_sse_smoke || {
+    blue_green_fail_after_cutover 'SSE smoke did not complete across cutover'
+    return 1
+  }
+
   # 이 시점부터 signal은 검증된 새 routing과 양쪽 slot을 보존한다.
   BLUE_GREEN_COMMITTED=1
   export BLUE_GREEN_COMMITTED
@@ -388,8 +489,8 @@ blue_green_deploy() {
     return 1
   }
   rm -f "$FILMOTT_UNCERTAIN_FILE" || return 1
+  blue_green_cleanup_sse_smoke || return 1
 
-  sleep "${FILMOTT_BLUE_GREEN_DRAIN_SECONDS:-5}"
   blue_green_compose stop \
     "backend-${BLUE_GREEN_ACTIVE_SLOT}" "frontend-${BLUE_GREEN_ACTIVE_SLOT}" || return 1
 }

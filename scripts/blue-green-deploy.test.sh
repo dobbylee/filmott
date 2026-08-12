@@ -24,6 +24,9 @@ export FILMOTT_RECOVERY_LOG_DIR="$test_root"
 
 # shellcheck source=scripts/deploy-blue-green.sh
 source "${repo_root}/scripts/deploy-blue-green.sh"
+blue_green_load_smoke_helpers
+declare -F blue_green_start_probe > /dev/null
+declare -F blue_green_start_sse_smoke > /dev/null
 
 assert_status() {
   if [ "$2" -ne "$1" ]; then
@@ -67,9 +70,20 @@ upstream="$(<"$FILMOTT_UPSTREAM_FILE")"
 for fragment in \
   'map $host $filmott_active_slot { default "blue"; }' \
   "map \$host \$filmott_active_sha { default \"${active_sha}\"; }" \
+  'map $host $filmott_previous_frontend { default "frontend-blue:3000"; }' \
   'server frontend-blue:3000' \
   'server backend-blue:3001'; do
   [[ "$upstream" == *"$fragment"* ]] || { echo "upstream missing: $fragment" >&2; exit 1; }
+done
+
+blue_green_write_upstream "$FILMOTT_CANDIDATE_FILE" green "$target_sha" blue
+green_upstream="$(<"$FILMOTT_CANDIDATE_FILE")"
+for fragment in \
+  'map $host $filmott_active_slot { default "green"; }' \
+  'map $host $filmott_previous_frontend { default "frontend-blue:3000"; }' \
+  'server frontend-green:3000' \
+  'server backend-green:3001'; do
+  [[ "$green_upstream" == *"$fragment"* ]] || { echo "green upstream missing: $fragment" >&2; exit 1; }
 done
 
 # uncertainty marker는 컨테이너 조회보다 먼저 배포를 차단한다.
@@ -163,6 +177,7 @@ record() {
     [ "$failure" != "$1" ] || return 1
   done
 }
+sleep() { record "sleep:$1"; }
 blue_green_build_inactive() { record "build:$1"; }
 blue_green_start_inactive() { record "start:$1"; }
 blue_green_wait_inactive() { record "wait:$1"; }
@@ -172,8 +187,92 @@ git() {
 }
 blue_green_write_upstream() { record "candidate:$2:$3"; printf candidate > "$1"; }
 blue_green_test_candidate() { record test_nginx; }
+blue_green_static_smoke() { record "static:$1"; }
+blue_green_start_probe() {
+  record start_probe || return 1
+  MOCK_PROBE_STARTED=1
+}
+blue_green_verify_observers() { record verify_observers; }
+blue_green_wait_drain() { record "drain:${BLUE_GREEN_DRAIN_SECONDS}"; }
+blue_green_finish_probe() {
+  if ! record finish_probe; then
+    MOCK_PROBE_STARTED=0
+    return 1
+  fi
+  MOCK_PROBE_STARTED=0
+}
+blue_green_abort_probe() {
+  [ "${MOCK_PROBE_STARTED:-0}" = 1 ] || return 0
+  record abort_probe || true
+  MOCK_PROBE_STARTED=0
+}
+
+# probe ready와 SSE marker는 실제 배포 helper 계약으로 교차 검증한다.
+BLUE_GREEN_PROBE_PID=$$
+: > "$FILMOTT_PROBE_READY_FILE"
+blue_green_wait_probe_ready
+rm -f "$FILMOTT_PROBE_READY_FILE"
+: > "$FILMOTT_PROBE_FAILURE_FILE"
+set +e
+blue_green_wait_probe_ready
+status=$?
+set -e
+assert_status 1 "$status" 'probe ready failure marker'
+rm -f "$FILMOTT_PROBE_FAILURE_FILE"
+
+export FILMOTT_REQUIRE_SSE_SMOKE=1
+export FILMOTT_SSE_ATTEMPT=0123456789abcdef0123456789abcdef
+BLUE_GREEN_ACTIVE_SLOT=blue
+printf 'attempt=ffffffffffffffffffffffffffffffff\nslot=blue\n' > "$FILMOTT_SSE_READY_FILE"
+printf 'attempt=%s\n' "$FILMOTT_SSE_ATTEMPT" > "$FILMOTT_SSE_SUCCESS_FILE"
+set +e
+blue_green_wait_sse_ready
+status=$?
+set -e
+assert_status 1 "$status" 'stale SSE ready marker'
+printf 'attempt=%s\nslot=blue\n' "$FILMOTT_SSE_ATTEMPT" > "$FILMOTT_SSE_READY_FILE"
+blue_green_wait_sse_ready
+printf 'attempt=ffffffffffffffffffffffffffffffff\n' > "$FILMOTT_SSE_SUCCESS_FILE"
+true &
+BLUE_GREEN_SSE_PID=$!
+: > "$FILMOTT_SSE_LOG_FILE"
+set +e
+blue_green_finish_sse_smoke
+status=$?
+set -e
+assert_status 1 "$status" 'stale SSE success marker'
+printf 'attempt=%s\n' "$FILMOTT_SSE_ATTEMPT" > "$FILMOTT_SSE_SUCCESS_FILE"
+true &
+BLUE_GREEN_SSE_PID=$!
+blue_green_finish_sse_smoke
+blue_green_signal_sse_cutover
+[ "$(<"$FILMOTT_SSE_CUTOVER_FILE")" = "attempt=${FILMOTT_SSE_ATTEMPT}" ]
+blue_green_cleanup_sse_smoke
+unset FILMOTT_REQUIRE_SSE_SMOKE FILMOTT_SSE_ATTEMPT
+
+blue_green_start_sse_smoke() {
+  [ "${FILMOTT_REQUIRE_SSE_SMOKE:-0}" = 1 ] || return 0
+  record start_sse
+}
+blue_green_signal_sse_cutover() {
+  [ "${FILMOTT_REQUIRE_SSE_SMOKE:-0}" = 1 ] || return 0
+  record signal_sse
+}
+blue_green_finish_sse_smoke() {
+  [ "${FILMOTT_REQUIRE_SSE_SMOKE:-0}" = 1 ] || return 0
+  record finish_sse
+}
+blue_green_cleanup_sse_smoke() {
+  [ "${FILMOTT_REQUIRE_SSE_SMOKE:-0}" = 1 ] || return 0
+  record cleanup_sse
+}
+blue_green_abort_sse_smoke() {
+  [ "${FILMOTT_REQUIRE_SSE_SMOKE:-0}" = 1 ] || return 0
+  record abort_sse || true
+}
 blue_green_mark_uncertain() { record mark_uncertain; : > "$FILMOTT_UNCERTAIN_FILE"; }
 blue_green_reload_nginx() { record reload; }
+blue_green_finalize_upstream() { record finalize_upstream; }
 blue_green_wait_for_identity() { record "identity:$1:$2"; }
 blue_green_revalidate() { record "revalidate:$1"; }
 blue_green_write_release() { record "commit:$1:$2"; }
@@ -192,6 +291,7 @@ run_deploy() {
   BLUE_GREEN_ACTIVE_SLOT=blue
   BLUE_GREEN_ACTIVE_SHA="$active_sha"
   BLUE_GREEN_TARGET_SHA="$target_sha"
+  MOCK_PROBE_STARTED=0
   export BLUE_GREEN_ACTIVE_SLOT BLUE_GREEN_ACTIVE_SHA BLUE_GREEN_TARGET_SHA
   FAIL_AT="$failure"
   set +e
@@ -206,16 +306,35 @@ start:green
 wait:green
 candidate:green:${target_sha}
 test_nginx
+static:capture-static
+start_probe
+verify_observers
 mark_uncertain
 reload
 identity:green:${target_sha}
+static:check-static
 revalidate:green
+drain:300
+finalize_upstream
+finish_probe
 commit:green:${target_sha}
 compose:stop backend-blue frontend-blue"
 status="$(run_deploy)"
 assert_status 0 "$status" 'successful deploy'
 assert_events "$success_events" 'successful deploy'
 [ ! -e "$FILMOTT_UNCERTAIN_FILE" ]
+
+opt_in_success_events="${success_events/start_probe/start_probe
+start_sse}"
+opt_in_success_events="${opt_in_success_events/reload/reload
+signal_sse}"
+opt_in_success_events="${opt_in_success_events/finish_probe/finish_probe
+finish_sse}"
+opt_in_success_events="${opt_in_success_events/commit:green:${target_sha}/commit:green:${target_sha}
+cleanup_sse}"
+status="$(FILMOTT_REQUIRE_SSE_SMOKE=1 run_deploy)"
+assert_status 0 "$status" 'successful SSE opt-in deploy'
+assert_events "$opt_in_success_events" 'successful SSE opt-in deploy'
 
 # 동일 SHA 재실행은 immutable tag와 active slot을 건드리지 않는다.
 : > "$event_log"
@@ -234,6 +353,32 @@ status="$(run_deploy wait:green)"
 assert_status 1 "$status" 'pre-cutover readiness failure'
 [[ "$(<"$event_log")" == *'compose:rm -sf frontend-green backend-green'* ]]
 [[ "$(<"$event_log")" != *'mark_uncertain'* ]]
+
+status="$(run_deploy static:capture-static)"
+assert_status 1 "$status" 'pre-cutover static capture failure'
+[[ "$(<"$event_log")" == *'compose:rm -sf frontend-green backend-green'* ]]
+[[ "$(<"$event_log")" != *'mark_uncertain'* ]]
+
+status="$(run_deploy verify_observers)"
+assert_status 1 "$status" 'pre-cutover observer failure'
+[[ "$(<"$event_log")" == *$'abort_probe' ]]
+[[ "$(<"$event_log")" != *'mark_uncertain'* ]] && [[ "$(<"$event_log")" != *$'reload' ]]
+
+status="$(run_deploy static:check-static)"
+assert_status 1 "$status" 'post-cutover static check failure'
+[[ "$(<"$event_log")" == *$'rollback' ]]
+
+status="$(FILMOTT_REQUIRE_SSE_SMOKE=1 run_deploy signal_sse)"
+assert_status 1 "$status" 'SSE cutover signal failure'
+[[ "$(<"$event_log")" == *$'abort_probe\nabort_sse\nrollback' ]]
+
+status="$(run_deploy drain:300)"
+assert_status 1 "$status" 'availability probe drain failure'
+[[ "$(<"$event_log")" == *$'abort_probe\nrollback' ]]
+
+status="$(run_deploy finalize_upstream)"
+assert_status 1 "$status" 'previous static fallback cleanup failure'
+[[ "$(<"$event_log")" == *$'abort_probe\nrollback' ]]
 
 status="$(run_deploy rollback)"
 # rollback hook is reached only after inducing a post-cutover failure.

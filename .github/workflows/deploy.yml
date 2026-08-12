@@ -29,6 +29,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DEPLOY_SHA
+          command_timeout: 20m
           script: |
             set -Eeuo pipefail
 
