@@ -132,7 +132,7 @@ for required_fragment in \
   'blue_green_compose build "frontend-${slot}" "backend-${slot}"' \
   'blue_green_compose up -d --no-deps --force-recreate' \
   'blue_green_compose exec -T nginx nginx -s reload' \
-  'FILMOTT_BLUE_GREEN_DRAIN_SECONDS:-300' \
+  'FILMOTT_BLUE_GREEN_DRAIN_SECONDS:-120' \
   'blue_green_start_probe' \
   'blue_green_verify_observers' \
   'blue_green_wait_drain' \

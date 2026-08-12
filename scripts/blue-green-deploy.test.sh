@@ -315,7 +315,7 @@ reload
 identity:green:${target_sha}
 static:check-static
 revalidate:green
-drain:300
+drain:120
 finalize_upstream
 finish_probe
 commit:green:${target_sha}
@@ -373,7 +373,7 @@ status="$(FILMOTT_REQUIRE_SSE_SMOKE=1 run_deploy signal_sse)"
 assert_status 1 "$status" 'SSE cutover signal failure'
 [[ "$(<"$event_log")" == *$'abort_probe\nabort_sse\nrollback' ]]
 
-status="$(run_deploy drain:300)"
+status="$(run_deploy drain:120)"
 assert_status 1 "$status" 'availability probe drain failure'
 [[ "$(<"$event_log")" == *$'abort_probe\nrollback' ]]
 

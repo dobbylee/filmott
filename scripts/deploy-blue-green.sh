@@ -359,7 +359,7 @@ blue_green_deploy() {
     return 0
   fi
   blue_green_load_smoke_helpers || return 1
-  BLUE_GREEN_DRAIN_SECONDS="${FILMOTT_BLUE_GREEN_DRAIN_SECONDS:-300}"
+  BLUE_GREEN_DRAIN_SECONDS="${FILMOTT_BLUE_GREEN_DRAIN_SECONDS:-120}"
   [[ "$BLUE_GREEN_DRAIN_SECONDS" =~ ^[0-9]+$ ]] || return 1
   BLUE_GREEN_PROBE_SECONDS="${FILMOTT_BLUE_GREEN_PROBE_SECONDS:-$((BLUE_GREEN_DRAIN_SECONDS + 120))}"
   [[ "$BLUE_GREEN_PROBE_SECONDS" =~ ^[1-9][0-9]*$ ]] || return 1
