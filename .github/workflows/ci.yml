@@ -121,15 +121,24 @@ jobs:
           set -Eeuo pipefail
 
           cert_dir="$RUNNER_TEMP/filmott-nginx-certs/live/filmott.kr"
+          runtime_dir="$RUNNER_TEMP/filmott-nginx-runtime"
           mkdir -p "$cert_dir"
+          mkdir -p "$runtime_dir"
+          printf '%s\n' \
+            'map $host $filmott_active_slot { default "blue"; }' \
+            'map $host $filmott_active_sha { default "0000000000000000000000000000000000000000"; }' \
+            'upstream frontend { server frontend-blue:3000; }' \
+            'upstream backend { server backend-blue:3001; }' \
+            > "$runtime_dir/upstreams.conf"
           openssl req -x509 -nodes -newkey rsa:2048 -sha256 -days 1 \
             -subj '/CN=filmott.kr' \
             -keyout "$cert_dir/privkey.pem" \
             -out "$cert_dir/fullchain.pem"
           docker run --rm \
-            --add-host frontend:127.0.0.1 \
-            --add-host backend:127.0.0.1 \
+            --add-host frontend-blue:127.0.0.1 \
+            --add-host backend-blue:127.0.0.1 \
             -v "$PWD/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
             -v "$PWD/nginx/security-headers.conf:/etc/nginx/security-headers.conf:ro" \
+            -v "$runtime_dir:/etc/nginx/runtime:ro" \
             -v "$RUNNER_TEMP/filmott-nginx-certs:/etc/letsencrypt:ro" \
             nginx:alpine nginx -t

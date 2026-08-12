@@ -98,43 +98,35 @@ fi
 
 deploy_workflow="$(<"${repo_root}/.github/workflows/deploy.yml")"
 for required_fragment in \
-  'previous_head=$(git rev-parse HEAD)' \
-  'git reset --hard "$previous_head"' \
-  'docker image tag filmott-frontend:rollback "$previous_frontend_ref"' \
-  'docker image tag filmott-backend:rollback "$previous_backend_ref"' \
-  "trap 'handle_deploy_signal HUP 129' HUP" \
-  "trap 'handle_deploy_signal INT 130' INT" \
-  "trap 'handle_deploy_signal TERM 143' TERM" \
-  'docker image inspect filmott-frontend:rollback filmott-backend:rollback' \
-  'docker image tag filmott-frontend:rollback filmott-frontend:latest' \
-  'docker image tag filmott-backend:rollback filmott-backend:latest' \
-  'compose up -d --no-deps --force-recreate frontend backend' \
-  'wait_for_backend || return 1' \
-  'wait_for_frontend || return 1' \
-  'compose restart nginx || return 1'; do
+  'git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main' \
+  'git cat-file -e "${DEPLOY_SHA}^{commit}"' \
+  'git show "${DEPLOY_SHA}:scripts/deploy-blue-green.sh" > "$deploy_script"' \
+  'FILMOTT_REPO_ROOT="$PWD" bash "$deploy_script" deploy "$DEPLOY_SHA"'; do
   if [[ "$deploy_workflow" != *"$required_fragment"* ]]; then
-    echo "배포 복구 계약이 누락됐습니다: ${required_fragment}" >&2
+    echo "검증된 SHA의 blue-green 스크립트 실행 계약이 누락됐습니다: ${required_fragment}" >&2
     exit 1
   fi
 done
 
-if [[ "$deploy_workflow" != *'recover_deploy "$status" "Deploy failed" 0'* ]] ||
-  [[ "$deploy_workflow" != *'recover_deploy "$status" "Deploy interrupted by ${signal}" 1'* ]]; then
-  echo 'ERR와 중단 신호가 같은 배포 복구 경로를 사용하지 않습니다.' >&2
-  exit 1
-fi
-
-if [[ "$deploy_workflow" == *'scripts/deploy-blue-green.sh'* ]]; then
-  echo 'Phase 2 전에는 production workflow가 blue-green 상태 머신을 실행하면 안 됩니다.' >&2
-  exit 1
-fi
+for forbidden_fragment in \
+  'compose restart nginx' \
+  'compose up -d' \
+  'docker compose down'; do
+  if [[ "$deploy_workflow" == *"$forbidden_fragment"* ]]; then
+    echo "Deploy workflow가 검증된 blue-green 스크립트 밖에서 lifecycle을 변경합니다: ${forbidden_fragment}" >&2
+    exit 1
+  fi
+done
 
 blue_green_script="$(<"${repo_root}/scripts/deploy-blue-green.sh")"
 for required_fragment in \
   "trap '' PIPE" \
   'mktemp "${FILMOTT_RECOVERY_LOG_DIR:-/tmp}/filmott-blue-green-recovery.XXXXXX"' \
-  'Blue-green automatic rollback failed; preserving both slots' \
-  'New active slot is already committed; preserving both slots'; do
+  'Rollback failed; preserving both slots and uncertainty marker' \
+  'blue_green_compose build "frontend-${slot}" "backend-${slot}"' \
+  'blue_green_compose up -d --no-deps --force-recreate' \
+  'blue_green_compose exec -T nginx nginx -s reload' \
+  'git -C "$FILMOTT_REPO_ROOT" reset --hard "$target_sha"'; do
   if [[ "$blue_green_script" != *"$required_fragment"* ]]; then
     echo "Blue-green 복구 안전 계약이 누락됐습니다: ${required_fragment}" >&2
     exit 1
@@ -145,87 +137,17 @@ for forbidden_fragment in \
   'compose down' \
   'docker volume' \
   '--volumes' \
-  'postgres'; do
+  'compose restart nginx'; do
   if [[ "$blue_green_script" == *"$forbidden_fragment"* ]]; then
     echo "Blue-green app 배포 상태 머신에 금지된 lifecycle 범위가 있습니다: ${forbidden_fragment}" >&2
     exit 1
   fi
 done
 
-if [[ "$deploy_workflow" != *'recovery_in_progress=1'* ]] ||
-  [[ "$deploy_workflow" != *'trap - ERR HUP INT TERM'* ]] ||
-  [[ "$deploy_workflow" != *$'trap - ERR HUP INT TERM\n              set +e'* ]] ||
-  [[ "$deploy_workflow" != *"trap '' PIPE"* ]] ||
-  [[ "$deploy_workflow" != *'mktemp /tmp/filmott-deploy-recovery.XXXXXX.log'* ]] ||
-  [[ "$deploy_workflow" != *'exec >> "$recovery_log" 2>&1'* ]]; then
-  echo '중단 신호의 중복 rollback 방지 계약이 누락됐습니다.' >&2
-  exit 1
-fi
-
-pre_recovery_output="${deploy_workflow%%echo \"\$reason\"*}"
+pre_recovery_output="${blue_green_script%%blue_green_error \"Deploy interrupted by \${signal}\"*}"
 if [[ "$pre_recovery_output" != *"trap '' PIPE"* ]] ||
   [[ "$pre_recovery_output" != *'exec >> "$recovery_log" 2>&1'* ]]; then
   echo '중단 신호 복구가 출력 전에 SIGPIPE 보호와 서버 로그 전환을 수행하지 않습니다.' >&2
-  exit 1
-fi
-
-pre_container_snapshot="${deploy_workflow%%previous_frontend_container=\$\(compose ps -q frontend\)*}"
-if [[ "$pre_container_snapshot" != *'if ! apps_are_running; then'* ]] ||
-  [[ "$pre_container_snapshot" != *'if ! restore_interrupted_release; then'* ]]; then
-  echo '실행 컨테이너 snapshot 전에 interrupted deploy 복구가 수행되지 않습니다.' >&2
-  exit 1
-fi
-
-if [[ "$deploy_workflow" != *'Both frontend/backend rollback images are required for interrupted deploy recovery'* ]] ||
-  [[ "$deploy_workflow" != *'fail_deploy "Cannot recover interrupted frontend/backend release"'* ]]; then
-  echo '두 rollback 이미지가 없을 때 안전하게 실패하는 계약이 누락됐습니다.' >&2
-  exit 1
-fi
-
-interrupted_restore_body="$(
-  awk '
-    $0 == "            restore_interrupted_release() {" {
-      capture = 1
-    }
-    capture {
-      print
-    }
-    capture && $0 == "            }" {
-      exit
-    }
-  ' "${repo_root}/.github/workflows/deploy.yml"
-)"
-if [[ "$interrupted_restore_body" != *'compose up -d --no-deps --force-recreate frontend backend || return 1'* ]] ||
-  [[ "$interrupted_restore_body" == *postgres* ]] ||
-  [[ "$interrupted_restore_body" == *'compose down'* ]] ||
-  [[ "$interrupted_restore_body" == *'docker volume'* ]] ||
-  [[ "$interrupted_restore_body" == *'--volumes'* ]]; then
-  echo 'interrupted deploy 복구가 frontend/backend 범위를 벗어났습니다.' >&2
-  exit 1
-fi
-
-unexpected_lifecycle_call="$(
-  printf '%s\n' "$interrupted_restore_body" |
-    grep -E '^[[:space:]]+compose (up|down|stop|rm|restart)' |
-    grep -Fv 'compose up -d --no-deps --force-recreate frontend backend || return 1' |
-    grep -Fv 'compose restart nginx || return 1' ||
-    true
-)"
-if [ -n "$unexpected_lifecycle_call" ]; then
-  echo "interrupted deploy 복구에 허용되지 않은 compose lifecycle 호출이 있습니다: ${unexpected_lifecycle_call}" >&2
-  exit 1
-fi
-
-restore_call_count="$(grep -Fc 'restore_previous_build_state' "${repo_root}/.github/workflows/deploy.yml")"
-if [ "$restore_call_count" -lt 4 ]; then
-  echo 'stale skip, pre-cutover 실패, rollback의 상태 복구 호출이 누락됐습니다.' >&2
-  exit 1
-fi
-
-post_checkout="${deploy_workflow#*git reset --hard \"\$DEPLOY_SHA\"}"
-pre_cutover="${post_checkout%%cutover_started=1*}"
-if [[ "$pre_cutover" == *'exit 1'* ]]; then
-  echo 'checkout 변경 후 cutover 전 오류가 복구 handler를 우회합니다.' >&2
   exit 1
 fi
 

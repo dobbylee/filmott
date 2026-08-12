@@ -5,362 +5,263 @@ set -Eeuo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 test_root="$(mktemp -d)"
 event_log="${test_root}/events.log"
-state_file="${test_root}/active-slot"
+active_sha='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+target_sha='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 
 cleanup() {
-  rm -f "$event_log" "$state_file" "${test_root}"/filmott-blue-green-recovery.*
-  rmdir "$test_root" 2>/dev/null || true
+  rm -f "${test_root}"/* "${test_root}"/nginx/* 2>/dev/null || true
+  rmdir "${test_root}/nginx" "$test_root" 2>/dev/null || true
 }
 trap cleanup EXIT
+
+export FILMOTT_DEPLOY_STATE_DIR="$test_root"
+export FILMOTT_RELEASE_FILE="${test_root}/active-release"
+export FILMOTT_UNCERTAIN_FILE="${test_root}/deployment-uncertain"
+export FILMOTT_UPSTREAM_FILE="${test_root}/nginx/upstreams.conf"
+export FILMOTT_CANDIDATE_FILE="${test_root}/nginx/candidate.conf"
+export FILMOTT_ROLLBACK_FILE="${test_root}/nginx/rollback.conf"
+export FILMOTT_RECOVERY_LOG_DIR="$test_root"
 
 # shellcheck source=scripts/deploy-blue-green.sh
 source "${repo_root}/scripts/deploy-blue-green.sh"
 
-record_hook() {
-  local name="$1"
-  local event="$1"
-  shift
-
-  if [ "$#" -gt 0 ]; then
-    event="${event}:$*"
-  fi
-  printf '%s\n' "$event" >> "$event_log"
-
-  local failure
-  for failure in ${FAIL_AT:-}; do
-    if [ "$failure" = "$name" ] || [ "$failure" = "$event" ]; then
-      return 1
-    fi
-  done
-  return 0
-}
-
-blue_green_verify_deploy_target() { record_hook verify "$@"; }
-blue_green_snapshot_active_release() { record_hook snapshot "$@"; }
-blue_green_prepare_inactive_slot() { record_hook prepare "$@"; }
-blue_green_wait_for_inactive_backend() { record_hook wait_backend "$@"; }
-blue_green_wait_for_inactive_frontend() { record_hook wait_frontend "$@"; }
-blue_green_smoke_inactive_slot() { record_hook smoke_inactive "$@"; }
-blue_green_render_candidate_upstream() { record_hook render_upstream "$@"; }
-blue_green_test_candidate_upstream() { record_hook test_nginx "$@"; }
-blue_green_activate_candidate_upstream() { record_hook activate_upstream "$@"; }
-blue_green_reload_nginx() { record_hook reload_nginx "$@"; }
-blue_green_smoke_active_slot() { record_hook smoke_active "$@"; }
-blue_green_commit_active_slot() {
-  record_hook commit_state "$@" || return 1
-  printf '%s\n' "$1" > "$state_file"
-}
-blue_green_drain_previous_slot() { record_hook drain "$@"; }
-blue_green_stop_previous_slot() { record_hook stop_previous "$@"; }
-blue_green_restore_previous_upstream() { record_hook restore_upstream "$@"; }
-blue_green_restore_previous_slot_state() {
-  record_hook restore_state "$@" || return 1
-  printf '%s\n' "$1" > "$state_file"
-}
-blue_green_smoke_previous_slot() { record_hook smoke_previous "$@"; }
-blue_green_cleanup_inactive_slot() { record_hook cleanup_inactive "$@"; }
-
 assert_status() {
-  local expected="$1"
-  local actual="$2"
-  local context="$3"
-
-  if [ "$actual" -ne "$expected" ]; then
-    echo "${context}: expected status ${expected}, got ${actual}" >&2
+  if [ "$2" -ne "$1" ]; then
+    echo "$3: expected status $1, got $2" >&2
     exit 1
   fi
 }
 
 assert_events() {
-  local expected="$1"
-  local context="$2"
   local actual
-
   actual="$(<"$event_log")"
-  if [ "$actual" != "$expected" ]; then
-    echo "${context}: unexpected event sequence" >&2
-    printf '%s\n' '--- expected ---' "$expected" '--- actual ---' "$actual" >&2
+  if [ "$actual" != "$1" ]; then
+    echo "$2: unexpected event sequence" >&2
+    printf '%s\n' '--- expected ---' "$1" '--- actual ---' "$actual" >&2
     exit 1
   fi
 }
 
-run_transition() {
-  local active_slot="$1"
-  local failure_hook="${2:-}"
-  local status
-
-  : > "$event_log"
-  printf '%s\n' "$active_slot" > "$state_file"
-  export FILMOTT_ACTIVE_SLOT_FILE="$state_file"
-  export FILMOTT_RECOVERY_LOG_DIR="$test_root"
-  export FAIL_AT="$failure_hook"
-
+# release와 upstream 상태는 파일 전체를 정확히 검증한다.
+blue_green_write_release blue "$active_sha"
+blue_green_read_release
+[ "$BLUE_GREEN_ACTIVE_SLOT" = blue ] && [ "$BLUE_GREEN_ACTIVE_SHA" = "$active_sha" ]
+for invalid in $'slot=blue\nsha=bad' $'slot=blue\nsha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nextra=1'; do
+  printf '%s\n' "$invalid" > "$FILMOTT_RELEASE_FILE"
   set +e
-  blue_green_run
+  blue_green_read_release > /dev/null 2>&1
+  status=$?
+  set -e
+  assert_status 1 "$status" 'invalid release state'
+done
+printf 'slot=blue\nsha=%s\0' "$active_sha" > "$FILMOTT_RELEASE_FILE"
+set +e
+blue_green_read_release > /dev/null 2>&1
+status=$?
+set -e
+assert_status 1 "$status" 'NUL release state'
+
+blue_green_write_release blue "$active_sha"
+blue_green_write_upstream "$FILMOTT_UPSTREAM_FILE" blue "$active_sha"
+upstream="$(<"$FILMOTT_UPSTREAM_FILE")"
+for fragment in \
+  'map $host $filmott_active_slot { default "blue"; }' \
+  "map \$host \$filmott_active_sha { default \"${active_sha}\"; }" \
+  'server frontend-blue:3000' \
+  'server backend-blue:3001'; do
+  [[ "$upstream" == *"$fragment"* ]] || { echo "upstream missing: $fragment" >&2; exit 1; }
+done
+
+# uncertainty marker는 컨테이너 조회보다 먼저 배포를 차단한다.
+: > "$event_log"
+: > "$FILMOTT_UNCERTAIN_FILE"
+blue_green_compose() { printf 'compose:%s\n' "$*" >> "$event_log"; }
+set +e
+blue_green_preflight > /dev/null 2>&1
+status=$?
+set -e
+assert_status 1 "$status" 'uncertain preflight'
+assert_events '' 'uncertain preflight'
+rm -f "$FILMOTT_UNCERTAIN_FILE"
+
+# 200이어도 기대 slot/SHA header가 아니면 다음 응답까지 기다린다.
+: > "${test_root}/identity-count"
+blue_green_origin_headers() {
+  local count
+  count="$(wc -l < "${test_root}/identity-count" | tr -d '[:space:]')"
+  printf 'x\n' >> "${test_root}/identity-count"
+  if [ "$count" -eq 0 ]; then
+    printf 'HTTP/1.1 200 OK\r\nX-Filmott-Slot: blue\r\nX-Filmott-SHA: %s\r\n\r\n' "$active_sha"
+  else
+    printf 'HTTP/1.1 200 OK\r\nX-Filmott-Slot: green\r\nX-Filmott-SHA: %s\r\n\r\n' "$target_sha"
+  fi
+}
+sleep() { :; }
+blue_green_wait_for_identity green "$target_sha" 2
+[ "$(wc -l < "${test_root}/identity-count" | tr -d '[:space:]')" -eq 2 ]
+
+# inactive lifecycle은 app 두 서비스만 다루고 첫 실패를 숨기지 않는다.
+: > "$event_log"
+blue_green_compose() {
+  printf 'compose:%s\n' "$*" >> "$event_log"
+  [ "${FAIL_COMPOSE:-}" != "$1" ]
+}
+blue_green_start_inactive green
+assert_events 'compose:rm -sf frontend-green backend-green
+compose:up -d --no-deps --force-recreate frontend-green backend-green' 'inactive lifecycle scope'
+: > "$event_log"
+FAIL_COMPOSE=rm
+set +e
+if ! blue_green_start_inactive green; then status=1; else status=0; fi
+set -e
+assert_status 1 "$status" 'inactive rm failure'
+assert_events 'compose:rm -sf frontend-green backend-green' 'inactive rm failure'
+unset FAIL_COMPOSE
+
+# slot 상태는 service label뿐 아니라 실행 image와 SHA tag까지 일치해야 한다.
+blue_green_compose() {
+  [ "$1" = ps ] && printf 'container-%s\n' "$3"
+}
+test_container_image='sha256:expected'
+docker() {
+  local last="${!#}"
+  if [ "$1" = image ]; then
+    printf 'sha256:expected\n'
+  elif [[ "$*" == *'.State.Running'* ]]; then
+    printf 'true\n'
+  elif [[ "$*" == *'com.docker.compose.service'* ]]; then
+    printf '%s\n' "${last#container-}"
+  else
+    printf '%s\n' "$test_container_image"
+  fi
+}
+blue_green_assert_slot green "$target_sha"
+test_container_image='sha256:unexpected'
+set +e
+blue_green_assert_slot green "$target_sha"
+status=$?
+set -e
+assert_status 1 "$status" 'slot image mismatch'
+
+# nginx -t 실패 후 reload를 실행하지 않는다.
+: > "$event_log"
+blue_green_compose() {
+  printf 'compose:%s\n' "$*" >> "$event_log"
+  [[ "$*" != *'nginx -t'* ]]
+}
+set +e
+if ! blue_green_reload_nginx; then status=1; else status=0; fi
+set -e
+assert_status 1 "$status" 'nginx test failure'
+assert_events 'compose:exec -T nginx nginx -t' 'nginx test failure'
+
+# 실제 상태 머신 순서는 mock hook으로 간결하게 고정한다.
+record() {
+  local failure
+  printf '%s\n' "$1" >> "$event_log"
+  for failure in ${FAIL_AT:-}; do
+    [ "$failure" != "$1" ] || return 1
+  done
+}
+blue_green_build_inactive() { record "build:$1"; }
+blue_green_start_inactive() { record "start:$1"; }
+blue_green_wait_inactive() { record "wait:$1"; }
+git() {
+  [[ "$*" == *'rev-parse origin/main'* ]] && printf '%s\n' "$target_sha"
+  return 0
+}
+blue_green_write_upstream() { record "candidate:$2:$3"; printf candidate > "$1"; }
+blue_green_test_candidate() { record test_nginx; }
+blue_green_mark_uncertain() { record mark_uncertain; : > "$FILMOTT_UNCERTAIN_FILE"; }
+blue_green_reload_nginx() { record reload; }
+blue_green_wait_for_identity() { record "identity:$1:$2"; }
+blue_green_revalidate() { record "revalidate:$1"; }
+blue_green_write_release() { record "commit:$1:$2"; }
+blue_green_compose() { record "compose:$*"; }
+blue_green_rollback() {
+  record rollback || return 1
+  rm -f "$FILMOTT_UNCERTAIN_FILE"
+}
+
+run_deploy() {
+  local failure="${1:-}"
+  local status
+  : > "$event_log"
+  rm -f "$FILMOTT_UNCERTAIN_FILE"
+  printf active > "$FILMOTT_UPSTREAM_FILE"
+  BLUE_GREEN_ACTIVE_SLOT=blue
+  BLUE_GREEN_ACTIVE_SHA="$active_sha"
+  BLUE_GREEN_TARGET_SHA="$target_sha"
+  export BLUE_GREEN_ACTIVE_SLOT BLUE_GREEN_ACTIVE_SHA BLUE_GREEN_TARGET_SHA
+  FAIL_AT="$failure"
+  set +e
+  blue_green_deploy
   status=$?
   set -e
   printf '%s\n' "$status"
 }
 
-success_blue_expected='verify:blue
-snapshot:blue
-prepare:green blue
-wait_backend:green
-wait_frontend:green
-smoke_inactive:green
-render_upstream:green blue
-test_nginx:green
-activate_upstream:green blue
-reload_nginx:green
-smoke_active:green
-commit_state:green blue
-drain:blue
-stop_previous:blue'
+success_events="build:green
+start:green
+wait:green
+candidate:green:${target_sha}
+test_nginx
+mark_uncertain
+reload
+identity:green:${target_sha}
+revalidate:green
+commit:green:${target_sha}
+compose:stop backend-blue frontend-blue"
+status="$(run_deploy)"
+assert_status 0 "$status" 'successful deploy'
+assert_events "$success_events" 'successful deploy'
+[ ! -e "$FILMOTT_UNCERTAIN_FILE" ]
 
-status="$(run_transition blue)"
-assert_status 0 "$status" 'blue to green transition'
-assert_events "$success_blue_expected" 'blue to green transition'
-if [ "$(<"$state_file")" != green ]; then
-  echo 'blue to green transition did not commit green state' >&2
-  exit 1
-fi
-
-success_green_expected="${success_blue_expected//blue/__blue__}"
-success_green_expected="${success_green_expected//green/blue}"
-success_green_expected="${success_green_expected//__blue__/green}"
-status="$(run_transition green)"
-assert_status 0 "$status" 'green to blue transition'
-assert_events "$success_green_expected" 'green to blue transition'
-
-status="$(run_transition blue wait_backend)"
-assert_status 1 "$status" 'pre-cutover health failure'
-assert_events 'verify:blue
-snapshot:blue
-prepare:green blue
-wait_backend:green
-cleanup_inactive:green' 'pre-cutover health failure'
-
-status="$(run_transition blue prepare)"
-assert_status 1 "$status" 'partial inactive preparation failure'
-assert_events 'verify:blue
-snapshot:blue
-prepare:green blue
-cleanup_inactive:green' 'partial inactive preparation failure'
-
-status="$(run_transition blue test_nginx)"
-assert_status 1 "$status" 'nginx validation failure'
-assert_events 'verify:blue
-snapshot:blue
-prepare:green blue
-wait_backend:green
-wait_frontend:green
-smoke_inactive:green
-render_upstream:green blue
-test_nginx:green
-cleanup_inactive:green' 'nginx validation failure'
-
-status="$(run_transition blue smoke_active)"
-assert_status 1 "$status" 'post-cutover smoke failure'
-assert_events 'verify:blue
-snapshot:blue
-prepare:green blue
-wait_backend:green
-wait_frontend:green
-smoke_inactive:green
-render_upstream:green blue
-test_nginx:green
-activate_upstream:green blue
-reload_nginx:green
-smoke_active:green
-restore_upstream:blue green
-reload_nginx:blue
-smoke_previous:blue
-restore_state:blue green
-cleanup_inactive:green' 'post-cutover smoke failure'
-
-status="$(run_transition blue reload_nginx:green)"
-assert_status 1 "$status" 'nginx reload failure'
-assert_events 'verify:blue
-snapshot:blue
-prepare:green blue
-wait_backend:green
-wait_frontend:green
-smoke_inactive:green
-render_upstream:green blue
-test_nginx:green
-activate_upstream:green blue
-reload_nginx:green
-restore_upstream:blue green
-reload_nginx:blue
-smoke_previous:blue
-restore_state:blue green
-cleanup_inactive:green' 'nginx reload failure'
-
-status="$(run_transition blue 'smoke_active restore_upstream')"
-assert_status 1 "$status" 'rollback upstream restoration failure'
-assert_events 'verify:blue
-snapshot:blue
-prepare:green blue
-wait_backend:green
-wait_frontend:green
-smoke_inactive:green
-render_upstream:green blue
-test_nginx:green
-activate_upstream:green blue
-reload_nginx:green
-smoke_active:green
-restore_upstream:blue green' 'rollback upstream restoration failure'
-
-status="$(run_transition blue verify)"
-assert_status 1 "$status" 'stale target failure'
-assert_events 'verify:blue' 'stale target failure'
-
+# 동일 SHA 재실행은 immutable tag와 active slot을 건드리지 않는다.
 : > "$event_log"
-printf '%s\n' invalid > "$state_file"
-export FILMOTT_ACTIVE_SLOT_FILE="$state_file"
-set +e
-blue_green_run > /dev/null 2>&1
-status=$?
-set -e
-assert_status 1 "$status" 'invalid active slot'
-assert_events '' 'invalid active slot'
+BLUE_GREEN_ACTIVE_SHA="$target_sha"
+BLUE_GREEN_TARGET_SHA="$target_sha"
+FAIL_AT="build:green identity:green:${target_sha}"
+blue_green_deploy > /dev/null
+assert_events '' 'same SHA deploy'
 
-: > "$event_log"
-printf 'blue\ngreen\n' > "$state_file"
-set +e
-blue_green_run > /dev/null 2>&1
-status=$?
-set -e
-assert_status 1 "$status" 'multi-line active slot'
-assert_events '' 'multi-line active slot'
+status="$(run_deploy "identity:green:${target_sha}")"
+assert_status 1 "$status" 'post-cutover identity failure'
+[[ "$(<"$event_log")" == *$'rollback' ]]
+[ ! -e "$FILMOTT_UNCERTAIN_FILE" ]
 
-: > "$event_log"
-printf 'blue\0' > "$state_file"
-set +e
-blue_green_run > /dev/null 2>&1
-status=$?
-set -e
-assert_status 1 "$status" 'NUL active slot'
-assert_events '' 'NUL active slot'
+status="$(run_deploy wait:green)"
+assert_status 1 "$status" 'pre-cutover readiness failure'
+[[ "$(<"$event_log")" == *'compose:rm -sf frontend-green backend-green'* ]]
+[[ "$(<"$event_log")" != *'mark_uncertain'* ]]
 
-: > "$event_log"
-rm -f "$state_file"
-set +e
-blue_green_run > /dev/null 2>&1
-status=$?
-set -e
-assert_status 1 "$status" 'missing active slot'
-assert_events '' 'missing active slot'
+status="$(run_deploy rollback)"
+# rollback hook is reached only after inducing a post-cutover failure.
+assert_status 0 "$status" 'rollback hook is not used on success'
+status="$(run_deploy "identity:green:${target_sha} rollback")"
+assert_status 1 "$status" 'rollback failure'
+[[ "$(<"$event_log")" != *'compose:rm'* ]]
+[ -e "$FILMOTT_UNCERTAIN_FILE" ]
 
+# 닫힌 SSH 출력에서도 signal handler가 pre-cutover inactive만 정리한다.
 : > "$event_log"
+rm -f "$FILMOTT_UNCERTAIN_FILE"
+BLUE_GREEN_INACTIVE_SLOT=green
+BLUE_GREEN_INACTIVE_STARTED=1
+BLUE_GREEN_CUTOVER_STARTED=0
+BLUE_GREEN_COMMITTED=0
 set +e
-(
-  BLUE_GREEN_ACTIVE_SLOT=blue
-  BLUE_GREEN_INACTIVE_SLOT=green
-  BLUE_GREEN_INACTIVE_PREPARED=1
-  BLUE_GREEN_CUTOVER_STARTED=0
-  BLUE_GREEN_STATE_COMMITTED=0
-  blue_green_recover_and_exit 143 TERM
-) > /dev/null 2>&1
-status=$?
-set -e
-assert_status 143 "$status" 'pre-cutover signal recovery'
-assert_events 'cleanup_inactive:green' 'pre-cutover signal recovery'
-
-: > "$event_log"
-set +e
-(
-  BLUE_GREEN_ACTIVE_SLOT=blue
-  BLUE_GREEN_INACTIVE_SLOT=green
-  BLUE_GREEN_INACTIVE_PREPARED=1
-  BLUE_GREEN_CUTOVER_STARTED=0
-  BLUE_GREEN_STATE_COMMITTED=0
-  blue_green_recover_and_exit 130 INT
-) > /dev/null 2>&1
-status=$?
-set -e
-assert_status 130 "$status" 'pre-cutover INT recovery'
-assert_events 'cleanup_inactive:green' 'pre-cutover INT recovery'
-
-: > "$event_log"
-set +e
-(
-  BLUE_GREEN_ACTIVE_SLOT=blue
-  BLUE_GREEN_INACTIVE_SLOT=green
-  BLUE_GREEN_INACTIVE_PREPARED=1
-  BLUE_GREEN_CUTOVER_STARTED=1
-  BLUE_GREEN_STATE_COMMITTED=0
-  blue_green_recover_and_exit 129 HUP
-) > /dev/null 2>&1
-status=$?
-set -e
-assert_status 129 "$status" 'post-cutover signal recovery'
-assert_events 'restore_upstream:blue green
-reload_nginx:blue
-smoke_previous:blue
-restore_state:blue green
-cleanup_inactive:green' 'post-cutover signal recovery'
-
-: > "$event_log"
-printf '%s\n' green > "$state_file"
-set +e
-(
-  BLUE_GREEN_ACTIVE_SLOT=blue
-  BLUE_GREEN_INACTIVE_SLOT=green
-  BLUE_GREEN_INACTIVE_PREPARED=1
-  BLUE_GREEN_CUTOVER_STARTED=1
-  BLUE_GREEN_STATE_COMMITTED=1
-  blue_green_recover_and_exit 143 TERM
-) > /dev/null 2>&1
-status=$?
-set -e
-assert_status 143 "$status" 'drain signal recovery'
-assert_events '' 'drain signal recovery'
-if [ "$(<"$state_file")" != green ]; then
-  echo 'drain signal recovery changed the committed active slot' >&2
-  exit 1
-fi
-
-: > "$event_log"
-export FAIL_AT='restore_upstream'
-set +e
-(
-  BLUE_GREEN_ACTIVE_SLOT=blue
-  BLUE_GREEN_INACTIVE_SLOT=green
-  BLUE_GREEN_INACTIVE_PREPARED=1
-  BLUE_GREEN_CUTOVER_STARTED=1
-  BLUE_GREEN_STATE_COMMITTED=0
-  blue_green_recover_and_exit 143 TERM
-) > /dev/null 2>&1
-status=$?
-set -e
-assert_status 143 "$status" 'signal rollback failure'
-assert_events 'restore_upstream:blue green' 'signal rollback failure'
-
-: > "$event_log"
-export FAIL_AT=''
-set +e
-(
-  BLUE_GREEN_ACTIVE_SLOT=blue
-  BLUE_GREEN_INACTIVE_SLOT=green
-  BLUE_GREEN_INACTIVE_PREPARED=1
-  BLUE_GREEN_CUTOVER_STARTED=0
-  BLUE_GREEN_STATE_COMMITTED=0
-  blue_green_recover_and_exit 143 TERM
-) 2>&1 | true
+(blue_green_on_signal 143 TERM) 2>&1 | true
 pipeline_status=("${PIPESTATUS[@]}")
 set -e
 assert_status 143 "${pipeline_status[0]}" 'closed output signal recovery'
-assert_events 'cleanup_inactive:green' 'closed output signal recovery'
+assert_events 'compose:rm -sf frontend-green backend-green' 'closed output signal recovery'
 
 set +e
 direct_output="$(bash "${repo_root}/scripts/deploy-blue-green.sh" 2>&1)"
 status=$?
 set -e
-assert_status 64 "$status" 'direct production execution guard'
-if [[ "$direct_output" != *'Blue-green production deployment is not enabled until Phase 2.'* ]]; then
-  echo 'Phase 1 direct execution guard message is missing' >&2
-  exit 1
-fi
+assert_status 64 "$status" 'direct execution guard'
+[[ "$direct_output" == *'Usage: deploy-blue-green.sh deploy <40-character SHA>'* ]]
 
 echo 'Blue-green 배포 상태 전이 검증 통과'
