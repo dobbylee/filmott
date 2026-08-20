@@ -114,6 +114,19 @@ jobs:
           touch backend/.env backend/.env.production
           docker compose --env-file /dev/null -f docker-compose.yml config --quiet
           docker compose --env-file /dev/null -f docker-compose.prod.yml config --quiet
+          production_config="$(docker compose --profile legacy --env-file /dev/null -f docker-compose.prod.yml config --format json)"
+          for service in \
+            nginx postgres \
+            frontend-blue frontend-green backend-blue backend-green \
+            frontend backend; do
+            printf '%s\n' "$production_config" | jq -e --arg service "$service" '
+              .services[$service].logging.driver == "json-file" and
+              .services[$service].logging.options["max-size"] == "20m" and
+              .services[$service].logging.options["max-file"] == "5"
+            ' > /dev/null
+          done
+          printf '%s\n' "$production_config" | jq -e \
+            '.services.certbot.logging == null' > /dev/null
       - name: Validate operations script safety
         run: bash scripts/ops-safety.test.sh
       - name: Validate nginx configuration

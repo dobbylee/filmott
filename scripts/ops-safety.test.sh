@@ -190,6 +190,38 @@ for required_fragment in \
   fi
 done
 
+production_compose="$(<"${repo_root}/docker-compose.prod.yml")"
+for required_fragment in \
+  'x-json-logging: &json-logging' \
+  'driver: json-file' \
+  "max-size: '20m'" \
+  "max-file: '5'"; do
+  if [[ "$production_compose" != *"$required_fragment"* ]]; then
+    echo "Production Compose log rotation 계약이 누락됐습니다: ${required_fragment}" >&2
+    exit 1
+  fi
+done
+if [ "$(grep -c 'logging: \*json-logging' "${repo_root}/docker-compose.prod.yml")" -ne 4 ]; then
+  echo 'Production Compose 장기 실행 서비스의 log rotation 상속 범위가 달라졌습니다.' >&2
+  exit 1
+fi
+
+ci_workflow="$(<"${repo_root}/.github/workflows/ci.yml")"
+for required_fragment in \
+  'production_config="$(docker compose --profile legacy --env-file /dev/null -f docker-compose.prod.yml config --format json)"' \
+  'nginx postgres' \
+  'frontend-blue frontend-green backend-blue backend-green' \
+  'frontend backend' \
+  '.services[$service].logging.driver == "json-file"' \
+  '.services[$service].logging.options["max-size"] == "20m"' \
+  '.services[$service].logging.options["max-file"] == "5"' \
+  '.services.certbot.logging == null'; do
+  if [[ "$ci_workflow" != *"$required_fragment"* ]]; then
+    echo "CI resolved log rotation 검증이 누락됐습니다: ${required_fragment}" >&2
+    exit 1
+  fi
+done
+
 for forbidden_fragment in \
   'compose restart nginx' \
   'compose up -d' \

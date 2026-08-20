@@ -1,3 +1,9 @@
+x-json-logging: &json-logging
+  driver: json-file
+  options:
+    max-size: '20m'
+    max-file: '5'
+
 x-frontend-common: &frontend-common
   build:
     context: ./frontend
@@ -21,6 +27,7 @@ x-frontend-common: &frontend-common
     retries: 3
     start_period: 30s
   restart: unless-stopped
+  logging: *json-logging
 
 x-backend-common: &backend-common
   build:
@@ -42,6 +49,7 @@ x-backend-common: &backend-common
     retries: 3
     start_period: 30s
   restart: unless-stopped
+  logging: *json-logging
 
 x-backend-environment: &backend-environment
   NODE_ENV: production
@@ -62,6 +70,7 @@ services:
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
     restart: always
+    logging: *json-logging
 
   certbot:
     image: certbot/certbot
@@ -160,6 +169,7 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+    logging: *json-logging
 
 volumes:
   pgdata:
