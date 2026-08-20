@@ -132,6 +132,42 @@ assert_status 1 "$status" 'inactive rm failure'
 assert_events 'compose:rm -sf frontend-green backend-green' 'inactive rm failure'
 unset FAIL_COMPOSE
 
+# deploy disk headroom은 경계값을 허용하고 부족하거나 파싱할 수 없으면 실패한다.
+FILMOTT_DEPLOY_MIN_FREE_MB=10
+df() {
+  printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+  printf '/dev/test 100000 1 %s 1%% /test\n' "${MOCK_AVAILABLE_KB}"
+}
+MOCK_AVAILABLE_KB=10240
+blue_green_require_disk_headroom "$test_root"
+MOCK_AVAILABLE_KB=10239
+set +e
+blue_green_require_disk_headroom "$test_root" > /dev/null 2>&1
+status=$?
+set -e
+assert_status 1 "$status" 'deploy disk below threshold'
+MOCK_AVAILABLE_KB=invalid
+set +e
+blue_green_require_disk_headroom "$test_root" > /dev/null 2>&1
+status=$?
+set -e
+assert_status 1 "$status" 'deploy disk invalid result'
+FILMOTT_DEPLOY_MIN_FREE_MB=invalid
+MOCK_AVAILABLE_KB=10240
+set +e
+blue_green_require_disk_headroom "$test_root" > /dev/null 2>&1
+status=$?
+set -e
+assert_status 1 "$status" 'deploy disk invalid override'
+FILMOTT_DEPLOY_MIN_FREE_MB=18014398509481984
+set +e
+blue_green_require_disk_headroom "$test_root" > /dev/null 2>&1
+status=$?
+set -e
+assert_status 1 "$status" 'deploy disk overflow override'
+unset FILMOTT_DEPLOY_MIN_FREE_MB MOCK_AVAILABLE_KB
+unset -f df
+
 # slot 상태는 service label뿐 아니라 실행 image와 SHA tag까지 일치해야 한다.
 blue_green_compose() {
   [ "$1" = ps ] && printf 'container-%s\n' "$3"
@@ -490,6 +526,45 @@ run_main_contract() (
     exit 1
   }
 )
+
+# main 경로는 disk headroom 실패 후 preflight, checkout, compose와 deploy에 도달하지 않는다.
+run_low_disk_main_contract() (
+  local actual_status
+  local actual_events
+
+  # shellcheck source=scripts/deploy-blue-green.sh
+  source "${repo_root}/scripts/deploy-blue-green.sh"
+  : > "$event_log"
+  export FILMOTT_OPS_LOCK_FILE="${test_root}/main-low-disk.lock"
+  blue_green_require_files() { return 0; }
+  flock() { return 0; }
+  git() {
+    if [[ "$*" == *'rev-parse origin/main'* ]]; then
+      printf '%s\n' "$target_sha"
+    elif [[ "$*" == *'reset --hard'* ]]; then
+      record reset
+    fi
+  }
+  blue_green_require_disk_headroom() { record disk; return 1; }
+  blue_green_preflight() { record preflight; }
+  blue_green_compose() { record compose; }
+  blue_green_deploy() { record deploy; }
+  set +e
+  blue_green_main "$target_sha" > /dev/null 2>&1
+  actual_status=$?
+  set -e
+  actual_events="$(<"$event_log")"
+  [ "$actual_status" -eq 1 ] || {
+    echo "low disk main status mismatch: ${actual_status}" >&2
+    exit 1
+  }
+  [ "$actual_events" = disk ] || {
+    echo "low disk main crossed mutation boundary: ${actual_events}" >&2
+    exit 1
+  }
+)
+
+run_low_disk_main_contract
 
 run_main_contract 0 "$active_sha" "$active_sha" "$active_sha" 0 ''
 run_main_contract 1 "$active_sha" "$active_sha" "$active_sha" 1 ''

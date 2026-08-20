@@ -20,11 +20,46 @@ container_path="/tmp/${filename}"
 partial_path="${backup_dir}/${filename}.part"
 backup_path="${backup_dir}/${filename}"
 
+backup_require_disk_headroom() {
+  local path="$1"
+  local required_mb="${FILMOTT_BACKUP_MIN_FREE_MB:-10240}"
+  local max_required_mb='9007199254740991'
+  local required_kb
+  local available_kb
+
+  [[ "$required_mb" =~ ^[1-9][0-9]*$ ]] || {
+    echo "Invalid FILMOTT_BACKUP_MIN_FREE_MB: ${required_mb}" >&2
+    return 1
+  }
+  if [ "${#required_mb}" -gt "${#max_required_mb}" ] ||
+    { [ "${#required_mb}" -eq "${#max_required_mb}" ] &&
+      [[ "$required_mb" > "$max_required_mb" ]]; }; then
+    echo "FILMOTT_BACKUP_MIN_FREE_MB is too large: ${required_mb}" >&2
+    return 1
+  fi
+  available_kb="$(LC_ALL=C df -Pk "$path" 2>/dev/null | awk 'END { print $4 }')" || {
+    echo "Cannot inspect backup disk headroom: ${path}" >&2
+    return 1
+  }
+  [[ "$available_kb" =~ ^[0-9]+$ ]] || {
+    echo "Invalid backup disk headroom result: path=${path} available_kb=${available_kb:-missing}" >&2
+    return 1
+  }
+  required_kb=$((required_mb * 1024))
+  [ "$available_kb" -ge "$required_kb" ] || {
+    echo "Insufficient backup disk headroom: path=${path} available_kb=${available_kb} required_kb=${required_kb}" >&2
+    return 1
+  }
+}
+
 exec 9>"$lock_file"
 if ! flock -w 900 9; then
   echo "[$(date)] 다른 운영 작업이 실행 중이어서 DB 백업을 중단합니다: ${lock_file}"
   exit 1
 fi
+
+mkdir -p "$backup_dir"
+backup_require_disk_headroom "$backup_dir"
 
 cleanup() {
   docker exec "$container" rm -f "$container_path" >/dev/null 2>&1 || true
@@ -32,7 +67,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$backup_dir"
 docker exec "$container" pg_dump \
   -U "$db_user" \
   -d "$db_name" \

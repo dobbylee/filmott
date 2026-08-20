@@ -175,6 +175,38 @@ blue_green_preflight() {
   blue_green_wait_for_identity "$BLUE_GREEN_ACTIVE_SLOT" "$BLUE_GREEN_ACTIVE_SHA" 1 || return 1
 }
 
+blue_green_require_disk_headroom() {
+  local path="$1"
+  local required_mb="${FILMOTT_DEPLOY_MIN_FREE_MB:-10240}"
+  local max_required_mb='9007199254740991'
+  local required_kb
+  local available_kb
+
+  [[ "$required_mb" =~ ^[1-9][0-9]*$ ]] || {
+    blue_green_error "Invalid FILMOTT_DEPLOY_MIN_FREE_MB: ${required_mb}"
+    return 1
+  }
+  if [ "${#required_mb}" -gt "${#max_required_mb}" ] ||
+    { [ "${#required_mb}" -eq "${#max_required_mb}" ] &&
+      [[ "$required_mb" > "$max_required_mb" ]]; }; then
+    blue_green_error "FILMOTT_DEPLOY_MIN_FREE_MB is too large: ${required_mb}"
+    return 1
+  fi
+  available_kb="$(LC_ALL=C df -Pk "$path" 2>/dev/null | awk 'END { print $4 }')" || {
+    blue_green_error "Cannot inspect deploy disk headroom: ${path}"
+    return 1
+  }
+  [[ "$available_kb" =~ ^[0-9]+$ ]] || {
+    blue_green_error "Invalid deploy disk headroom result: path=${path} available_kb=${available_kb:-missing}"
+    return 1
+  }
+  required_kb=$((required_mb * 1024))
+  [ "$available_kb" -ge "$required_kb" ] || {
+    blue_green_error "Insufficient deploy disk headroom: path=${path} available_kb=${available_kb} required_kb=${required_kb}"
+    return 1
+  }
+}
+
 blue_green_build_inactive() {
   local slot="$1"
   local app
@@ -531,6 +563,7 @@ blue_green_main() {
     return 0
   fi
 
+  blue_green_require_disk_headroom "$FILMOTT_REPO_ROOT" || return 1
   blue_green_preflight || return 1
   if [ "${FILMOTT_REQUIRE_CUTOVER:-0}" = 1 ] &&
     [ "$target_sha" = "$BLUE_GREEN_ACTIVE_SHA" ]; then

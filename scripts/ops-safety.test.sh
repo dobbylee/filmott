@@ -9,7 +9,9 @@ cleanup() {
   rm -f \
     "${test_root}/init/certbot/conf/live/filmott.kr/fullchain.pem" \
     "${test_root}/init/ops.lock" \
+    "${test_root}/backup.lock" \
     "${test_root}/verify.lock"
+  rm -f "${test_root}"/backup-order-* 2>/dev/null || true
   rmdir \
     "${test_root}/init/certbot/conf/live/filmott.kr" \
     "${test_root}/init/certbot/conf/live" \
@@ -40,6 +42,80 @@ run_verify() {
 }
 
 mkdir -p "${test_root}/backups"
+
+run_backup_preflight() (
+  local mock_available_kb="$1"
+  local required_mb="$2"
+  local order_file="${test_root}/backup-order-${mock_available_kb}-${required_mb}"
+
+  : > "$order_file"
+
+  export BACKUP_DIR="${test_root}/backups"
+  export FILMOTT_BACKUP_CONFIG_FILE="${test_root}/missing-backup.env"
+  export FILMOTT_BACKUP_MIN_FREE_MB="$required_mb"
+  export FILMOTT_OPS_LOCK_FILE="${test_root}/backup.lock"
+  flock() {
+    printf 'flock\n' >> "$order_file"
+    return 0
+  }
+  df() {
+    printf 'df\n' >> "$order_file"
+    printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+    printf '/dev/test 100000 1 %s 1%% /test\n' "$mock_available_kb"
+  }
+  docker() {
+    if [ "${3:-}" = pg_dump ]; then
+      printf 'pg_dump\n' >> "$order_file"
+    fi
+    echo '__backup_docker_called__'
+    return 99
+  }
+  source "${repo_root}/scripts/backup-db.sh"
+) 2>&1
+
+set +e
+backup_below_output="$(run_backup_preflight 10239 10)"
+backup_below_status=$?
+backup_exact_output="$(run_backup_preflight 10240 10)"
+backup_exact_status=$?
+backup_invalid_result_output="$(run_backup_preflight invalid 10)"
+backup_invalid_result_status=$?
+backup_invalid_override_output="$(run_backup_preflight 10240 invalid)"
+backup_invalid_override_status=$?
+backup_overflow_override_output="$(run_backup_preflight 10240 18014398509481984)"
+backup_overflow_override_status=$?
+set -e
+
+if [ "$backup_below_status" -eq 0 ] ||
+  [[ "$backup_below_output" != *'Insufficient backup disk headroom'* ]] ||
+  [[ "$backup_below_output" == *'__backup_docker_called__'* ]]; then
+  echo 'DB backup이 부족한 disk headroom에서 fail-closed하지 않았습니다.' >&2
+  exit 1
+fi
+if [ "$backup_exact_status" -eq 0 ] ||
+  [[ "$backup_exact_output" != *'__backup_docker_called__'* ]] ||
+  [ "$(<"${test_root}/backup-order-10240-10")" != $'flock\ndf\npg_dump' ]; then
+  echo 'DB backup이 정확한 disk headroom 경계값을 허용하지 않았습니다.' >&2
+  exit 1
+fi
+if [ "$backup_invalid_result_status" -eq 0 ] ||
+  [[ "$backup_invalid_result_output" != *'Invalid backup disk headroom result'* ]] ||
+  [[ "$backup_invalid_result_output" == *'__backup_docker_called__'* ]]; then
+  echo 'DB backup이 잘못된 df 결과를 거부하지 않았습니다.' >&2
+  exit 1
+fi
+if [ "$backup_invalid_override_status" -eq 0 ] ||
+  [[ "$backup_invalid_override_output" != *'Invalid FILMOTT_BACKUP_MIN_FREE_MB'* ]] ||
+  [[ "$backup_invalid_override_output" == *'__backup_docker_called__'* ]]; then
+  echo 'DB backup이 잘못된 disk headroom override를 거부하지 않았습니다.' >&2
+  exit 1
+fi
+if [ "$backup_overflow_override_status" -eq 0 ] ||
+  [[ "$backup_overflow_override_output" != *'FILMOTT_BACKUP_MIN_FREE_MB is too large'* ]] ||
+  [[ "$backup_overflow_override_output" == *'__backup_docker_called__'* ]]; then
+  echo 'DB backup이 overflow 가능한 disk headroom override를 거부하지 않았습니다.' >&2
+  exit 1
+fi
 
 set +e
 same_db_output="$(run_verify filmott_restore_verify filmott_restore_verify)"
@@ -140,6 +216,8 @@ for required_fragment in \
   'blue_green_signal_sse_cutover' \
   'blue_green_compose rm -sf' \
   'Retired slot cleanup failed after release commit' \
+  'FILMOTT_DEPLOY_MIN_FREE_MB:-10240' \
+  'blue_green_require_disk_headroom "$FILMOTT_REPO_ROOT"' \
   'FILMOTT_REQUIRE_CUTOVER' \
   'Manual cutover target is stale' \
   'Manual cutover did not activate target' \
