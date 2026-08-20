@@ -277,7 +277,10 @@ blue_green_finalize_upstream() { record finalize_upstream; }
 blue_green_wait_for_identity() { record "identity:$1:$2"; }
 blue_green_revalidate() { record "revalidate:$1"; }
 blue_green_write_release() { record "commit:$1:$2"; }
-blue_green_compose() { record "compose:$*"; }
+blue_green_compose() {
+  record "compose:$*" || return 1
+  [ "${FAIL_RETIRED_CLEANUP:-0}" != 1 ]
+}
 blue_green_rollback() {
   record rollback || return 1
   rm -f "$FILMOTT_UNCERTAIN_FILE"
@@ -319,7 +322,7 @@ drain:120
 finalize_upstream
 finish_probe
 commit:green:${target_sha}
-compose:stop backend-blue frontend-blue"
+compose:rm -sf frontend-blue backend-blue"
 status="$(run_deploy)"
 assert_status 0 "$status" 'successful deploy'
 assert_events "$success_events" 'successful deploy'
@@ -381,6 +384,18 @@ status="$(run_deploy finalize_upstream)"
 assert_status 1 "$status" 'previous static fallback cleanup failure'
 [[ "$(<"$event_log")" == *$'abort_probe\nrollback' ]]
 
+status="$(run_deploy "commit:green:${target_sha}")"
+assert_status 1 "$status" 'release state commit failure'
+[[ "$(<"$event_log")" == *$'rollback' ]]
+[[ "$(<"$event_log")" != *'compose:rm -sf frontend-blue backend-blue'* ]]
+
+status="$(FAIL_RETIRED_CLEANUP=1 run_deploy)"
+assert_status 1 "$status" 'post-commit retired slot cleanup failure'
+[[ "$(<"$event_log")" == *$'commit:green:'* ]]
+[[ "$(<"$event_log")" == *'compose:rm -sf frontend-blue backend-blue'* ]]
+[[ "$(<"$event_log")" != *$'rollback' ]]
+[ ! -e "$FILMOTT_UNCERTAIN_FILE" ]
+
 status="$(run_deploy rollback)"
 # rollback hook is reached only after inducing a post-cutover failure.
 assert_status 0 "$status" 'rollback hook is not used on success'
@@ -402,6 +417,19 @@ pipeline_status=("${PIPESTATUS[@]}")
 set -e
 assert_status 143 "${pipeline_status[0]}" 'closed output signal recovery'
 assert_events 'compose:rm -sf frontend-green backend-green' 'closed output signal recovery'
+
+# release commit 이후 signal은 검증된 routing을 rollback하거나 추가 lifecycle을 실행하지 않는다.
+: > "$event_log"
+BLUE_GREEN_INACTIVE_SLOT=green
+BLUE_GREEN_INACTIVE_STARTED=1
+BLUE_GREEN_CUTOVER_STARTED=1
+BLUE_GREEN_COMMITTED=1
+set +e
+(blue_green_on_signal 143 TERM) 2>&1 | true
+pipeline_status=("${PIPESTATUS[@]}")
+set -e
+assert_status 143 "${pipeline_status[0]}" 'committed cleanup signal handling'
+assert_events '' 'committed cleanup signal handling'
 
 set +e
 direct_output="$(bash "${repo_root}/scripts/deploy-blue-green.sh" 2>&1)"

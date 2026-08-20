@@ -479,7 +479,7 @@ blue_green_deploy() {
     return 1
   }
 
-  # 이 시점부터 signal은 검증된 새 routing과 양쪽 slot을 보존한다.
+  # 이 시점부터 signal은 검증된 새 routing을 보존하고 retired slot을 rollback하지 않는다.
   BLUE_GREEN_COMMITTED=1
   export BLUE_GREEN_COMMITTED
   blue_green_write_release "$BLUE_GREEN_INACTIVE_SLOT" "$BLUE_GREEN_TARGET_SHA" || {
@@ -491,8 +491,11 @@ blue_green_deploy() {
   rm -f "$FILMOTT_UNCERTAIN_FILE" || return 1
   blue_green_cleanup_sse_smoke || return 1
 
-  blue_green_compose stop \
-    "backend-${BLUE_GREEN_ACTIVE_SLOT}" "frontend-${BLUE_GREEN_ACTIVE_SLOT}" || return 1
+  blue_green_compose rm -sf \
+    "frontend-${BLUE_GREEN_ACTIVE_SLOT}" "backend-${BLUE_GREEN_ACTIVE_SLOT}" || {
+    blue_green_error 'Retired slot cleanup failed after release commit'
+    return 1
+  }
 }
 
 blue_green_require_files() {

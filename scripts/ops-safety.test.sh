@@ -105,7 +105,7 @@ for required_fragment in \
   'git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main' \
   'git cat-file -e "${DEPLOY_SHA}^{commit}"' \
   'git show "${DEPLOY_SHA}:scripts/deploy-blue-green.sh" > "$deploy_script"' \
-  'command_timeout: 20m' \
+  'command_timeout: 45m' \
   'envs: DEPLOY_SHA,FILMOTT_REQUIRE_SSE_SMOKE,FILMOTT_REQUIRE_CUTOVER' \
   'FILMOTT_REPO_ROOT="$PWD" bash "$deploy_script" deploy "$DEPLOY_SHA"'; do
   if [[ "$deploy_workflow" != *"$required_fragment"* ]]; then
@@ -138,6 +138,8 @@ for required_fragment in \
   'blue_green_wait_drain' \
   'blue_green_finish_probe' \
   'blue_green_signal_sse_cutover' \
+  'blue_green_compose rm -sf' \
+  'Retired slot cleanup failed after release commit' \
   'FILMOTT_REQUIRE_CUTOVER' \
   'Manual cutover target is stale' \
   'Manual cutover did not activate target' \
@@ -165,6 +167,7 @@ for forbidden_fragment in \
   'compose down' \
   'docker volume' \
   '--volumes' \
+  'blue_green_compose stop' \
   'compose restart nginx'; do
   if [[ "$blue_green_script" == *"$forbidden_fragment"* ]]; then
     echo "Blue-green app 배포 상태 머신에 금지된 lifecycle 범위가 있습니다: ${forbidden_fragment}" >&2
