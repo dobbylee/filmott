@@ -3,6 +3,10 @@ import { withSentryConfig } from '@sentry/nextjs';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  cacheMaxMemorySize: 256 * 1024 * 1024,
+  experimental: {
+    isrFlushToDisk: false,
+  },
   images: {
     remotePatterns: [
       {
