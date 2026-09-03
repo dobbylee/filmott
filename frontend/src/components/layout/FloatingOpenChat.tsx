@@ -7,7 +7,7 @@ export default function FloatingOpenChat() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Filmott 오픈채팅 참여"
-      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-50 flex min-h-11 items-center gap-2 rounded-full bg-[#FEE500] px-4 py-2.5 text-sm font-bold text-[#191919] shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FEE500] active:scale-95"
+      className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-50 flex min-h-11 items-center gap-2 rounded-full bg-[#FEE500] px-4 py-2.5 text-sm font-bold text-[#191919] shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FEE500] active:scale-95 xl:right-[calc((100vw-80rem)/2+1rem)]"
     >
       <svg
         viewBox="0 0 24 24"

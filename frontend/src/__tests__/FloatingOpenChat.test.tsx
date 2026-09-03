@@ -22,8 +22,9 @@ describe('FloatingOpenChat', () => {
     });
     expect(link).toHaveClass(
       'fixed',
-      'bottom-[max(1rem,env(safe-area-inset-bottom))]',
+      'bottom-[max(1.5rem,env(safe-area-inset-bottom))]',
       'right-[max(1rem,env(safe-area-inset-right))]',
+      'xl:right-[calc((100vw-80rem)/2+1rem)]',
       'z-50',
     );
     expect(screen.getByText('오픈채팅')).toBeVisible();
