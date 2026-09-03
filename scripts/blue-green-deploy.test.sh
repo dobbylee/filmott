@@ -168,15 +168,44 @@ assert_status 1 "$status" 'deploy disk overflow override'
 unset FILMOTT_DEPLOY_MIN_FREE_MB MOCK_AVAILABLE_KB
 unset -f df
 
-# slot 상태는 service label뿐 아니라 실행 image와 SHA tag까지 일치해야 한다.
+# slot 상태는 service label뿐 아니라 실행 image, slot image, SHA tag까지 일치해야 한다.
 blue_green_compose() {
   [ "$1" = ps ] && printf 'container-%s\n' "$3"
 }
 test_container_image='sha256:expected'
+test_slot_image='sha256:expected'
+test_sha_image='sha256:expected'
+MISSING_FRONTEND_SHA_TAG=0
+MISSING_BACKEND_SHA_TAG=0
+MISSING_SLOT_IMAGE=0
+FAIL_SHA_TAG_RECOVERY=0
+sha_tag_recovery_count=0
 docker() {
   local last="${!#}"
-  if [ "$1" = image ]; then
-    printf 'sha256:expected\n'
+  if [ "$1" = image ] && [ "$2" = inspect ]; then
+    case "$last" in
+      "filmott-frontend:${target_sha}"|"filmott-backend:${target_sha}")
+        if [ "$last" = "filmott-frontend:${target_sha}" ]; then
+          [ "$MISSING_FRONTEND_SHA_TAG" = 0 ] || return 1
+        else
+          [ "$MISSING_BACKEND_SHA_TAG" = 0 ] || return 1
+        fi
+        printf '%s\n' "$test_sha_image"
+        ;;
+      filmott-frontend:green|filmott-backend:green)
+        [ "$MISSING_SLOT_IMAGE" = 0 ] || return 1
+        printf '%s\n' "$test_slot_image"
+        ;;
+      *) return 1 ;;
+    esac
+  elif [ "$1" = image ] && [ "$2" = tag ]; then
+    [ "$FAIL_SHA_TAG_RECOVERY" = 0 ] || return 1
+    sha_tag_recovery_count=$((sha_tag_recovery_count + 1))
+    case "$last" in
+      "filmott-frontend:${target_sha}") MISSING_FRONTEND_SHA_TAG=0 ;;
+      "filmott-backend:${target_sha}") MISSING_BACKEND_SHA_TAG=0 ;;
+      *) return 1 ;;
+    esac
   elif [[ "$*" == *'.State.Running'* ]]; then
     printf 'true\n'
   elif [[ "$*" == *'com.docker.compose.service'* ]]; then
@@ -193,6 +222,52 @@ blue_green_assert_slot green "$target_sha"
 status=$?
 set -e
 assert_status 1 "$status" 'slot image mismatch'
+test_container_image='sha256:expected'
+
+# SHA tag만 누락된 경우 active container와 slot image 일치 후 tag를 복구한다.
+MISSING_FRONTEND_SHA_TAG=1
+MISSING_BACKEND_SHA_TAG=1
+sha_tag_recovery_count=0
+blue_green_assert_slot green "$target_sha"
+[ "$sha_tag_recovery_count" -eq 2 ] || {
+  echo 'missing SHA tag recovery should tag frontend and backend' >&2
+  exit 1
+}
+
+# slot image가 없거나 container image와 다르면 SHA tag를 만들지 않고 실패한다.
+MISSING_FRONTEND_SHA_TAG=1
+MISSING_BACKEND_SHA_TAG=1
+MISSING_SLOT_IMAGE=1
+sha_tag_recovery_count=0
+set +e
+blue_green_assert_slot green "$target_sha"
+status=$?
+set -e
+assert_status 1 "$status" 'missing slot image'
+[ "$sha_tag_recovery_count" -eq 0 ]
+MISSING_SLOT_IMAGE=0
+test_slot_image='sha256:unexpected'
+sha_tag_recovery_count=0
+set +e
+blue_green_assert_slot green "$target_sha"
+status=$?
+set -e
+assert_status 1 "$status" 'container and slot image mismatch'
+[ "$sha_tag_recovery_count" -eq 0 ]
+test_slot_image='sha256:expected'
+
+# SHA tag 복구 자체가 실패하면 배포를 계속하지 않는다.
+MISSING_FRONTEND_SHA_TAG=1
+MISSING_BACKEND_SHA_TAG=1
+FAIL_SHA_TAG_RECOVERY=1
+set +e
+blue_green_assert_slot green "$target_sha"
+status=$?
+set -e
+assert_status 1 "$status" 'SHA tag recovery failure'
+FAIL_SHA_TAG_RECOVERY=0
+MISSING_FRONTEND_SHA_TAG=0
+MISSING_BACKEND_SHA_TAG=0
 
 # nginx -t 실패 후 reload를 실행하지 않는다.
 : > "$event_log"

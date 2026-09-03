@@ -139,7 +139,9 @@ blue_green_assert_slot() {
   local app
   local service
   local container
-  local expected_image
+  local container_image
+  local slot_image
+  local sha_image
 
   for app in frontend backend; do
     service="${app}-${slot}"
@@ -147,8 +149,18 @@ blue_green_assert_slot() {
     [ -n "$container" ] || return 1
     [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null)" = true ] || return 1
     [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' "$container" 2>/dev/null)" = "$service" ] || return 1
-    expected_image="$(docker image inspect -f '{{.Id}}' "filmott-${app}:${sha}")" || return 1
-    [ "$(docker inspect -f '{{.Image}}' "$container")" = "$expected_image" ] || return 1
+    container_image="$(docker inspect -f '{{.Image}}' "$container")" || return 1
+    slot_image="$(docker image inspect -f '{{.Id}}' "filmott-${app}:${slot}")" || return 1
+    [ "$container_image" = "$slot_image" ] || return 1
+
+    if ! sha_image="$(docker image inspect -f '{{.Id}}' "filmott-${app}:${sha}" 2>/dev/null)"; then
+      docker image tag "$slot_image" "filmott-${app}:${sha}" || return 1
+      printf 'Recovered SHA image tag: app=%s slot=%s sha=%s image=%s\n' \
+        "$app" "$slot" "$sha" "$slot_image"
+      sha_image="$(docker image inspect -f '{{.Id}}' "filmott-${app}:${sha}")" || return 1
+    fi
+
+    [ "$container_image" = "$sha_image" ] || return 1
   done
 }
 
