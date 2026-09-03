@@ -1961,6 +1961,67 @@ describe('ContentsService', () => {
     });
   });
 
+  describe('getGoogleSitemapContents', () => {
+    it('filmott 신호 cohort는 리뷰 또는 랭킹 조건을 추가해야 한다', async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValue([
+        {
+          tmdbId: '123',
+          contentType: 'movie',
+          lastModified: '2026-09-03T00:00:00.000Z',
+        },
+      ]);
+
+      const result = await service.getGoogleSitemapContents('filmott-signal');
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(rv.id IS NOT NULL OR rk.id IS NOT NULL)',
+      );
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalledWith(
+        'GREATEST(MAX(rv.updated_at), c.updated_at, c.created_at)',
+        'lastModified',
+      );
+      expect(mockQueryBuilder.addOrderBy).toHaveBeenCalledWith(
+        'GREATEST(MAX(rv.updated_at), c.updated_at, c.created_at)',
+        'DESC',
+      );
+      expect(result).toEqual([
+        {
+          tmdbId: 123,
+          contentType: 'movie',
+          lastModified: new Date('2026-09-03T00:00:00.000Z'),
+        },
+      ]);
+    });
+
+    it('provider-high cohort는 filmott 신호를 제외하고 투표 2000 이상을 요구해야 한다', async () => {
+      await service.getGoogleSitemapContents('provider-high');
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('rv.id IS NULL');
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('rk.id IS NULL');
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'c.watch_providers IS NOT NULL',
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'c.vote_count >= :googleProviderHighMinVoteCount',
+        { googleProviderHighMinVoteCount: 2000 },
+      );
+    });
+
+    it('provider-mid cohort는 투표 1000 이상 2000 미만 범위를 요구해야 한다', async () => {
+      await service.getGoogleSitemapContents('provider-mid');
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'c.vote_count >= :googleProviderMidMinVoteCount',
+        { googleProviderMidMinVoteCount: 1000 },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'c.vote_count < :googleProviderHighMinVoteCount',
+        { googleProviderHighMinVoteCount: 2000 },
+      );
+      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10000);
+    });
+  });
+
   describe('cleanupExpiredPersonCache', () => {
     it('만료된 인물 캐시 엔트리를 삭제해야 한다', async () => {
       // 캐시에 만료 엔트리를 채우기 위해 getPersonDetail 호출

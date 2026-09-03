@@ -11,7 +11,7 @@ import {
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
-import { ContentsService } from './contents.service';
+import { ContentsService, isGoogleSitemapCohort } from './contents.service';
 import { SearchContentsDto } from './dto/search-contents.dto';
 import { DiscoverContentsDto } from './dto/discover-contents.dto';
 import { ToggleAdultDto } from './dto/toggle-adult.dto';
@@ -58,6 +58,17 @@ export class ContentsController {
   @Get('sitemap')
   async getSitemapContents() {
     return this.contentsService.getSitemapContents();
+  }
+
+  @Get('sitemap/google/:cohort')
+  async getGoogleSitemapContents(@Param('cohort') cohort: string) {
+    if (!isGoogleSitemapCohort(cohort)) {
+      throw new BadRequestException(
+        '지원하지 않는 Google sitemap cohort입니다.',
+      );
+    }
+
+    return this.contentsService.getGoogleSitemapContents(cohort);
   }
 
   @Patch('adult')

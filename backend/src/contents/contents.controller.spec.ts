@@ -16,6 +16,7 @@ describe('ContentsController', () => {
     getPersonDetail: jest.fn(),
     getPersonCredits: jest.fn(),
     getSitemapContents: jest.fn(),
+    getGoogleSitemapContents: jest.fn(),
     toggleAdult: jest.fn(),
     getAdultContents: jest.fn(),
     blockPersonContents: jest.fn(),
@@ -151,6 +152,29 @@ describe('ContentsController', () => {
         ContentsController.prototype.getDetail,
       );
       expect(guards).toBeUndefined();
+    });
+  });
+
+  describe('getGoogleSitemapContents', () => {
+    it('허용된 Google sitemap cohort를 서비스에 전달해야 한다', async () => {
+      const contents = [{ tmdbId: 123, contentType: 'movie' }];
+      mockContentsService.getGoogleSitemapContents.mockResolvedValue(contents);
+
+      await expect(
+        controller.getGoogleSitemapContents('filmott-signal'),
+      ).resolves.toEqual(contents);
+      expect(mockContentsService.getGoogleSitemapContents).toHaveBeenCalledWith(
+        'filmott-signal',
+      );
+    });
+
+    it('알 수 없는 Google sitemap cohort를 거부해야 한다', async () => {
+      await expect(
+        controller.getGoogleSitemapContents('unknown'),
+      ).rejects.toThrow(BadRequestException);
+      expect(
+        mockContentsService.getGoogleSitemapContents,
+      ).not.toHaveBeenCalled();
     });
   });
 
