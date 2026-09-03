@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import SocialLoginButton from '@/components/auth/SocialLoginButton';
 
 const mockTrackEvent = vi.fn();
+const mockLocationAssign = vi.fn();
 vi.mock('@/lib/ga', () => ({
   trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
 }));
@@ -18,9 +19,11 @@ describe('SocialLoginButton', () => {
       writable: true,
       value: {
         href: '',
+        origin: originalLocation.origin,
         pathname: '/contents/123',
         search: '?tab=reviews',
         hash: '#comments',
+        assign: mockLocationAssign,
       },
     });
   });
@@ -66,11 +69,12 @@ describe('SocialLoginButton', () => {
     Object.defineProperty(window, 'location', {
       writable: true,
       value: {
-        get href() { return ''; },
-        set href(_v: string) { callOrder.push('redirect'); },
+        href: '',
+        origin: originalLocation.origin,
         pathname: '/contents/123',
         search: '',
         hash: '',
+        assign: () => callOrder.push('redirect'),
       },
     });
 
@@ -88,7 +92,7 @@ describe('SocialLoginButton', () => {
 
     await user.click(screen.getByText('Google로 계속하기'));
 
-    expect(window.location.href).toContain('/auth/google');
+    expect(mockLocationAssign).toHaveBeenCalledWith(expect.stringContaining('/auth/google'));
   });
 
   it.each([

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import AuthModal from '@/components/auth/AuthModal';
 
 const mockCloseAuthModal = vi.fn();
+const mockLocationAssign = vi.fn();
 let mockIsOpen = false;
 let mockReason: 'want_to_watch' | 'watched' | null = null;
 
@@ -29,7 +30,12 @@ beforeEach(() => {
   mockReason = null;
   Object.defineProperty(window, 'location', {
     writable: true,
-    value: { ...originalLocation, href: '' },
+    value: {
+      ...originalLocation,
+      href: '',
+      origin: originalLocation.origin,
+      assign: mockLocationAssign,
+    },
   });
 });
 
@@ -91,7 +97,7 @@ describe('AuthModal', () => {
     render(<AuthModal />);
 
     await user.click(screen.getByTestId('social-login-google'));
-    expect(window.location.href).toContain('/auth/google');
+    expect(mockLocationAssign).toHaveBeenCalledWith(expect.stringContaining('/auth/google'));
   });
 
   it('Kakao 버튼 클릭 시 올바른 URL로 이동한다', async () => {
@@ -100,7 +106,7 @@ describe('AuthModal', () => {
     render(<AuthModal />);
 
     await user.click(screen.getByTestId('social-login-kakao'));
-    expect(window.location.href).toContain('/auth/kakao');
+    expect(mockLocationAssign).toHaveBeenCalledWith(expect.stringContaining('/auth/kakao'));
   });
 
   it('Naver 버튼 클릭 시 올바른 URL로 이동한다', async () => {
@@ -109,7 +115,7 @@ describe('AuthModal', () => {
     render(<AuthModal />);
 
     await user.click(screen.getByTestId('social-login-naver'));
-    expect(window.location.href).toContain('/auth/naver');
+    expect(mockLocationAssign).toHaveBeenCalledWith(expect.stringContaining('/auth/naver'));
   });
 
   it('닫기 버튼 클릭 시 closeAuthModal을 호출한다', async () => {

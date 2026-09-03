@@ -56,7 +56,8 @@ export default function SocialLoginButton({ provider }: SocialLoginButtonProps) 
   const handleClick = () => {
     storeCurrentAuthReturnPath();
     trackEvent('social_login_started', { provider });
-    window.location.href = `${API_URL}/auth/${provider}`;
+    const authUrl = new URL(`${API_URL}/auth/${provider}`, window.location.origin);
+    window.location.assign(authUrl.toString());
   };
 
   return (
