@@ -3,11 +3,11 @@ import { render, screen } from '@testing-library/react';
 import Footer from '@/components/layout/Footer';
 
 describe('Footer', () => {
-  it('로고를 렌더링한다', () => {
+  it('헤더와 중복되는 로고를 렌더링하지 않는다', () => {
     render(<Footer />);
-    const logo = screen.getByRole('link', { name: /^film\s*ott$/i });
-    expect(logo).toBeInTheDocument();
-    expect(logo).toHaveClass('text-3xl');
+    expect(
+      screen.queryByRole('link', { name: /^film\s*ott$/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('기존 AI 추천 태그라인을 표시하지 않는다', () => {
@@ -37,5 +37,19 @@ describe('Footer', () => {
   it('이메일 연락처를 표시한다', () => {
     render(<Footer />);
     expect(screen.getByText('filmottkr@gmail.com')).toBeInTheDocument();
+  });
+
+  it('PC에서는 현재 높이를 유지하고 양쪽 콘텐츠를 중앙 정렬해야 한다', () => {
+    render(<Footer />);
+
+    expect(screen.getByTestId('footer-content')).toHaveClass(
+      'sm:min-h-[124px]',
+      'sm:flex-row',
+      'sm:items-center',
+      'sm:justify-between',
+    );
+    expect(screen.getByTestId('footer-source-content')).toHaveClass(
+      'sm:text-left',
+    );
   });
 });

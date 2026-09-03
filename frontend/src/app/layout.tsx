@@ -4,6 +4,7 @@ import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@/contexts/AuthContext';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import FloatingOpenChat from '@/components/layout/FloatingOpenChat';
 import AuthModal from '@/components/auth/AuthModal';
 import GoogleAnalytics from '@/components/analytics/GoogleAnalytics';
 import ServiceWorkerRegister from '@/components/pwa/ServiceWorkerRegister';
@@ -103,6 +104,7 @@ export default function RootLayout({
               <main className="w-full flex-1 pb-10 pt-20">{children}</main>
               <Footer />
             </div>
+            <FloatingOpenChat />
             <AuthModal />
           </AuthProvider>
         </ThemeProvider>
