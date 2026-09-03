@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
+import type { JsonBodyType } from 'msw';
 import sitemap from '@/app/sitemap';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 
 describe('sitemap', () => {
-  function respondWith(body: unknown, status = 200): void {
+  function respondWith(body: JsonBodyType, status = 200): void {
     server.use(
       http.get(apiUrl('/contents/sitemap'), () =>
         HttpResponse.json(body, { status }),

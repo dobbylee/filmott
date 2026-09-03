@@ -1,4 +1,4 @@
-import { ContentItem } from './content';
+import type { ContentItem } from './content';
 
 export interface ReviewUser {
   id: number;

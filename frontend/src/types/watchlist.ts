@@ -1,5 +1,5 @@
-import { ContentItem } from './content';
-import { Review } from './review';
+import type { ContentItem } from './content';
+import type { Review } from './review';
 
 export type WatchlistStatus = 'want_to_watch' | 'watched';
 

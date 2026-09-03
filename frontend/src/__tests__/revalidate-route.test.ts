@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 
 const mockRevalidatePath = vi.fn();
 const mockRevalidateTag = vi.fn();
@@ -53,8 +54,6 @@ describe('revalidate route', () => {
     if (options.authorization) {
       headers['authorization'] = options.authorization;
     }
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { NextRequest } = require('next/server');
     return new NextRequest('http://localhost:3000/internal/revalidate', {
       method: 'POST',
       headers,
@@ -189,8 +188,6 @@ describe('revalidate route', () => {
     const headers: Record<string, string> = {
       referer: 'https://filmott.kr/admin',
     };
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { NextRequest } = require('next/server');
     const req = new NextRequest('http://localhost:3000/internal/revalidate', {
       method: 'POST',
       headers,
