@@ -1,3 +1,7 @@
+vi.mock('@sentry/nextjs/config', () => ({
+  withSentryConfig: <T>(config: T) => config,
+}));
+
 import nextConfig from '../../next.config';
 
 describe('Next.js 서버 캐시 설정', () => {

@@ -21,7 +21,7 @@
     "test:e2e:fixture": "node e2e/fixtures/backend.mjs"
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.44.0",
+    "@sentry/nextjs": "10.73.0",
     "axios": "1.20.0",
     "lucide-react": "^0.460.0",
     "next": "16.3.4",
