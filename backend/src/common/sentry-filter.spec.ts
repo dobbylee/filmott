@@ -261,4 +261,44 @@ describe('filterSentryEvent', () => {
     );
     expect(sanitized.data['http.method']).toBe('GET');
   });
+
+  it('순환 객체와 배열을 안전하게 끊고 비밀값 정제를 유지해야 한다', () => {
+    const circularObject: Record<string, unknown> = {
+      url: 'https://www.kobis.or.kr/list?key=circular-secret&targetDt=20260902',
+    };
+    circularObject.self = circularObject;
+    const circularArray: unknown[] = [];
+    circularArray.push(circularArray);
+    const event: Event = {
+      extra: {
+        circularObject,
+        circularArray,
+      },
+    };
+
+    const sanitized = filterSentryEvent(event, {});
+    const payload = JSON.stringify(sanitized);
+
+    expect(payload).not.toContain('circular-secret');
+    expect(sanitized?.extra?.circularObject).toEqual({
+      url: 'https://www.kobis.or.kr/list?key=[REDACTED]&targetDt=20260902',
+      self: '[Circular]',
+    });
+    expect(sanitized?.extra?.circularArray).toEqual(['[Circular]']);
+  });
+
+  it('다른 branch의 공유 객체를 순환 참조로 오판하지 않아야 한다', () => {
+    const shared = { language: 'ko-KR', region: 'KR' };
+    const event: Event = {
+      extra: {
+        first: shared,
+        second: shared,
+      },
+    };
+
+    const sanitized = filterSentryEvent(event, {});
+
+    expect(sanitized?.extra?.first).toEqual(shared);
+    expect(sanitized?.extra?.second).toEqual(shared);
+  });
 });

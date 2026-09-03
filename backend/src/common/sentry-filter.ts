@@ -9,6 +9,7 @@ import type {
 } from '@sentry/core';
 
 const REDACTED_VALUE = '[REDACTED]';
+const CIRCULAR_VALUE = '[Circular]';
 const SENSITIVE_QUERY_PARAMETER =
   /\b(api_key|apikey|key|token|access_token|auth|authorization)=([^&#\s]+)/gi;
 const BEARER_TOKEN = /\b(Bearer)\s+[^,;\s]+/gi;
@@ -79,6 +80,7 @@ function sanitizeSentryValue(
   fieldName?: string,
   inParameterContainer = false,
   redactValue = false,
+  ancestors: WeakSet<object> = new WeakSet(),
 ): unknown {
   if (redactValue) {
     return REDACTED_VALUE;
@@ -98,44 +100,71 @@ function sanitizeSentryValue(
   }
 
   if (Array.isArray(value)) {
+    if (ancestors.has(value)) {
+      return CIRCULAR_VALUE;
+    }
+    ancestors.add(value);
     const parameterContainer =
       inParameterContainer || isParameterContainer(fieldName ?? '');
-    return (value as unknown[]).map((item) => {
-      if (
-        parameterContainer &&
-        Array.isArray(item) &&
-        typeof item[0] === 'string' &&
-        SENSITIVE_PARAMETER_NAMES.has(normalizeFieldName(item[0]))
-      ) {
-        return item.map((tupleValue, index) =>
-          index === 1 ? REDACTED_VALUE : sanitizeSentryValue(tupleValue),
-        );
-      }
+    try {
+      return (value as unknown[]).map((item) => {
+        if (
+          parameterContainer &&
+          Array.isArray(item) &&
+          typeof item[0] === 'string' &&
+          SENSITIVE_PARAMETER_NAMES.has(normalizeFieldName(item[0]))
+        ) {
+          return item.map((tupleValue, index) =>
+            index === 1
+              ? REDACTED_VALUE
+              : sanitizeSentryValue(
+                  tupleValue,
+                  undefined,
+                  false,
+                  false,
+                  ancestors,
+                ),
+          );
+        }
 
-      return sanitizeSentryValue(
-        item,
-        undefined,
-        parameterContainer,
-        isSensitiveValueContainer(fieldName ?? ''),
-      );
-    });
+        return sanitizeSentryValue(
+          item,
+          undefined,
+          parameterContainer,
+          isSensitiveValueContainer(fieldName ?? ''),
+          ancestors,
+        );
+      });
+    } finally {
+      ancestors.delete(value);
+    }
   }
 
   if (typeof value !== 'object' || value === null || !isPlainObject(value)) {
     return value;
   }
 
-  const sanitizedEntries = Object.entries(value).map(([key, entryValue]) => [
-    key,
-    sanitizeSentryValue(
-      entryValue,
-      key,
-      inParameterContainer || isParameterContainer(fieldName ?? ''),
-      isSensitiveValueContainer(fieldName ?? ''),
-    ),
-  ]);
+  if (ancestors.has(value)) {
+    return CIRCULAR_VALUE;
+  }
+  ancestors.add(value);
 
-  return Object.fromEntries(sanitizedEntries);
+  try {
+    const sanitizedEntries = Object.entries(value).map(([key, entryValue]) => [
+      key,
+      sanitizeSentryValue(
+        entryValue,
+        key,
+        inParameterContainer || isParameterContainer(fieldName ?? ''),
+        isSensitiveValueContainer(fieldName ?? ''),
+        ancestors,
+      ),
+    ]);
+
+    return Object.fromEntries(sanitizedEntries);
+  } finally {
+    ancestors.delete(value);
+  }
 }
 
 export function sanitizeSentryBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
