@@ -12,12 +12,14 @@
     "start": "next start",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
-    "check": "npm run lint && npm run typecheck && npm test && npm run build",
-    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm test && npm run test:harness && npm run build:check",
+    "build:check": "node scripts/isolated-build.mjs build",
+    "test:harness": "node --test scripts/isolated-build.test.mjs",
+    "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:app": "npm run build && cp -R .next/static .next/standalone/.next/ && cp -R public .next/standalone/ && HOSTNAME=127.0.0.1 node .next/standalone/server.js",
+    "test:e2e:app": "node scripts/isolated-build.mjs serve",
     "test:e2e:fixture": "node e2e/fixtures/backend.mjs"
   },
   "dependencies": {

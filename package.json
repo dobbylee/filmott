@@ -7,6 +7,11 @@
   "scripts": {
     "check:backend": "npm --prefix backend run check",
     "check:frontend": "npm --prefix frontend run check",
-    "check": "npm run check:backend && npm run check:frontend"
+    "check": "npm run check:harness && npm run check:backend && npm run check:frontend",
+    "check:harness": "node --test scripts/check-harness.test.mjs && node scripts/check-harness.mjs",
+    "check:backend:full": "npm run check:backend && npm --prefix backend run test:e2e && npm --prefix backend run test:integration",
+    "check:frontend:full": "npm run check:frontend && npm --prefix frontend run test:e2e",
+    "check:ops": "bash scripts/ops-safety.test.sh",
+    "check:release": "npm run check:harness && npm run check:backend:full && npm run check:frontend:full && npm run check:ops"
   }
 }

@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 
 const host = '127.0.0.1';
-const port = Number(process.env.E2E_FIXTURE_BACKEND_PORT ?? 3101);
+const port = Number(process.env.E2E_FIXTURE_BACKEND_PORT ?? 3201);
 const now = '2026-05-01T00:00:00.000Z';
 
 const user = {

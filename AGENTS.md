@@ -36,6 +36,6 @@
 
 - 사용자 개발 서버를 시작·종료·재시작하지 않는다. 별도 수동 테스트 서버를 방치하지 않는다.
 - 검증 안내에 정의한 테스트 러너 소유의 격리 서버/DB는 허용한다. 충돌하면 기존 프로세스를 종료하거나 재사용하지 않고 실패한다. 테스트가 만든 프로세스·임시 자원만 정리한다.
-- Docker image 변경은 push 전 `docker build --platform linux/arm64`, migration은 로컬 `npm run migration:run` 성공을 확인한다.
+- Docker image 변경은 push 전 `docker build --platform linux/arm64`, migration은 로컬 `npm --prefix backend run migration:run` 성공을 확인한다.
 - 운영 전환은 검증된 blue-green script의 reload·복구 순서를 따른다. 컨테이너 재생성으로 upstream 갱신이 필요하면 해당 운영 절차의 Nginx 검증·reload 또는 재시작을 수행한다.
 - 배포는 exact SHA의 CI/Deploy·active slot과 외부 `https://filmott.kr` HTTP 200을 확인한다. 필요한 API/UI/SSE·오류 확인을 함께 보고한다.
