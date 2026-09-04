@@ -142,12 +142,15 @@ describeWithDb('contents indexability integration', () => {
 
   it('Google sitemap 관찰 cohort를 신호와 투표 구간별로 겹치지 않게 분리해야 한다', async () => {
     const fixtures = createIntegrationFixtures(dataSource);
+    const createdAt = new Date('2026-09-01T00:00:00.000Z');
     const common = {
       posterUrl: '/poster.jpg',
       overview: '검색에 제공할 줄거리',
       releaseDate: new Date('2026-01-01T00:00:00.000Z'),
       voteCount: 0,
       watchProviders: null,
+      createdAt,
+      updatedAt: createdAt,
     };
     const provider = {
       flatrate: [
@@ -165,7 +168,12 @@ describeWithDb('contents indexability integration', () => {
       watchProviders: provider,
     });
     const reviewer = await fixtures.user();
-    await fixtures.review({ userId: reviewer.id, contentId: byReview.id });
+    await fixtures.review({
+      userId: reviewer.id,
+      contentId: byReview.id,
+      createdAt,
+      updatedAt: createdAt,
+    });
     const contentUpdatedAt = new Date('2026-09-04T00:00:00.000Z');
     await dataSource
       .getRepository(Content)
