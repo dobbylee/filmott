@@ -611,6 +611,8 @@ async function main(args = process.argv.slice(2)) {
       cpu: os.cpus()[0]?.model,
       logicalCpus: os.cpus().length,
       totalMemory: os.totalmem(),
+      execution:
+        'Node + ts-node transpile-only; fresh worker per scenario/variant/run',
     },
     db: { image: 'pgvector/pgvector:pg18', cpus: 2, memory: '768m', container },
     runs: { before: [], after: [] },
@@ -695,22 +697,27 @@ async function main(args = process.argv.slice(2)) {
     }
     assert(ready && !interrupted, '테스트 DB가 준비되지 않았습니다.');
     for (let run = 0; run < options.runs; run++) {
-      for (const variant of run % 2 === 0
-        ? ['before', 'after']
-        : ['after', 'before']) {
-        assert(!interrupted, '벤치마크가 중단됐습니다.');
-        worker = spawnWorker(sources[variant].root, {
-          TEST_DB_NAME: 'filmott_benchmark_test',
-          TEST_DB_HOST: '127.0.0.1',
-          TEST_DB_PORT: port,
-          TEST_DB_USERNAME: 'benchmark',
-          TEST_DB_PASSWORD: password,
-          FILMOTT_BENCHMARK_FAILURE: options.injectFailure ?? '',
-        });
-        const readyWorker = await worker.ready;
-        report.workers.push({ variant, run: run + 1, pid: readyWorker.pid });
-        write();
-        for (const scenario of options.selected) {
+      for (const scenario of options.selected) {
+        for (const variant of run % 2 === 0
+          ? ['before', 'after']
+          : ['after', 'before']) {
+          assert(!interrupted, '벤치마크가 중단됐습니다.');
+          worker = spawnWorker(sources[variant].root, {
+            TEST_DB_NAME: 'filmott_benchmark_test',
+            TEST_DB_HOST: '127.0.0.1',
+            TEST_DB_PORT: port,
+            TEST_DB_USERNAME: 'benchmark',
+            TEST_DB_PASSWORD: password,
+            FILMOTT_BENCHMARK_FAILURE: options.injectFailure ?? '',
+          });
+          const readyWorker = await worker.ready;
+          report.workers.push({
+            variant,
+            scenario,
+            run: run + 1,
+            pid: readyWorker.pid,
+          });
+          write();
           assert(!interrupted, '벤치마크가 중단됐습니다.');
           const result = {
             run: run + 1,
@@ -733,9 +740,9 @@ async function main(args = process.argv.slice(2)) {
             `${variant} ${run + 1}/${options.runs} ${scenario}: p50=${result.summary.p50Ms.toFixed(2)}ms p95=${result.summary.p95Ms.toFixed(2)}ms`,
           );
           write();
+          await worker.close();
+          worker = undefined;
         }
-        await worker.close();
-        worker = undefined;
       }
     }
     for (const [variant, source] of Object.entries(sources))
