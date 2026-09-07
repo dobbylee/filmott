@@ -1,0 +1,362 @@
+[
+  {
+    "method": "DELETE",
+    "path": "/api/reviews/:id",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/reviews/comments/:commentId",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/users/me",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/users/me/profile-image",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/watchlist/:id",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/google",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/google/callback",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/kakao",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/kakao/callback",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/naver",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/naver/callback",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/contents/:type/:tmdbId",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/contents/:type/:tmdbId/related",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/contents/adult-list",
+    "guards": ["JwtAuthGuard", "RolesGuard"],
+    "roles": ["ADMIN"]
+  },
+  {
+    "method": "GET",
+    "path": "/api/contents/discover",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/contents/person/:personId",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/contents/person/:personId/credits",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/contents/search",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/contents/sitemap",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/contents/sitemap/google/:cohort",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/rankings",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/rankings/unmatched",
+    "guards": ["JwtAuthGuard", "RolesGuard"],
+    "roles": ["ADMIN"]
+  },
+  {
+    "method": "GET",
+    "path": "/api/reviews",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/reviews/:id/comments",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/reviews/:id/stats",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/reviews/liked-ids",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/reviews/my",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/reviews/recent",
+    "guards": [],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/reviews/user/:userId",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/users/:id/profile",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/users/admin",
+    "guards": ["JwtAuthGuard", "RolesGuard"],
+    "roles": ["ADMIN"]
+  },
+  {
+    "method": "GET",
+    "path": "/api/users/check-nickname/:nickname",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/users/me",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/watchlist/me",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/watchlist/me/counts",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/watchlist/me/status",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/watchlist/me/want-to-watch",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/watchlist/me/watched",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/watchlist/me/watched-years",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/contents/adult",
+    "guards": ["JwtAuthGuard", "RolesGuard"],
+    "roles": ["ADMIN"]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/rankings/:id/poster",
+    "guards": ["JwtAuthGuard", "RolesGuard"],
+    "roles": ["ADMIN"]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/reviews/:id",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/users/admin/:id/status",
+    "guards": ["JwtAuthGuard", "RolesGuard"],
+    "roles": ["ADMIN"]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/users/me",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/users/me/otts",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/watchlist/:id",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/logout",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/refresh",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/social/complete-signup",
+    "guards": ["ThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/chat/messages",
+    "guards": ["OptionalJwtAuthGuard", "ChatThrottlerGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/contents/adult/block-person/:personId",
+    "guards": ["JwtAuthGuard", "RolesGuard"],
+    "roles": ["ADMIN"]
+  },
+  {
+    "method": "POST",
+    "path": "/api/rankings/refresh/:category",
+    "guards": ["JwtAuthGuard", "RolesGuard"],
+    "roles": ["ADMIN"]
+  },
+  {
+    "method": "POST",
+    "path": "/api/reviews",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/reviews/:id/comments",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/reviews/:id/like",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/users/me/profile-image",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/users/me/verify-password",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/watchlist",
+    "guards": ["JwtAuthGuard"],
+    "roles": []
+  }
+]
