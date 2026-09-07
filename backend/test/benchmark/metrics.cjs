@@ -100,7 +100,7 @@ function summarize(samples, worker, durationMs) {
   };
 }
 
-function compare(before, after) {
+function compare(before, after, labels = { before: 'before', after: 'after' }) {
   assert(
     before.length > 0 && before.length === after.length,
     '반복 수가 다릅니다.',
@@ -143,8 +143,8 @@ function compare(before, after) {
         0.5,
       );
       for (const [label, runs, median] of [
-        ['before', a, base],
-        ['after', b, candidate],
+        [labels.before, a, base],
+        [labels.after, b, candidate],
       ]) {
         if (
           runs.some(

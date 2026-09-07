@@ -17,6 +17,7 @@ const { DiscoveryService } = require('@nestjs/core');
 const { JwtService } = require('@nestjs/jwt');
 const { DataSource } = require('typeorm');
 const { scenarios } = require('./metrics.cjs');
+const { relatedVector } = require('./fixtures.cjs');
 const {
   completionResponse,
   embeddingResponse,
@@ -405,11 +406,9 @@ async function prepare(options) {
   await db.getRepository('Content').insert(contents);
   if (scenario.startsWith('related') || scenario.startsWith('chat')) {
     const metadata = contents.map((_, index) => {
-      const vector = Array.from({ length: 1536 }, () => 0.01);
-      if (scenario.startsWith('related')) {
-        vector[0] = 1;
-        vector[1] = (index + 1) / dataSize;
-      }
+      const vector = scenario.startsWith('related')
+        ? relatedVector(index, dataSize)
+        : Array.from({ length: 1536 }, () => 0.01);
       return {
         contentId: index + 1,
         description: '고정 metadata 설명',

@@ -27,7 +27,13 @@ function verifyDependencyRoot(root) {
 }
 const harnessHash = () =>
   sha256(
-    ['run.cjs', 'worker.cjs', 'metrics.cjs', '../contracts/openai-fixtures.ts']
+    [
+      'run.cjs',
+      'worker.cjs',
+      'metrics.cjs',
+      'fixtures.cjs',
+      '../contracts/openai-fixtures.ts',
+    ]
       .map((file) => readHash(path.join(__dirname, file)))
       .join('\n'),
   );
@@ -670,7 +676,15 @@ async function main(args = process.argv.slice(2)) {
       try {
         execFileSync(
           'docker',
-          ['exec', container, 'pg_isready', '-U', 'benchmark'],
+          [
+            'exec',
+            container,
+            'pg_isready',
+            '-h',
+            '127.0.0.1',
+            '-U',
+            'benchmark',
+          ],
           { stdio: 'ignore' },
         );
         ready = true;
@@ -742,7 +756,12 @@ async function main(args = process.argv.slice(2)) {
     );
     report.findings = compare(report.runs.before, report.runs.after);
     if (report.mode === 'A/A')
-      report.findings.push(...compare(report.runs.after, report.runs.before));
+      report.findings.push(
+        ...compare(report.runs.after, report.runs.before, {
+          before: 'after',
+          after: 'before',
+        }),
+      );
     report.findings = [...new Set(report.findings)];
     report.completeComparison =
       !options.smoke &&

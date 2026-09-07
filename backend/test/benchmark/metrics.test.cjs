@@ -18,9 +18,10 @@ const {
   requestDescriptor,
   validateResponse,
 } = require('./run.cjs');
+const { relatedVector } = require('./fixtures.cjs');
 
 test('runner·worker는 실행 없이 문법 검사를 통과해야 한다', () => {
-  for (const file of ['run.cjs', 'worker.cjs', 'metrics.cjs'])
+  for (const file of ['run.cjs', 'worker.cjs', 'metrics.cjs', 'fixtures.cjs'])
     execFileSync(process.execPath, ['--check', path.join(__dirname, file)]);
 });
 
@@ -183,4 +184,32 @@ test('별도 checkout의 의존성은 거부하고 동일 realpath의 snapshot�
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('related fixture는 고정 차원·norm과 구분 가능한 그룹 내 거리를 유지해야 한다', () => {
+  for (let group = 0; group < 142; group++) {
+    const vectors = Array.from({ length: 7 }, (_, index) =>
+      relatedVector(group * 7 + index, 1000),
+    );
+    for (let source = 0; source < 7; source++) {
+      const vector = vectors[source];
+      assert.equal(vector.length, 1536);
+      assert(Math.abs(vector[0] ** 2 + vector[1] ** 2 - 1) < 1e-12);
+      const distances = vectors
+        .filter((_, index) => index !== source)
+        .map((other) => 1 - (vector[0] * other[0] + vector[1] * other[1]))
+        .sort((a, b) => a - b);
+      for (let index = 1; index < distances.length; index++)
+        assert(distances[index] - distances[index - 1] > 1e-7);
+    }
+  }
+  assert.deepEqual(relatedVector(50, 1000), relatedVector(50, 1000));
+});
+
+test('A/A 역방향 비교에서도 불안정한 원래 cohort 이름을 유지해야 한다', () => {
+  const stable = Array.from({ length: 5 }, () => result());
+  const noisy = [result(), result(), result(), result(), result(8)];
+  const findings = compare(noisy, stable, { before: 'after', after: 'before' });
+  assert(findings.some((finding) => finding.includes('after p95Ms 반복')));
+  assert(!findings.some((finding) => finding.includes('before p95Ms 반복')));
 });
