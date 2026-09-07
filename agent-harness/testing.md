@@ -6,7 +6,7 @@
 
 | 적용 조건 | 명령 | 범위 |
 | --- | --- | --- |
-| backend 기본 | `npm run check:backend` | lint policy·lint·unit·HTTP boundary·build |
+| backend 기본 | `npm run check:backend` | lint policy·benchmark runner 검사·lint·unit·HTTP boundary·build |
 | frontend 기본 | `npm run check:frontend` | lint·typecheck·unit/MSW·runner 검사·격리 build |
 | 두 앱 기본 | `npm run check` | 위 두 기본 검사. DB/e2e/인프라 완료를 뜻하지 않음 |
 | 모든 backend 변경의 커밋 전 | 기본 + `npm --prefix backend run test:e2e` | 전체 Nest 앱·격리 PostgreSQL |
