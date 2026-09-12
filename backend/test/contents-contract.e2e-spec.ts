@@ -535,6 +535,35 @@ describe('콘텐츠 API 실제 HTTP·외부 응답·DB 계약', () => {
     },
   );
 
+  it('관련 작품 입력 오류의 메시지와 검증 순서를 DB 조회 없이 보존해야 한다', async () => {
+    const runners = jest.spyOn(db, 'createQueryRunner');
+    const cases = [
+      ['anime/0/related?limit=7', 'type은 "movie" 또는 "tv"만 허용됩니다.'],
+      ['movie/0/related?limit=7', '유효하지 않은 TMDB ID입니다.'],
+      ['movie/20000001/related', '유효하지 않은 TMDB ID입니다.'],
+      ['movie/123/related?limit=0', 'limit은 1에서 6 사이의 정수여야 합니다.'],
+      ['movie/123/related?limit=7', 'limit은 1에서 6 사이의 정수여야 합니다.'],
+      ['movie/1.5/related', 'Validation failed (numeric string is expected)'],
+      [
+        'movie/123/related?limit=1.5',
+        'Validation failed (numeric string is expected)',
+      ],
+    ];
+    try {
+      for (const [path, message] of cases) {
+        await request(harness.app.getHttpServer())
+          .get(`/api/contents/${path}`)
+          .expect(400, { message, error: 'Bad Request', statusCode: 400 });
+      }
+      expect(runners).not.toHaveBeenCalled();
+    } finally {
+      runners.mockRestore();
+    }
+    expect(harness.httpCalls).toEqual([]);
+    expect(harness.fetchCalls).toEqual([]);
+    expect(harness.s3Spy).not.toHaveBeenCalled();
+  });
+
   it('관련 작품은 실제 SQL로 source·adult를 제외하고 cache와 ID/limit 경계를 보존해야 한다', async () => {
     const base = { posterUrl: '/p.jpg', voteCount: 1000 };
     const source = await fixtures.content({ ...base, tmdbId: 101 });
@@ -557,7 +586,7 @@ describe('콘텐츠 API 실제 HTTP·외부 응답·DB 계약', () => {
     const firstQueryRunnerCount = runners.mock.calls.length;
     expect(firstQueryRunnerCount).toBeGreaterThan(0);
     await request(harness.app.getHttpServer())
-      .get('/api/contents/movie/101/related?limit=6')
+      .get('/api/contents/movie/101/related')
       .expect(200, first.body);
     expect(runners).toHaveBeenCalledTimes(firstQueryRunnerCount);
     runners.mockRestore();
@@ -572,5 +601,7 @@ describe('콘텐츠 API 실제 HTTP·외부 응답·DB 계약', () => {
         .expect(400);
     }
     expect(harness.httpCalls).toEqual([]);
+    expect(harness.fetchCalls).toEqual([]);
+    expect(harness.s3Spy).not.toHaveBeenCalled();
   });
 });

@@ -24,7 +24,6 @@ import {
 } from '../common/constants';
 import { RevalidateService } from '../common/revalidate.service';
 import { DISCOVER_TMDB_PROVIDER_IDS } from '../common/ott-providers';
-import { EmbeddingService } from '../embedding/embedding.service';
 import { buildSearchIndexableContentSql } from './search-indexable-content';
 
 const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000; // 5분
@@ -89,7 +88,6 @@ export class ContentsService {
     private readonly contentRepo: Repository<Content>,
     private readonly tmdbService: TmdbService,
     private readonly revalidateService: RevalidateService,
-    private readonly embeddingService: EmbeddingService,
   ) {}
 
   private canUseStalePersonCache(error: unknown): boolean {
@@ -352,18 +350,6 @@ export class ContentsService {
       }
     }
     return query;
-  }
-
-  async getRelatedContents(tmdbId: number, type: 'movie' | 'tv', limit = 6) {
-    this.assertValidTmdbId(tmdbId);
-    if (type !== 'movie' && type !== 'tv') {
-      throw new BadRequestException('type은 "movie" 또는 "tv"만 허용됩니다.');
-    }
-    if (!Number.isInteger(limit) || limit < 1 || limit > 6) {
-      throw new BadRequestException('limit은 1에서 6 사이의 정수여야 합니다.');
-    }
-
-    return this.embeddingService.findRelatedContents(tmdbId, type, limit);
   }
 
   private assertValidTmdbId(tmdbId: number): void {

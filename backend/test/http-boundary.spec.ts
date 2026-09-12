@@ -18,7 +18,9 @@ import { ContentsService } from '../src/contents/contents.service';
 import { Content } from '../src/contents/content.entity';
 import { TmdbService } from '../src/tmdb/tmdb.service';
 import { RevalidateService } from '../src/common/revalidate.service';
-import { EmbeddingService } from '../src/embedding/embedding.service';
+import { DataSource } from 'typeorm';
+import { RelatedContentsController } from '../src/recommendation/related-contents.controller';
+import { RelatedContentService } from '../src/recommendation/related-content.service';
 import { ReviewsController } from '../src/reviews/reviews.controller';
 import { ReviewsService } from '../src/reviews/reviews.service';
 import { ReviewCommentsService } from '../src/reviews/review-comments.service';
@@ -89,6 +91,7 @@ describe('HTTP boundary smoke', () => {
       imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }])],
       controllers: [
         ContentsController,
+        RelatedContentsController,
         ReviewsController,
         ValidationProbeController,
       ],
@@ -97,10 +100,8 @@ describe('HTTP boundary smoke', () => {
         { provide: getRepositoryToken(Content), useValue: contentRepo },
         { provide: TmdbService, useValue: tmdbService },
         { provide: RevalidateService, useValue: revalidateService },
-        {
-          provide: EmbeddingService,
-          useValue: { findRelatedContents: jest.fn() },
-        },
+        RelatedContentService,
+        { provide: DataSource, useValue: { transaction: jest.fn() } },
         { provide: ReviewsService, useValue: reviewsService },
         { provide: ReviewCommentsService, useValue: reviewCommentsService },
         {

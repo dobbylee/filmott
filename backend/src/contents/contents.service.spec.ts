@@ -9,7 +9,6 @@ import { ContentsService } from './contents.service';
 import { Content } from './content.entity';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { RevalidateService } from '../common/revalidate.service';
-import { EmbeddingService } from '../embedding/embedding.service';
 import { AxiosError, AxiosHeaders } from 'axios';
 describe('ContentsService', () => {
   let service: ContentsService;
@@ -54,10 +53,6 @@ describe('ContentsService', () => {
     revalidatePaths: jest.fn().mockResolvedValue(undefined),
   };
 
-  const mockEmbeddingService = {
-    findRelatedContents: jest.fn(),
-  };
-
   const makeConnectionResetError = () =>
     new AxiosError('read ECONNRESET', 'ECONNRESET', {
       headers: new AxiosHeaders(),
@@ -85,7 +80,6 @@ describe('ContentsService', () => {
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },
         { provide: TmdbService, useValue: mockTmdbService },
         { provide: RevalidateService, useValue: mockRevalidateService },
-        { provide: EmbeddingService, useValue: mockEmbeddingService },
       ],
     }).compile();
 
@@ -572,61 +566,6 @@ describe('ContentsService', () => {
       );
 
       expect(mockTmdbService.getDetails).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('getRelatedContents', () => {
-    it('저장된 embedding 기반 관련 작품 조회를 위임해야 한다', async () => {
-      const related = [
-        {
-          tmdbId: 124,
-          contentType: 'movie' as const,
-          title: '관련 작품',
-          posterUrl: '/related.jpg',
-          releaseDate: '2026-01-01',
-          voteAverage: 8.2,
-        },
-      ];
-      mockEmbeddingService.findRelatedContents.mockResolvedValue(related);
-
-      await expect(
-        service.getRelatedContents(123, 'movie', 6),
-      ).resolves.toEqual(related);
-      expect(mockEmbeddingService.findRelatedContents).toHaveBeenCalledWith(
-        123,
-        'movie',
-        6,
-      );
-    });
-
-    it.each([0, 7, 1.5])('limit=%s를 거부해야 한다', async (limit) => {
-      await expect(
-        service.getRelatedContents(123, 'movie', limit),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockEmbeddingService.findRelatedContents).not.toHaveBeenCalled();
-    });
-
-    it('limit을 생략하면 최대 조회 개수 6을 사용해야 한다', async () => {
-      mockEmbeddingService.findRelatedContents.mockResolvedValue([]);
-
-      await service.getRelatedContents(123, 'tv');
-
-      expect(mockEmbeddingService.findRelatedContents).toHaveBeenCalledWith(
-        123,
-        'tv',
-        6,
-      );
-    });
-
-    it('지원하지 않는 content type을 거부해야 한다', async () => {
-      await expect(
-        service.getRelatedContents(
-          123,
-          'anime' as unknown as 'movie' | 'tv',
-          6,
-        ),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockEmbeddingService.findRelatedContents).not.toHaveBeenCalled();
     });
   });
 

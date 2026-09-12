@@ -1,10 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
-import { Content } from '../../src/contents/content.entity';
-import { EmbeddingService } from '../../src/embedding/embedding.service';
-import { ContentMetadata } from '../../src/embedding/entities/content-metadata.entity';
+import { RelatedContentService } from '../../src/recommendation/related-content.service';
 import {
   createIntegrationDataSource,
   hasIntegrationDatabaseConfig,
@@ -26,32 +22,20 @@ function createDirectionalVector(
   return `[${values.join(',')}]`;
 }
 
-describeWithDb('related contents integration', () => {
+describeWithDb('관련 작품 실제 DB 조회', () => {
   let dataSource: DataSource;
   let moduleRef: TestingModule;
-  let service: EmbeddingService;
+  let service: RelatedContentService;
 
   beforeAll(async () => {
     dataSource = await createIntegrationDataSource();
     moduleRef = await Test.createTestingModule({
       providers: [
-        EmbeddingService,
-        {
-          provide: getRepositoryToken(ContentMetadata),
-          useValue: dataSource.getRepository(ContentMetadata),
-        },
-        {
-          provide: getRepositoryToken(Content),
-          useValue: dataSource.getRepository(Content),
-        },
-        {
-          provide: ConfigService,
-          useValue: { get: () => '' },
-        },
+        RelatedContentService,
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
-    service = moduleRef.get(EmbeddingService);
+    service = moduleRef.get(RelatedContentService);
   });
 
   beforeEach(async () => {
