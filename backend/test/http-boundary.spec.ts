@@ -1,3 +1,4 @@
+import { AdultContentService } from '../src/contents/services/adult-content.service';
 import { ContentCatalogService } from '../src/contents/services/content-catalog.service';
 import { ContentIndexingService } from '../src/contents/services/content-indexing.service';
 import {
@@ -99,6 +100,7 @@ describe('HTTP boundary smoke', () => {
       ],
       providers: [
         ContentsService,
+        AdultContentService,
         ContentCatalogService,
         ContentIndexingService,
         { provide: getRepositoryToken(Content), useValue: contentRepo },

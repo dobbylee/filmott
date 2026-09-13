@@ -1,3 +1,4 @@
+import { AdultContentService } from './services/adult-content.service';
 import { ContentCatalogService } from './services/content-catalog.service';
 import { ContentIndexingService } from './services/content-indexing.service';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -79,6 +80,7 @@ describe('ContentsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ContentsService,
+        AdultContentService,
         ContentCatalogService,
         ContentIndexingService,
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },

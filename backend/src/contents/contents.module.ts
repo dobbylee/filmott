@@ -1,3 +1,4 @@
+import { AdultContentService } from './services/adult-content.service';
 import { ContentCatalogService } from './services/content-catalog.service';
 import { ContentIndexingService } from './services/content-indexing.service';
 import { Module } from '@nestjs/common';
@@ -11,7 +12,12 @@ import { CommonModule } from '../common/common.module';
 @Module({
   imports: [TypeOrmModule.forFeature([Content]), TmdbModule, CommonModule],
   controllers: [ContentsController],
-  providers: [ContentsService, ContentIndexingService, ContentCatalogService],
+  providers: [
+    AdultContentService,
+    ContentsService,
+    ContentIndexingService,
+    ContentCatalogService,
+  ],
   exports: [ContentsService, ContentCatalogService],
 })
 export class ContentsModule {}
