@@ -1,3 +1,4 @@
+import { ContentIndexingService } from '../../src/contents/services/content-indexing.service';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -26,6 +27,7 @@ describeWithDb('contents indexability integration', () => {
     moduleRef = await Test.createTestingModule({
       providers: [
         ContentsService,
+        ContentIndexingService,
         {
           provide: getRepositoryToken(Content),
           useValue: dataSource.getRepository(Content),

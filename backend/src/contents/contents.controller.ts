@@ -10,7 +10,8 @@ import {
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
-import { ContentsService, isGoogleSitemapCohort } from './contents.service';
+import { ContentsService } from './contents.service';
+import { isGoogleSitemapCohort } from './services/content-indexing.service';
 import { SearchContentsDto } from './dto/search-contents.dto';
 import { DiscoverContentsDto } from './dto/discover-contents.dto';
 import { ToggleAdultDto } from './dto/toggle-adult.dto';

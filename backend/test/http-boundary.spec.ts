@@ -1,3 +1,4 @@
+import { ContentIndexingService } from '../src/contents/services/content-indexing.service';
 import {
   Body,
   Controller,
@@ -97,6 +98,7 @@ describe('HTTP boundary smoke', () => {
       ],
       providers: [
         ContentsService,
+        ContentIndexingService,
         { provide: getRepositoryToken(Content), useValue: contentRepo },
         { provide: TmdbService, useValue: tmdbService },
         { provide: RevalidateService, useValue: revalidateService },

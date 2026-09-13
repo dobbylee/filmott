@@ -1,3 +1,4 @@
+import { ContentIndexingService } from './services/content-indexing.service';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Content } from './content.entity';
@@ -9,7 +10,7 @@ import { CommonModule } from '../common/common.module';
 @Module({
   imports: [TypeOrmModule.forFeature([Content]), TmdbModule, CommonModule],
   controllers: [ContentsController],
-  providers: [ContentsService],
+  providers: [ContentsService, ContentIndexingService],
   exports: [ContentsService],
 })
 export class ContentsModule {}
