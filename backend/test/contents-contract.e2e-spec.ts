@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { Content } from '../src/contents/content.entity';
-import { ContentsService } from '../src/contents/contents.service';
+import { ContentCatalogService } from '../src/contents/services/content-catalog.service';
 import { UserRole } from '../src/users/enums/user-role.enum';
 import { createContractApp } from './contracts/contract-app';
 import { createIntegrationFixtures } from './integration/helpers/fixtures';
@@ -275,7 +275,9 @@ describe('콘텐츠 API 실제 HTTP·외부 응답·DB 계약', () => {
     // 현재 background 소유자의 실제 promise를 관찰한다. 업무 결과는 대체하지 않는다.
     // 책임 이동 시 이 관찰 경계만 옮기고 HTTP·저장 결과 기대값은 유지한다.
     const background = jest.spyOn(
-      harness.app.get<ContentsService>(ContentsService) as unknown as {
+      harness.app.get<ContentCatalogService>(
+        ContentCatalogService,
+      ) as unknown as {
         fetchAndSave(
           id: number,
           type: 'movie' | 'tv',

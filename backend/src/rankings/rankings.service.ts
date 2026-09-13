@@ -11,7 +11,7 @@ import { Cron } from '@nestjs/schedule';
 import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
-import { ContentsService } from '../contents/contents.service';
+import { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 import { RevalidateService } from '../common/revalidate.service';
 import { Content } from '../contents/content.entity';
@@ -50,7 +50,7 @@ export class RankingsService {
     private readonly rankingRepo: Repository<Ranking>,
     private readonly kobisService: KobisService,
     private readonly tmdbService: TmdbService,
-    private readonly contentsService: ContentsService,
+    private readonly contentCatalogService: ContentCatalogService,
     private readonly embeddingService: EmbeddingService,
     private readonly revalidateService: RevalidateService,
   ) {}
@@ -479,7 +479,7 @@ export class RankingsService {
       for (const item of trendingData.results) {
         const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
         try {
-          const value = await this.contentsService.findOrFetchByTmdbId(
+          const value = await this.contentCatalogService.findOrFetchByTmdbId(
             item.id,
             mediaType,
           );
@@ -678,7 +678,7 @@ export class RankingsService {
       const bestMatch = matched ?? searchResult.results[0];
 
       // contents 테이블에 캐싱
-      const content = await this.contentsService.findOrFetchByTmdbId(
+      const content = await this.contentCatalogService.findOrFetchByTmdbId(
         bestMatch.id,
         'movie',
       );
@@ -784,7 +784,7 @@ export class RankingsService {
       let failCount = 0;
       for (const item of allResults) {
         try {
-          const content = await this.contentsService.findOrFetchByTmdbId(
+          const content = await this.contentCatalogService.findOrFetchByTmdbId(
             item.id,
             'tv',
           );

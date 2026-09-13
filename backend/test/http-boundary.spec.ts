@@ -1,3 +1,4 @@
+import { ContentCatalogService } from '../src/contents/services/content-catalog.service';
 import { ContentIndexingService } from '../src/contents/services/content-indexing.service';
 import {
   Body,
@@ -98,6 +99,7 @@ describe('HTTP boundary smoke', () => {
       ],
       providers: [
         ContentsService,
+        ContentCatalogService,
         ContentIndexingService,
         { provide: getRepositoryToken(Content), useValue: contentRepo },
         { provide: TmdbService, useValue: tmdbService },

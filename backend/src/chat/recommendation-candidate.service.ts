@@ -1,3 +1,4 @@
+import { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ContentsService } from '../contents/contents.service';
@@ -39,6 +40,7 @@ export class RecommendationCandidateService {
     private readonly embeddingService: EmbeddingService,
     private readonly contentsService: ContentsService,
     private readonly dataSource: DataSource,
+    private readonly contentCatalogService: ContentCatalogService,
   ) {}
 
   selectConfirmedRecommendationCandidates(
@@ -299,7 +301,7 @@ export class RecommendationCandidateService {
 
     if (!firstMatch) return null;
 
-    const content = await this.contentsService.findOrFetchByTmdbId(
+    const content = await this.contentCatalogService.findOrFetchByTmdbId(
       firstMatch.id,
       firstMatch.type,
       ...signalArgs,

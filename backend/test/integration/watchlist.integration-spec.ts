@@ -7,7 +7,7 @@ import { DataSource } from 'typeorm';
 import { WatchlistModule } from '../../src/watchlist/watchlist.module';
 import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 import type { JwtPayload } from '../../src/auth/decorators/current-user.decorator';
-import { ContentsService } from '../../src/contents/contents.service';
+import { ContentCatalogService } from '../../src/contents/services/content-catalog.service';
 import { Watchlist } from '../../src/watchlist/watchlist.entity';
 import {
   hasIntegrationDatabaseConfig,
@@ -27,7 +27,7 @@ describeWithDb('watchlist integration', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let currentUser: JwtPayload;
-  const contentsService = {
+  const contentCatalogService = {
     findOrFetchByTmdbId: jest.fn(),
   };
   const authGuard: CanActivate = {
@@ -45,8 +45,8 @@ describeWithDb('watchlist integration', () => {
         builder
           .overrideGuard(JwtAuthGuard)
           .useValue(authGuard)
-          .overrideProvider(ContentsService)
-          .useValue(contentsService),
+          .overrideProvider(ContentCatalogService)
+          .useValue(contentCatalogService),
     });
     dataSource = app.get(DataSource);
   });
@@ -72,7 +72,7 @@ describeWithDb('watchlist integration', () => {
     });
     await fixtures.review({ userId: user.id, contentId: content.id });
     currentUser = { id: user.id, nickname: user.nickname, role: user.role };
-    contentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+    contentCatalogService.findOrFetchByTmdbId.mockResolvedValue(content);
 
     const response = await requestIntegrationApp(
       app,

@@ -1,3 +1,4 @@
+import { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -218,6 +219,7 @@ describe('ChatService', () => {
         { provide: ContentSearchService, useValue: mockContentSearchService },
         { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
         { provide: ContentsService, useValue: mockContentsService },
+        { provide: ContentCatalogService, useValue: mockContentsService },
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
@@ -1621,6 +1623,7 @@ describe('ChatService', () => {
             useValue: mockIntentAnalyzerService,
           },
           { provide: ContentsService, useValue: mockContentsService },
+          { provide: ContentCatalogService, useValue: mockContentsService },
           {
             provide: getRepositoryToken(Watchlist),
             useValue: mockWatchlistRepo,

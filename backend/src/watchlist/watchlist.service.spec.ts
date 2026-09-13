@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { WatchlistService } from './watchlist.service';
 import { Watchlist } from './watchlist.entity';
-import { ContentsService } from '../contents/contents.service';
+import { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { Review } from '../reviews/review.entity';
 import { RevalidateService } from '../common/revalidate.service';
 
@@ -35,7 +35,7 @@ describe('WatchlistService', () => {
     remove: jest.fn(),
   };
 
-  const mockContentsService = {
+  const mockContentCatalogService = {
     findOrFetchByTmdbId: jest.fn(),
   };
 
@@ -51,7 +51,7 @@ describe('WatchlistService', () => {
         WatchlistService,
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
-        { provide: ContentsService, useValue: mockContentsService },
+        { provide: ContentCatalogService, useValue: mockContentCatalogService },
         { provide: RevalidateService, useValue: mockRevalidateService },
       ],
     }).compile();
@@ -81,7 +81,7 @@ describe('WatchlistService', () => {
 
     it('새 워치리스트 항목을 생성해야 한다', async () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue(content);
       mockWatchlistRepo.findOne.mockResolvedValue(null);
       const created = {
         id: 1,
@@ -95,10 +95,9 @@ describe('WatchlistService', () => {
 
       const result = await service.addToWatchlist(1, dto);
 
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
-        550,
-        'movie',
-      );
+      expect(
+        mockContentCatalogService.findOrFetchByTmdbId,
+      ).toHaveBeenCalledWith(550, 'movie');
       expect(mockWatchlistRepo.create).toHaveBeenCalledWith({
         userId: 1,
         contentId: 1,
@@ -110,7 +109,7 @@ describe('WatchlistService', () => {
 
     it('리뷰가 있는 작품은 감상할 작품으로 등록할 수 없어야 한다', async () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue(content);
       mockReviewRepo.findOne.mockResolvedValue({ id: 10 });
 
       await expect(service.addToWatchlist(1, dto)).rejects.toThrow(
@@ -122,7 +121,7 @@ describe('WatchlistService', () => {
 
     it('status가 watched이면 watchedAt을 설정해야 한다', async () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue(content);
       mockWatchlistRepo.findOne.mockResolvedValue(null);
 
       const watchedDto = {
@@ -153,7 +152,7 @@ describe('WatchlistService', () => {
 
     it('기존 워치리스트 항목을 업데이트해야 한다 (upsert)', async () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue(content);
 
       const existing = {
         id: 5,
@@ -177,7 +176,7 @@ describe('WatchlistService', () => {
 
     it('기존 watched 항목에서 watchedAt이 주어지면 해당 날짜로 업데이트해야 한다', async () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue(content);
 
       const existing = {
         id: 5,
@@ -204,7 +203,7 @@ describe('WatchlistService', () => {
 
     it('기존 항목을 want_to_watch로 업데이트하면 watchedAt이 null이어야 한다', async () => {
       const content = { id: 1, tmdbId: 550, contentType: 'movie' };
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(content);
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue(content);
 
       const existing = {
         id: 5,

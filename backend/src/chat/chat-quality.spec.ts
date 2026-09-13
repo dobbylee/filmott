@@ -1,3 +1,4 @@
+import type { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { DataSource } from 'typeorm';
 import type { ContentsService } from '../contents/contents.service';
 import type { ContentSearchFilters } from './content-search.service';
@@ -42,6 +43,7 @@ function createRecommendationCandidateService(): RecommendationCandidateService 
     embeddingService,
     contentsService,
     dataSource,
+    {} as ContentCatalogService,
   );
 }
 

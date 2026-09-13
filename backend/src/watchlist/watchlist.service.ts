@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Watchlist } from './watchlist.entity';
 import { Review } from '../reviews/review.entity';
-import { ContentsService } from '../contents/contents.service';
+import { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { AddToWatchlistDto } from './dto/add-to-watchlist.dto';
 import { UpdateWatchlistDto } from './dto/update-watchlist.dto';
 import { RevalidateService } from '../common/revalidate.service';
@@ -28,7 +28,7 @@ export class WatchlistService {
     private readonly watchlistRepo: Repository<Watchlist>,
     @InjectRepository(Review)
     private readonly reviewRepo: Repository<Review>,
-    private readonly contentsService: ContentsService,
+    private readonly contentCatalogService: ContentCatalogService,
     private readonly revalidateService: RevalidateService,
   ) {}
 
@@ -40,7 +40,7 @@ export class WatchlistService {
     dto: AddToWatchlistDto,
   ): Promise<Watchlist> {
     // Ensure content exists in DB
-    const content = await this.contentsService.findOrFetchByTmdbId(
+    const content = await this.contentCatalogService.findOrFetchByTmdbId(
       dto.tmdbId,
       dto.contentType,
     );

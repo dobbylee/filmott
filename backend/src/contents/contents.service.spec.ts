@@ -1,3 +1,4 @@
+import { ContentCatalogService } from './services/content-catalog.service';
 import { ContentIndexingService } from './services/content-indexing.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -78,6 +79,7 @@ describe('ContentsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ContentsService,
+        ContentCatalogService,
         ContentIndexingService,
         { provide: getRepositoryToken(Content), useValue: mockContentRepo },
         { provide: TmdbService, useValue: mockTmdbService },

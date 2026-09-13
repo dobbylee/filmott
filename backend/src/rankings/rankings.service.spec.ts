@@ -7,7 +7,7 @@ import { RankingsService } from './rankings.service';
 import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
-import { ContentsService } from '../contents/contents.service';
+import { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 import { RevalidateService } from '../common/revalidate.service';
 
@@ -39,7 +39,7 @@ describe('RankingsService', () => {
     discoverByFilters: jest.fn(),
   };
 
-  const mockContentsService = {
+  const mockContentCatalogService = {
     findOrFetchByTmdbId: jest.fn(),
   };
 
@@ -60,7 +60,7 @@ describe('RankingsService', () => {
         { provide: getRepositoryToken(Ranking), useValue: mockRankingRepo },
         { provide: KobisService, useValue: mockKobisService },
         { provide: TmdbService, useValue: mockTmdbService },
-        { provide: ContentsService, useValue: mockContentsService },
+        { provide: ContentCatalogService, useValue: mockContentCatalogService },
         { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: RevalidateService, useValue: mockRevalidateService },
       ],
@@ -109,7 +109,9 @@ describe('RankingsService', () => {
         tmdbId: 999,
         posterUrl: 'https://image.tmdb.org/t/p/w500/poster.jpg',
       };
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue(cachedContent);
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue(
+        cachedContent,
+      );
 
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
@@ -763,7 +765,7 @@ describe('RankingsService', () => {
 
       const movieContent = { id: 10, tmdbId: 100 };
       const tvContent = { id: 20, tmdbId: 200 };
-      mockContentsService.findOrFetchByTmdbId
+      mockContentCatalogService.findOrFetchByTmdbId
         .mockResolvedValueOnce(movieContent)
         .mockResolvedValueOnce(tvContent);
 
@@ -778,7 +780,9 @@ describe('RankingsService', () => {
       expect(result[0].targetDate).toBeDefined();
       expect(result[1].targetDate).toBeDefined();
       expect(mockTmdbService.getTrending).toHaveBeenCalledWith('all', 'day');
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledTimes(2);
+      expect(
+        mockContentCatalogService.findOrFetchByTmdbId,
+      ).toHaveBeenCalledTimes(2);
       expect(mockRankingRepo.upsert).toHaveBeenCalledWith(expect.any(Array), [
         'source',
         'category',
@@ -800,7 +804,9 @@ describe('RankingsService', () => {
       };
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 10,
+      });
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
       }));
@@ -827,7 +833,7 @@ describe('RankingsService', () => {
       };
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
-      mockContentsService.findOrFetchByTmdbId.mockRejectedValue(
+      mockContentCatalogService.findOrFetchByTmdbId.mockRejectedValue(
         new Error('TMDB error'),
       );
 
@@ -883,10 +889,12 @@ describe('RankingsService', () => {
           results: [{ id: 100, title: name, release_date: '2026-03-01' }],
         };
       });
-      mockContentsService.findOrFetchByTmdbId.mockImplementation(async () => {
-        callOrder.push('cache');
-        return { id: 1, posterUrl: '/poster.jpg' };
-      });
+      mockContentCatalogService.findOrFetchByTmdbId.mockImplementation(
+        async () => {
+          callOrder.push('cache');
+          return { id: 1, posterUrl: '/poster.jpg' };
+        },
+      );
 
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
@@ -1133,7 +1141,9 @@ describe('RankingsService', () => {
       };
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 10,
+      });
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
       }));
@@ -1162,7 +1172,9 @@ describe('RankingsService', () => {
       };
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 10,
+      });
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
       }));
@@ -1186,7 +1198,9 @@ describe('RankingsService', () => {
       };
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 10,
+      });
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
       }));
@@ -1215,7 +1229,9 @@ describe('RankingsService', () => {
         })
         .mockRejectedValueOnce(new Error('TMDB 일시 장애'));
 
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 10,
+      });
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
       }));
@@ -1244,7 +1260,9 @@ describe('RankingsService', () => {
         })
         .mockRejectedValueOnce(trendingError);
 
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 10 });
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 10,
+      });
       mockRankingRepo.create.mockImplementation((data: object) => ({
         ...data,
       }));
@@ -1280,7 +1298,7 @@ describe('RankingsService', () => {
       mockTmdbService.searchByType.mockResolvedValue({
         results: [{ id: 999, title: 'Test Movie', release_date: '2026-03-01' }],
       });
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue({
         id: 42,
         posterUrl: '/poster.jpg',
       });
@@ -1344,7 +1362,7 @@ describe('RankingsService', () => {
       };
 
       mockTmdbService.getTrending.mockResolvedValue(trendingData);
-      mockContentsService.findOrFetchByTmdbId
+      mockContentCatalogService.findOrFetchByTmdbId
         .mockResolvedValueOnce({
           id: 10,
           watchProviders: {
@@ -1410,7 +1428,7 @@ describe('RankingsService', () => {
           { id: 888, title: 'Weekly Movie', release_date: '2026-03-01' },
         ],
       });
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue({
         id: 55,
         posterUrl: '/poster.jpg',
       });
@@ -1447,7 +1465,7 @@ describe('RankingsService', () => {
         .mockResolvedValueOnce(page1)
         .mockResolvedValueOnce(page2);
 
-      mockContentsService.findOrFetchByTmdbId
+      mockContentCatalogService.findOrFetchByTmdbId
         .mockResolvedValueOnce({ id: 101 })
         .mockResolvedValueOnce({ id: 102 })
         .mockResolvedValueOnce({ id: 103 });
@@ -1470,19 +1488,18 @@ describe('RankingsService', () => {
         }),
       );
 
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledTimes(3);
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
-        1001,
-        'tv',
-      );
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
-        1002,
-        'tv',
-      );
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
-        1003,
-        'tv',
-      );
+      expect(
+        mockContentCatalogService.findOrFetchByTmdbId,
+      ).toHaveBeenCalledTimes(3);
+      expect(
+        mockContentCatalogService.findOrFetchByTmdbId,
+      ).toHaveBeenCalledWith(1001, 'tv');
+      expect(
+        mockContentCatalogService.findOrFetchByTmdbId,
+      ).toHaveBeenCalledWith(1002, 'tv');
+      expect(
+        mockContentCatalogService.findOrFetchByTmdbId,
+      ).toHaveBeenCalledWith(1003, 'tv');
     });
 
     it('캐싱 성공한 contentId로 metadata 캐싱을 호출해야 한다', async () => {
@@ -1490,7 +1507,9 @@ describe('RankingsService', () => {
         .mockResolvedValueOnce({ results: [{ id: 2001 }] })
         .mockResolvedValueOnce({ results: [] });
 
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({ id: 201 });
+      mockContentCatalogService.findOrFetchByTmdbId.mockResolvedValue({
+        id: 201,
+      });
 
       await service.fetchKoreanTvDiscover();
 
@@ -1506,7 +1525,7 @@ describe('RankingsService', () => {
         })
         .mockResolvedValueOnce({ results: [] });
 
-      mockContentsService.findOrFetchByTmdbId
+      mockContentCatalogService.findOrFetchByTmdbId
         .mockRejectedValueOnce(new Error('TMDB error'))
         .mockResolvedValueOnce({ id: 301 });
 
@@ -1550,7 +1569,9 @@ describe('RankingsService', () => {
 
       await service.fetchKoreanTvDiscover();
 
-      expect(mockContentsService.findOrFetchByTmdbId).not.toHaveBeenCalled();
+      expect(
+        mockContentCatalogService.findOrFetchByTmdbId,
+      ).not.toHaveBeenCalled();
       expect(
         mockEmbeddingService.batchCacheByContentIds,
       ).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+import type { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { ConfigService } from '@nestjs/config';
 import type { Repository } from 'typeorm';
 import type { ContentsService } from '../contents/contents.service';
@@ -95,6 +96,7 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         embeddingService,
         contentsService,
         dataSource,
+        {} as ContentCatalogService,
       );
       const userRepository = {
         findOne: jest.fn().mockResolvedValue({
