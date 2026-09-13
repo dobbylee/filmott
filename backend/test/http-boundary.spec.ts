@@ -1,3 +1,4 @@
+import { PersonCatalogService } from '../src/contents/services/person-catalog.service';
 import { ContentDiscoveryService } from '../src/contents/services/content-discovery.service';
 import { AdultContentService } from '../src/contents/services/adult-content.service';
 import { ContentCatalogService } from '../src/contents/services/content-catalog.service';
@@ -18,7 +19,6 @@ import { EventEmitter } from 'events';
 import { createRequest, createResponse } from 'node-mocks-http';
 import type { Request, Response } from 'express';
 import { ContentsController } from '../src/contents/contents.controller';
-import { ContentsService } from '../src/contents/contents.service';
 import { Content } from '../src/contents/content.entity';
 import { TmdbService } from '../src/tmdb/tmdb.service';
 import { RevalidateService } from '../src/common/revalidate.service';
@@ -100,7 +100,7 @@ describe('HTTP boundary smoke', () => {
         ValidationProbeController,
       ],
       providers: [
-        ContentsService,
+        PersonCatalogService,
         ContentDiscoveryService,
         AdultContentService,
         ContentCatalogService,

@@ -1,14 +1,18 @@
+import { ContentCatalogService } from './services/content-catalog.service';
+import { ContentIndexingService } from './services/content-indexing.service';
+import { AdultContentService } from './services/adult-content.service';
+import { ContentDiscoveryService } from './services/content-discovery.service';
+import { PersonCatalogService } from './services/person-catalog.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { ContentsController } from './contents.controller';
-import { ContentsService } from './contents.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 
 describe('ContentsController', () => {
   let controller: ContentsController;
 
-  const mockContentsService = {
+  const mockContentServices = {
     searchContents: jest.fn(),
     getContentDetail: jest.fn(),
     discoverContents: jest.fn(),
@@ -24,7 +28,13 @@ describe('ContentsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ContentsController],
-      providers: [{ provide: ContentsService, useValue: mockContentsService }],
+      providers: [
+        { provide: ContentCatalogService, useValue: mockContentServices },
+        { provide: ContentIndexingService, useValue: mockContentServices },
+        { provide: AdultContentService, useValue: mockContentServices },
+        { provide: ContentDiscoveryService, useValue: mockContentServices },
+        { provide: PersonCatalogService, useValue: mockContentServices },
+      ],
     }).compile();
 
     controller = module.get<ContentsController>(ContentsController);
@@ -42,11 +52,11 @@ describe('ContentsController', () => {
         total_results: 0,
         results: [],
       };
-      mockContentsService.searchContents.mockResolvedValue(searchResult);
+      mockContentServices.searchContents.mockResolvedValue(searchResult);
 
       await controller.search({ q: 'test', type: 'movie', page: '2' });
 
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
+      expect(mockContentServices.searchContents).toHaveBeenCalledWith(
         'test',
         'movie',
         2,
@@ -60,11 +70,11 @@ describe('ContentsController', () => {
         total_results: 0,
         results: [],
       };
-      mockContentsService.searchContents.mockResolvedValue(searchResult);
+      mockContentServices.searchContents.mockResolvedValue(searchResult);
 
       await controller.search({ q: 'test' });
 
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
+      expect(mockContentServices.searchContents).toHaveBeenCalledWith(
         'test',
         undefined,
         1,
@@ -80,7 +90,7 @@ describe('ContentsController', () => {
         total_results: 0,
         results: [],
       };
-      mockContentsService.discoverContents.mockResolvedValue(discoverResult);
+      mockContentServices.discoverContents.mockResolvedValue(discoverResult);
 
       await controller.discover({
         type: 'tv',
@@ -90,7 +100,7 @@ describe('ContentsController', () => {
         page: '3',
       });
 
-      expect(mockContentsService.discoverContents).toHaveBeenCalledWith('tv', {
+      expect(mockContentServices.discoverContents).toHaveBeenCalledWith('tv', {
         genres: '18,28',
         providers: '8',
         year: 2024,
@@ -106,11 +116,11 @@ describe('ContentsController', () => {
         total_results: 0,
         results: [],
       };
-      mockContentsService.discoverContents.mockResolvedValue(discoverResult);
+      mockContentServices.discoverContents.mockResolvedValue(discoverResult);
 
       await controller.discover({});
 
-      expect(mockContentsService.discoverContents).toHaveBeenCalledWith(
+      expect(mockContentServices.discoverContents).toHaveBeenCalledWith(
         'movie',
         {
           genres: undefined,
@@ -126,11 +136,11 @@ describe('ContentsController', () => {
   describe('getDetail', () => {
     it('파싱된 tmdbId로 getContentDetail을 호출해야 한다', async () => {
       const detailResult = { id: 1, tmdbId: 123, title: 'Test' };
-      mockContentsService.getContentDetail.mockResolvedValue(detailResult);
+      mockContentServices.getContentDetail.mockResolvedValue(detailResult);
 
       await controller.getDetail('movie', 123);
 
-      expect(mockContentsService.getContentDetail).toHaveBeenCalledWith(
+      expect(mockContentServices.getContentDetail).toHaveBeenCalledWith(
         123,
         'movie',
       );
@@ -157,12 +167,12 @@ describe('ContentsController', () => {
   describe('getGoogleSitemapContents', () => {
     it('허용된 Google sitemap cohort를 서비스에 전달해야 한다', async () => {
       const contents = [{ tmdbId: 123, contentType: 'movie' }];
-      mockContentsService.getGoogleSitemapContents.mockResolvedValue(contents);
+      mockContentServices.getGoogleSitemapContents.mockResolvedValue(contents);
 
       await expect(
         controller.getGoogleSitemapContents('filmott-signal'),
       ).resolves.toEqual(contents);
-      expect(mockContentsService.getGoogleSitemapContents).toHaveBeenCalledWith(
+      expect(mockContentServices.getGoogleSitemapContents).toHaveBeenCalledWith(
         'filmott-signal',
       );
     });
@@ -172,7 +182,7 @@ describe('ContentsController', () => {
         controller.getGoogleSitemapContents('unknown'),
       ).rejects.toThrow(BadRequestException);
       expect(
-        mockContentsService.getGoogleSitemapContents,
+        mockContentServices.getGoogleSitemapContents,
       ).not.toHaveBeenCalled();
     });
   });

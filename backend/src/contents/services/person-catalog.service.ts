@@ -1,6 +1,3 @@
-import { ContentDiscoveryService } from './services/content-discovery.service';
-import { AdultContentService } from './services/adult-content.service';
-import { ContentCatalogService } from './services/content-catalog.service';
 import {
   GatewayTimeoutException,
   Injectable,
@@ -14,21 +11,21 @@ import {
   TmdbService,
   TmdbPersonDetail,
   TmdbPersonCredit,
-} from '../tmdb/tmdb.service';
-import {
-  ContentIndexingService,
-  type GoogleSitemapCohort,
-} from './services/content-indexing.service';
-
-const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72시간
+} from '../../tmdb/tmdb.service';
+import { AdultContentService } from './adult-content.service';
+const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
 }
-
 @Injectable()
-export class ContentsService {
-  private readonly logger = new Logger(ContentsService.name);
+export class PersonCatalogService {
+  private readonly logger = new Logger(PersonCatalogService.name);
+  constructor(
+    private readonly tmdbService: TmdbService,
+    private readonly adultService: AdultContentService,
+  ) {}
+
   private readonly personDetailCache = new Map<
     number,
     CacheEntry<TmdbPersonDetail>
@@ -38,47 +35,11 @@ export class ContentsService {
     CacheEntry<{ cast: TmdbPersonCredit[]; crew: TmdbPersonCredit[] }>
   >();
 
-  constructor(
-    private readonly tmdbService: TmdbService,
-    private readonly adultService: AdultContentService,
-    private readonly indexingService: ContentIndexingService,
-    private readonly catalogService: ContentCatalogService,
-    private readonly discoveryService: ContentDiscoveryService,
-  ) {}
-
   private canUseStalePersonCache(error: unknown): boolean {
     return (
       error instanceof GatewayTimeoutException ||
       isTmdbConnectionResetError(error)
     );
-  }
-
-  findOrFetchByTmdbId(
-    tmdbId: number,
-    type: 'movie' | 'tv',
-    signal?: AbortSignal,
-  ) {
-    return this.catalogService.findOrFetchByTmdbId(tmdbId, type, signal);
-  }
-
-  searchContents(
-    query: string,
-    type?: 'movie' | 'tv' | 'person',
-    page = 1,
-    signal?: AbortSignal,
-  ) {
-    return this.discoveryService.searchContents(query, type, page, signal);
-  }
-
-  getContentDetail(tmdbId: number, type: 'movie' | 'tv') {
-    return this.catalogService.getContentDetail(tmdbId, type);
-  }
-
-  discoverContents(
-    type: 'movie' | 'tv' = 'movie',
-    options: Parameters<ContentDiscoveryService['discoverContents']>[1] = {},
-  ) {
-    return this.discoveryService.discoverContents(type, options);
   }
 
   /**
@@ -169,26 +130,6 @@ export class ContentsService {
       cast: filterAndSort(raw.cast),
       crew: filterAndSort(raw.crew),
     };
-  }
-
-  getSitemapContents() {
-    return this.indexingService.getSitemapContents();
-  }
-
-  getGoogleSitemapContents(cohort: GoogleSitemapCohort) {
-    return this.indexingService.getGoogleSitemapContents(cohort);
-  }
-
-  getAdultContents(page = 1, limit = 20) {
-    return this.adultService.getAdultContents(page, limit);
-  }
-
-  toggleAdult(tmdbId: number, contentType: 'movie' | 'tv', adult: boolean) {
-    return this.adultService.toggleAdult(tmdbId, contentType, adult);
-  }
-
-  blockPersonContents(personId: number) {
-    return this.adultService.blockPersonContents(personId);
   }
 
   @Cron('0 */6 * * *', { name: 'person-cache-cleanup', timeZone: 'Asia/Seoul' })

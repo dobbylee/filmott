@@ -1,13 +1,9 @@
-import { ContentDiscoveryService } from '../../src/contents/services/content-discovery.service';
-import { AdultContentService } from '../../src/contents/services/adult-content.service';
 import { ContentCatalogService } from '../../src/contents/services/content-catalog.service';
 import { ContentIndexingService } from '../../src/contents/services/content-indexing.service';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Content } from '../../src/contents/content.entity';
-import { ContentsService } from '../../src/contents/contents.service';
-import { RevalidateService } from '../../src/common/revalidate.service';
 import { TmdbService } from '../../src/tmdb/tmdb.service';
 import {
   createIntegrationDataSource,
@@ -23,15 +19,13 @@ const describeWithDb = hasIntegrationDatabaseConfig()
 describeWithDb('contents indexability integration', () => {
   let dataSource: DataSource;
   let moduleRef: TestingModule;
-  let service: ContentsService;
+  let catalogService: ContentCatalogService;
+  let indexingService: ContentIndexingService;
 
   beforeAll(async () => {
     dataSource = await createIntegrationDataSource();
     moduleRef = await Test.createTestingModule({
       providers: [
-        ContentsService,
-        ContentDiscoveryService,
-        AdultContentService,
         ContentCatalogService,
         ContentIndexingService,
         {
@@ -42,13 +36,10 @@ describeWithDb('contents indexability integration', () => {
           provide: TmdbService,
           useValue: {},
         },
-        {
-          provide: RevalidateService,
-          useValue: {},
-        },
       ],
     }).compile();
-    service = moduleRef.get(ContentsService);
+    catalogService = moduleRef.get(ContentCatalogService);
+    indexingService = moduleRef.get(ContentIndexingService);
   });
 
   beforeEach(async () => {
@@ -112,26 +103,26 @@ describeWithDb('contents indexability integration', () => {
     });
 
     await expect(
-      service.getContentDetail(byVote.tmdbId, 'movie'),
+      catalogService.getContentDetail(byVote.tmdbId, 'movie'),
     ).resolves.toMatchObject({ searchIndexable: true });
     await expect(
-      service.getContentDetail(byReview.tmdbId, 'movie'),
+      catalogService.getContentDetail(byReview.tmdbId, 'movie'),
     ).resolves.toMatchObject({ searchIndexable: true });
     await expect(
-      service.getContentDetail(byRanking.tmdbId, 'movie'),
+      catalogService.getContentDetail(byRanking.tmdbId, 'movie'),
     ).resolves.toMatchObject({ searchIndexable: true });
     await expect(
-      service.getContentDetail(byProvider.tmdbId, 'movie'),
+      catalogService.getContentDetail(byProvider.tmdbId, 'movie'),
     ).resolves.toMatchObject({ searchIndexable: true });
     await expect(
-      service.getContentDetail(withoutSignal.tmdbId, 'movie'),
+      catalogService.getContentDetail(withoutSignal.tmdbId, 'movie'),
     ).resolves.toMatchObject({ searchIndexable: false });
     await expect(
-      service.getContentDetail(withoutOverview.tmdbId, 'movie'),
+      catalogService.getContentDetail(withoutOverview.tmdbId, 'movie'),
     ).resolves.toMatchObject({ searchIndexable: false });
 
     const sitemapTmdbIds = new Set(
-      (await service.getSitemapContents()).map((item) => item.tmdbId),
+      (await indexingService.getSitemapContents()).map((item) => item.tmdbId),
     );
     expect(sitemapTmdbIds).toEqual(
       new Set([
@@ -232,11 +223,11 @@ describeWithDb('contents indexability integration', () => {
     });
 
     const filmottSignal =
-      await service.getGoogleSitemapContents('filmott-signal');
+      await indexingService.getGoogleSitemapContents('filmott-signal');
     const providerHighItems =
-      await service.getGoogleSitemapContents('provider-high');
+      await indexingService.getGoogleSitemapContents('provider-high');
     const providerMidItems =
-      await service.getGoogleSitemapContents('provider-mid');
+      await indexingService.getGoogleSitemapContents('provider-mid');
     const filmottIds = new Set(filmottSignal.map((item) => item.tmdbId));
     const providerHighIds = new Set(
       providerHighItems.map((item) => item.tmdbId),

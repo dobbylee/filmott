@@ -1,3 +1,8 @@
+import { ContentCatalogService } from './services/content-catalog.service';
+import { ContentIndexingService } from './services/content-indexing.service';
+import { AdultContentService } from './services/adult-content.service';
+import { ContentDiscoveryService } from './services/content-discovery.service';
+import { PersonCatalogService } from './services/person-catalog.service';
 import {
   Controller,
   Get,
@@ -10,7 +15,6 @@ import {
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
-import { ContentsService } from './contents.service';
 import { isGoogleSitemapCohort } from './services/content-indexing.service';
 import { SearchContentsDto } from './dto/search-contents.dto';
 import { DiscoverContentsDto } from './dto/discover-contents.dto';
@@ -22,12 +26,18 @@ import { UserRole } from '../users/enums/user-role.enum';
 
 @Controller('contents')
 export class ContentsController {
-  constructor(private readonly contentsService: ContentsService) {}
+  constructor(
+    private readonly catalogService: ContentCatalogService,
+    private readonly indexingService: ContentIndexingService,
+    private readonly adultService: AdultContentService,
+    private readonly discoveryService: ContentDiscoveryService,
+    private readonly personService: PersonCatalogService,
+  ) {}
 
   @Get('search')
   async search(@Query() dto: SearchContentsDto) {
     const page = dto.page ? parseInt(dto.page, 10) : 1;
-    return this.contentsService.searchContents(dto.q, dto.type, page);
+    return this.discoveryService.searchContents(dto.q, dto.type, page);
   }
 
   @Get('discover')
@@ -36,7 +46,7 @@ export class ContentsController {
     const page = dto.page ? parseInt(dto.page, 10) : 1;
     const year = dto.year ? parseInt(dto.year, 10) : undefined;
 
-    return this.contentsService.discoverContents(type, {
+    return this.discoveryService.discoverContents(type, {
       genres: dto.genres,
       providers: dto.providers,
       year,
@@ -47,17 +57,17 @@ export class ContentsController {
 
   @Get('person/:personId')
   async getPersonDetail(@Param('personId', ParseIntPipe) personId: number) {
-    return this.contentsService.getPersonDetail(personId);
+    return this.personService.getPersonDetail(personId);
   }
 
   @Get('person/:personId/credits')
   async getPersonCredits(@Param('personId', ParseIntPipe) personId: number) {
-    return this.contentsService.getPersonCredits(personId);
+    return this.personService.getPersonCredits(personId);
   }
 
   @Get('sitemap')
   async getSitemapContents() {
-    return this.contentsService.getSitemapContents();
+    return this.indexingService.getSitemapContents();
   }
 
   @Get('sitemap/google/:cohort')
@@ -68,14 +78,14 @@ export class ContentsController {
       );
     }
 
-    return this.contentsService.getGoogleSitemapContents(cohort);
+    return this.indexingService.getGoogleSitemapContents(cohort);
   }
 
   @Patch('adult')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   async toggleAdult(@Body() dto: ToggleAdultDto) {
-    return this.contentsService.toggleAdult(
+    return this.adultService.toggleAdult(
       dto.tmdbId,
       dto.contentType,
       dto.adult,
@@ -91,14 +101,14 @@ export class ContentsController {
   ) {
     const p = Math.max(1, parseInt(page ?? '1', 10) || 1);
     const l = Math.max(1, Math.min(parseInt(limit ?? '20', 10) || 20, 100));
-    return this.contentsService.getAdultContents(p, l);
+    return this.adultService.getAdultContents(p, l);
   }
 
   @Post('adult/block-person/:personId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   async blockPersonContents(@Param('personId', ParseIntPipe) personId: number) {
-    return this.contentsService.blockPersonContents(personId);
+    return this.adultService.blockPersonContents(personId);
   }
 
   @Get(':type/:tmdbId')
@@ -109,6 +119,6 @@ export class ContentsController {
     if (type !== 'movie' && type !== 'tv') {
       throw new BadRequestException('type은 "movie" 또는 "tv"만 허용됩니다.');
     }
-    return this.contentsService.getContentDetail(tmdbId, type);
+    return this.catalogService.getContentDetail(tmdbId, type);
   }
 }

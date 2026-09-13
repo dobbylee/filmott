@@ -1,3 +1,4 @@
+import { PersonCatalogService } from './services/person-catalog.service';
 import { ContentDiscoveryService } from './services/content-discovery.service';
 import { AdultContentService } from './services/adult-content.service';
 import { ContentCatalogService } from './services/content-catalog.service';
@@ -9,14 +10,16 @@ import {
   GatewayTimeoutException,
   NotFoundException,
 } from '@nestjs/common';
-import { ContentsService } from './contents.service';
 import { Content } from './content.entity';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { RevalidateService } from '../common/revalidate.service';
 import { AxiosError, AxiosHeaders } from 'axios';
-describe('ContentsService', () => {
-  let service: ContentsService;
-  let tmdbService: TmdbService;
+describe('콘텐츠 책임별 서비스 계약', () => {
+  let catalogService: ContentCatalogService;
+  let indexingService: ContentIndexingService;
+  let adultService: AdultContentService;
+  let discoveryService: ContentDiscoveryService;
+  let personService: PersonCatalogService;
 
   const mockQueryBuilder = {
     select: jest.fn().mockReturnThis(),
@@ -80,7 +83,7 @@ describe('ContentsService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        ContentsService,
+        PersonCatalogService,
         ContentDiscoveryService,
         AdultContentService,
         ContentCatalogService,
@@ -91,8 +94,11 @@ describe('ContentsService', () => {
       ],
     }).compile();
 
-    service = module.get<ContentsService>(ContentsService);
-    tmdbService = module.get<TmdbService>(TmdbService);
+    catalogService = module.get(ContentCatalogService);
+    indexingService = module.get(ContentIndexingService);
+    adultService = module.get(AdultContentService);
+    discoveryService = module.get(ContentDiscoveryService);
+    personService = module.get(PersonCatalogService);
 
     mockContentRepo.find.mockResolvedValue([]);
     mockContentRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
@@ -115,7 +121,7 @@ describe('ContentsService', () => {
       };
       mockContentRepo.findOne.mockResolvedValue(cachedContent);
 
-      const result = await service.findOrFetchByTmdbId(123, 'movie');
+      const result = await catalogService.findOrFetchByTmdbId(123, 'movie');
 
       expect(result).toEqual(cachedContent);
       expect(mockTmdbService.getDetails).not.toHaveBeenCalled();
@@ -157,7 +163,7 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockReturnValue(savedContent);
       mockContentRepo.save.mockResolvedValue(savedContent);
 
-      const result = await service.findOrFetchByTmdbId(123, 'movie');
+      const result = await catalogService.findOrFetchByTmdbId(123, 'movie');
 
       expect(mockTmdbService.getDetails).toHaveBeenCalledWith(123, 'movie');
       expect(mockContentRepo.create).toHaveBeenCalledWith(
@@ -197,7 +203,12 @@ describe('ContentsService', () => {
       };
       mockTmdbService.searchByType.mockResolvedValue(searchResult);
 
-      await service.searchContents('테스트', 'movie', 1, controller.signal);
+      await discoveryService.searchContents(
+        '테스트',
+        'movie',
+        1,
+        controller.signal,
+      );
 
       expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
         '테스트',
@@ -232,7 +243,7 @@ describe('ContentsService', () => {
         .mockResolvedValueOnce(movieResult)
         .mockResolvedValueOnce(tvResult);
 
-      const result = await service.searchContents('test');
+      const result = await discoveryService.searchContents('test');
 
       expect(mockTmdbService.searchByType).toHaveBeenCalledTimes(3);
       expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
@@ -267,7 +278,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.searchByType.mockResolvedValue(searchResult);
 
-      const result = await service.searchContents('test', 'movie', 2);
+      const result = await discoveryService.searchContents('test', 'movie', 2);
 
       expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
         'test',
@@ -280,7 +291,7 @@ describe('ContentsService', () => {
 
   describe('getContentDetail', () => {
     it('tmdbId가 양수가 아니면 TMDB 호출 전에 BadRequestException을 던져야 한다', async () => {
-      await expect(service.getContentDetail(0, 'movie')).rejects.toThrow(
+      await expect(catalogService.getContentDetail(0, 'movie')).rejects.toThrow(
         BadRequestException,
       );
 
@@ -290,7 +301,7 @@ describe('ContentsService', () => {
 
     it('tmdbId가 허용 범위를 넘으면 TMDB 호출 전에 BadRequestException을 던져야 한다', async () => {
       await expect(
-        service.getContentDetail(20_000_001, 'movie'),
+        catalogService.getContentDetail(20_000_001, 'movie'),
       ).rejects.toThrow(BadRequestException);
 
       expect(mockContentRepo.findOne).not.toHaveBeenCalled();
@@ -350,7 +361,7 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockReturnValue(savedContent);
       mockContentRepo.save.mockResolvedValue(savedContent);
 
-      const result = await service.getContentDetail(456, 'movie');
+      const result = await catalogService.getContentDetail(456, 'movie');
 
       expect(mockTmdbService.getDetails).toHaveBeenCalledWith(456, 'movie');
       expect(result.watchProviders).toEqual(
@@ -372,7 +383,7 @@ describe('ContentsService', () => {
       };
       mockContentRepo.findOne.mockResolvedValue(cachedContent);
 
-      const result = await service.getContentDetail(456, 'movie');
+      const result = await catalogService.getContentDetail(456, 'movie');
 
       expect(mockTmdbService.getDetails).not.toHaveBeenCalled();
       expect(result.tmdbId).toBe(456);
@@ -398,7 +409,7 @@ describe('ContentsService', () => {
       mockContentRepo.findOne.mockResolvedValue(cachedContent);
       mockQueryBuilder.getRawOne.mockResolvedValue({ id: '20' });
 
-      const result = await service.getContentDetail(456, 'movie');
+      const result = await catalogService.getContentDetail(456, 'movie');
 
       expect(result.searchIndexable).toBe(true);
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
@@ -426,7 +437,7 @@ describe('ContentsService', () => {
       mockContentRepo.findOne.mockResolvedValue(cachedContent);
       mockQueryBuilder.getRawOne.mockResolvedValue(undefined);
 
-      const result = await service.getContentDetail(457, 'movie');
+      const result = await catalogService.getContentDetail(457, 'movie');
 
       expect(result.searchIndexable).toBe(false);
     });
@@ -467,7 +478,7 @@ describe('ContentsService', () => {
       mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
 
       // TTL 초과 시 캐시된 데이터를 즉시 반환
-      const result = await service.getContentDetail(789, 'movie');
+      const result = await catalogService.getContentDetail(789, 'movie');
 
       expect(result.title).toBe('Old Title');
       expect(result.watchProviders).toEqual(expiredContent.watchProviders);
@@ -490,7 +501,7 @@ describe('ContentsService', () => {
       };
       mockContentRepo.findOne.mockResolvedValue(cachedContent);
 
-      const result = await service.getContentDetail(100, 'movie');
+      const result = await catalogService.getContentDetail(100, 'movie');
 
       expect(mockTmdbService.getDetails).not.toHaveBeenCalled();
       expect(result.watchProviders).toBeNull();
@@ -528,7 +539,7 @@ describe('ContentsService', () => {
       mockTmdbService.getDetails.mockResolvedValue(tmdbData);
       mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
 
-      await service.getContentDetail(100, 'movie');
+      await catalogService.getContentDetail(100, 'movie');
 
       expect(mockTmdbService.getDetails).toHaveBeenCalledWith(100, 'movie');
     });
@@ -546,7 +557,7 @@ describe('ContentsService', () => {
       mockContentRepo.findOne.mockResolvedValueOnce(partialCache);
       mockTmdbService.getDetails.mockRejectedValue(new Error('TMDB timeout'));
 
-      const result = await service.getContentDetail(100, 'movie');
+      const result = await catalogService.getContentDetail(100, 'movie');
 
       expect(result.title).toBe('Partial Cache');
       expect(result.watchProviders).toBeNull();
@@ -557,21 +568,21 @@ describe('ContentsService', () => {
       mockContentRepo.findOne.mockResolvedValue(null);
       mockTmdbService.getDetails.mockResolvedValue({});
 
-      await expect(service.getContentDetail(999, 'movie')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        catalogService.getContentDetail(999, 'movie'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('최근 존재하지 않는 것으로 확인한 콘텐츠는 짧은 시간 동안 TMDB를 재호출하지 않아야 한다', async () => {
       mockContentRepo.findOne.mockResolvedValue(null);
       mockTmdbService.getDetails.mockRejectedValueOnce(new Error('not found'));
 
-      await expect(service.getContentDetail(404404, 'movie')).rejects.toThrow(
-        NotFoundException,
-      );
-      await expect(service.getContentDetail(404404, 'movie')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        catalogService.getContentDetail(404404, 'movie'),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        catalogService.getContentDetail(404404, 'movie'),
+      ).rejects.toThrow(NotFoundException);
 
       expect(mockTmdbService.getDetails).toHaveBeenCalledTimes(1);
     });
@@ -606,7 +617,7 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockReturnValue(savedContent);
       mockContentRepo.save.mockResolvedValue(savedContent);
 
-      const result = await service.findOrFetchByTmdbId(456, 'tv');
+      const result = await catalogService.findOrFetchByTmdbId(456, 'tv');
 
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -642,7 +653,7 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockImplementation((data: any) => data);
       mockContentRepo.save.mockResolvedValue(savedContent);
 
-      await service.findOrFetchByTmdbId(789, 'tv');
+      await catalogService.findOrFetchByTmdbId(789, 'tv');
 
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ runtime: 30 }),
@@ -663,7 +674,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getPersonDetail.mockResolvedValue(personData);
 
-      const result = await service.getPersonDetail(17419);
+      const result = await personService.getPersonDetail(17419);
 
       expect(mockTmdbService.getPersonDetail).toHaveBeenCalledWith(17419);
       expect(result).toEqual(personData);
@@ -674,7 +685,7 @@ describe('ContentsService', () => {
         makeTmdbResponseError(404),
       );
 
-      await expect(service.getPersonDetail(1682487)).rejects.toThrow(
+      await expect(personService.getPersonDetail(1682487)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -683,7 +694,7 @@ describe('ContentsService', () => {
       const error = makeTmdbResponseError(500);
       mockTmdbService.getPersonDetail.mockRejectedValueOnce(error);
 
-      await expect(service.getPersonDetail(17419)).rejects.toBe(error);
+      await expect(personService.getPersonDetail(17419)).rejects.toBe(error);
     });
 
     it('타임아웃이면 만료된 stale cache를 반환해야 한다', async () => {
@@ -697,10 +708,10 @@ describe('ContentsService', () => {
         known_for_department: 'Acting',
       };
       mockTmdbService.getPersonDetail.mockResolvedValueOnce(personData);
-      await service.getPersonDetail(17419);
+      await personService.getPersonDetail(17419);
 
       const detailCache = (
-        service as unknown as {
+        personService as unknown as {
           personDetailCache: Map<
             number,
             { data: typeof personData; expiresAt: number }
@@ -714,7 +725,7 @@ describe('ContentsService', () => {
         new GatewayTimeoutException('TMDB person 응답 시간이 초과되었습니다.'),
       );
 
-      const result = await service.getPersonDetail(17419);
+      const result = await personService.getPersonDetail(17419);
 
       expect(result).toEqual(personData);
       expect(mockTmdbService.getPersonDetail).toHaveBeenCalledTimes(2);
@@ -731,10 +742,10 @@ describe('ContentsService', () => {
         known_for_department: 'Acting',
       };
       mockTmdbService.getPersonDetail.mockResolvedValueOnce(personData);
-      await service.getPersonDetail(17419);
+      await personService.getPersonDetail(17419);
 
       const detailCache = (
-        service as unknown as {
+        personService as unknown as {
           personDetailCache: Map<
             number,
             { data: typeof personData; expiresAt: number }
@@ -748,7 +759,7 @@ describe('ContentsService', () => {
         makeConnectionResetError(),
       );
 
-      const result = await service.getPersonDetail(17419);
+      const result = await personService.getPersonDetail(17419);
 
       expect(result).toEqual(personData);
       expect(mockTmdbService.getPersonDetail).toHaveBeenCalledTimes(2);
@@ -761,7 +772,7 @@ describe('ContentsService', () => {
         makeTmdbResponseError(404),
       );
 
-      await expect(service.getPersonCredits(1682487)).rejects.toThrow(
+      await expect(personService.getPersonCredits(1682487)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -770,7 +781,7 @@ describe('ContentsService', () => {
       const error = makeTmdbResponseError(500);
       mockTmdbService.getPersonCredits.mockRejectedValueOnce(error);
 
-      await expect(service.getPersonCredits(17419)).rejects.toBe(error);
+      await expect(personService.getPersonCredits(17419)).rejects.toBe(error);
     });
 
     it('차단 콘텐츠를 partial index 조건과 같은 리터럴로 조회하고 캐시해야 한다', async () => {
@@ -798,8 +809,8 @@ describe('ContentsService', () => {
         { tmdbId: 1, contentType: 'movie' },
       ]);
 
-      const firstResult = await service.getPersonCredits(17419);
-      const secondResult = await service.getPersonCredits(17419);
+      const firstResult = await personService.getPersonCredits(17419);
+      const secondResult = await personService.getPersonCredits(17419);
 
       expect(mockContentRepo.createQueryBuilder).toHaveBeenCalledWith(
         'content',
@@ -859,7 +870,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
 
-      const result = await service.getPersonCredits(17419);
+      const result = await personService.getPersonCredits(17419);
 
       expect(mockTmdbService.getPersonCredits).toHaveBeenCalledWith(17419);
       // cast should be sorted: 2024 > 2010 > no date
@@ -888,7 +899,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
 
-      const result = await service.getPersonCredits(100);
+      const result = await personService.getPersonCredits(100);
 
       expect(result.cast).toHaveLength(1);
       expect(result.cast[0].media_type).toBe('movie');
@@ -910,10 +921,10 @@ describe('ContentsService', () => {
 
       mockContentRepo.find.mockResolvedValue([]);
       mockTmdbService.getPersonCredits.mockResolvedValueOnce(creditsData);
-      await service.getPersonCredits(100);
+      await personService.getPersonCredits(100);
 
       const creditsCache = (
-        service as unknown as {
+        personService as unknown as {
           personCreditsCache: Map<
             number,
             { data: typeof creditsData; expiresAt: number }
@@ -929,7 +940,7 @@ describe('ContentsService', () => {
         ),
       );
 
-      const result = await service.getPersonCredits(100);
+      const result = await personService.getPersonCredits(100);
 
       expect(result.cast).toHaveLength(1);
       expect(result.cast[0].id).toBe(1);
@@ -952,10 +963,10 @@ describe('ContentsService', () => {
 
       mockContentRepo.find.mockResolvedValue([]);
       mockTmdbService.getPersonCredits.mockResolvedValueOnce(creditsData);
-      await service.getPersonCredits(100);
+      await personService.getPersonCredits(100);
 
       const creditsCache = (
-        service as unknown as {
+        personService as unknown as {
           personCreditsCache: Map<
             number,
             { data: typeof creditsData; expiresAt: number }
@@ -969,7 +980,7 @@ describe('ContentsService', () => {
         makeConnectionResetError(),
       );
 
-      const result = await service.getPersonCredits(100);
+      const result = await personService.getPersonCredits(100);
 
       expect(result.cast).toHaveLength(1);
       expect(result.cast[0].id).toBe(1);
@@ -987,7 +998,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
 
-      const result = await service.discoverContents('tv', {
+      const result = await discoveryService.discoverContents('tv', {
         genres: '18',
         providers: '8',
         year: 2024,
@@ -1012,7 +1023,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
 
-      const result = await service.discoverContents('movie', {});
+      const result = await discoveryService.discoverContents('movie', {});
 
       expect(mockTmdbService.discoverByFilters).toHaveBeenCalledWith('movie', {
         genres: undefined,
@@ -1033,7 +1044,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
 
-      await service.discoverContents('movie', {
+      await discoveryService.discoverContents('movie', {
         sort: 'primary_release_date.desc',
       });
 
@@ -1075,7 +1086,7 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockReturnValue(savedContent);
       mockContentRepo.save.mockResolvedValue(savedContent);
 
-      await service.findOrFetchByTmdbId(999, 'movie');
+      await catalogService.findOrFetchByTmdbId(999, 'movie');
 
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1112,7 +1123,7 @@ describe('ContentsService', () => {
         Promise.resolve(data),
       );
 
-      await service.findOrFetchByTmdbId(888, 'movie');
+      await catalogService.findOrFetchByTmdbId(888, 'movie');
 
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1150,7 +1161,7 @@ describe('ContentsService', () => {
         Promise.resolve(data),
       );
 
-      await service.findOrFetchByTmdbId(777, 'movie');
+      await catalogService.findOrFetchByTmdbId(777, 'movie');
 
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1185,7 +1196,7 @@ describe('ContentsService', () => {
         Promise.resolve(data),
       );
 
-      await service.findOrFetchByTmdbId(778, 'movie');
+      await catalogService.findOrFetchByTmdbId(778, 'movie');
 
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1205,7 +1216,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.searchByType.mockResolvedValue(searchResult);
 
-      const result = await service.searchContents('배우', 'person', 1);
+      const result = await discoveryService.searchContents('배우', 'person', 1);
 
       expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
         '배우',
@@ -1224,7 +1235,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.searchByType.mockResolvedValue(searchResult);
 
-      const result = await service.searchContents('드라마', 'tv', 2);
+      const result = await discoveryService.searchContents('드라마', 'tv', 2);
 
       expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
         '드라마',
@@ -1259,7 +1270,7 @@ describe('ContentsService', () => {
         .mockResolvedValueOnce(movieResult)
         .mockResolvedValueOnce(tvResult);
 
-      await service.searchContents('test', undefined, 3);
+      await discoveryService.searchContents('test', undefined, 3);
 
       expect(mockTmdbService.searchByType).toHaveBeenCalledWith(
         'test',
@@ -1314,7 +1325,7 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockReturnValue(savedContent);
       mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
 
-      const result = await service.getContentDetail(700, 'movie');
+      const result = await catalogService.getContentDetail(700, 'movie');
 
       expect(result.watchProviders).toBeNull();
     });
@@ -1357,7 +1368,7 @@ describe('ContentsService', () => {
       mockContentRepo.create.mockReturnValue(savedContent);
       mockContentRepo.save.mockImplementation((c: any) => Promise.resolve(c));
 
-      const result = await service.getContentDetail(800, 'movie');
+      const result = await catalogService.getContentDetail(800, 'movie');
 
       expect(result.credits).toHaveLength(20);
     });
@@ -1391,7 +1402,7 @@ describe('ContentsService', () => {
         Promise.resolve(data),
       );
 
-      await service.findOrFetchByTmdbId(900, 'movie');
+      await catalogService.findOrFetchByTmdbId(900, 'movie');
 
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1427,7 +1438,7 @@ describe('ContentsService', () => {
         Promise.resolve(data),
       );
 
-      await service.findOrFetchByTmdbId(901, 'movie');
+      await catalogService.findOrFetchByTmdbId(901, 'movie');
 
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1462,7 +1473,7 @@ describe('ContentsService', () => {
         Promise.resolve(data),
       );
 
-      await service.findOrFetchByTmdbId(902, 'movie');
+      await catalogService.findOrFetchByTmdbId(902, 'movie');
 
       expect(mockContentRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1507,7 +1518,7 @@ describe('ContentsService', () => {
         Promise.resolve(c as Content),
       );
 
-      const result = await service.getContentDetail(999, 'movie');
+      const result = await catalogService.getContentDetail(999, 'movie');
 
       // save 호출 시 adult가 true로 유지되어야 한다
       const savedContent = mockContentRepo.save.mock.calls[0][0];
@@ -1548,7 +1559,7 @@ describe('ContentsService', () => {
         Promise.resolve(c as Content),
       );
 
-      await service.getContentDetail(998, 'movie');
+      await catalogService.getContentDetail(998, 'movie');
 
       const savedContent = mockContentRepo.save.mock.calls[0][0];
       expect(savedContent.adult).toBe(true);
@@ -1575,7 +1586,7 @@ describe('ContentsService', () => {
       ];
       mockContentRepo.findAndCount.mockResolvedValue([adultList, 2]);
 
-      const result = await service.getAdultContents(1, 20);
+      const result = await adultService.getAdultContents(1, 20);
 
       expect(result.data).toEqual(adultList);
       expect(result.total).toBe(2);
@@ -1586,7 +1597,7 @@ describe('ContentsService', () => {
     it('차단된 콘텐츠가 없으면 빈 배열을 반환해야 한다', async () => {
       mockContentRepo.findAndCount.mockResolvedValue([[], 0]);
 
-      const result = await service.getAdultContents();
+      const result = await adultService.getAdultContents();
 
       expect(result.data).toEqual([]);
       expect(result.total).toBe(0);
@@ -1607,7 +1618,7 @@ describe('ContentsService', () => {
         Promise.resolve(c),
       );
 
-      const result = await service.toggleAdult(123, 'movie', true);
+      const result = await adultService.toggleAdult(123, 'movie', true);
 
       expect(mockContentRepo.findOne).toHaveBeenCalledWith({
         where: { tmdbId: 123, contentType: 'movie' },
@@ -1657,7 +1668,7 @@ describe('ContentsService', () => {
         Promise.resolve(c),
       );
 
-      const result = await service.toggleAdult(456, 'movie', true);
+      const result = await adultService.toggleAdult(456, 'movie', true);
 
       expect(mockTmdbService.getDetails).toHaveBeenCalledWith(456, 'movie');
       expect(result.adult).toBe(true);
@@ -1680,7 +1691,7 @@ describe('ContentsService', () => {
         Promise.resolve(c),
       );
 
-      const result = await service.toggleAdult(789, 'tv', false);
+      const result = await adultService.toggleAdult(789, 'tv', false);
 
       expect(result.adult).toBe(false);
       expect(mockRevalidateService.revalidatePaths).toHaveBeenCalledWith([
@@ -1704,7 +1715,7 @@ describe('ContentsService', () => {
       };
       mockTmdbService.searchByType.mockResolvedValue(searchResult);
 
-      const result = await service.searchContents('test', 'movie', 1);
+      const result = await discoveryService.searchContents('test', 'movie', 1);
 
       expect(result.results).toHaveLength(2);
       expect(result.results.map((r: { id: number }) => r.id)).toEqual([1, 3]);
@@ -1739,7 +1750,7 @@ describe('ContentsService', () => {
         .mockResolvedValueOnce(movieResult)
         .mockResolvedValueOnce(tvResult);
 
-      const result = await service.searchContents('test');
+      const result = await discoveryService.searchContents('test');
 
       // tv:5는 차단, movie:5는 유지 (contentType이 다르므로)
       const movieResults = result.results.filter(
@@ -1767,7 +1778,9 @@ describe('ContentsService', () => {
       };
       mockTmdbService.discoverByFilters.mockResolvedValue(discoverResult);
 
-      const result = await service.discoverContents('movie', { page: 1 });
+      const result = await discoveryService.discoverContents('movie', {
+        page: 1,
+      });
 
       expect(result.results).toHaveLength(1);
       expect(result.results[0].id).toBe(11);
@@ -1790,7 +1803,7 @@ describe('ContentsService', () => {
       ];
       mockQueryBuilder.getRawMany.mockResolvedValue(mockRows);
 
-      const result = await service.getSitemapContents();
+      const result = await indexingService.getSitemapContents();
 
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
         'c.adult IS NOT TRUE',
@@ -1888,21 +1901,21 @@ describe('ContentsService', () => {
       mockContentRepo.findOne.mockResolvedValue(cachedContent);
       mockQueryBuilder.getRawOne.mockResolvedValue({ id: 30 });
 
-      await service.getContentDetail(789, 'movie');
+      await catalogService.getContentDetail(789, 'movie');
       expectQualityConditions();
 
       mockQueryBuilder.where.mockClear();
       mockQueryBuilder.andWhere.mockClear();
       mockQueryBuilder.getRawMany.mockResolvedValue([]);
 
-      await service.getSitemapContents();
+      await indexingService.getSitemapContents();
       expectQualityConditions();
     });
 
     it('콘텐츠가 없으면 빈 배열을 반환해야 한다', async () => {
       mockQueryBuilder.getRawMany.mockResolvedValue([]);
 
-      const result = await service.getSitemapContents();
+      const result = await indexingService.getSitemapContents();
 
       expect(result).toEqual([]);
     });
@@ -1918,7 +1931,8 @@ describe('ContentsService', () => {
         },
       ]);
 
-      const result = await service.getGoogleSitemapContents('filmott-signal');
+      const result =
+        await indexingService.getGoogleSitemapContents('filmott-signal');
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         '(rv.id IS NOT NULL OR rk.id IS NOT NULL)',
@@ -1941,7 +1955,7 @@ describe('ContentsService', () => {
     });
 
     it('provider-high cohort는 filmott 신호를 제외하고 투표 2000 이상을 요구해야 한다', async () => {
-      await service.getGoogleSitemapContents('provider-high');
+      await indexingService.getGoogleSitemapContents('provider-high');
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('rv.id IS NULL');
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('rk.id IS NULL');
@@ -1955,7 +1969,7 @@ describe('ContentsService', () => {
     });
 
     it('provider-mid cohort는 투표 1000 이상 2000 미만 범위를 요구해야 한다', async () => {
-      await service.getGoogleSitemapContents('provider-mid');
+      await indexingService.getGoogleSitemapContents('provider-mid');
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'c.vote_count >= :googleProviderMidMinVoteCount',
@@ -1974,16 +1988,16 @@ describe('ContentsService', () => {
       // 캐시에 만료 엔트리를 채우기 위해 getPersonDetail 호출
       const personData = { id: 1, name: 'Actor 1' };
       mockTmdbService.getPersonDetail.mockResolvedValue(personData);
-      await service.getPersonDetail(1);
+      await personService.getPersonDetail(1);
 
       // 캐시 엔트리의 expiresAt을 과거로 설정하기 위해 다시 호출
       const personData2 = { id: 2, name: 'Actor 2' };
       mockTmdbService.getPersonDetail.mockResolvedValue(personData2);
-      await service.getPersonDetail(2);
+      await personService.getPersonDetail(2);
 
       // 내부 캐시 접근: personDetailCache에 expiresAt을 강제로 과거로 변경
       const detailCache = (
-        service as unknown as {
+        personService as unknown as {
           personDetailCache: Map<number, { data: unknown; expiresAt: number }>;
         }
       ).personDetailCache;
@@ -1992,7 +2006,7 @@ describe('ContentsService', () => {
 
       expect(detailCache.size).toBe(2);
 
-      service.cleanupExpiredPersonCache();
+      personService.cleanupExpiredPersonCache();
 
       // 만료된 엔트리(id=1)만 삭제, 미만료(id=2) 유지
       expect(detailCache.size).toBe(1);
@@ -2007,11 +2021,11 @@ describe('ContentsService', () => {
       mockContentRepo.find.mockResolvedValue([]);
 
       mockTmdbService.getPersonCredits.mockResolvedValue(creditsData);
-      await service.getPersonCredits(10);
-      await service.getPersonCredits(20);
+      await personService.getPersonCredits(10);
+      await personService.getPersonCredits(20);
 
       const creditsCache = (
-        service as unknown as {
+        personService as unknown as {
           personCreditsCache: Map<number, { data: unknown; expiresAt: number }>;
         }
       ).personCreditsCache;
@@ -2020,7 +2034,7 @@ describe('ContentsService', () => {
 
       expect(creditsCache.size).toBe(2);
 
-      service.cleanupExpiredPersonCache();
+      personService.cleanupExpiredPersonCache();
 
       expect(creditsCache.size).toBe(1);
       expect(creditsCache.has(10)).toBe(false);
@@ -2030,16 +2044,16 @@ describe('ContentsService', () => {
     it('만료된 엔트리가 없으면 아무것도 삭제하지 않아야 한다', async () => {
       const personData = { id: 5, name: 'Actor 5' };
       mockTmdbService.getPersonDetail.mockResolvedValue(personData);
-      await service.getPersonDetail(5);
+      await personService.getPersonDetail(5);
 
       const detailCache = (
-        service as unknown as {
+        personService as unknown as {
           personDetailCache: Map<number, { data: unknown; expiresAt: number }>;
         }
       ).personDetailCache;
       expect(detailCache.size).toBe(1);
 
-      service.cleanupExpiredPersonCache();
+      personService.cleanupExpiredPersonCache();
 
       expect(detailCache.size).toBe(1);
       expect(detailCache.has(5)).toBe(true);
@@ -2104,7 +2118,7 @@ describe('ContentsService', () => {
         { tmdbId: 300, contentType: 'movie' },
       ]);
 
-      const result = await service.blockPersonContents(12345);
+      const result = await adultService.blockPersonContents(12345);
 
       // 중복 제거: movie:100, tv:200, movie:300 = 3개
       expect(result.total).toBe(3);
@@ -2140,7 +2154,7 @@ describe('ContentsService', () => {
         { tmdbId: 200, contentType: 'movie' },
       ]);
 
-      const result = await service.blockPersonContents(99999);
+      const result = await adultService.blockPersonContents(99999);
 
       // id:100은 이미 adult=true → 건너뜀, id:200만 차단
       expect(result.blocked).toBe(1);
@@ -2201,7 +2215,7 @@ describe('ContentsService', () => {
         { tmdbId: 100, contentType: 'movie' },
       ]);
 
-      const result = await service.blockPersonContents(11111);
+      const result = await adultService.blockPersonContents(11111);
 
       expect(result.blocked).toBe(1);
       expect(result.failed).toBe(1);
