@@ -1,3 +1,4 @@
+import { ContentDiscoveryService } from './services/content-discovery.service';
 import { AdultContentService } from './services/adult-content.service';
 import { ContentCatalogService } from './services/content-catalog.service';
 import { ContentIndexingService } from './services/content-indexing.service';
@@ -80,6 +81,7 @@ describe('ContentsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ContentsService,
+        ContentDiscoveryService,
         AdultContentService,
         ContentCatalogService,
         ContentIndexingService,

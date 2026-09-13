@@ -1,7 +1,7 @@
 import type { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { ConfigService } from '@nestjs/config';
 import type { Repository } from 'typeorm';
-import type { ContentsService } from '../contents/contents.service';
+import type { ContentDiscoveryService } from '../contents/services/content-discovery.service';
 import type { User } from '../users/user.entity';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
 import { ChatContextService } from './chat-context.service';
@@ -86,7 +86,7 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
           .fn()
           .mockResolvedValue(testCase.preferenceFixture.userContext),
       } as unknown as ChatContextService;
-      const contentsService = {} as ContentsService;
+      const contentDiscoveryService = {} as ContentDiscoveryService;
       const dataSource = {
         query: jest.fn().mockResolvedValue([]),
       } as unknown as ConstructorParameters<
@@ -94,7 +94,7 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
       >[2];
       const recommendationCandidateService = new RecommendationCandidateService(
         embeddingService,
-        contentsService,
+        contentDiscoveryService,
         dataSource,
         {} as ContentCatalogService,
       );

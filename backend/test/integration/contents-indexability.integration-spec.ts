@@ -1,3 +1,4 @@
+import { ContentDiscoveryService } from '../../src/contents/services/content-discovery.service';
 import { AdultContentService } from '../../src/contents/services/adult-content.service';
 import { ContentCatalogService } from '../../src/contents/services/content-catalog.service';
 import { ContentIndexingService } from '../../src/contents/services/content-indexing.service';
@@ -29,6 +30,7 @@ describeWithDb('contents indexability integration', () => {
     moduleRef = await Test.createTestingModule({
       providers: [
         ContentsService,
+        ContentDiscoveryService,
         AdultContentService,
         ContentCatalogService,
         ContentIndexingService,

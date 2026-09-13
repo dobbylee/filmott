@@ -1,3 +1,4 @@
+import { ContentDiscoveryService } from './services/content-discovery.service';
 import { AdultContentService } from './services/adult-content.service';
 import { ContentCatalogService } from './services/content-catalog.service';
 import { ContentIndexingService } from './services/content-indexing.service';
@@ -13,11 +14,12 @@ import { CommonModule } from '../common/common.module';
   imports: [TypeOrmModule.forFeature([Content]), TmdbModule, CommonModule],
   controllers: [ContentsController],
   providers: [
+    ContentDiscoveryService,
     AdultContentService,
     ContentsService,
     ContentIndexingService,
     ContentCatalogService,
   ],
-  exports: [ContentsService, ContentCatalogService],
+  exports: [ContentDiscoveryService, ContentsService, ContentCatalogService],
 })
 export class ContentsModule {}

@@ -1,3 +1,4 @@
+import { ContentDiscoveryService } from '../src/contents/services/content-discovery.service';
 import { AdultContentService } from '../src/contents/services/adult-content.service';
 import { ContentCatalogService } from '../src/contents/services/content-catalog.service';
 import { ContentIndexingService } from '../src/contents/services/content-indexing.service';
@@ -100,6 +101,7 @@ describe('HTTP boundary smoke', () => {
       ],
       providers: [
         ContentsService,
+        ContentDiscoveryService,
         AdultContentService,
         ContentCatalogService,
         ContentIndexingService,

@@ -1,7 +1,7 @@
 import { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { ContentsService } from '../contents/contents.service';
+import { ContentDiscoveryService } from '../contents/services/content-discovery.service';
 import { ContentSearchFilters } from './content-search.service';
 import {
   EmbeddingService,
@@ -38,7 +38,7 @@ export class RecommendationCandidateService {
 
   constructor(
     private readonly embeddingService: EmbeddingService,
-    private readonly contentsService: ContentsService,
+    private readonly contentDiscoveryService: ContentDiscoveryService,
     private readonly dataSource: DataSource,
     private readonly contentCatalogService: ContentCatalogService,
   ) {}
@@ -282,10 +282,10 @@ export class RecommendationCandidateService {
   ): Promise<{ embedding: number[]; tmdbId: number } | null> {
     const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
     const [movieResult, tvResult] = await Promise.all([
-      this.contentsService
+      this.contentDiscoveryService
         .searchContents(title, 'movie', 1, ...signalArgs)
         .catch(() => null),
-      this.contentsService
+      this.contentDiscoveryService
         .searchContents(title, 'tv', 1, ...signalArgs)
         .catch(() => null),
     ]);

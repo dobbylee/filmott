@@ -11,7 +11,7 @@ import {
 } from '../embedding/embedding.service';
 import { ContentSearchService } from './content-search.service';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
-import { ContentsService } from '../contents/contents.service';
+import { ContentDiscoveryService } from '../contents/services/content-discovery.service';
 import { ChatContextService } from './chat-context.service';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
 import { ChatResponseStreamService } from './chat-response-stream.service';
@@ -68,7 +68,7 @@ describe('ChatService', () => {
     buildSemanticQuery: jest.fn(),
   };
 
-  const mockContentsService = {
+  const mockContentDiscoveryService = {
     findOrFetchByTmdbId: jest.fn(),
     searchContents: jest.fn(),
   };
@@ -218,8 +218,14 @@ describe('ChatService', () => {
         { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: ContentSearchService, useValue: mockContentSearchService },
         { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
-        { provide: ContentsService, useValue: mockContentsService },
-        { provide: ContentCatalogService, useValue: mockContentsService },
+        {
+          provide: ContentDiscoveryService,
+          useValue: mockContentDiscoveryService,
+        },
+        {
+          provide: ContentCatalogService,
+          useValue: mockContentDiscoveryService,
+        },
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
         { provide: getRepositoryToken(Review), useValue: mockReviewRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
@@ -521,7 +527,9 @@ describe('ChatService', () => {
     it('완성되지 않은 구조화 JSON은 거부해야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([]);
-      mockContentsService.searchContents.mockResolvedValue({ results: [] });
+      mockContentDiscoveryService.searchContents.mockResolvedValue({
+        results: [],
+      });
       mockStreamingResponse(['{"message":']);
 
       const emittedEvents: { event: string; data: unknown }[] = [];
@@ -569,7 +577,7 @@ describe('ChatService', () => {
         (e) => e.event === 'recommendations',
       );
       expect(recEvents).toHaveLength(0);
-      expect(mockContentsService.searchContents).not.toHaveBeenCalled();
+      expect(mockContentDiscoveryService.searchContents).not.toHaveBeenCalled();
     });
 
     it('확정 후보가 없으면 본문 제목을 TMDB 검색으로 카드 복구하지 않아야 한다', async () => {
@@ -582,7 +590,7 @@ describe('ChatService', () => {
         confidence: 'high',
       });
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
-      mockContentsService.searchContents.mockResolvedValue({
+      mockContentDiscoveryService.searchContents.mockResolvedValue({
         results: [
           {
             id: 156400,
@@ -610,7 +618,7 @@ describe('ChatService', () => {
         service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit),
       ).rejects.toThrow('AI 응답 형식이 올바르지 않습니다');
 
-      expect(mockContentsService.searchContents).not.toHaveBeenCalled();
+      expect(mockContentDiscoveryService.searchContents).not.toHaveBeenCalled();
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
@@ -651,7 +659,7 @@ describe('ChatService', () => {
         service.sendMessageStream(1, '두뇌 예능 추천해줘', [], emit),
       ).rejects.toThrow('AI 응답 형식이 올바르지 않습니다');
 
-      expect(mockContentsService.searchContents).not.toHaveBeenCalled();
+      expect(mockContentDiscoveryService.searchContents).not.toHaveBeenCalled();
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
@@ -904,7 +912,7 @@ describe('ChatService', () => {
         confidence: 'high',
       });
       mockContentSearchService.searchWithFilters.mockResolvedValue([]);
-      mockContentsService.searchContents.mockResolvedValue({
+      mockContentDiscoveryService.searchContents.mockResolvedValue({
         results: [
           {
             id: 999,
@@ -932,7 +940,7 @@ describe('ChatService', () => {
         service.sendMessageStream(1, '멘탈/전략형으로 추천해줘', [], emit),
       ).rejects.toThrow('AI 응답 형식이 올바르지 않습니다');
 
-      expect(mockContentsService.searchContents).not.toHaveBeenCalled();
+      expect(mockContentDiscoveryService.searchContents).not.toHaveBeenCalled();
       const recEvents = emittedEvents.filter(
         (e) => e.event === 'recommendations',
       );
@@ -1622,8 +1630,14 @@ describe('ChatService', () => {
             provide: IntentAnalyzerService,
             useValue: mockIntentAnalyzerService,
           },
-          { provide: ContentsService, useValue: mockContentsService },
-          { provide: ContentCatalogService, useValue: mockContentsService },
+          {
+            provide: ContentDiscoveryService,
+            useValue: mockContentDiscoveryService,
+          },
+          {
+            provide: ContentCatalogService,
+            useValue: mockContentDiscoveryService,
+          },
           {
             provide: getRepositoryToken(Watchlist),
             useValue: mockWatchlistRepo,
@@ -2303,7 +2317,9 @@ describe('ChatService', () => {
           controller.signal,
         );
 
-        expect(mockContentsService.searchContents).not.toHaveBeenCalled();
+        expect(
+          mockContentDiscoveryService.searchContents,
+        ).not.toHaveBeenCalled();
         expect(
           mockContentSearchService.searchWithFilters,
         ).not.toHaveBeenCalled();
@@ -2461,11 +2477,11 @@ describe('ChatService', () => {
       mockDataSource.query.mockResolvedValue([]);
 
       // TMDB 검색 성공
-      mockContentsService.searchContents
+      mockContentDiscoveryService.searchContents
         .mockResolvedValueOnce({ results: [] }) // movie 검색 실패
         .mockResolvedValueOnce({ results: [{ id: 12345 }] }); // tv 검색 성공
 
-      mockContentsService.findOrFetchByTmdbId.mockResolvedValue({
+      mockContentDiscoveryService.findOrFetchByTmdbId.mockResolvedValue({
         id: 100,
         tmdbId: 12345,
       });
@@ -2484,13 +2500,13 @@ describe('ChatService', () => {
       );
 
       // TMDB 검색 호출 확인
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
+      expect(mockContentDiscoveryService.searchContents).toHaveBeenCalledWith(
         '영야성하',
         'movie',
         1,
         controller.signal,
       );
-      expect(mockContentsService.searchContents).toHaveBeenCalledWith(
+      expect(mockContentDiscoveryService.searchContents).toHaveBeenCalledWith(
         '영야성하',
         'tv',
         1,
@@ -2498,11 +2514,9 @@ describe('ChatService', () => {
       );
 
       // findOrFetchByTmdbId + cacheContentMetadata 호출 확인
-      expect(mockContentsService.findOrFetchByTmdbId).toHaveBeenCalledWith(
-        12345,
-        'tv',
-        controller.signal,
-      );
+      expect(
+        mockContentDiscoveryService.findOrFetchByTmdbId,
+      ).toHaveBeenCalledWith(12345, 'tv', controller.signal);
       expect(mockEmbeddingService.cacheContentMetadata).toHaveBeenCalledWith(
         100,
         false,
