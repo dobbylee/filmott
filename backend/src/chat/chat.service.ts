@@ -8,13 +8,12 @@ import {
   AI_TEXT_REASONING_EFFORT,
 } from '../common/ai-text.constants';
 import { ContentMetadataService } from '../recommendation/content-metadata.service';
-import { EmbeddingService } from '../embedding/embedding.service';
+import { RecommendationSearchService } from '../recommendation/recommendation-search.service';
 import type { SimilarContent } from '../recommendation/recommendation.types';
 import {
-  ContentSearchService,
   ContentSearchFilters,
   type RelaxableFilterKey,
-} from './content-search.service';
+} from '../recommendation/recommendation-search.types';
 import { User } from '../users/user.entity';
 import { buildSystemPrompt, UserContext } from './prompts/system-prompt';
 import { OTT_PROVIDERS } from '../common/ott-providers';
@@ -64,8 +63,7 @@ type SseEmitter = (event: string, data: unknown) => void;
 export class ChatService {
   constructor(
     private readonly metadataService: ContentMetadataService,
-    private readonly embeddingService: EmbeddingService,
-    private readonly contentSearchService: ContentSearchService,
+    private readonly recommendationSearchService: RecommendationSearchService,
     private readonly intentAnalyzer: IntentAnalyzerService,
     private readonly chatContextService: ChatContextService,
     private readonly recommendationCandidateService: RecommendationCandidateService,
@@ -237,14 +235,15 @@ export class ChatService {
           intent,
         );
 
-        similarContents = await this.contentSearchService.searchWithFilters(
-          enrichedQuery,
-          20,
-          referenceExcludeTmdbIds,
-          mergedFilters,
-          referenceEmbedding ?? undefined,
-          ...signalArgs,
-        );
+        similarContents =
+          await this.recommendationSearchService.searchWithFilters(
+            enrichedQuery,
+            20,
+            referenceExcludeTmdbIds,
+            mergedFilters,
+            referenceEmbedding ?? undefined,
+            ...signalArgs,
+          );
       } else {
         // 모호한 요청 (confidence='low')
         if (userPref.hasData) {
@@ -281,23 +280,25 @@ export class ChatService {
             intent,
           );
 
-          similarContents = await this.contentSearchService.searchWithFilters(
-            enrichedQuery,
-            20,
-            referenceExcludeTmdbIds,
-            prefOnlyFilters,
-            referenceEmbedding ?? undefined,
-            ...signalArgs,
-          );
+          similarContents =
+            await this.recommendationSearchService.searchWithFilters(
+              enrichedQuery,
+              20,
+              referenceExcludeTmdbIds,
+              prefOnlyFilters,
+              referenceEmbedding ?? undefined,
+              ...signalArgs,
+            );
         } else {
           // 신규 유저: 벡터 유사도만
-          similarContents = await this.embeddingService.searchSimilar(
-            semanticQuery,
-            20,
-            referenceExcludeTmdbIds,
-            referenceEmbedding ?? undefined,
-            ...signalArgs,
-          );
+          similarContents =
+            await this.recommendationSearchService.searchSimilar(
+              semanticQuery,
+              20,
+              referenceExcludeTmdbIds,
+              referenceEmbedding ?? undefined,
+              ...signalArgs,
+            );
         }
       }
       if (signal?.aborted) return;

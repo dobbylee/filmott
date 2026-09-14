@@ -7,9 +7,9 @@ import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatService } from './chat.service';
 import { ContentMetadataService } from '../recommendation/content-metadata.service';
-import { EmbeddingService } from '../embedding/embedding.service';
+import { RecommendationSearchService } from '../recommendation/recommendation-search.service';
 import type { SimilarContent } from '../recommendation/recommendation.types';
-import { ContentSearchService } from './content-search.service';
+
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentDiscoveryService } from '../contents/services/content-discovery.service';
 import { ChatContextService } from './chat-context.service';
@@ -58,9 +58,8 @@ describe('ChatService', () => {
       .mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
   };
 
-  const mockEmbeddingService = { searchSimilar: jest.fn() };
-
-  const mockContentSearchService = {
+  const mockRecommendationSearchService = {
+    searchSimilar: jest.fn(),
     searchWithFilters: jest.fn(),
   };
 
@@ -217,9 +216,11 @@ describe('ChatService', () => {
         ChatContextService,
         RecommendationCandidateService,
         ChatResponseStreamService,
-        { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: ContentMetadataService, useValue: mockMetadataService },
-        { provide: ContentSearchService, useValue: mockContentSearchService },
+        {
+          provide: RecommendationSearchService,
+          useValue: mockRecommendationSearchService,
+        },
         { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
         {
           provide: ContentDiscoveryService,
@@ -323,7 +324,9 @@ describe('ChatService', () => {
           overview: null,
         },
       ];
-      mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue(
+        candidates,
+      );
 
       mockStreamingResponse([
         structuredResponse(
@@ -418,7 +421,9 @@ describe('ChatService', () => {
           overview: null,
         },
       ];
-      mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue(
+        candidates,
+      );
       mockStreamingResponse([
         structuredResponse(
           [
@@ -477,7 +482,7 @@ describe('ChatService', () => {
 
     it('구조화 응답에 추천작이 없으면 recommendations 이벤트를 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       mockStreamingResponse([
         structuredResponse(
           [],
@@ -504,7 +509,7 @@ describe('ChatService', () => {
 
     it('대시가 포함된 일반 안내 문장은 추천 제목으로 오인하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       mockStreamingResponse([
         structuredResponse(
           [],
@@ -532,7 +537,7 @@ describe('ChatService', () => {
 
     it('완성되지 않은 구조화 JSON은 거부해야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       mockContentDiscoveryService.searchContents.mockResolvedValue({
         results: [],
       });
@@ -550,7 +555,7 @@ describe('ChatService', () => {
 
     it('JSON이 아닌 본문에 후보 제목이 있어도 추천 카드를 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([
         {
           contentId: 1,
           tmdbId: 156400,
@@ -595,7 +600,7 @@ describe('ChatService', () => {
         genres: ['리얼리티', '토크'],
         confidence: 'high',
       });
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
       mockContentDiscoveryService.searchContents.mockResolvedValue({
         results: [
           {
@@ -633,7 +638,7 @@ describe('ChatService', () => {
 
     it('서버 후보 밖 추천이 하나라도 있으면 응답 전체를 거부해야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([
         {
           contentId: 1,
           tmdbId: 156400,
@@ -680,7 +685,7 @@ describe('ChatService', () => {
         genres: ['리얼리티'],
         confidence: 'high',
       });
-      mockContentSearchService.searchWithFilters.mockResolvedValue([
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([
         {
           contentId: 1,
           tmdbId: 801,
@@ -729,7 +734,7 @@ describe('ChatService', () => {
         genres: ['리얼리티'],
         confidence: 'high',
       });
-      mockContentSearchService.searchWithFilters.mockResolvedValue([
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([
         {
           contentId: 1,
           tmdbId: 801,
@@ -866,7 +871,9 @@ describe('ChatService', () => {
           overview: null,
         }),
       );
-      mockEmbeddingService.searchSimilar.mockResolvedValue(candidates);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue(
+        candidates,
+      );
       mockStreamingResponse([
         structuredResponse(
           candidates.slice(0, 5).map((candidate) => ({
@@ -917,7 +924,7 @@ describe('ChatService', () => {
         genres: ['리얼리티'],
         confidence: 'high',
       });
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
       mockContentDiscoveryService.searchContents.mockResolvedValue({
         results: [
           {
@@ -955,7 +962,7 @@ describe('ChatService', () => {
 
     it('구조화 JSON이 chunk 경계에 걸려도 내부 JSON을 노출하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       mockStreamingResponse([
         '{"message":"추천 ',
         '본문입니다.","recommendations":[],',
@@ -979,7 +986,7 @@ describe('ChatService', () => {
 
     it('추천이 없는 일반 답변은 finish_reason 확인 후 한 text 이벤트로 전송해야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       const finalResponse = structuredResponse(
         [],
         '일반 답변을 이어서 전송합니다.',
@@ -1020,7 +1027,7 @@ describe('ChatService', () => {
 
     it('잘못된 JSON은 어떤 본문도 먼저 노출하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       mockStreamingResponse(['추천 본문입니다.']);
 
       const emittedEvents: { event: string; data: unknown }[] = [];
@@ -1038,7 +1045,7 @@ describe('ChatService', () => {
 
     it('첫 응답이 후보 밖 ID면 노출 없이 한 번 재생성하고 두 번째 정상 응답만 emit해야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([
         {
           contentId: 1,
           tmdbId: 123,
@@ -1107,7 +1114,7 @@ describe('ChatService', () => {
 
     it('부분 응답을 노출한 시도가 최종 검증에 실패하면 reset 후 재시도 응답만 완료해야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([
         {
           contentId: 1,
           tmdbId: 123,
@@ -1200,7 +1207,7 @@ describe('ChatService', () => {
 
     it('두 번째 시도도 부분 출력 뒤 실패하면 reset하고 done 없이 종료해야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([
         {
           contentId: 1,
           tmdbId: 123,
@@ -1261,7 +1268,7 @@ describe('ChatService', () => {
 
     it('finish_reason이 stop이 아니면 부분 본문을 노출하지 않고 완료 처리하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       mockIncompleteStreamingResponse(['일부 응답입니다.'], 'length');
       const emittedEvents: { event: string; data: unknown }[] = [];
 
@@ -1277,7 +1284,7 @@ describe('ChatService', () => {
 
     it('content_filter로 끝난 임시 본문은 reset하고 완료 처리하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([
         {
           contentId: 1,
           tmdbId: 123,
@@ -1348,7 +1355,7 @@ describe('ChatService', () => {
 
     it('완성되지 않은 JSON은 검증 전에 어떤 이벤트도 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       mockStreamingResponse([
         '{"message":"일부 응답입니다.","recommendations":',
       ]);
@@ -1365,7 +1372,7 @@ describe('ChatService', () => {
 
     it('finish_reason이 없는 JSON chunk는 검증 전에 어떤 이벤트도 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       mockIncompleteStreamingResponse(['{"message":"일부 응답'], null);
       const emittedEvents: { event: string; data: unknown }[] = [];
 
@@ -1387,7 +1394,7 @@ describe('ChatService', () => {
       '%s 요청에서 recommendations가 비면 한 번 재생성하고 정상 추천만 emit해야 한다',
       async (content) => {
         setupEmptyUserContext();
-        mockEmbeddingService.searchSimilar.mockResolvedValue([
+        mockRecommendationSearchService.searchSimilar.mockResolvedValue([
           {
             contentId: 1,
             tmdbId: 123,
@@ -1452,7 +1459,7 @@ describe('ChatService', () => {
 
     it('추천을 원하지 않는 요청은 빈 recommendations를 재생성하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([
         {
           contentId: 1,
           tmdbId: 123,
@@ -1498,7 +1505,7 @@ describe('ChatService', () => {
 
     it('모델이 안전상 거절하면 재시도하거나 이벤트를 emit하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
       mockStreamCreate.mockImplementation(() => ({
         async *[Symbol.asyncIterator]() {
           yield {
@@ -1549,7 +1556,7 @@ describe('ChatService', () => {
       '%s은 서버 후보 전체 카드로 fallback하지 않아야 한다',
       async (_description, response) => {
         setupEmptyUserContext();
-        mockEmbeddingService.searchSimilar.mockResolvedValue([
+        mockRecommendationSearchService.searchSimilar.mockResolvedValue([
           {
             contentId: 1,
             tmdbId: 123,
@@ -1588,7 +1595,7 @@ describe('ChatService', () => {
 
     it('이전 추천작은 history의 recommendations 메타데이터를 우선 사용해야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -1622,7 +1629,9 @@ describe('ChatService', () => {
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
       expect(mockMetadataService.hasAnyMetadata).toHaveBeenCalled();
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
     it('OPENAI_API_KEY가 없으면 BadRequestException을 던져야 한다', async () => {
@@ -1634,9 +1643,11 @@ describe('ChatService', () => {
           ChatContextService,
           RecommendationCandidateService,
           ChatResponseStreamService,
-          { provide: EmbeddingService, useValue: mockEmbeddingService },
           { provide: ContentMetadataService, useValue: mockMetadataService },
-          { provide: ContentSearchService, useValue: mockContentSearchService },
+          {
+            provide: RecommendationSearchService,
+            useValue: mockRecommendationSearchService,
+          },
           {
             provide: IntentAnalyzerService,
             useValue: mockIntentAnalyzerService,
@@ -1676,7 +1687,7 @@ describe('ChatService', () => {
 
     it('OpenAI 구조화 스트림 호출에 response format과 30초 timeout이 전달되어야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
@@ -1692,7 +1703,7 @@ describe('ChatService', () => {
 
     it('대화 이력(history)을 포함하여 OpenAI에 전달해야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
 
       const history = [
         { role: 'user' as const, content: '이전 질문' },
@@ -1717,7 +1728,7 @@ describe('ChatService', () => {
       );
     });
 
-    it('OTT 키워드가 있는 메시지는 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
+    it('OTT 키워드가 있는 메시지는 RecommendationSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
@@ -1727,7 +1738,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
         '볼만한 영화',
       );
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -1738,7 +1749,9 @@ describe('ChatService', () => {
 
       expect(mockIntentAnalyzerService.analyzeIntent).toHaveBeenCalled();
       expect(mockIntentAnalyzerService.buildSemanticQuery).toHaveBeenCalled();
-      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+      expect(
+        mockRecommendationSearchService.searchWithFilters,
+      ).toHaveBeenCalledWith(
         '볼만한 영화',
         20,
         expect.any(Array),
@@ -1746,12 +1759,14 @@ describe('ChatService', () => {
         undefined,
       );
       const calledFilters =
-        mockContentSearchService.searchWithFilters.mock.calls[0][3];
+        mockRecommendationSearchService.searchWithFilters.mock.calls[0][3];
       expect(calledFilters.relaxableFilterKeys).toEqual([]);
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
-    it('confidence=low + 신규 유저 메시지는 EmbeddingService.searchSimilar를 호출해야 한다', async () => {
+    it('confidence=low + 신규 유저 메시지는 RecommendationSearchService.searchSimilar를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
@@ -1760,7 +1775,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
         '재미있는 영화',
       );
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -1770,16 +1785,15 @@ describe('ChatService', () => {
       );
 
       expect(mockIntentAnalyzerService.analyzeIntent).toHaveBeenCalled();
-      expect(mockEmbeddingService.searchSimilar).toHaveBeenCalledWith(
-        '재미있는 영화',
-        20,
-        expect.any(Array),
-        undefined,
-      );
-      expect(mockContentSearchService.searchWithFilters).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).toHaveBeenCalledWith('재미있는 영화', 20, expect.any(Array), undefined);
+      expect(
+        mockRecommendationSearchService.searchWithFilters,
+      ).not.toHaveBeenCalled();
     });
 
-    it('analyzeIntent가 국가/인물/연도 의도를 반환하면 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
+    it('analyzeIntent가 국가/인물/연도 의도를 반환하면 RecommendationSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
       const intentResult: ParsedIntent = {
         ...emptyIntent,
@@ -1791,7 +1805,7 @@ describe('ChatService', () => {
       };
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue(intentResult);
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('감독 영화');
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -1804,7 +1818,9 @@ describe('ChatService', () => {
         expect.any(String),
         intentResult,
       );
-      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+      expect(
+        mockRecommendationSearchService.searchWithFilters,
+      ).toHaveBeenCalledWith(
         '감독 영화',
         20,
         expect.any(Array),
@@ -1816,7 +1832,9 @@ describe('ChatService', () => {
         }),
         undefined,
       );
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
     it('searchWithFilters에 buildSemanticQuery로 정제된 쿼리를 전달해야 한다', async () => {
@@ -1831,7 +1849,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
         '사회 풍자 영화',
       );
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -1851,7 +1869,9 @@ describe('ChatService', () => {
       );
 
       // searchWithFilters에 정제된 쿼리가 전달되는지 확인
-      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+      expect(
+        mockRecommendationSearchService.searchWithFilters,
+      ).toHaveBeenCalledWith(
         '사회 풍자 영화',
         20,
         expect.any(Array),
@@ -1871,10 +1891,12 @@ describe('ChatService', () => {
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
       expect(mockIntentAnalyzerService.analyzeIntent).not.toHaveBeenCalled();
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
-    it('dateRange.to만 있는 의도면 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
+    it('dateRange.to만 있는 의도면 RecommendationSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
@@ -1884,11 +1906,13 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
         '90년대 이전 영화',
       );
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '90년대 이전 영화', [], jest.fn());
 
-      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+      expect(
+        mockRecommendationSearchService.searchWithFilters,
+      ).toHaveBeenCalledWith(
         '90년대 이전 영화',
         20,
         expect.any(Array),
@@ -1897,10 +1921,12 @@ describe('ChatService', () => {
         }),
         undefined,
       );
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
-    it('genres 필터가 포함된 복합 의도 시 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
+    it('genres 필터가 포함된 복합 의도 시 RecommendationSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
@@ -1911,7 +1937,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
         '무서운 영화',
       );
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -1920,7 +1946,9 @@ describe('ChatService', () => {
         jest.fn(),
       );
 
-      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+      expect(
+        mockRecommendationSearchService.searchWithFilters,
+      ).toHaveBeenCalledWith(
         '무서운 영화',
         20,
         expect.any(Array),
@@ -1930,10 +1958,12 @@ describe('ChatService', () => {
         }),
         undefined,
       );
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
-    it('confidence=low + 유저 데이터 있음: 유저 선호만으로 ContentSearchService.searchWithFilters를 호출해야 한다', async () => {
+    it('confidence=low + 유저 데이터 있음: 유저 선호만으로 RecommendationSearchService.searchWithFilters를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockExtractUserPreference.mockReturnValue({
         ...defaultEmptyPreference,
@@ -1950,7 +1980,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
         '잔잔한 영화',
       );
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -1960,7 +1990,9 @@ describe('ChatService', () => {
       );
 
       // confidence=low이므로 intent 필터를 스킵하고 유저 선호만 전달
-      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+      expect(
+        mockRecommendationSearchService.searchWithFilters,
+      ).toHaveBeenCalledWith(
         expect.any(String),
         20,
         expect.any(Array),
@@ -1972,7 +2004,9 @@ describe('ChatService', () => {
         }),
         undefined,
       );
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
     it('필터 있음: 명시적 필터가 유저 선호보다 우선해야 한다', async () => {
@@ -1993,7 +2027,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
         '히어로 영화',
       );
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -2003,14 +2037,16 @@ describe('ChatService', () => {
       );
 
       const calledFilters =
-        mockContentSearchService.searchWithFilters.mock.calls[0][3];
+        mockRecommendationSearchService.searchWithFilters.mock.calls[0][3];
       // 명시적 필터가 있는 필드에는 유저 선호가 합쳐지지 않는다
       expect(calledFilters.ottProviderNames).toEqual(['Disney Plus']);
       expect(calledFilters.countries).toEqual(['US']);
       // 명시적 필터가 없는 필드에는 유저 선호가 WHERE 필터로 적용된다
       expect(calledFilters.genres).toEqual(['드라마']);
       expect(calledFilters.relaxableFilterKeys).toEqual(['genres']);
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
     it('명시적 OTT 필터 있음: 유저 장르/국가 선호는 WHERE 필터에 합쳐져야 한다', async () => {
@@ -2030,12 +2066,12 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
         '로맨스 영화',
       );
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '티빙에서 볼만한 영화', [], jest.fn());
 
       const calledFilters =
-        mockContentSearchService.searchWithFilters.mock.calls[0][3];
+        mockRecommendationSearchService.searchWithFilters.mock.calls[0][3];
       // 명시적 OTT(Tving)가 유저 구독 OTT(Netflix)를 덮어야 한다
       expect(calledFilters.ottProviderNames).toEqual(['Tving']);
       // 명시적 필터가 없는 장르/국가는 유저 선호가 WHERE 필터로 합쳐져야 한다
@@ -2061,7 +2097,7 @@ describe('ChatService', () => {
         confidence: 'low',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('추천 영화');
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -2071,16 +2107,18 @@ describe('ChatService', () => {
       );
 
       const calledFilters =
-        mockContentSearchService.searchWithFilters.mock.calls[0][3];
+        mockRecommendationSearchService.searchWithFilters.mock.calls[0][3];
       // confidence=low이므로 유저 선호만 적용
       expect(calledFilters.ottProviderNames).toEqual(['wavve']);
       expect(calledFilters.genres).toBeUndefined();
       expect(calledFilters.countries).toBeUndefined();
       expect(calledFilters.relaxableFilterKeys).toEqual(['ottProviderNames']);
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
-    it('confidence=high이면 의도 필터 우선으로 ContentSearchService를 호출해야 한다', async () => {
+    it('confidence=high이면 의도 필터 우선으로 RecommendationSearchService를 호출해야 한다', async () => {
       setupEmptyUserContext();
       mockExtractUserPreference.mockReturnValue({
         ...defaultEmptyPreference,
@@ -2098,7 +2136,7 @@ describe('ChatService', () => {
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue(
         '미국 액션 SF',
       );
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -2108,14 +2146,16 @@ describe('ChatService', () => {
       );
 
       const calledFilters =
-        mockContentSearchService.searchWithFilters.mock.calls[0][3];
+        mockRecommendationSearchService.searchWithFilters.mock.calls[0][3];
       // confidence=high: 의도 필터가 우선, 유저 선호는 빈 필드에만 합산
       expect(calledFilters.genres).toEqual(['액션', 'SF']);
       expect(calledFilters.countries).toEqual(['US']);
       // OTT는 의도에 없으므로 유저 선호 합산
       expect(calledFilters.ottProviderNames).toEqual(['Netflix']);
       expect(calledFilters.relaxableFilterKeys).toEqual(['ottProviderNames']);
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
     it('confidence=low이면 의도 필터를 스킵하고 유저 선호만으로 검색해야 한다', async () => {
@@ -2134,12 +2174,12 @@ describe('ChatService', () => {
         confidence: 'low',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('뭐 볼까');
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '뭐 볼까', [], jest.fn());
 
       const calledFilters =
-        mockContentSearchService.searchWithFilters.mock.calls[0][3];
+        mockRecommendationSearchService.searchWithFilters.mock.calls[0][3];
       // confidence=low: 의도 필터(genres: ['액션'])를 스킵, 유저 선호만 사용
       expect(calledFilters.genres).toEqual(['드라마']);
       expect(calledFilters.countries).toEqual(['KR']);
@@ -2149,12 +2189,14 @@ describe('ChatService', () => {
         'genres',
         'countries',
       ]);
-      expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+      expect(
+        mockRecommendationSearchService.searchSimilar,
+      ).not.toHaveBeenCalled();
     });
 
     it('extractUserPreference가 올바른 인자로 호출되어야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
@@ -2185,12 +2227,12 @@ describe('ChatService', () => {
         confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('영화 추천');
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '영화 추천해줘', [], jest.fn());
 
       const calledFilters =
-        mockContentSearchService.searchWithFilters.mock.calls[0][3];
+        mockRecommendationSearchService.searchWithFilters.mock.calls[0][3];
       expect(calledFilters.excludeGenres).toEqual(['공포', '스릴러']);
     });
 
@@ -2211,12 +2253,12 @@ describe('ChatService', () => {
         confidence: 'high',
       });
       mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('공포 영화');
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '공포 영화 추천해줘', [], jest.fn());
 
       const calledFilters =
-        mockContentSearchService.searchWithFilters.mock.calls[0][3];
+        mockRecommendationSearchService.searchWithFilters.mock.calls[0][3];
       // '공포'는 명시적 요청 장르이므로 excludeGenres에서 제거
       expect(calledFilters.genres).toEqual(['공포']);
       expect(calledFilters.excludeGenres).toEqual(['스릴러']);
@@ -2276,7 +2318,7 @@ describe('ChatService', () => {
           confidence: 'high',
         });
         mockIntentAnalyzerService.buildSemanticQuery.mockReturnValue('영화');
-        mockContentSearchService.searchWithFilters.mockImplementation(
+        mockRecommendationSearchService.searchWithFilters.mockImplementation(
           async () => {
             controller.abort();
             return [];
@@ -2297,7 +2339,9 @@ describe('ChatService', () => {
           controller.signal,
         );
         expect(resolveReferenceSpy).toHaveBeenCalledWith([], controller.signal);
-        expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+        expect(
+          mockRecommendationSearchService.searchWithFilters,
+        ).toHaveBeenCalledWith(
           '영화',
           20,
           [],
@@ -2335,16 +2379,18 @@ describe('ChatService', () => {
           mockContentDiscoveryService.searchContents,
         ).not.toHaveBeenCalled();
         expect(
-          mockContentSearchService.searchWithFilters,
+          mockRecommendationSearchService.searchWithFilters,
         ).not.toHaveBeenCalled();
-        expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
+        expect(
+          mockRecommendationSearchService.searchSimilar,
+        ).not.toHaveBeenCalled();
         expect(mockStreamCreate).not.toHaveBeenCalled();
       });
 
       it('recommendations emit 중 중단되면 metadata background와 done을 시작하지 않아야 한다', async () => {
         setupEmptyUserContext();
         const controller = new AbortController();
-        mockEmbeddingService.searchSimilar.mockResolvedValue([
+        mockRecommendationSearchService.searchSimilar.mockResolvedValue([
           {
             contentId: 1,
             tmdbId: 123,
@@ -2445,7 +2491,7 @@ describe('ChatService', () => {
         },
       ]);
 
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '기생충 같은 영화', [], jest.fn());
 
@@ -2460,7 +2506,9 @@ describe('ChatService', () => {
       );
 
       // precomputedEmbedding이 searchWithFilters에 전달됨
-      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+      expect(
+        mockRecommendationSearchService.searchWithFilters,
+      ).toHaveBeenCalledWith(
         expect.any(String),
         20,
         expect.any(Array),
@@ -2503,7 +2551,7 @@ describe('ChatService', () => {
         embedding: JSON.stringify(fakeEmbedding),
       });
 
-      mockContentSearchService.searchWithFilters.mockResolvedValue([]);
+      mockRecommendationSearchService.searchWithFilters.mockResolvedValue([]);
 
       await service.sendMessageStream(
         1,
@@ -2538,7 +2586,9 @@ describe('ChatService', () => {
       );
 
       // precomputedEmbedding 전달 확인
-      expect(mockContentSearchService.searchWithFilters).toHaveBeenCalledWith(
+      expect(
+        mockRecommendationSearchService.searchWithFilters,
+      ).toHaveBeenCalledWith(
         expect.any(String),
         20,
         expect.any(Array),
@@ -2572,12 +2622,12 @@ describe('ChatService', () => {
         { content_id: 1, tmdb_id: 496243, embedding: JSON.stringify([0.1]) },
       ]);
 
-      mockEmbeddingService.searchSimilar.mockResolvedValue([]);
+      mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
 
       await service.sendMessageStream(1, '기생충 같은 영화', [], jest.fn());
 
       // searchSimilar의 excludeTmdbIds에 496243이 포함되어야 함
-      const excludeArg = mockEmbeddingService.searchSimilar.mock
+      const excludeArg = mockRecommendationSearchService.searchSimilar.mock
         .calls[0][2] as number[];
       expect(excludeArg).toContain(496243);
     });

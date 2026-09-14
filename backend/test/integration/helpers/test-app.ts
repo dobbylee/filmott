@@ -9,7 +9,7 @@ import type { Request, Response } from 'express';
 import { AppModule } from '../../../src/app.module';
 import { ChatService } from '../../../src/chat/chat.service';
 import { ContentMetadataService } from '../../../src/recommendation/content-metadata.service';
-import { EmbeddingService } from '../../../src/embedding/embedding.service';
+import { RecommendationSearchService } from '../../../src/recommendation/recommendation-search.service';
 import { R2StorageService } from '../../../src/common/r2-storage.service';
 import { configureApp } from '../../../src/configure-app';
 import { KobisService } from '../../../src/kobis/kobis.service';
@@ -138,7 +138,7 @@ const metadataServiceStub = {
     .mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
 };
 
-const embeddingServiceStub = { searchSimilar: jest.fn() };
+const recommendationSearchServiceStub = { searchSimilar: jest.fn() };
 
 const chatServiceStub = {
   sendMessageStream: jest.fn(),
@@ -156,8 +156,8 @@ export async function createE2eTestApp(): Promise<INestApplication> {
     .useValue(r2StorageServiceStub)
     .overrideProvider(ContentMetadataService)
     .useValue(metadataServiceStub)
-    .overrideProvider(EmbeddingService)
-    .useValue(embeddingServiceStub)
+    .overrideProvider(RecommendationSearchService)
+    .useValue(recommendationSearchServiceStub)
     .overrideProvider(ChatService)
     .useValue(chatServiceStub)
     .compile();

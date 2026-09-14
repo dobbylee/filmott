@@ -1,6 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import { ContentSearchService } from '../../src/chat/content-search.service';
+import { RecommendationSearchService } from '../../src/recommendation/recommendation-search.service';
 import { ContentMetadataService } from '../../src/recommendation/content-metadata.service';
 import {
   createIntegrationDataSource,
@@ -30,7 +30,7 @@ const netflixProviders = {
 describeWithDb('content search integration', () => {
   let dataSource: DataSource;
   let moduleRef: TestingModule;
-  let service: ContentSearchService;
+  let service: RecommendationSearchService;
   const metadataService = {
     generateEmbedding: jest.fn<Promise<number[]>, [string]>(),
   };
@@ -39,12 +39,12 @@ describeWithDb('content search integration', () => {
     dataSource = await createIntegrationDataSource();
     moduleRef = await Test.createTestingModule({
       providers: [
-        ContentSearchService,
+        RecommendationSearchService,
         { provide: DataSource, useValue: dataSource },
         { provide: ContentMetadataService, useValue: metadataService },
       ],
     }).compile();
-    service = moduleRef.get(ContentSearchService);
+    service = moduleRef.get(RecommendationSearchService);
   });
 
   beforeEach(async () => {

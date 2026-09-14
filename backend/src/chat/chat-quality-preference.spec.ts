@@ -9,9 +9,9 @@ import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
 import { ChatContextService } from './chat-context.service';
 import { ChatResponseStreamService } from './chat-response-stream.service';
 import { ChatService } from './chat.service';
-import type { ContentSearchService } from './content-search.service';
+import type { RecommendationSearchService } from '../recommendation/recommendation-search.service';
 import type { ContentMetadataService } from '../recommendation/content-metadata.service';
-import type { EmbeddingService } from '../embedding/embedding.service';
+
 import type { IntentAnalyzerService } from './intent-analyzer';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
 
@@ -74,12 +74,10 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
           failed: 0,
         }),
       } as unknown as ContentMetadataService;
-      const embeddingService = {
+      const recommendationSearchService = {
         searchSimilar: jest.fn().mockResolvedValue([]),
-      } as unknown as EmbeddingService;
-      const contentSearchService = {
         searchWithFilters: jest.fn().mockResolvedValue([]),
-      } as unknown as ContentSearchService;
+      } as unknown as RecommendationSearchService;
       const intentAnalyzer = {
         analyzeIntent: jest
           .fn()
@@ -114,8 +112,7 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
       } as unknown as ConfigService;
       const service = new ChatService(
         metadataService,
-        embeddingService,
-        contentSearchService,
+        recommendationSearchService,
         intentAnalyzer,
         chatContextService,
         recommendationCandidateService,
@@ -132,7 +129,9 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         jest.fn(),
       );
 
-      expect(contentSearchService.searchWithFilters).toHaveBeenCalledWith(
+      expect(
+        recommendationSearchService.searchWithFilters,
+      ).toHaveBeenCalledWith(
         expect.any(String),
         20,
         expect.any(Array),

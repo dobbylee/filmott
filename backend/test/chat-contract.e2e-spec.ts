@@ -4,10 +4,10 @@ import { JwtService } from '@nestjs/jwt';
 import { ModulesContainer } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { ChatService } from '../src/chat/chat.service';
-import { ContentSearchService } from '../src/chat/content-search.service';
+import { RecommendationSearchService } from '../src/recommendation/recommendation-search.service';
 import { RecommendationCandidateService } from '../src/chat/recommendation-candidate.service';
 import { RankingsService } from '../src/rankings/rankings.service';
-import { EmbeddingService } from '../src/embedding/embedding.service';
+
 import type { ChatHistoryMessageDto } from '../src/chat/dto/send-message.dto';
 import { IntentAnalyzerService } from '../src/chat/intent-analyzer';
 import { OpenAIChatClient } from '../src/integrations/openai/openai-chat.client';
@@ -128,6 +128,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
       OpenAIChatClient,
       OpenAIEmbeddingClient,
       ContentMetadataService,
+      RecommendationSearchService,
     ]) {
       const providers = [...modules.values()].flatMap((module) =>
         [...module.providers.values()].filter(
@@ -143,10 +144,9 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
     const metadata = harness.app.get(ContentMetadataService);
     for (const consumer of [
       ChatService,
-      ContentSearchService,
+      RecommendationSearchService,
       RecommendationCandidateService,
       RankingsService,
-      EmbeddingService,
     ]) {
       expect(Reflect.get(harness.app.get(consumer), 'metadataService')).toBe(
         metadata,
@@ -776,7 +776,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
       );
     };
     const search = jest.spyOn(
-      harness.app.get(ContentSearchService),
+      harness.app.get(RecommendationSearchService),
       'searchWithFilters',
     );
     const batch = jest.spyOn(

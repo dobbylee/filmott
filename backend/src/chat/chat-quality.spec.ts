@@ -1,7 +1,7 @@
 import type { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { DataSource } from 'typeorm';
 import type { ContentDiscoveryService } from '../contents/services/content-discovery.service';
-import type { ContentSearchFilters } from './content-search.service';
+import type { ContentSearchFilters } from '../recommendation/recommendation-search.types';
 import type { ContentMetadataService } from '../recommendation/content-metadata.service';
 import type { ParsedIntent } from './intent-analyzer';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';

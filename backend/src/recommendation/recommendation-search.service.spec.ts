@@ -1,21 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import {
-  ContentSearchService,
-  FILTER_RELAXATION_SEQUENCE,
-} from './content-search.service';
-import { ContentMetadataService } from '../recommendation/content-metadata.service';
+import { RecommendationSearchService } from './recommendation-search.service';
+import { FILTER_RELAXATION_SEQUENCE } from './recommendation-search.types';
+import { ContentMetadataService } from './content-metadata.service';
 
-describe('ContentSearchService', () => {
-  let service: ContentSearchService;
+describe('RecommendationSearchService', () => {
+  let service: RecommendationSearchService;
 
   const mockContentMetadataService = {
     generateEmbedding: jest.fn(),
   };
 
   const mockStatementTimeoutQuery = jest.fn().mockResolvedValue([]);
+  const mockQuery = jest.fn();
   const mockDataSource = {
-    query: jest.fn(),
+    query: mockQuery,
     transaction: jest.fn(
       async (
         callback: (manager: {
@@ -27,7 +26,7 @@ describe('ContentSearchService', () => {
             if (query.includes("set_config('statement_timeout'")) {
               return mockStatementTimeoutQuery(query, parameters);
             }
-            return mockDataSource.query(query, parameters);
+            return mockQuery(query, parameters);
           },
         }),
     ),
@@ -38,7 +37,7 @@ describe('ContentSearchService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        ContentSearchService,
+        RecommendationSearchService,
         {
           provide: ContentMetadataService,
           useValue: mockContentMetadataService,
@@ -47,7 +46,9 @@ describe('ContentSearchService', () => {
       ],
     }).compile();
 
-    service = module.get<ContentSearchService>(ContentSearchService);
+    service = module.get<RecommendationSearchService>(
+      RecommendationSearchService,
+    );
 
     mockContentMetadataService.generateEmbedding.mockResolvedValue(
       mockEmbedding,

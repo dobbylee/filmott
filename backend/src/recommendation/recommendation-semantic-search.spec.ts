@@ -6,9 +6,9 @@ import { OpenAISdkProvider } from '../integrations/openai/openai-sdk.provider';
 import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
 import { OpenAIEmbeddingClient } from '../integrations/openai/openai-embedding.client';
 import { DataSource } from 'typeorm';
-import { ContentMetadataService } from '../recommendation/content-metadata.service';
-import { EmbeddingService } from './embedding.service';
-import { ContentMetadata } from '../recommendation/content-metadata.entity';
+import { ContentMetadataService } from './content-metadata.service';
+import { RecommendationSearchService } from './recommendation-search.service';
+import { ContentMetadata } from './content-metadata.entity';
 import { Content } from '../contents/content.entity';
 
 // OpenAI SDK mock
@@ -31,8 +31,8 @@ jest.mock('openai', () => {
   };
 });
 
-describe('EmbeddingService', () => {
-  let service: EmbeddingService;
+describe('RecommendationSearchService', () => {
+  let service: RecommendationSearchService;
   let module: TestingModule;
 
   const mockMetadataRepo = {
@@ -81,7 +81,7 @@ describe('EmbeddingService', () => {
     module = await Test.createTestingModule({
       imports: [OpenAIModule],
       providers: [
-        EmbeddingService,
+        RecommendationSearchService,
         ContentMetadataService,
         {
           provide: getRepositoryToken(ContentMetadata),
@@ -96,7 +96,9 @@ describe('EmbeddingService', () => {
       .useValue(mockConfigService)
       .compile();
 
-    service = module.get<EmbeddingService>(EmbeddingService);
+    service = module.get<RecommendationSearchService>(
+      RecommendationSearchService,
+    );
   });
 
   afterEach(async () => {
@@ -115,7 +117,10 @@ describe('EmbeddingService', () => {
       new OpenAIEmbeddingClient(sdk),
       module.get(DataSource),
     );
-    const noKey = new EmbeddingService(metadata, module.get(DataSource));
+    const noKey = new RecommendationSearchService(
+      module.get(DataSource),
+      metadata,
+    );
     await expect(noKey.searchSimilar('입력', 10, [], [0.1])).resolves.toEqual(
       [],
     );

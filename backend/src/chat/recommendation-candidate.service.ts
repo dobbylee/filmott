@@ -2,7 +2,7 @@ import { ContentCatalogService } from '../contents/services/content-catalog.serv
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ContentDiscoveryService } from '../contents/services/content-discovery.service';
-import { ContentSearchFilters } from './content-search.service';
+import { ContentSearchFilters } from '../recommendation/recommendation-search.types';
 import { ContentMetadataService } from '../recommendation/content-metadata.service';
 import type { SimilarContent } from '../recommendation/recommendation.types';
 import { ParsedIntent } from './intent-analyzer';

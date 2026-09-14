@@ -1,4 +1,4 @@
-import type { ContentSearchFilters } from './content-search.service';
+import type { ContentSearchFilters } from '../recommendation/recommendation-search.types';
 import type { ChatHistoryMessageDto } from './dto/send-message.dto';
 import type { SimilarContent } from '../recommendation/recommendation.types';
 import type { ParsedIntent } from './intent-analyzer';
