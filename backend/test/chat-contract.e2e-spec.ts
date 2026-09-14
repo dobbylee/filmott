@@ -5,13 +5,16 @@ import { ModulesContainer } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { ChatService } from '../src/chat/chat.service';
 import { ContentSearchService } from '../src/chat/content-search.service';
+import { RecommendationCandidateService } from '../src/chat/recommendation-candidate.service';
+import { RankingsService } from '../src/rankings/rankings.service';
+import { EmbeddingService } from '../src/embedding/embedding.service';
 import type { ChatHistoryMessageDto } from '../src/chat/dto/send-message.dto';
 import { IntentAnalyzerService } from '../src/chat/intent-analyzer';
 import { OpenAIChatClient } from '../src/integrations/openai/openai-chat.client';
 import { OpenAIEmbeddingClient } from '../src/integrations/openai/openai-embedding.client';
 import { OpenAISdkProvider } from '../src/integrations/openai/openai-sdk.provider';
-import { EmbeddingService } from '../src/embedding/embedding.service';
-import { ContentMetadata } from '../src/embedding/entities/content-metadata.entity';
+import { ContentMetadataService } from '../src/recommendation/content-metadata.service';
+import { ContentMetadata } from '../src/recommendation/content-metadata.entity';
 import { createContractApp } from './contracts/contract-app';
 import {
   completionResponse,
@@ -118,12 +121,13 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
     }
   });
 
-  it('실제 Chat/Embedding module이 하나의 SDK와 client를 공유해야 한다', () => {
+  it('실제 모듈이 하나의 메타데이터 서비스와 entity 및 SDK를 공유해야 한다', () => {
     const modules = harness.app.get(ModulesContainer);
     for (const token of [
       OpenAISdkProvider,
       OpenAIChatClient,
       OpenAIEmbeddingClient,
+      ContentMetadataService,
     ]) {
       const providers = [...modules.values()].flatMap((module) =>
         [...module.providers.values()].filter(
@@ -136,17 +140,34 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
     const chatClient = harness.app.get(OpenAIChatClient);
     const embeddingClient = harness.app.get(OpenAIEmbeddingClient);
     const sdk = harness.app.get(OpenAISdkProvider);
+    const metadata = harness.app.get(ContentMetadataService);
+    for (const consumer of [
+      ChatService,
+      ContentSearchService,
+      RecommendationCandidateService,
+      RankingsService,
+      EmbeddingService,
+    ]) {
+      expect(Reflect.get(harness.app.get(consumer), 'metadataService')).toBe(
+        metadata,
+      );
+    }
+    const entities = db.entityMetadatas.filter(
+      (entity) => entity.tableName === 'content_metadata',
+    );
+    expect(entities).toHaveLength(1);
+    expect(entities[0].target).toBe(ContentMetadata);
     expect(Reflect.get(harness.app.get(ChatService), 'openai')).toBe(
       chatClient,
     );
     expect(Reflect.get(harness.app.get(IntentAnalyzerService), 'openai')).toBe(
       chatClient,
     );
-    expect(Reflect.get(harness.app.get(EmbeddingService), 'openaiChat')).toBe(
-      chatClient,
-    );
     expect(
-      Reflect.get(harness.app.get(EmbeddingService), 'openaiEmbedding'),
+      Reflect.get(harness.app.get(ContentMetadataService), 'openaiChat'),
+    ).toBe(chatClient);
+    expect(
+      Reflect.get(harness.app.get(ContentMetadataService), 'openaiEmbedding'),
     ).toBe(embeddingClient);
     expect(Reflect.get(chatClient, 'sdk')).toBe(sdk);
     expect(Reflect.get(embeddingClient, 'sdk')).toBe(sdk);
@@ -404,7 +425,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
         );
       };
       const batch = jest.spyOn(
-        harness.app.get<EmbeddingService>(EmbeddingService),
+        harness.app.get<ContentMetadataService>(ContentMetadataService),
         'batchCacheByContentIds',
       );
       let response: request.Response;
@@ -590,7 +611,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
       );
     };
     const batch = jest.spyOn(
-      harness.app.get<EmbeddingService>(EmbeddingService),
+      harness.app.get<ContentMetadataService>(ContentMetadataService),
       'batchCacheByContentIds',
     );
     try {
@@ -759,7 +780,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
       'searchWithFilters',
     );
     const batch = jest.spyOn(
-      harness.app.get(EmbeddingService),
+      harness.app.get(ContentMetadataService),
       'batchCacheByContentIds',
     );
     const history: ChatHistoryMessageDto[] = [];
@@ -969,7 +990,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
         return knowledgeResponse(call);
       };
       const batch = jest.spyOn(
-        harness.app.get<EmbeddingService>(EmbeddingService),
+        harness.app.get<ContentMetadataService>(ContentMetadataService),
         'batchCacheByContentIds',
       );
       let results: PromiseSettledResult<unknown>[] = [];

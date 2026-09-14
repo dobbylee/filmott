@@ -2,7 +2,7 @@ import type { ContentCatalogService } from '../contents/services/content-catalog
 import { DataSource } from 'typeorm';
 import type { ContentDiscoveryService } from '../contents/services/content-discovery.service';
 import type { ContentSearchFilters } from './content-search.service';
-import type { EmbeddingService } from '../embedding/embedding.service';
+import type { ContentMetadataService } from '../recommendation/content-metadata.service';
 import type { ParsedIntent } from './intent-analyzer';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
@@ -32,16 +32,16 @@ function hasCandidateFixture(
 }
 
 function createRecommendationCandidateService(): RecommendationCandidateService {
-  const embeddingService = {
+  const metadataService = {
     batchCacheByContentIds: jest.fn(),
-  } as unknown as EmbeddingService;
+  } as unknown as ContentMetadataService;
   const contentDiscoveryService = {} as unknown as ContentDiscoveryService;
   const dataSource = {
     query: jest.fn(),
   } as unknown as DataSource;
 
   return new RecommendationCandidateService(
-    embeddingService,
+    metadataService,
     contentDiscoveryService,
     dataSource,
     {} as ContentCatalogService,

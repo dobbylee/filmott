@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
-import type { SimilarContent } from '../embedding/embedding.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 import type { ChatHistoryMessageDto } from './dto/send-message.dto';
 
 export const STRUCTURED_CHAT_RESPONSE_SCHEMA = z

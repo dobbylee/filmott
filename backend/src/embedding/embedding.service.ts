@@ -1,191 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
-import { OpenAIEmbeddingClient } from '../integrations/openai/openai-embedding.client';
-import { ContentMetadata } from './entities/content-metadata.entity';
-import { Content } from '../contents/content.entity';
-import {
-  AI_TEXT_MODEL,
-  AI_TEXT_REASONING_EFFORT,
-} from '../common/ai-text.constants';
+import { Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { ContentMetadataService } from '../recommendation/content-metadata.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 
-const OPENAI_EMBEDDING_TIMEOUT_MS = 10_000;
 const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
-export interface SimilarContent {
-  contentId: number;
-  tmdbId: number;
-  contentType: string;
-  title: string;
-  posterUrl: string | null;
-  genres: { id: number; name: string }[];
-  voteAverage: number;
-  description: string;
-  similarity: number;
-  director: string | null;
-  originCountry: string | null;
-  overview: string | null;
-}
-
-export interface BatchResult {
-  cached: number;
-  skipped: number;
-  failed: number;
-}
-
-function stripControlCharacters(value: string | null | undefined): string {
-  if (!value) return '정보 없음';
-
-  const sanitized = Array.from(value)
-    .filter((char) => {
-      const code = char.charCodeAt(0);
-      return code >= 0x20 && code !== 0x7f;
-    })
-    .join('')
-    .trim();
-
-  return sanitized || '정보 없음';
-}
 
 @Injectable()
 export class EmbeddingService {
-  private readonly logger = new Logger(EmbeddingService.name);
-  private hasMetadataCache: boolean | null = null;
   constructor(
-    @InjectRepository(ContentMetadata)
-    private readonly metadataRepo: Repository<ContentMetadata>,
-    @InjectRepository(Content)
-    private readonly contentRepo: Repository<Content>,
-    private readonly openaiChat: OpenAIChatClient,
-    private readonly openaiEmbedding: OpenAIEmbeddingClient,
+    private readonly metadataService: ContentMetadataService,
     private readonly dataSource: DataSource,
   ) {}
-
-  private ensureOpenAI(): void {
-    if (!this.openaiEmbedding.isAvailable()) {
-      throw new Error('OpenAI API key가 설정되지 않았습니다.');
-    }
-  }
-
-  async hasAnyMetadata(): Promise<boolean> {
-    if (this.hasMetadataCache !== null) return this.hasMetadataCache;
-
-    const rows: { exists: boolean }[] = await this.dataSource.query(
-      'SELECT EXISTS(SELECT 1 FROM content_metadata LIMIT 1) AS "exists"',
-    );
-    this.hasMetadataCache = rows[0]?.exists ?? false;
-    return this.hasMetadataCache;
-  }
-
-  async generateEmbedding(
-    text: string,
-    signal?: AbortSignal,
-  ): Promise<number[]> {
-    signal?.throwIfAborted();
-    this.ensureOpenAI();
-    const response = await this.openaiEmbedding.createEmbedding(
-      {
-        model: 'text-embedding-3-small',
-        input: text,
-      },
-      { timeout: OPENAI_EMBEDDING_TIMEOUT_MS, signal },
-    );
-    return response.data[0].embedding;
-  }
-
-  async generateDescription(
-    content: Content,
-    signal?: AbortSignal,
-  ): Promise<string> {
-    signal?.throwIfAborted();
-    this.ensureOpenAI();
-
-    const genreNames = (content.genres || []).map((g) => g.name).join(', ');
-    const cast = (content.credits || [])
-      .slice(0, 5)
-      .map((c) => c.name)
-      .join(', ');
-    const year = content.releaseDate
-      ? new Date(content.releaseDate).getFullYear()
-      : '알 수 없음';
-    const contentType = content.contentType === 'tv' ? '시리즈' : '영화';
-
-    // OTT 플랫폼 추출
-    const ottNames = (content.watchProviders?.flatrate || [])
-      .map((p) => p.provider_name)
-      .join(', ');
-
-    const prompt = `아래 작품 정보를 바탕으로 분위기, 감성, 테마, 시청 상황을 포함한 한국어 설명을 3~5문장으로 작성하세요.
-첫 문장에 연도, 국가, 타입, 플랫폼 정보를 자연스럽게 포함하세요.
-제목: ${stripControlCharacters(content.title)}
-타입: ${contentType}
-장르: ${genreNames || '정보 없음'}
-줄거리: ${stripControlCharacters(content.overview)}
-감독: ${stripControlCharacters(content.director)}
-출연진: ${cast || '정보 없음'}
-연도: ${year}
-제작 국가: ${stripControlCharacters(content.originCountry)}
-OTT 플랫폼: ${ottNames || '정보 없음'}
-평점: ${content.voteAverage ?? '정보 없음'}
-러닝타임: ${content.runtime ? content.runtime + '분' : '정보 없음'}`;
-
-    const response = await this.openaiChat.createCompletion(
-      {
-        model: AI_TEXT_MODEL,
-        reasoning_effort: AI_TEXT_REASONING_EFFORT,
-        max_completion_tokens: 2048,
-        messages: [{ role: 'user', content: prompt }],
-      },
-      { timeout: OPENAI_EMBEDDING_TIMEOUT_MS, signal },
-    );
-
-    return response.choices[0]?.message?.content?.trim() || '';
-  }
-
-  async cacheContentMetadata(
-    contentId: number,
-    force = false,
-    signal?: AbortSignal,
-  ): Promise<ContentMetadata | null> {
-    if (signal?.aborted) return null;
-    if (!force) {
-      const existing = await this.metadataRepo.findOne({
-        where: { contentId },
-      });
-      if (signal?.aborted) return null;
-      if (existing) return existing;
-    }
-
-    const content = await this.contentRepo.findOne({
-      where: { id: contentId },
-    });
-    if (signal?.aborted) return null;
-    if (!content) return null;
-
-    const description = await this.generateDescription(content, signal);
-    if (signal?.aborted) return null;
-    if (!description) return null;
-
-    const embedding = await this.generateEmbedding(description, signal);
-    if (signal?.aborted) return null;
-    const embeddingStr = `[${embedding.join(',')}]`;
-
-    // upsert: INSERT ... ON CONFLICT 로 이중 조회 제거
-    await this.dataSource.query(
-      `INSERT INTO content_metadata (content_id, description, embedding)
-       VALUES ($1, $2, $3::vector)
-       ON CONFLICT (content_id)
-       DO UPDATE SET description = EXCLUDED.description, embedding = EXCLUDED.embedding`,
-      [contentId, description, embeddingStr],
-    );
-    if (signal?.aborted) return null;
-
-    this.hasMetadataCache = true;
-
-    return this.metadataRepo.findOne({
-      where: { contentId },
-    }) as Promise<ContentMetadata>;
-  }
 
   async searchSimilar(
     queryText: string,
@@ -194,12 +19,13 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     precomputedEmbedding?: number[],
     signal?: AbortSignal,
   ): Promise<SimilarContent[]> {
-    if (!this.openaiEmbedding.isAvailable() || signal?.aborted) return [];
+    if (!this.metadataService.isEmbeddingAvailable() || signal?.aborted)
+      return [];
     const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
 
     const embedding =
       precomputedEmbedding ??
-      (await this.generateEmbedding(queryText, ...signalArgs));
+      (await this.metadataService.generateEmbedding(queryText, ...signalArgs));
     if (signal?.aborted) return [];
     const embeddingStr = `[${embedding.join(',')}]`;
     const excludeIds = excludeTmdbIds.length > 0 ? excludeTmdbIds : [-1];
@@ -268,36 +94,5 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
       originCountry: row.origin_country,
       overview: null,
     }));
-  }
-
-  async batchCacheByContentIds(contentIds: number[]): Promise<BatchResult> {
-    const result: BatchResult = { cached: 0, skipped: 0, failed: 0 };
-    if (contentIds.length === 0) return result;
-
-    // 이미 캐싱된 content_id 조회
-    const existingRows: { content_id: number }[] = await this.dataSource.query(
-      `SELECT content_id FROM content_metadata WHERE content_id = ANY($1::int[])`,
-      [contentIds],
-    );
-    const existingIds = new Set(existingRows.map((r) => r.content_id));
-
-    const uncachedIds = contentIds.filter((id) => !existingIds.has(id));
-    result.skipped = contentIds.length - uncachedIds.length;
-
-    for (const contentId of uncachedIds) {
-      try {
-        await this.cacheContentMetadata(contentId, false);
-        result.cached++;
-        // Rate limit 방어: 100ms 딜레이
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error) {
-        result.failed++;
-        this.logger.warn(
-          `배치 캐싱 실패 (contentId: ${contentId}): ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
-
-    return result;
   }
 }

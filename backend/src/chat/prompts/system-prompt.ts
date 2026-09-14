@@ -1,6 +1,6 @@
 import { OttProvider } from '../../common/ott-providers';
 import { getKoreaDateString } from '../../common/date.util';
-import { SimilarContent } from '../../embedding/embedding.service';
+import type { SimilarContent } from '../../recommendation/recommendation.types';
 import { ParsedIntent } from '../intent-analyzer';
 
 export interface FavoriteContent {

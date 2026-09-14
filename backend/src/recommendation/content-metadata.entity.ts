@@ -7,7 +7,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Content } from '../../contents/content.entity';
+import { Content } from '../contents/content.entity';
 
 @Entity('content_metadata')
 export class ContentMetadata {

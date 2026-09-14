@@ -8,7 +8,7 @@ import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentCatalogService } from '../contents/services/content-catalog.service';
-import { EmbeddingService } from '../embedding/embedding.service';
+import { ContentMetadataService } from '../recommendation/content-metadata.service';
 import { RevalidateService } from '../common/revalidate.service';
 
 jest.mock('@sentry/nestjs', () => ({
@@ -43,7 +43,7 @@ describe('RankingsService', () => {
     findOrFetchByTmdbId: jest.fn(),
   };
 
-  const mockEmbeddingService = {
+  const mockContentMetadataService = {
     batchCacheByContentIds: jest
       .fn()
       .mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
@@ -61,7 +61,10 @@ describe('RankingsService', () => {
         { provide: KobisService, useValue: mockKobisService },
         { provide: TmdbService, useValue: mockTmdbService },
         { provide: ContentCatalogService, useValue: mockContentCatalogService },
-        { provide: EmbeddingService, useValue: mockEmbeddingService },
+        {
+          provide: ContentMetadataService,
+          useValue: mockContentMetadataService,
+        },
         { provide: RevalidateService, useValue: mockRevalidateService },
       ],
     }).compile();
@@ -1309,9 +1312,9 @@ describe('RankingsService', () => {
 
       await service.fetchDailyBoxOffice();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
-        42,
-      ]);
+      expect(
+        mockContentMetadataService.batchCacheByContentIds,
+      ).toHaveBeenCalledWith([42]);
     });
 
     it('fetchDailyBoxOffice에서 contentId가 없으면 metadata 캐싱을 호출하지 않아야 한다', async () => {
@@ -1338,7 +1341,7 @@ describe('RankingsService', () => {
       await service.fetchDailyBoxOffice();
 
       expect(
-        mockEmbeddingService.batchCacheByContentIds,
+        mockContentMetadataService.batchCacheByContentIds,
       ).not.toHaveBeenCalled();
     });
 
@@ -1395,9 +1398,9 @@ describe('RankingsService', () => {
 
       await service.fetchTrending('all', 'day');
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
-        10,
-      ]);
+      expect(
+        mockContentMetadataService.batchCacheByContentIds,
+      ).toHaveBeenCalledWith([10]);
       expect(mockRankingRepo.upsert).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ contentId: 10 }),
@@ -1439,9 +1442,9 @@ describe('RankingsService', () => {
 
       await service.fetchWeeklyBoxOffice();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
-        55,
-      ]);
+      expect(
+        mockContentMetadataService.batchCacheByContentIds,
+      ).toHaveBeenCalledWith([55]);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledTimes(1);
       expect(mockRevalidateService.revalidatePath).toHaveBeenCalledWith('/', [
         'rankings',
@@ -1513,9 +1516,9 @@ describe('RankingsService', () => {
 
       await service.fetchKoreanTvDiscover();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
-        201,
-      ]);
+      expect(
+        mockContentMetadataService.batchCacheByContentIds,
+      ).toHaveBeenCalledWith([201]);
     });
 
     it('contents 캐싱 실패 시에도 에러를 throw하지 않아야 한다', async () => {
@@ -1531,9 +1534,9 @@ describe('RankingsService', () => {
 
       await expect(service.fetchKoreanTvDiscover()).resolves.not.toThrow();
 
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
-        301,
-      ]);
+      expect(
+        mockContentMetadataService.batchCacheByContentIds,
+      ).toHaveBeenCalledWith([301]);
     });
 
     it('Discover API 실패 시 에러 로깅만 하고 throw하지 않아야 한다', async () => {
@@ -1544,7 +1547,7 @@ describe('RankingsService', () => {
       await expect(service.fetchKoreanTvDiscover()).resolves.not.toThrow();
 
       expect(
-        mockEmbeddingService.batchCacheByContentIds,
+        mockContentMetadataService.batchCacheByContentIds,
       ).not.toHaveBeenCalled();
     });
 
@@ -1573,7 +1576,7 @@ describe('RankingsService', () => {
         mockContentCatalogService.findOrFetchByTmdbId,
       ).not.toHaveBeenCalled();
       expect(
-        mockEmbeddingService.batchCacheByContentIds,
+        mockContentMetadataService.batchCacheByContentIds,
       ).not.toHaveBeenCalled();
     });
   });

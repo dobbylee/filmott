@@ -12,7 +12,7 @@ import { Ranking } from './ranking.entity';
 import { KobisService } from '../kobis/kobis.service';
 import { TmdbService } from '../tmdb/tmdb.service';
 import { ContentCatalogService } from '../contents/services/content-catalog.service';
-import { EmbeddingService } from '../embedding/embedding.service';
+import { ContentMetadataService } from '../recommendation/content-metadata.service';
 import { RevalidateService } from '../common/revalidate.service';
 import { Content } from '../contents/content.entity';
 import { TMDB_IMAGE_BASE } from '../common/constants';
@@ -51,7 +51,7 @@ export class RankingsService {
     private readonly kobisService: KobisService,
     private readonly tmdbService: TmdbService,
     private readonly contentCatalogService: ContentCatalogService,
-    private readonly embeddingService: EmbeddingService,
+    private readonly metadataService: ContentMetadataService,
     private readonly revalidateService: RevalidateService,
   ) {}
 
@@ -811,7 +811,7 @@ export class RankingsService {
   }
 
   private cacheMetadataInBackground(contentIds: number[]): void {
-    this.embeddingService
+    this.metadataService
       .batchCacheByContentIds(contentIds)
       .then((result) => {
         this.logger.log(

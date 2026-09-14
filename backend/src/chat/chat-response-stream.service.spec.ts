@@ -3,7 +3,7 @@ import { OpenAIError } from 'openai';
 import { LengthFinishReasonError } from 'openai/error';
 import type { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { ChatResponseStreamService } from './chat-response-stream.service';
-import type { SimilarContent } from '../embedding/embedding.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 import type { StructuredChatResponse } from './structured-chat-response';
 import { StructuredChatStreamAccumulator } from './structured-chat-stream';
 

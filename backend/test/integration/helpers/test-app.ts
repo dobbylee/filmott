@@ -8,6 +8,7 @@ import { createRequest, createResponse } from 'node-mocks-http';
 import type { Request, Response } from 'express';
 import { AppModule } from '../../../src/app.module';
 import { ChatService } from '../../../src/chat/chat.service';
+import { ContentMetadataService } from '../../../src/recommendation/content-metadata.service';
 import { EmbeddingService } from '../../../src/embedding/embedding.service';
 import { R2StorageService } from '../../../src/common/r2-storage.service';
 import { configureApp } from '../../../src/configure-app';
@@ -127,15 +128,17 @@ const r2StorageServiceStub = {
   delete: jest.fn().mockResolvedValue(undefined),
 };
 
-const embeddingServiceStub = {
+const metadataServiceStub = {
+  isEmbeddingAvailable: jest.fn().mockReturnValue(false),
   hasAnyMetadata: jest.fn().mockResolvedValue(false),
   generateEmbedding: jest.fn(),
   cacheContentMetadata: jest.fn(),
-  searchSimilar: jest.fn(),
   batchCacheByContentIds: jest
     .fn()
     .mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
 };
+
+const embeddingServiceStub = { searchSimilar: jest.fn() };
 
 const chatServiceStub = {
   sendMessageStream: jest.fn(),
@@ -151,6 +154,8 @@ export async function createE2eTestApp(): Promise<INestApplication> {
     .useValue(kobisServiceStub)
     .overrideProvider(R2StorageService)
     .useValue(r2StorageServiceStub)
+    .overrideProvider(ContentMetadataService)
+    .useValue(metadataServiceStub)
     .overrideProvider(EmbeddingService)
     .useValue(embeddingServiceStub)
     .overrideProvider(ChatService)

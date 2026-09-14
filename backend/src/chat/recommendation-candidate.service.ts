@@ -3,10 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ContentDiscoveryService } from '../contents/services/content-discovery.service';
 import { ContentSearchFilters } from './content-search.service';
-import {
-  EmbeddingService,
-  SimilarContent,
-} from '../embedding/embedding.service';
+import { ContentMetadataService } from '../recommendation/content-metadata.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 import { ParsedIntent } from './intent-analyzer';
 import { getSearchableGenres } from './intent-genres';
 
@@ -38,7 +36,7 @@ export class RecommendationCandidateService {
   private readonly logger = new Logger(RecommendationCandidateService.name);
 
   constructor(
-    private readonly embeddingService: EmbeddingService,
+    private readonly metadataService: ContentMetadataService,
     private readonly contentDiscoveryService: ContentDiscoveryService,
     private readonly dataSource: DataSource,
     private readonly contentCatalogService: ContentCatalogService,
@@ -91,7 +89,7 @@ export class RecommendationCandidateService {
 
     if (contentIds.length === 0) return;
 
-    this.embeddingService.batchCacheByContentIds(contentIds).catch((error) => {
+    this.metadataService.batchCacheByContentIds(contentIds).catch((error) => {
       this.logger.warn(
         `추천 후보 metadata 캐싱 실패: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -310,12 +308,12 @@ export class RecommendationCandidateService {
     );
     if (signal?.aborted) return null;
     const metadata = signal
-      ? await this.embeddingService.cacheContentMetadata(
+      ? await this.metadataService.cacheContentMetadata(
           content.id,
           false,
           signal,
         )
-      : await this.embeddingService.cacheContentMetadata(content.id);
+      : await this.metadataService.cacheContentMetadata(content.id);
     if (signal?.aborted) return null;
     if (!metadata?.embedding) return null;
 

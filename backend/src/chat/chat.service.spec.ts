@@ -6,10 +6,9 @@ import { OpenAIModule } from '../integrations/openai/openai.module';
 import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatService } from './chat.service';
-import {
-  EmbeddingService,
-  SimilarContent,
-} from '../embedding/embedding.service';
+import { ContentMetadataService } from '../recommendation/content-metadata.service';
+import { EmbeddingService } from '../embedding/embedding.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 import { ContentSearchService } from './content-search.service';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentDiscoveryService } from '../contents/services/content-discovery.service';
@@ -51,14 +50,15 @@ describe('ChatService', () => {
   let service: ChatService;
   let recommendationCandidateService: RecommendationCandidateService;
 
-  const mockEmbeddingService = {
+  const mockMetadataService = {
     hasAnyMetadata: jest.fn(),
-    searchSimilar: jest.fn(),
     cacheContentMetadata: jest.fn().mockResolvedValue(undefined),
     batchCacheByContentIds: jest
       .fn()
       .mockResolvedValue({ cached: 0, skipped: 0, failed: 0 }),
   };
+
+  const mockEmbeddingService = { searchSimilar: jest.fn() };
 
   const mockContentSearchService = {
     searchWithFilters: jest.fn(),
@@ -218,6 +218,7 @@ describe('ChatService', () => {
         RecommendationCandidateService,
         ChatResponseStreamService,
         { provide: EmbeddingService, useValue: mockEmbeddingService },
+        { provide: ContentMetadataService, useValue: mockMetadataService },
         { provide: ContentSearchService, useValue: mockContentSearchService },
         { provide: IntentAnalyzerService, useValue: mockIntentAnalyzerService },
         {
@@ -293,7 +294,7 @@ describe('ChatService', () => {
         id: 1,
         subscribedOtts: ['netflix'],
       });
-      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
+      mockMetadataService.hasAnyMetadata.mockResolvedValue(true);
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
       });
@@ -587,7 +588,7 @@ describe('ChatService', () => {
 
     it('확정 후보가 없으면 본문 제목을 TMDB 검색으로 카드 복구하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
+      mockMetadataService.hasAnyMetadata.mockResolvedValue(true);
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
         contentType: 'tv',
@@ -834,7 +835,7 @@ describe('ChatService', () => {
           },
         ],
       });
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
+      expect(mockMetadataService.batchCacheByContentIds).toHaveBeenCalledWith([
         4,
       ]);
 
@@ -892,7 +893,7 @@ describe('ChatService', () => {
           recEvents[0].data as { recommendations: { title: string }[] }
         ).recommendations.map((recommendation) => recommendation.title),
       ).toEqual(['추천작1', '추천작2', '추천작3', '추천작4', '추천작5']);
-      expect(mockEmbeddingService.batchCacheByContentIds).toHaveBeenCalledWith([
+      expect(mockMetadataService.batchCacheByContentIds).toHaveBeenCalledWith([
         1, 2, 3, 4, 5,
       ]);
 
@@ -909,7 +910,7 @@ describe('ChatService', () => {
 
     it('본문 제목 fallback으로 후보 밖 TMDB 검색 결과를 카드로 복구하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
+      mockMetadataService.hasAnyMetadata.mockResolvedValue(true);
       mockIntentAnalyzerService.analyzeIntent.mockResolvedValue({
         ...emptyIntent,
         contentType: 'tv',
@@ -1580,7 +1581,7 @@ describe('ChatService', () => {
 
         expect(emittedEvents).toEqual([]);
         expect(
-          mockEmbeddingService.batchCacheByContentIds,
+          mockMetadataService.batchCacheByContentIds,
         ).not.toHaveBeenCalled();
       },
     );
@@ -1616,11 +1617,11 @@ describe('ChatService', () => {
 
     it('content_metadata가 비어있으면 임베딩 검색을 스킵해야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(false);
+      mockMetadataService.hasAnyMetadata.mockResolvedValue(false);
 
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
-      expect(mockEmbeddingService.hasAnyMetadata).toHaveBeenCalled();
+      expect(mockMetadataService.hasAnyMetadata).toHaveBeenCalled();
       expect(mockEmbeddingService.searchSimilar).not.toHaveBeenCalled();
     });
 
@@ -1634,6 +1635,7 @@ describe('ChatService', () => {
           RecommendationCandidateService,
           ChatResponseStreamService,
           { provide: EmbeddingService, useValue: mockEmbeddingService },
+          { provide: ContentMetadataService, useValue: mockMetadataService },
           { provide: ContentSearchService, useValue: mockContentSearchService },
           {
             provide: IntentAnalyzerService,
@@ -1864,7 +1866,7 @@ describe('ChatService', () => {
 
     it('content_metadata가 없으면 analyzeIntent를 호출하지 않아야 한다', async () => {
       setupEmptyUserContext();
-      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(false);
+      mockMetadataService.hasAnyMetadata.mockResolvedValue(false);
 
       await service.sendMessageStream(1, '추천해줘', [], jest.fn());
 
@@ -2235,7 +2237,7 @@ describe('ChatService', () => {
         );
 
         expect(mockUserRepo.findOne).not.toHaveBeenCalled();
-        expect(mockEmbeddingService.hasAnyMetadata).not.toHaveBeenCalled();
+        expect(mockMetadataService.hasAnyMetadata).not.toHaveBeenCalled();
         expect(mockStreamCreate).not.toHaveBeenCalled();
         expect(emit).not.toHaveBeenCalled();
       });
@@ -2256,7 +2258,7 @@ describe('ChatService', () => {
           controller.signal,
         );
 
-        expect(mockEmbeddingService.hasAnyMetadata).not.toHaveBeenCalled();
+        expect(mockMetadataService.hasAnyMetadata).not.toHaveBeenCalled();
         expect(mockIntentAnalyzerService.analyzeIntent).not.toHaveBeenCalled();
         expect(mockStreamCreate).not.toHaveBeenCalled();
       });
@@ -2383,7 +2385,7 @@ describe('ChatService', () => {
         expect(emittedEvents).toContain('recommendations');
         expect(emittedEvents).not.toContain('done');
         expect(
-          mockEmbeddingService.batchCacheByContentIds,
+          mockMetadataService.batchCacheByContentIds,
         ).not.toHaveBeenCalled();
       });
     });
@@ -2406,7 +2408,7 @@ describe('ChatService', () => {
       mockReviewRepo.createQueryBuilder.mockReturnValue(emptyQb);
       mockWatchlistRepo.createQueryBuilder.mockReturnValue(emptyQb);
       mockUserRepo.findOne.mockResolvedValue({ id: 1, subscribedOtts: [] });
-      mockEmbeddingService.hasAnyMetadata.mockResolvedValue(true);
+      mockMetadataService.hasAnyMetadata.mockResolvedValue(true);
       mockExtractUserPreference.mockReturnValue({
         preferredGenres: [],
         preferredCountries: [],
@@ -2497,7 +2499,7 @@ describe('ChatService', () => {
         id: 100,
         tmdbId: 12345,
       });
-      mockEmbeddingService.cacheContentMetadata.mockResolvedValue({
+      mockMetadataService.cacheContentMetadata.mockResolvedValue({
         embedding: JSON.stringify(fakeEmbedding),
       });
 
@@ -2529,7 +2531,7 @@ describe('ChatService', () => {
       expect(
         mockContentDiscoveryService.findOrFetchByTmdbId,
       ).toHaveBeenCalledWith(12345, 'tv', controller.signal);
-      expect(mockEmbeddingService.cacheContentMetadata).toHaveBeenCalledWith(
+      expect(mockMetadataService.cacheContentMetadata).toHaveBeenCalledWith(
         100,
         false,
         controller.signal,

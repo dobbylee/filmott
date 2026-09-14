@@ -10,7 +10,7 @@ import {
 } from 'openai/error';
 import type { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { ZodError } from 'zod';
-import type { SimilarContent } from '../embedding/embedding.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 import type { StructuredChatResponse } from './structured-chat-response';
 import { StructuredChatStreamAccumulator } from './structured-chat-stream';
 import { getStructuredChatProgress } from './structured-chat-progress';

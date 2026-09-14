@@ -10,6 +10,7 @@ import { ChatContextService } from './chat-context.service';
 import { ChatResponseStreamService } from './chat-response-stream.service';
 import { ChatService } from './chat.service';
 import type { ContentSearchService } from './content-search.service';
+import type { ContentMetadataService } from '../recommendation/content-metadata.service';
 import type { EmbeddingService } from '../embedding/embedding.service';
 import type { IntentAnalyzerService } from './intent-analyzer';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
@@ -65,14 +66,16 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
   it.each(CHAT_QUALITY_CASES.filter(hasPreferenceFixture))(
     '$id fixture는 실제 ChatService 검색 필터와 일치해야 한다',
     async (testCase) => {
-      const embeddingService = {
+      const metadataService = {
         hasAnyMetadata: jest.fn().mockResolvedValue(true),
-        searchSimilar: jest.fn().mockResolvedValue([]),
         batchCacheByContentIds: jest.fn().mockResolvedValue({
           cached: 0,
           skipped: 0,
           failed: 0,
         }),
+      } as unknown as ContentMetadataService;
+      const embeddingService = {
+        searchSimilar: jest.fn().mockResolvedValue([]),
       } as unknown as EmbeddingService;
       const contentSearchService = {
         searchWithFilters: jest.fn().mockResolvedValue([]),
@@ -95,7 +98,7 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         typeof RecommendationCandidateService
       >[2];
       const recommendationCandidateService = new RecommendationCandidateService(
-        embeddingService,
+        metadataService,
         contentDiscoveryService,
         dataSource,
         {} as ContentCatalogService,
@@ -110,6 +113,7 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         get: jest.fn().mockReturnValue('test-openai-key'),
       } as unknown as ConfigService;
       const service = new ChatService(
+        metadataService,
         embeddingService,
         contentSearchService,
         intentAnalyzer,

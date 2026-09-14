@@ -7,10 +7,9 @@ import {
   AI_TEXT_MODEL,
   AI_TEXT_REASONING_EFFORT,
 } from '../common/ai-text.constants';
-import {
-  EmbeddingService,
-  SimilarContent,
-} from '../embedding/embedding.service';
+import { ContentMetadataService } from '../recommendation/content-metadata.service';
+import { EmbeddingService } from '../embedding/embedding.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 import {
   ContentSearchService,
   ContentSearchFilters,
@@ -64,6 +63,7 @@ type SseEmitter = (event: string, data: unknown) => void;
 @Injectable()
 export class ChatService {
   constructor(
+    private readonly metadataService: ContentMetadataService,
     private readonly embeddingService: EmbeddingService,
     private readonly contentSearchService: ContentSearchService,
     private readonly intentAnalyzer: IntentAnalyzerService,
@@ -118,7 +118,7 @@ export class ChatService {
     if (signal?.aborted) return;
 
     // 2. 대화 맥락을 합쳐서 벡터 검색 (전체 user 메시지 + 현재 메시지)
-    const hasMetadata = await this.embeddingService.hasAnyMetadata();
+    const hasMetadata = await this.metadataService.hasAnyMetadata();
     if (signal?.aborted) return;
     let similarContents: SimilarContent[] = [];
     let intent: ParsedIntent = {

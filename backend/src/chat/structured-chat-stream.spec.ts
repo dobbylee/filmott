@@ -1,4 +1,4 @@
-import type { SimilarContent } from '../embedding/embedding.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 import { StructuredChatStreamAccumulator } from './structured-chat-stream';
 import { getStructuredChatProgress } from './structured-chat-progress';
 import { partialParse } from 'openai/_vendor/partial-json-parser/parser';

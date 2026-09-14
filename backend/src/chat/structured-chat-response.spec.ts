@@ -1,4 +1,4 @@
-import type { SimilarContent } from '../embedding/embedding.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 import {
   CHAT_RESPONSE_FORMAT,
   extractPreviouslyRecommendedTitles,

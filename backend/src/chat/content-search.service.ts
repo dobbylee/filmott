@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import {
-  EmbeddingService,
-  SimilarContent,
-} from '../embedding/embedding.service';
+import { ContentMetadataService } from '../recommendation/content-metadata.service';
+import type { SimilarContent } from '../recommendation/recommendation.types';
 
 export const FILTER_RELAXATION_SEQUENCE = [
   'genres',
@@ -58,7 +56,7 @@ export class ContentSearchService {
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly embeddingService: EmbeddingService,
+    private readonly metadataService: ContentMetadataService,
   ) {}
 
   async searchWithFilters(
@@ -75,7 +73,7 @@ export class ContentSearchService {
     let embedding: number[] | null = precomputedEmbedding ?? null;
     if (!embedding) {
       try {
-        embedding = await this.embeddingService.generateEmbedding(
+        embedding = await this.metadataService.generateEmbedding(
           queryText,
           ...signalArgs,
         );

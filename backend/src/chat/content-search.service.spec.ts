@@ -4,12 +4,12 @@ import {
   ContentSearchService,
   FILTER_RELAXATION_SEQUENCE,
 } from './content-search.service';
-import { EmbeddingService } from '../embedding/embedding.service';
+import { ContentMetadataService } from '../recommendation/content-metadata.service';
 
 describe('ContentSearchService', () => {
   let service: ContentSearchService;
 
-  const mockEmbeddingService = {
+  const mockContentMetadataService = {
     generateEmbedding: jest.fn(),
   };
 
@@ -39,14 +39,19 @@ describe('ContentSearchService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ContentSearchService,
-        { provide: EmbeddingService, useValue: mockEmbeddingService },
+        {
+          provide: ContentMetadataService,
+          useValue: mockContentMetadataService,
+        },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 
     service = module.get<ContentSearchService>(ContentSearchService);
 
-    mockEmbeddingService.generateEmbedding.mockResolvedValue(mockEmbedding);
+    mockContentMetadataService.generateEmbedding.mockResolvedValue(
+      mockEmbedding,
+    );
   });
 
   afterEach(() => {
@@ -113,7 +118,7 @@ describe('ContentSearchService', () => {
       });
 
       expect(result).toHaveLength(5);
-      expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledWith(
+      expect(mockContentMetadataService.generateEmbedding).toHaveBeenCalledWith(
         '스릴러 추천',
       );
       expect(mockDataSource.query).toHaveBeenCalledTimes(1);
@@ -387,7 +392,9 @@ describe('ContentSearchService', () => {
       expect(result).toHaveLength(6);
 
       // 임베딩은 1회만 생성
-      expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledTimes(1);
+      expect(
+        mockContentMetadataService.generateEmbedding,
+      ).toHaveBeenCalledTimes(1);
 
       // 1차 쿼리: 모든 필터 포함
       const firstQuery = mockDataSource.query.mock.calls[0][0] as string;
@@ -640,7 +647,7 @@ describe('ContentSearchService', () => {
     });
 
     it('generateEmbedding 실패 시 벡터 유사도 없이 인기도 기반 결과를 반환해야 한다', async () => {
-      mockEmbeddingService.generateEmbedding.mockRejectedValue(
+      mockContentMetadataService.generateEmbedding.mockRejectedValue(
         new Error('OpenAI API 오류'),
       );
       mockDataSource.query.mockResolvedValue(fiveRows);
@@ -663,7 +670,7 @@ describe('ContentSearchService', () => {
     });
 
     it('generateEmbedding 실패 시에도 contentType 필터가 유지되어야 한다', async () => {
-      mockEmbeddingService.generateEmbedding.mockRejectedValue(
+      mockContentMetadataService.generateEmbedding.mockRejectedValue(
         new Error('OpenAI API 오류'),
       );
       mockDataSource.query.mockResolvedValue(fiveRows);
@@ -737,7 +744,9 @@ describe('ContentSearchService', () => {
         precomputed,
       );
 
-      expect(mockEmbeddingService.generateEmbedding).not.toHaveBeenCalled();
+      expect(
+        mockContentMetadataService.generateEmbedding,
+      ).not.toHaveBeenCalled();
       const params = mockDataSource.query.mock.calls[0][1] as unknown[];
       // precomputedEmbedding이 쿼리 파라미터에 포함되어야 한다
       expect(params).toContain('[0.5,0.6,0.7]');
@@ -750,7 +759,7 @@ describe('ContentSearchService', () => {
         contentType: 'movie',
       });
 
-      expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledWith(
+      expect(mockContentMetadataService.generateEmbedding).toHaveBeenCalledWith(
         '스릴러 추천',
       );
     });
@@ -814,7 +823,7 @@ describe('ContentSearchService', () => {
     });
 
     it('임베딩 실패 시 1순위에서 인기도 기반으로 정렬해야 한다', async () => {
-      mockEmbeddingService.generateEmbedding.mockRejectedValue(
+      mockContentMetadataService.generateEmbedding.mockRejectedValue(
         new Error('OpenAI API 오류'),
       );
       mockDataSource.query.mockResolvedValue(fiveRows);

@@ -1,7 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { ContentSearchService } from '../../src/chat/content-search.service';
-import { EmbeddingService } from '../../src/embedding/embedding.service';
+import { ContentMetadataService } from '../../src/recommendation/content-metadata.service';
 import {
   createIntegrationDataSource,
   hasIntegrationDatabaseConfig,
@@ -31,7 +31,7 @@ describeWithDb('content search integration', () => {
   let dataSource: DataSource;
   let moduleRef: TestingModule;
   let service: ContentSearchService;
-  const embeddingService = {
+  const metadataService = {
     generateEmbedding: jest.fn<Promise<number[]>, [string]>(),
   };
 
@@ -41,7 +41,7 @@ describeWithDb('content search integration', () => {
       providers: [
         ContentSearchService,
         { provide: DataSource, useValue: dataSource },
-        { provide: EmbeddingService, useValue: embeddingService },
+        { provide: ContentMetadataService, useValue: metadataService },
       ],
     }).compile();
     service = moduleRef.get(ContentSearchService);
@@ -49,7 +49,7 @@ describeWithDb('content search integration', () => {
 
   beforeEach(async () => {
     await resetIntegrationDatabase(dataSource);
-    embeddingService.generateEmbedding.mockResolvedValue(embedding);
+    metadataService.generateEmbedding.mockResolvedValue(embedding);
   });
 
   afterEach(() => {
@@ -254,15 +254,13 @@ describeWithDb('content search integration', () => {
       description: '높은 인기도 설명',
       embedding: createVectorLiteral(1536, 0.01),
     });
-    embeddingService.generateEmbedding.mockRejectedValueOnce(
+    metadataService.generateEmbedding.mockRejectedValueOnce(
       new Error('OpenAI API 오류'),
     );
 
     const result = await service.searchWithFilters('영화 추천', 10, [], {});
 
-    expect(embeddingService.generateEmbedding).toHaveBeenCalledWith(
-      '영화 추천',
-    );
+    expect(metadataService.generateEmbedding).toHaveBeenCalledWith('영화 추천');
     expect(result.map((item) => item.contentId)).toEqual([
       highVoteContent.id,
       lowVoteContent.id,

@@ -6,7 +6,7 @@ import { RankingsController } from './rankings.controller';
 import { KobisModule } from '../kobis/kobis.module';
 import { TmdbModule } from '../tmdb/tmdb.module';
 import { ContentsModule } from '../contents/contents.module';
-import { EmbeddingModule } from '../embedding/embedding.module';
+import { RecommendationModule } from '../recommendation/recommendation.module';
 import { CommonModule } from '../common/common.module';
 
 @Module({
@@ -15,7 +15,7 @@ import { CommonModule } from '../common/common.module';
     KobisModule,
     TmdbModule,
     ContentsModule,
-    EmbeddingModule,
+    RecommendationModule,
     CommonModule,
   ],
   controllers: [RankingsController],
