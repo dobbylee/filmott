@@ -18,3 +18,10 @@ export interface BatchResult {
   skipped: number;
   failed: number;
 }
+
+export interface RecommendationRerankContext {
+  contentType?: 'movie' | 'tv' | null;
+  genres?: string[];
+  countries?: string[];
+  personNames?: string[];
+}

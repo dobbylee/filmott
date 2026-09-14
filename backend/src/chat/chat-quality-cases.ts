@@ -3,7 +3,7 @@ import type { ChatHistoryMessageDto } from './dto/send-message.dto';
 import type { SimilarContent } from '../recommendation/recommendation.types';
 import type { ParsedIntent } from './intent-analyzer';
 import type { UserContext } from './prompts/system-prompt';
-import type { RecommendationRerankContext } from './recommendation-candidate.service';
+import type { RecommendationRerankContext } from '../recommendation/recommendation.types';
 
 export interface ChatQualityCase {
   id: string;

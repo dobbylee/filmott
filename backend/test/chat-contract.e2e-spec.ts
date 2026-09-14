@@ -5,7 +5,7 @@ import { ModulesContainer } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { ChatService } from '../src/chat/chat.service';
 import { RecommendationSearchService } from '../src/recommendation/recommendation-search.service';
-import { RecommendationCandidateService } from '../src/chat/recommendation-candidate.service';
+import { RecommendationCandidateService } from '../src/recommendation/recommendation-candidate.service';
 import { RankingsService } from '../src/rankings/rankings.service';
 
 import type { ChatHistoryMessageDto } from '../src/chat/dto/send-message.dto';
@@ -129,6 +129,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
       OpenAIEmbeddingClient,
       ContentMetadataService,
       RecommendationSearchService,
+      RecommendationCandidateService,
     ]) {
       const providers = [...modules.values()].flatMap((module) =>
         [...module.providers.values()].filter(

@@ -1,3 +1,4 @@
+import { buildFiltersFromIntent } from './intent-filter.mapper';
 import type { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { DataSource } from 'typeorm';
 import type { ContentDiscoveryService } from '../contents/services/content-discovery.service';
@@ -5,7 +6,7 @@ import type { ContentSearchFilters } from '../recommendation/recommendation-sear
 import type { ContentMetadataService } from '../recommendation/content-metadata.service';
 import type { ParsedIntent } from './intent-analyzer';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
-import { RecommendationCandidateService } from './recommendation-candidate.service';
+import { RecommendationCandidateService } from '../recommendation/recommendation-candidate.service';
 import {
   extractPreviouslyRecommendedTitles,
   resolveStructuredChatResponse,
@@ -82,11 +83,9 @@ describe('채팅 추천 downstream contract 평가셋 (LLM-free)', () => {
     const cases = CHAT_QUALITY_CASES.filter(hasExpectedFilters);
 
     for (const testCase of cases) {
-      expect(
-        recommendationCandidateService.buildFiltersFromIntent(
-          testCase.recordedStructuredOutput,
-        ),
-      ).toEqual(testCase.expectedFilters);
+      expect(buildFiltersFromIntent(testCase.recordedStructuredOutput)).toEqual(
+        testCase.expectedFilters,
+      );
     }
   });
 
@@ -102,9 +101,7 @@ describe('채팅 추천 downstream contract 평가셋 (LLM-free)', () => {
       genres: ['로맨스', '코미디'],
       confidence: 'high',
     };
-    expect(
-      recommendationCandidateService.buildFiltersFromIntent(intent),
-    ).toEqual({
+    expect(buildFiltersFromIntent(intent)).toEqual({
       ottProviderNames: ['Netflix'],
       countries: ['KR'],
       dateRange: { from: '2025-01-01', to: null },
@@ -113,7 +110,7 @@ describe('채팅 추천 downstream contract 평가셋 (LLM-free)', () => {
     });
     expect(intent.genres).toEqual(['로맨스', '코미디']);
     expect(
-      recommendationCandidateService.buildFiltersFromIntent({
+      buildFiltersFromIntent({
         ...intent,
         genres: ['로맨스', '로코', '힐링'],
       }),

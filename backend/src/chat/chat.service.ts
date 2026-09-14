@@ -1,3 +1,4 @@
+import { buildFiltersFromIntent } from './intent-filter.mapper';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -30,10 +31,8 @@ import {
 } from './structured-chat-response';
 import { StructuredChatStreamAccumulator } from './structured-chat-stream';
 import { ChatContextService } from './chat-context.service';
-import {
-  RecommendationCandidateService,
-  type RecommendationRerankContext,
-} from './recommendation-candidate.service';
+import { RecommendationCandidateService } from '../recommendation/recommendation-candidate.service';
+import type { RecommendationRerankContext } from '../recommendation/recommendation.types';
 import { ChatResponseStreamService } from './chat-response-stream.service';
 
 const OPENAI_CHAT_TIMEOUT_MS = 30_000;
@@ -148,8 +147,7 @@ export class ChatService {
       if (signal?.aborted) return;
 
       // 4. ParsedIntent → ContentSearchFilters 변환
-      const filters =
-        this.recommendationCandidateService.buildFiltersFromIntent(intent);
+      const filters = buildFiltersFromIntent(intent);
 
       // 5. 쿼리 정제: 메타데이터 키워드 제거 후 의미적 쿼리만 사용
       const semanticQuery = this.intentAnalyzer.buildSemanticQuery(

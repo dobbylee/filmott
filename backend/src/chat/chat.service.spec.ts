@@ -13,7 +13,7 @@ import type { SimilarContent } from '../recommendation/recommendation.types';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ContentDiscoveryService } from '../contents/services/content-discovery.service';
 import { ChatContextService } from './chat-context.service';
-import { RecommendationCandidateService } from './recommendation-candidate.service';
+import { RecommendationCandidateService } from '../recommendation/recommendation-candidate.service';
 import { ChatResponseStreamService } from './chat-response-stream.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';

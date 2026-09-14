@@ -2,21 +2,14 @@ import { ContentCatalogService } from '../contents/services/content-catalog.serv
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ContentDiscoveryService } from '../contents/services/content-discovery.service';
-import { ContentSearchFilters } from '../recommendation/recommendation-search.types';
-import { ContentMetadataService } from '../recommendation/content-metadata.service';
-import type { SimilarContent } from '../recommendation/recommendation.types';
-import { ParsedIntent } from './intent-analyzer';
-import { getSearchableGenres } from './intent-genres';
+import { ContentMetadataService } from './content-metadata.service';
+import type {
+  SimilarContent,
+  RecommendationRerankContext,
+} from './recommendation.types';
 
 const CHAT_RECOMMENDATION_LIMIT = 5;
 const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
-
-export interface RecommendationRerankContext {
-  contentType?: 'movie' | 'tv' | null;
-  genres?: string[];
-  countries?: string[];
-  personNames?: string[];
-}
 
 const RERANK_WEIGHTS = {
   GENRE_MATCH: 0.25,
@@ -124,23 +117,6 @@ export class RecommendationCandidateService {
     }
 
     return null;
-  }
-
-  buildFiltersFromIntent(intent: ParsedIntent): ContentSearchFilters {
-    const filters: ContentSearchFilters = {};
-    if (intent.ottProviderNames.length > 0)
-      filters.ottProviderNames = intent.ottProviderNames;
-    if (intent.countries.length > 0) filters.countries = intent.countries;
-    if (intent.excludeCountries.length > 0)
-      filters.excludeCountries = intent.excludeCountries;
-    if (intent.personNames.length > 0) filters.personNames = intent.personNames;
-    if (intent.dateRange && (intent.dateRange.from || intent.dateRange.to)) {
-      filters.dateRange = intent.dateRange;
-    }
-    if (intent.contentType) filters.contentType = intent.contentType;
-    const genres = getSearchableGenres(intent.genres, intent.contentType);
-    if (genres.length > 0) filters.genres = genres;
-    return filters;
   }
 
   private rerankCandidates(

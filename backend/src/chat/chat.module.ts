@@ -5,20 +5,17 @@ import { Content } from '../contents/content.entity';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
 import { User } from '../users/user.entity';
-import { ContentsModule } from '../contents/contents.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { IntentAnalyzerService } from './intent-analyzer';
 import { ChatContextService } from './chat-context.service';
-import { RecommendationCandidateService } from './recommendation-candidate.service';
 import { ChatResponseStreamService } from './chat-response-stream.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Content, Watchlist, Review, User]),
     OpenAIModule,
-    ContentsModule,
     RecommendationModule,
   ],
   controllers: [ChatController],
@@ -26,7 +23,6 @@ import { ChatResponseStreamService } from './chat-response-stream.service';
     ChatService,
     IntentAnalyzerService,
     ChatContextService,
-    RecommendationCandidateService,
     ChatResponseStreamService,
   ],
 })

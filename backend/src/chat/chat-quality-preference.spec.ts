@@ -13,7 +13,7 @@ import type { RecommendationSearchService } from '../recommendation/recommendati
 import type { ContentMetadataService } from '../recommendation/content-metadata.service';
 
 import type { IntentAnalyzerService } from './intent-analyzer';
-import { RecommendationCandidateService } from './recommendation-candidate.service';
+import { RecommendationCandidateService } from '../recommendation/recommendation-candidate.service';
 
 const mockStreamCreate = jest.fn();
 
