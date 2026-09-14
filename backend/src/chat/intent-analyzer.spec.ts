@@ -1,14 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { OpenAIModule } from '../integrations/openai/openai.module';
-import {
-  IntentAnalyzerService,
-  ParsedIntent,
-  GENRE_ALIAS_MAP,
-} from './intent-analyzer';
+import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { GENRE_NAME_MAP } from '../common/constants';
 import { CHAT_QUALITY_CASES } from './chat-quality-cases';
 import { CHAT_INTENT_RESPONSE_FORMAT } from './intent-schema';
+import { GENRE_ALIAS_MAP } from './intent-genres';
 
 // OpenAI SDK mock
 const mockCreate = jest.fn();
@@ -278,16 +275,29 @@ describe('IntentAnalyzerService', () => {
       expect(result.referenceTitles).toEqual([]);
     });
 
-    it('매핑에 없는 장르명은 그대로 유지해야 한다', async () => {
+    it('정식 목록에 없는 표현은 SQL 장르로 유지하지 않아야 한다', async () => {
       mockIntent({ genres: ['뮤지컬'] });
 
       const result = await service.analyzeIntent('뮤지컬 영화 추천해줘');
 
-      expect(result.genres).toEqual(['뮤지컬']);
+      expect(result.genres).toEqual([]);
+      expect(
+        service.buildSemanticQuery('뮤지컬 영화 추천해줘', result),
+      ).toContain('뮤지컬');
     });
 
-    it('"재밌는 드라마 추천해줘" → contentType=tv + genres에서 드라마 제거되어 빈 배열', async () => {
-      mockIntent({ genres: ['드라마'], contentType: null });
+    it('분위기 표현만 남으면 강제 SQL 장르와 잘못된 high confidence를 제거해야 한다', async () => {
+      mockIntent({ genres: ['힐링', '잔잔한'], confidence: 'high' });
+      const result = await service.analyzeIntent('잔잔한 힐링 작품');
+      expect(result.genres).toEqual([]);
+      expect(result.confidence).toBe('low');
+      expect(service.buildSemanticQuery('잔잔한 힐링 작품', result)).toBe(
+        '잔잔한 힐링 작품',
+      );
+    });
+
+    it('시리즈 의미의 드라마를 모델이 빈 장르로 정규화한 결과를 유지해야 한다', async () => {
+      mockIntent({ genres: [], contentType: 'tv' });
 
       const result = await service.analyzeIntent('재밌는 드라마 추천해줘');
 
@@ -295,8 +305,8 @@ describe('IntentAnalyzerService', () => {
       expect(result.genres).toEqual([]);
     });
 
-    it('"로맨스 드라마 추천해줘" → contentType=tv + genres에서 드라마 제거되어 로맨스만 남음', async () => {
-      mockIntent({ genres: ['로맨스', '드라마'], contentType: null });
+    it('로맨스 드라마의 모델 장르와 매체 결과를 서로 혼동하지 않아야 한다', async () => {
+      mockIntent({ genres: ['로맨스'], contentType: 'tv' });
 
       const result = await service.analyzeIntent('로맨스 드라마 추천해줘');
 
@@ -306,7 +316,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('"예능 추천해줘" → contentType=tv + 리얼리티/토크 장르로 확장해야 한다', async () => {
-      mockIntent({ genres: [], contentType: null });
+      mockIntent({ genres: ['리얼리티', '토크'], contentType: 'tv' });
 
       const result = await service.analyzeIntent('예능 추천해줘');
 
@@ -317,7 +327,7 @@ describe('IntentAnalyzerService', () => {
     });
 
     it('버라이어티 요청도 리얼리티/토크 장르로 확장해야 한다', async () => {
-      mockIntent({ genres: [], contentType: null });
+      mockIntent({ genres: ['리얼리티', '토크'], contentType: 'tv' });
 
       const result = await service.analyzeIntent('버라이어티 추천해줘');
 
@@ -400,6 +410,213 @@ describe('IntentAnalyzerService', () => {
   });
 
   describe('멀티턴', () => {
+    it.each([
+      '부모님이랑 영화 같이 보려고 하는데 추천해줘',
+      '친구랑 영화 같이 볼 만한 거 추천해줘',
+    ])(
+      '동반 시청을 비교 표현으로 오인해 영화 조건을 지우지 않아야 한다: %s',
+      async (message) => {
+        mockIntent({ contentType: 'movie' });
+        expect((await service.analyzeIntent(message)).contentType).toBe(
+          'movie',
+        );
+      },
+    );
+
+    it('시리즈 동반 시청도 모델이 정한 타입을 유지해야 한다', async () => {
+      mockIntent({ contentType: 'tv' });
+      expect(
+        (await service.analyzeIntent('친구랑 시리즈 같이 볼 만한 거'))
+          .contentType,
+      ).toBe('tv');
+    });
+
+    it.each([
+      '영화 말고 아까 조건으로 더 추천해줘',
+      '영화는 싫어, 아까 조건으로 더 추천해줘',
+    ])(
+      '거절한 매체 언급으로 모델이 유지한 시리즈를 뒤집지 않아야 한다: %s',
+      async (message) => {
+        mockIntent({ contentType: 'tv', genres: ['코미디'] });
+        expect(
+          (
+            await service.analyzeIntent(message, [
+              { role: 'user', content: '넷플릭스 시리즈 추천해줘' },
+            ])
+          ).contentType,
+        ).toBe('tv');
+      },
+    );
+
+    it.each([
+      '시리즈 말고 아까 조건으로 더 추천해줘',
+      '예능은 싫어, 영화 조건으로 더 추천해줘',
+    ])(
+      '거절한 TV 언급으로 모델이 유지한 영화를 뒤집지 않아야 한다: %s',
+      async (message) => {
+        mockIntent({ contentType: 'movie', genres: ['코미디'] });
+        const result = await service.analyzeIntent(message, [
+          { role: 'user', content: '영화 추천해줘' },
+        ]);
+        expect(result.contentType).toBe('movie');
+        expect(result.genres).toEqual(['코미디']);
+      },
+    );
+
+    it('정식 드라마 장르를 시리즈라는 이유로 제거하지 않아야 한다', async () => {
+      mockIntent({ contentType: 'tv', genres: ['드라마'] });
+      const result = await service.analyzeIntent('휴먼 드라마 시리즈 추천해줘');
+      expect(result.contentType).toBe('tv');
+      expect(result.genres).toEqual(['드라마']);
+    });
+
+    it.each([
+      '영화처럼 영상미 좋은 거',
+      '영화 같은 연출의 작품으로 추천해줘',
+      '영화 느낌 나는 거',
+      '영화 스타일의 연출이면 좋겠어',
+    ])(
+      '시리즈 후속의 비교 표현을 영화 전환으로 오인하지 않아야 한다: %s',
+      async (message) => {
+        mockIntent({ contentType: 'tv', genres: ['코미디'] });
+        expect(
+          (
+            await service.analyzeIntent(message, [
+              { role: 'user', content: '넷플릭스 시리즈 추천해줘' },
+            ])
+          ).contentType,
+        ).toBe('tv');
+      },
+    );
+
+    it.each(['시리즈처럼 긴 이야기', '드라마 같은 전개'])(
+      '영화 후속의 비교 표현도 시리즈 전환으로 오인하지 않아야 한다: %s',
+      async (message) => {
+        mockIntent({ contentType: 'movie' });
+        expect(
+          (
+            await service.analyzeIntent(message, [
+              { role: 'user', content: '영화 추천해줘' },
+            ])
+          ).contentType,
+        ).toBe('movie');
+      },
+    );
+
+    it('타입을 한정하지 않은 비교 요청의 모델 null 판단을 유지해야 한다', async () => {
+      mockIntent({ contentType: null });
+      expect(
+        (await service.analyzeIntent('영화처럼 영상미 좋은 거')).contentType,
+      ).toBeNull();
+    });
+
+    it('세 번째 장르/국가 후속 요청에서도 최초 시리즈 조건을 유지해야 한다', async () => {
+      mockIntent({
+        ottProviderNames: ['Netflix'],
+        countries: ['KR'],
+        dateRange: { from: '2025-01-01', to: null },
+        genres: ['코미디'],
+        contentType: 'tv',
+      });
+      const history = [
+        { role: 'user' as const, content: '최신 넷플릭스 시리즈 추천해줘' },
+        { role: 'assistant' as const, content: '어떤 장르를 원하세요?' },
+        { role: 'user' as const, content: '로맨틱 코미디' },
+        { role: 'assistant' as const, content: '어느 나라 작품을 원하세요?' },
+      ];
+      const result = await service.analyzeIntent('한국 로코', history);
+      expect(result).toMatchObject({
+        contentType: 'tv',
+        genres: ['코미디'],
+        countries: ['KR'],
+        ottProviderNames: ['Netflix'],
+        dateRange: { from: '2025-01-01', to: null },
+      });
+      const query = service.buildSemanticQuery(
+        [
+          ...history
+            .filter((message) => message.role === 'user')
+            .map((message) => message.content),
+          '한국 로코',
+        ].join(' '),
+        result,
+      );
+      expect(query).toContain('로맨틱 코미디');
+      expect(query).toContain('로코');
+    });
+
+    it('짧은 후속 요청이 여러 번 이어져도 허용 이력의 명시 타입을 검증 근거로 사용해야 한다', async () => {
+      mockIntent({ contentType: 'tv', genres: ['코미디'] });
+      const history = [
+        { role: 'user' as const, content: '시리즈 추천해줘' },
+        { role: 'assistant' as const, content: '어떤 느낌인가요?' },
+        ...Array.from({ length: 3 }, () => [
+          { role: 'user' as const, content: '조금 더 잔잔한 거' },
+          { role: 'assistant' as const, content: '어느 나라를 원하세요?' },
+        ]).flat(),
+      ];
+      expect(
+        (await service.analyzeIntent('한국 로코', history)).contentType,
+      ).toBe('tv');
+      expect(mockCreate.mock.calls.at(-1)[0].messages.slice(1, -1)).toEqual(
+        history,
+      );
+    });
+
+    it('현재 영화 전환을 반영한 모델 타입을 과거 시리즈로 뒤집지 않아야 한다', async () => {
+      mockIntent({ contentType: 'movie', genres: ['코미디'] });
+      expect(
+        (
+          await service.analyzeIntent('이번에는 영화로 추천해줘', [
+            { role: 'user', content: '시리즈 추천해줘' },
+          ])
+        ).contentType,
+      ).toBe('movie');
+    });
+
+    it('새 주제로 판단한 null 타입은 과거 시리즈로 강제 복원하지 않아야 한다', async () => {
+      mockIntent({ contentType: null, genres: ['코미디'] });
+      expect(
+        (
+          await service.analyzeIntent('그건 됐고 코미디 추천해줘', [
+            { role: 'user', content: '시리즈 추천해줘' },
+          ])
+        ).contentType,
+      ).toBeNull();
+    });
+
+    it('assistant의 유도 문구나 Apple TV 플랫폼명만으로 시리즈를 추론하지 않아야 한다', async () => {
+      mockIntent({ contentType: 'tv', genres: ['코미디'] });
+      expect(
+        (
+          await service.analyzeIntent('코미디', [
+            { role: 'assistant', content: '시리즈를 원하세요?' },
+          ])
+        ).contentType,
+      ).toBeNull();
+      expect(
+        (await service.analyzeIntent('Apple TV 코미디 추천해줘')).contentType,
+      ).toBeNull();
+    });
+
+    it('내부 호출에서도 API history 상한 20개를 넘겨 모델에 전달하지 않아야 한다', async () => {
+      mockIntent({ contentType: 'tv' });
+      const history = [
+        { role: 'user' as const, content: '시리즈 추천해줘' },
+        ...Array.from({ length: 20 }, (_, index) => ({
+          role: 'user' as const,
+          content: `후속 질문 ${index}`,
+        })),
+      ];
+      expect(
+        (await service.analyzeIntent('더 추천해줘', history)).contentType,
+      ).toBeNull();
+      expect(mockCreate.mock.calls.at(-1)[0].messages).toHaveLength(22);
+      expect(mockCreate.mock.calls.at(-1)[0].messages[1].content).toBe(
+        '후속 질문 0',
+      );
+    });
+
     it('이전 대화의 장르 조건이 후속 메시지에 유지되어야 한다', async () => {
       mockIntent({
         genres: ['스릴러', '호러'],
@@ -442,7 +659,7 @@ describe('IntentAnalyzerService', () => {
       );
     });
 
-    it('최근 2턴만 프롬프트에 포함되어야 한다', async () => {
+    it('API가 제공한 이전 조건을 잃지 않도록 전체 허용 이력을 포함해야 한다', async () => {
       mockIntent();
 
       const history = [
@@ -457,14 +674,9 @@ describe('IntentAnalyzerService', () => {
       await service.analyzeIntent('현재 질문', history);
 
       const callArgs = mockCreate.mock.calls[0][0];
-      // system(1) + 히스토리 2턴(4) + user(1) = 6개
-      expect(callArgs.messages).toHaveLength(6);
-      // 1턴 메시지는 잘려야 한다
-      expect(callArgs.messages[1].content).toBe('2턴 질문');
-      expect(callArgs.messages[2].content).toBe('2턴 응답');
-      expect(callArgs.messages[3].content).toBe('3턴 질문');
-      expect(callArgs.messages[4].content).toBe('3턴 응답');
-      expect(callArgs.messages[5].content).toBe('현재 질문');
+      expect(callArgs.messages).toHaveLength(8);
+      expect(callArgs.messages.slice(1, -1)).toEqual(history);
+      expect(callArgs.messages.at(-1).content).toBe('현재 질문');
     });
 
     it('LLM 호출 시 히스토리가 messages에 포함되어야 한다', async () => {
@@ -868,20 +1080,20 @@ describe('IntentAnalyzerService', () => {
       expect(result).not.toMatch(/최신/);
     });
 
-    it('장르 키워드를 쿼리에서 제거해야 한다', () => {
+    it('장르 표현도 세부 취향을 위해 의미 검색에 남겨야 한다', () => {
       const intent: ParsedIntent = {
         ...emptyIntent,
         genres: ['공포'],
       };
       const result = service.buildSemanticQuery('무서운 호러 영화', intent);
 
-      expect(result).not.toMatch(/호러/);
+      expect(result).toContain('호러');
       expect(result).not.toMatch(/공포/);
       expect(result).toContain('무서운');
       expect(result).toContain('영화');
     });
 
-    it('느와르 장르 키워드를 제거해야 한다 (역방향 매핑)', () => {
+    it('느와르의 의미는 범죄/액션 필터와 별개로 보존해야 한다', () => {
       const intent: ParsedIntent = {
         ...emptyIntent,
         genres: ['범죄', '액션'],
@@ -891,7 +1103,7 @@ describe('IntentAnalyzerService', () => {
         intent,
       );
 
-      expect(result).not.toMatch(/느와르/);
+      expect(result).toContain('느와르');
       expect(result).not.toMatch(/범죄/);
       expect(result).not.toMatch(/액션/);
       expect(result).toContain('영화');
@@ -949,7 +1161,7 @@ describe('IntentAnalyzerService', () => {
       expect(result).toContain('같은');
     });
 
-    it('복합 조건에서 장르 + 기타 메타데이터를 모두 제거해야 한다', () => {
+    it('복합 조건에서도 장르와 분위기는 의미 검색에 남겨야 한다', () => {
       const intent: ParsedIntent = {
         ...emptyIntent,
         ottProviderNames: ['Netflix'],
@@ -963,7 +1175,7 @@ describe('IntentAnalyzerService', () => {
 
       expect(result).not.toMatch(/넷플릭스/);
       expect(result).not.toMatch(/한국/);
-      expect(result).not.toMatch(/스릴러/);
+      expect(result).toContain('스릴러');
       expect(result).toContain('반전');
       expect(result).toContain('영화');
     });
@@ -984,7 +1196,7 @@ describe('IntentAnalyzerService', () => {
 
         const request = mockCreate.mock.calls.at(-1)?.[0];
         const expectedConversation = [
-          ...(testCase.history ?? []).slice(-4).map((message) => ({
+          ...(testCase.history ?? []).slice(-20).map((message) => ({
             role: message.role,
             content: message.content,
           })),

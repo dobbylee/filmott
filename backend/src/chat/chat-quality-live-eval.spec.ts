@@ -92,4 +92,26 @@ describe('live eval 실행 경계', () => {
     );
     expect(process.exitCode).toBeUndefined();
   });
+
+  it('명시적으로 변경한 live 기대값은 과거 recorded 출력과 분리해 평가해야 한다', async () => {
+    process.env.RUN_CHAT_QUALITY_LIVE_EVAL = 'true';
+    process.env.OPENAI_API_KEY = 'fixture-key';
+    const testCase = CHAT_QUALITY_CASES.find(
+      (item) => item.id === 'netflix-latest-thriller-tv',
+    )!;
+    expect(testCase.recordedStructuredOutput.genres).toEqual(['스릴러']);
+    expect(testCase.expectedLiveIntent?.genres).toEqual([]);
+    mockCreate.mockResolvedValue({
+      choices: [
+        { message: { content: JSON.stringify(testCase.expectedLiveIntent) } },
+      ],
+    });
+    await execute([testCase]);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(stderr).not.toHaveBeenCalled();
+    expect(stdout).toHaveBeenCalledWith(
+      expect.stringContaining(`PASS ${testCase.id}`),
+    );
+    expect(process.exitCode).toBeUndefined();
+  });
 });

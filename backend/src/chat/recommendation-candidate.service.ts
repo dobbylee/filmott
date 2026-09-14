@@ -8,6 +8,7 @@ import {
   SimilarContent,
 } from '../embedding/embedding.service';
 import { ParsedIntent } from './intent-analyzer';
+import { getSearchableGenres } from './intent-genres';
 
 const CHAT_RECOMMENDATION_LIMIT = 5;
 const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
@@ -139,7 +140,8 @@ export class RecommendationCandidateService {
       filters.dateRange = intent.dateRange;
     }
     if (intent.contentType) filters.contentType = intent.contentType;
-    if (intent.genres.length > 0) filters.genres = intent.genres;
+    const genres = getSearchableGenres(intent.genres, intent.contentType);
+    if (genres.length > 0) filters.genres = genres;
     return filters;
   }
 

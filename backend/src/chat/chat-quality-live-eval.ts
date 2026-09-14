@@ -41,12 +41,14 @@ async function runLiveEval(): Promise<void> {
       testCase.userMessage,
       testCase.history,
     );
-    const passed = intentsMatch(actual, testCase.recordedStructuredOutput);
+    const expected =
+      testCase.expectedLiveIntent ?? testCase.recordedStructuredOutput;
+    const passed = intentsMatch(actual, expected);
     if (!passed) failedCount += 1;
 
     process.stdout.write(
       `${passed ? 'PASS' : 'FAIL'} ${testCase.id}\n` +
-        `${JSON.stringify({ expected: testCase.recordedStructuredOutput, actual })}\n`,
+        `${JSON.stringify({ expected, actual })}\n`,
     );
   }
 

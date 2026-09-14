@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import type { ContentDiscoveryService } from '../contents/services/content-discovery.service';
 import type { ContentSearchFilters } from './content-search.service';
 import type { EmbeddingService } from '../embedding/embedding.service';
+import type { ParsedIntent } from './intent-analyzer';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
 import { RecommendationCandidateService } from './recommendation-candidate.service';
 import {
@@ -87,6 +88,41 @@ describe('채팅 추천 downstream contract 평가셋 (LLM-free)', () => {
         ),
       ).toEqual(testCase.expectedFilters);
     }
+  });
+
+  it('TV 미지원 장르를 SQL에서 제외해도 OTT·날짜·국가·타입 조건은 유지해야 한다', () => {
+    const intent: ParsedIntent = {
+      ottProviderNames: ['Netflix'],
+      countries: ['KR'],
+      excludeCountries: [],
+      personNames: [],
+      referenceTitles: [],
+      dateRange: { from: '2025-01-01', to: null },
+      contentType: 'tv',
+      genres: ['로맨스', '코미디'],
+      confidence: 'high',
+    };
+    expect(
+      recommendationCandidateService.buildFiltersFromIntent(intent),
+    ).toEqual({
+      ottProviderNames: ['Netflix'],
+      countries: ['KR'],
+      dateRange: { from: '2025-01-01', to: null },
+      contentType: 'tv',
+      genres: ['코미디'],
+    });
+    expect(intent.genres).toEqual(['로맨스', '코미디']);
+    expect(
+      recommendationCandidateService.buildFiltersFromIntent({
+        ...intent,
+        genres: ['로맨스', '로코', '힐링'],
+      }),
+    ).toEqual({
+      ottProviderNames: ['Netflix'],
+      countries: ['KR'],
+      dateRange: { from: '2025-01-01', to: null },
+      contentType: 'tv',
+    });
   });
 
   it('확정 후보에서 이전 추천과 다른 contentType을 제외해야 한다', () => {

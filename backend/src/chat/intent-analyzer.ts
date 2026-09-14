@@ -8,8 +8,14 @@ import {
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 import { getKoreaDateString } from '../common/date.util';
 import { CHAT_INTENT_RESPONSE_FORMAT } from './intent-schema';
+import {
+  MOVIE_INTENT_GENRES,
+  TV_INTENT_GENRES,
+  normalizeIntentGenres,
+} from './intent-genres';
 
 const OPENAI_INTENT_TIMEOUT_MS = 10_000;
+const MAX_INTENT_HISTORY_MESSAGES = 20;
 
 export interface ParsedIntent {
   ottProviderNames: string[];
@@ -49,8 +55,12 @@ function buildIntentSystemPrompt(): string {
 - excludeCountries: 제외할 국가 ISO 코드. "외국"/"해외" → ["KR"] (한국 제외), "비영어권" → ["US", "GB", "CA", "AU"]. 없으면 빈 배열.
 - personNames: 감독/배우 이름. "기생충 감독" → "봉준호"처럼 작품으로 유추 가능하면 실제 이름으로. 없으면 빈 배열.
 - dateRange: 연도/연대/시기 조건. "최신"/"요즘"/"최근" → {"from":"${oneYearAgo}","to":null}, "90년대" → {"from":"1990-01-01","to":"1999-12-31"}, "올해" → {"from":"${thisYear}","to":null}. 없으면 null.
-- contentType: "영화"/"무비" → "movie", "드라마"/"시리즈"/"TV"/"예능" → "tv". 이 단어가 메시지에 직접 포함된 경우에만 설정. 장르명(스릴러, 코미디, 로맨스, 액션, 호러, 공포, SF, 판타지, 애니메이션 등)으로는 절대 contentType을 추론하지 마세요. 확실하지 않으면 null.
-- genres: 사용자가 언급한 장르명을 배열로 추출. 사용자 표현 그대로 반환 (예: "호러" → ["호러"], "느와르" → ["느와르"], "SF 스릴러" → ["SF", "스릴러"], "예능" → ["예능"]). 장르 언급이 없으면 빈 배열.
+- contentType: "영화"/"무비" → "movie", "드라마"/"시리즈"/"TV"/"예능" → "tv". 현재 요청 또는 아직 유효한 이전 사용자 요청에 이 단어가 명시된 경우에만 설정. 이전 시리즈 요청에 장르/국가만 덧붙이면 tv를 유지하고, 현재 요청의 타입 전환이나 새 주제를 우선하세요. 장르명(스릴러, 코미디, 로맨스, 액션, 호러, 공포, SF, 판타지, 애니메이션 등)으로는 절대 contentType을 추론하지 마세요. 비교·수식이나 거절한 매체 언급은 타입 전환이 아닙니다. 시리즈 요청 후 "영화처럼 영상미 좋은 거" 또는 "영화 말고 이전 조건"은 tv를 유지하고, "이번에는 영화로"는 movie로 전환하세요. 확실하지 않으면 null.
+- genres: 사용자 표현을 아래 정식 장르명으로 정규화하세요. contentType에 맞는 목록만 사용하고, null이면 두 목록에서 선택할 수 있습니다.
+  - 영화: ${MOVIE_INTENT_GENRES.join(', ')}
+  - 시리즈: ${TV_INTENT_GENRES.join(', ')}
+  - "로맨틱 코미디"/"로코"는 영화에서는 ["로맨스", "코미디"], 시리즈에서는 ["코미디"]. "호러 영화"는 ["공포"], "예능"은 ["리얼리티", "토크"].
+  - "힐링", "잔잔한" 같은 분위기나 목록에 없는 세부 표현을 임의의 장르명으로 만들지 마세요. 대응하는 정식 장르가 없으면 빈 배열로 두세요. 시리즈라는 뜻의 "드라마"는 장르 조건이 아닙니다.
 - referenceTitles: "X 같은", "X 비슷한", "X 느낌의" 등에서 참조 작품명 X를 배열로 추출. 단순 언급("X 봤어")은 포함하지 않고, "~같은/비슷한/느낌의" 맥락에서만 추출. 없으면 빈 배열.
 - confidence: "high" 또는 "low"
   - high: 구체적 필터(장르, OTT, 국가, 인물, 연대, 참조 작품 등)가 1개 이상 명시된 경우
@@ -63,18 +73,6 @@ function buildIntentSystemPrompt(): string {
 - 현재 메시지의 의도를 중심으로 분석하되, 이전 대화에서 유지되는 조건만 보충하세요.
 
 JSON만 출력하세요.`;
-}
-
-function sliceRecentHistory(
-  history: ChatHistoryMessageDto[] | undefined,
-  maxTurns: number,
-): OpenAI.Chat.ChatCompletionMessageParam[] {
-  if (!history || history.length === 0) return [];
-  const sliced = history.slice(-(maxTurns * 2));
-  return sliced.map((msg) => ({
-    role: msg.role,
-    content: msg.content,
-  }));
 }
 
 interface RawIntentResponse {
@@ -204,43 +202,13 @@ const ORPHAN_RESIDUAL_START = /^(?:중에|이후|이전)\s+/;
 const ORPHAN_RESIDUAL_MID = /\s+(?:중에|이후|이전)\s+/g;
 const ORPHAN_RESIDUAL_END = /\s+(?:중에|이후|이전)$/;
 
-// 사용자 표현 -> DB 장르명 매핑
-// DB 장르명: GENRE_NAME_MAP (backend/src/common/constants.ts) 참조
-// TV 전용 장르: "액션 & 어드벤처", "SF & 판타지" 등은 contentType=tv일 때 자동 포함
-export const GENRE_ALIAS_MAP: Record<string, string[]> = {
-  호러: ['공포'],
-  공포: ['공포'],
-  느와르: ['범죄', '액션'],
-  액션: ['액션'],
-  판타지: ['판타지'],
-  스릴러: ['스릴러'],
-  코미디: ['코미디'],
-  로맨스: ['로맨스'],
-  SF: ['SF'],
-  드라마: ['드라마'],
-  애니메이션: ['애니메이션'],
-  다큐멘터리: ['다큐멘터리'],
-  예능: ['리얼리티', '토크'],
-  버라이어티: ['리얼리티', '토크'],
-  리얼리티: ['리얼리티'],
-  토크쇼: ['토크'],
-  토크: ['토크'],
-  범죄: ['범죄'],
-  미스터리: ['미스터리'],
-  전쟁: ['전쟁'],
-  역사: ['역사'],
-  가족: ['가족'],
-  음악: ['음악'],
-  모험: ['모험'],
-  서부: ['서부'],
-};
-
-// TV contentType일 때 추가할 TV 전용 장르 매핑
-const TV_GENRE_EXPANSION: Record<string, string> = {
-  액션: '액션 & 어드벤처',
-  판타지: 'SF & 판타지',
-  SF: 'SF & 판타지',
-};
+function getTypeKeywords(message: string) {
+  const text = message.replace(OTT_PATTERN, '');
+  return {
+    movie: /영화|무비/i.test(text),
+    tv: /드라마|시리즈|TV/i.test(text) || ENTERTAINMENT_PATTERN.test(text),
+  };
+}
 
 @Injectable()
 export class IntentAnalyzerService {
@@ -258,7 +226,14 @@ export class IntentAnalyzerService {
     }
 
     try {
-      const historyMessages = sliceRecentHistory(recentHistory, 2);
+      const intentHistory = (recentHistory ?? []).slice(
+        -MAX_INTENT_HISTORY_MESSAGES,
+      );
+      const historyMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
+        intentHistory.map((message) => ({
+          role: message.role,
+          content: message.content,
+        }));
 
       const response = await this.openai.createCompletion(
         {
@@ -283,34 +258,23 @@ export class IntentAnalyzerService {
       const parsed = JSON.parse(text) as unknown;
       const intent = parseIntentResponse(parsed);
 
-      // contentType 후처리: 메시지 키워드와 LLM 결과 교차 검증
-      // 멀티턴: 히스토리의 마지막 user 메시지도 키워드 검사 대상에 포함
-      const textToCheck = recentHistory?.length
-        ? `${recentHistory.filter((m) => m.role === 'user').slice(-1)[0]?.content ?? ''} ${userMessage}`
-        : userMessage;
-      const hasMovieKeyword = /영화|무비/i.test(textToCheck);
-      const hasTvKeyword = /드라마|시리즈|TV|예능/i.test(textToCheck);
-      const hasEntertainmentKeyword = ENTERTAINMENT_PATTERN.test(textToCheck);
-      if (intent.contentType) {
-        // LLM이 타입을 추출했지만 메시지에 키워드가 없으면 null로 강제
-        if (!hasMovieKeyword && !hasTvKeyword) {
-          intent.contentType = null;
-        }
-      } else {
-        // LLM이 타입을 놓쳤지만 메시지에 키워드가 있으면 보정
-        if (hasMovieKeyword && !hasTvKeyword) intent.contentType = 'movie';
-        if (hasTvKeyword && !hasMovieKeyword) intent.contentType = 'tv';
+      // 매체 전환/부정/비교의 의미는 모델이 판단한다. 키워드만으로 그 결과를
+      // 덮어쓰지 않고, 현재 및 허용 이력의 사용자 발화에 근거가 있는지만 검증한다.
+      const typeEvidence = [
+        userMessage,
+        ...intentHistory
+          .filter((message) => message.role === 'user')
+          .map((message) => message.content),
+      ].map(getTypeKeywords);
+      const contentType = intent.contentType;
+      if (
+        contentType &&
+        !typeEvidence.some((keywords) => keywords[contentType])
+      ) {
+        intent.contentType = null;
       }
-
-      if (hasEntertainmentKeyword) {
-        intent.contentType = 'tv';
-        intent.genres = [...intent.genres, '예능'];
-      }
-
-      // "드라마"가 contentType=tv로 잡혔으면 genres에서 제거 (장르 Drama 필터 방지)
-      if (intent.contentType === 'tv' && hasTvKeyword) {
-        intent.genres = intent.genres.filter((g) => !/^드라마$/i.test(g));
-      }
+      // 모델의 null은 새 주제/불확실성일 수 있어 과거 타입으로 강제 복원하지 않는다.
+      intent.genres = normalizeIntentGenres(intent.genres, intent.contentType);
 
       // confidence 후처리: 코드에서 교차 검증
       const hasFilters =
@@ -327,35 +291,6 @@ export class IntentAnalyzerService {
         intent.confidence = 'high';
       } else if (!hasFilters && intent.confidence === 'high') {
         intent.confidence = 'low';
-      }
-
-      // genres 후처리: GENRE_ALIAS_MAP으로 DB 장르명 변환 + TV 확장
-      if (intent.genres.length > 0) {
-        const mappedGenres = new Set<string>();
-        for (const genre of intent.genres) {
-          const mapped = GENRE_ALIAS_MAP[genre];
-          if (mapped) {
-            for (const g of mapped) {
-              mappedGenres.add(g);
-            }
-          } else {
-            // 매핑에 없는 장르명은 그대로 유지 (DB에 직접 존재할 수 있음)
-            mappedGenres.add(genre);
-          }
-        }
-
-        // TV 전용 장르 확장: contentType이 tv이거나 null(모든 타입 검색)일 때 확장
-        // movie에서 "액션 & 어드벤처" 등은 존재하지 않으므로 ANY 조건에서 자연스럽게 무시됨
-        if (intent.contentType !== 'movie') {
-          for (const genre of [...mappedGenres]) {
-            const tvGenre = TV_GENRE_EXPANSION[genre];
-            if (tvGenre) {
-              mappedGenres.add(tvGenre);
-            }
-          }
-        }
-
-        intent.genres = [...mappedGenres];
       }
 
       return intent;
@@ -412,27 +347,8 @@ export class IntentAnalyzerService {
     // 요청 표현 제거
     cleaned = cleaned.replace(REQUEST_PATTERN, '');
 
-    // 장르 키워드 제거 (intent.genres에 값이 있을 때만)
-    if (intent.genres.length > 0) {
-      // GENRE_ALIAS_MAP 키 (사용자 표현) + DB 장르명 모두 수집
-      const genreKeywords = new Set<string>();
-      for (const genre of intent.genres) {
-        genreKeywords.add(genre);
-      }
-      for (const [alias, dbNames] of Object.entries(GENRE_ALIAS_MAP)) {
-        if (dbNames.some((name) => intent.genres.includes(name))) {
-          genreKeywords.add(alias);
-        }
-      }
-      // 길이 역순 정렬 (긴 키워드부터 제거하여 부분 매칭 방지)
-      const sortedKeywords = [...genreKeywords].sort(
-        (a, b) => b.length - a.length,
-      );
-      for (const keyword of sortedKeywords) {
-        const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        cleaned = cleaned.replace(new RegExp(escaped, 'g'), '');
-      }
-    }
+    // 장르/분위기 표현은 의미 검색에도 필요하다. SQL 조건으로 투영된 장르나
+    // 미지원 표현을 지우면 로맨틱/느와르 등의 세부 의미가 사라질 수 있다.
 
     // OTT/국가 제거 후 남은 잔여 구문 정리 ("에서 볼 수 있는" 등)
     cleaned = cleaned.replace(/에서\s*볼\s*수\s*있는\s*(?:거|것)?/g, '');

@@ -11,6 +11,7 @@ export interface ChatQualityCase {
   userMessage: string;
   history?: ChatHistoryMessageDto[];
   recordedStructuredOutput: ParsedIntent;
+  expectedLiveIntent?: ParsedIntent;
   expectedFilters?: ContentSearchFilters;
   expectedPreferenceFilters?: ContentSearchFilters;
   preferenceFixture?: {
@@ -94,10 +95,16 @@ export const CHAT_QUALITY_CASES: ChatQualityCase[] = [
       genres: ['스릴러'],
       confidence: 'high',
     }),
+    // 과거 모델 출력은 보존하고, TV 스릴러를 의미 검색으로 다루는 새 계약을 명시한다.
+    expectedLiveIntent: createRecordedIntent({
+      ottProviderNames: ['Netflix'],
+      dateRange: { from: '2025-01-01', to: null },
+      contentType: 'tv',
+      confidence: 'high',
+    }),
     expectedFilters: {
       ottProviderNames: ['Netflix'],
       dateRange: { from: '2025-01-01', to: null },
-      genres: ['스릴러'],
       contentType: 'tv',
     },
   },

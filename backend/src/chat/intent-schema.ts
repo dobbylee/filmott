@@ -1,4 +1,5 @@
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
+import { CANONICAL_GENRES } from './intent-genres';
 
 export const CHAT_INTENT_RESPONSE_FORMAT: ResponseFormatJSONSchema = {
   type: 'json_schema',
@@ -61,7 +62,7 @@ export const CHAT_INTENT_RESPONSE_FORMAT: ResponseFormatJSONSchema = {
         },
         genres: {
           type: 'array',
-          items: { type: 'string' },
+          items: { type: 'string', enum: CANONICAL_GENRES },
         },
         confidence: {
           type: 'string',

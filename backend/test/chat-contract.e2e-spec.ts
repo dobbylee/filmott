@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ModulesContainer } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { ChatService } from '../src/chat/chat.service';
+import { ContentSearchService } from '../src/chat/content-search.service';
+import type { ChatHistoryMessageDto } from '../src/chat/dto/send-message.dto';
 import { IntentAnalyzerService } from '../src/chat/intent-analyzer';
 import { OpenAIChatClient } from '../src/integrations/openai/openai-chat.client';
 import { OpenAIEmbeddingClient } from '../src/integrations/openai/openai-embedding.client';
@@ -644,6 +646,205 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
       input: expect.any(String),
     });
     expect(await db.getRepository(ContentMetadata).count()).toBe(1);
+  });
+
+  it('최신 Netflix 시리즈에서 로맨틱 코미디·한국 로코로 이어지는 실제 검색 조건과 의미를 유지해야 한다', async () => {
+    const netflix = {
+      flatrate: [
+        { provider_id: 8, provider_name: 'Netflix', logo_path: '/netflix.png' },
+      ],
+    };
+    const common = {
+      contentType: 'tv',
+      originCountry: 'KR',
+      releaseDate: new Date('2026-01-15'),
+      posterUrl: '/poster.jpg',
+      genres: [{ id: 35, name: '코미디' }],
+      watchProviders: netflix,
+    };
+    const included = new Set<number>();
+    for (let index = 0; index < 8; index++) {
+      const content = await fixtures.content({
+        ...common,
+        tmdbId: 810100 + index,
+        title: `한국 로맨틱 시리즈 ${index}`,
+        voteCount: 1000 + index,
+      });
+      included.add(content.tmdbId);
+      await fixtures.contentMetadata({
+        contentId: content.id,
+        description: '한국의 로맨틱한 코미디 이야기',
+      });
+    }
+    const excluded = [
+      { tmdbId: 810201, contentType: 'movie' },
+      { tmdbId: 810202, releaseDate: new Date('2024-01-01') },
+      { tmdbId: 810203, originCountry: 'US' },
+      {
+        tmdbId: 810204,
+        watchProviders: {
+          flatrate: [
+            {
+              provider_id: 337,
+              provider_name: 'Disney Plus',
+              logo_path: '/disney.png',
+            },
+          ],
+        },
+      },
+      { tmdbId: 810205, genres: [{ id: 10759, name: '액션 & 어드벤처' }] },
+    ];
+    for (const overrides of excluded) {
+      const content = await fixtures.content({
+        ...common,
+        title: `제외 시리즈 ${overrides.tmdbId}`,
+        ...overrides,
+      });
+      await fixtures.contentMetadata({ contentId: content.id });
+    }
+    const turns = [
+      '최신 넷플릭스 시리즈 추천해줘',
+      '로맨틱 코미디',
+      '한국 로코',
+    ];
+    const confirmedByTurn: number[][] = [];
+    let turn = 0;
+    respond = (call) => {
+      if (call.path === '/v1/embeddings')
+        return embeddingResponse(call.body.encoding_format);
+      if (!call.body.stream)
+        return completionResponse(
+          JSON.stringify({
+            ottProviderNames: ['Netflix'],
+            countries: turn === 2 ? ['KR'] : [],
+            excludeCountries: [],
+            personNames: [],
+            referenceTitles: [],
+            dateRange: { from: '2025-01-01', to: null },
+            contentType: 'tv',
+            genres: turn === 0 ? [] : ['코미디'],
+            confidence: 'high',
+          }),
+        );
+      const messages = call.body.messages as {
+        role: string;
+        content: string;
+      }[];
+      const ids = [...messages[0].content.matchAll(/\[ID:(\d+)\|tv\]/g)].map(
+        (match) => Number(match[1]),
+      );
+      confirmedByTurn.push(ids);
+      expect(ids.length).toBeGreaterThan(0);
+      return streamResponse(
+        JSON.stringify({
+          recommendations: [
+            {
+              tmdbId: ids[0],
+              contentType: 'tv',
+              reason: '로맨틱한 분위기의 코미디예요.',
+            },
+          ],
+          message: '',
+          followUpQuestion:
+            turn === 0
+              ? '어떤 장르를 원하세요?'
+              : turn === 1
+                ? '어느 나라 작품을 원하세요?'
+                : '',
+        }),
+      );
+    };
+    const search = jest.spyOn(
+      harness.app.get(ContentSearchService),
+      'searchWithFilters',
+    );
+    const batch = jest.spyOn(
+      harness.app.get(EmbeddingService),
+      'batchCacheByContentIds',
+    );
+    const history: ChatHistoryMessageDto[] = [];
+    const chosen: number[] = [];
+    try {
+      for (turn = 0; turn < turns.length; turn++) {
+        const response = await request(harness.app.getHttpServer())
+          .post('/api/chat/messages')
+          .send({ content: turns[turn], history })
+          .expect(201);
+        const output = events(response.text);
+        expect(
+          output.filter(
+            (event) => event.event === 'error' || event.event === 'reset',
+          ),
+        ).toEqual([]);
+        expect(output.at(-1)).toEqual({ event: 'done', data: {} });
+        const data = output.find((event) => event.event === 'recommendations')
+          ?.data as {
+          recommendations: {
+            tmdbId: number;
+            contentType: 'tv';
+            title: string;
+          }[];
+        };
+        expect(data.recommendations).toHaveLength(1);
+        expect(included.has(data.recommendations[0].tmdbId)).toBe(true);
+        chosen.push(data.recommendations[0].tmdbId);
+        const text = output
+          .filter((event) => event.event === 'text')
+          .map((event) => (event.data as { content: string }).content)
+          .join('');
+        history.push(
+          { role: 'user', content: turns[turn] },
+          {
+            role: 'assistant',
+            content: text,
+            recommendations: data.recommendations.map(
+              ({ tmdbId, contentType, title }) => ({
+                tmdbId,
+                contentType,
+                title,
+              }),
+            ),
+          },
+        );
+      }
+      expect(new Set(chosen).size).toBe(3);
+      expect(search).toHaveBeenCalledTimes(3);
+      for (const [index, call] of search.mock.calls.entries()) {
+        expect(call[3]).toMatchObject({
+          ottProviderNames: ['Netflix'],
+          dateRange: { from: '2025-01-01', to: null },
+          contentType: 'tv',
+          relaxableFilterKeys: [],
+        });
+        expect(call[3]?.genres).toEqual(index === 0 ? undefined : ['코미디']);
+      }
+      expect(search.mock.calls[2][3]?.countries).toEqual(['KR']);
+      expect(confirmedByTurn[2].every((id) => included.has(id))).toBe(true);
+      const embeddings = calls.filter((call) => call.path === '/v1/embeddings');
+      expect(embeddings).toHaveLength(3);
+      expect(embeddings[1].body.input).toEqual(
+        expect.stringContaining('로맨틱 코미디'),
+      );
+      expect(embeddings[2].body.input).toEqual(expect.stringContaining('로코'));
+      const intents = calls.filter(
+        (call) => call.body.max_completion_tokens === 1024,
+      );
+      expect(intents).toHaveLength(3);
+      expect(intents[2].body.messages).toEqual(
+        expect.arrayContaining([
+          { role: 'user', content: turns[0] },
+          { role: 'user', content: turns[1] },
+        ]),
+      );
+    } finally {
+      await Promise.allSettled(
+        batch.mock.results
+          .filter((result) => result.type === 'return')
+          .map((result) => result.value),
+      );
+      batch.mockRestore();
+      search.mockRestore();
+    }
   });
 
   it('실제 연결 취소는 진행 중 SDK signal을 중단하고 추가 요청을 만들지 않아야 한다', async () => {
