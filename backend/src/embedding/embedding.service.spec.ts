@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import { OpenAIModule } from '../integrations/openai/openai.module';
+import { OpenAISdkProvider } from '../integrations/openai/openai-sdk.provider';
+import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
+import { OpenAIEmbeddingClient } from '../integrations/openai/openai-embedding.client';
 import { DataSource } from 'typeorm';
 import { EmbeddingService } from './embedding.service';
 import { ContentMetadata } from './entities/content-metadata.entity';
@@ -28,6 +32,7 @@ jest.mock('openai', () => {
 
 describe('EmbeddingService', () => {
   let service: EmbeddingService;
+  let module: TestingModule;
 
   const mockMetadataRepo = {
     findOne: jest.fn(),
@@ -71,7 +76,8 @@ describe('EmbeddingService', () => {
   };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
+      imports: [OpenAIModule],
       providers: [
         EmbeddingService,
         {
@@ -82,13 +88,67 @@ describe('EmbeddingService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: DataSource, useValue: mockDataSource },
       ],
-    }).compile();
+    })
+      .overrideProvider(ConfigService)
+      .useValue(mockConfigService)
+      .compile();
 
     service = module.get<EmbeddingService>(EmbeddingService);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await module.close();
     jest.clearAllMocks();
+  });
+
+  describe('키 부재와 사전 취소', () => {
+    function withoutKey(): EmbeddingService {
+      const sdk = new OpenAISdkProvider(
+        new ConfigService({ OPENAI_API_KEY: '' }),
+      );
+      return new EmbeddingService(
+        module.get(getRepositoryToken(ContentMetadata)),
+        module.get(getRepositoryToken(Content)),
+        new OpenAIChatClient(sdk),
+        new OpenAIEmbeddingClient(sdk),
+        module.get(DataSource),
+      );
+    }
+
+    it('키가 없으면 생성은 기존 오류를 반환하고 검색은 미리 계산한 벡터가 있어도 비어야 한다', async () => {
+      const noKey = withoutKey();
+      await expect(noKey.generateDescription({} as Content)).rejects.toThrow(
+        'OpenAI API key가 설정되지 않았습니다.',
+      );
+      await expect(noKey.generateEmbedding('입력')).rejects.toThrow(
+        'OpenAI API key가 설정되지 않았습니다.',
+      );
+      await expect(noKey.searchSimilar('입력', 10, [], [0.1])).resolves.toEqual(
+        [],
+      );
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
+      expect(mockDataSource.query).not.toHaveBeenCalled();
+    });
+
+    it('사전 취소는 키 부재 오류보다 먼저 처리해야 한다', async () => {
+      const noKey = withoutKey();
+      const controller = new AbortController();
+      const reason = new Error('호출자 취소');
+      controller.abort(reason);
+      await expect(
+        noKey.generateDescription({} as Content, controller.signal),
+      ).rejects.toBe(reason);
+      await expect(
+        noKey.generateEmbedding('입력', controller.signal),
+      ).rejects.toBe(reason);
+      await expect(
+        noKey.searchSimilar('입력', 10, [], [0.1], controller.signal),
+      ).resolves.toEqual([]);
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
+      expect(mockDataSource.query).not.toHaveBeenCalled();
+    });
   });
 
   describe('hasAnyMetadata', () => {
@@ -156,6 +216,26 @@ describe('EmbeddingService', () => {
   });
 
   describe('generateDescription', () => {
+    it('signal과 timeout을 유지하고 응답의 공백 및 빈 설명을 기존대로 처리해야 한다', async () => {
+      const controller = new AbortController();
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { content: '  설명  ' } }],
+      });
+      await expect(
+        service.generateDescription({} as Content, controller.signal),
+      ).resolves.toBe('설명');
+      expect(mockCreate).toHaveBeenCalledWith(expect.any(Object), {
+        timeout: 10_000,
+        signal: controller.signal,
+      });
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { content: '   ' } }],
+      });
+      await expect(service.generateDescription({} as Content)).resolves.toBe(
+        '',
+      );
+    });
+
     it('작품 정보를 기반으로 설명을 생성해야 한다', async () => {
       mockCreate.mockResolvedValue({
         choices: [

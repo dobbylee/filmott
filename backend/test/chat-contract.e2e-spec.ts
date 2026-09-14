@@ -1,8 +1,13 @@
 import request from 'supertest';
 import http from 'node:http';
 import { JwtService } from '@nestjs/jwt';
+import { ModulesContainer } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { ChatService } from '../src/chat/chat.service';
+import { IntentAnalyzerService } from '../src/chat/intent-analyzer';
+import { OpenAIChatClient } from '../src/integrations/openai/openai-chat.client';
+import { OpenAIEmbeddingClient } from '../src/integrations/openai/openai-embedding.client';
+import { OpenAISdkProvider } from '../src/integrations/openai/openai-sdk.provider';
 import { EmbeddingService } from '../src/embedding/embedding.service';
 import { ContentMetadata } from '../src/embedding/entities/content-metadata.entity';
 import { createContractApp } from './contracts/contract-app';
@@ -109,6 +114,41 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
     } finally {
       await harness.close();
     }
+  });
+
+  it('실제 Chat/Embedding module이 하나의 SDK와 client를 공유해야 한다', () => {
+    const modules = harness.app.get(ModulesContainer);
+    for (const token of [
+      OpenAISdkProvider,
+      OpenAIChatClient,
+      OpenAIEmbeddingClient,
+    ]) {
+      const providers = [...modules.values()].flatMap((module) =>
+        [...module.providers.values()].filter(
+          (provider) => provider.token === token,
+        ),
+      );
+      expect(providers).toHaveLength(1);
+      expect(providers[0].instance).toBe(harness.app.get(token));
+    }
+    const chatClient = harness.app.get(OpenAIChatClient);
+    const embeddingClient = harness.app.get(OpenAIEmbeddingClient);
+    const sdk = harness.app.get(OpenAISdkProvider);
+    expect(Reflect.get(harness.app.get(ChatService), 'openai')).toBe(
+      chatClient,
+    );
+    expect(Reflect.get(harness.app.get(IntentAnalyzerService), 'openai')).toBe(
+      chatClient,
+    );
+    expect(Reflect.get(harness.app.get(EmbeddingService), 'openaiChat')).toBe(
+      chatClient,
+    );
+    expect(
+      Reflect.get(harness.app.get(EmbeddingService), 'openaiEmbedding'),
+    ).toBe(embeddingClient);
+    expect(Reflect.get(chatClient, 'sdk')).toBe(sdk);
+    expect(Reflect.get(embeddingClient, 'sdk')).toBe(sdk);
+    expect(calls).toEqual([]);
   });
 
   async function seedRecommendation() {

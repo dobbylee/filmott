@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
+import { OpenAIEmbeddingClient } from '../integrations/openai/openai-embedding.client';
 import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
 
@@ -47,25 +47,21 @@ function stripControlCharacters(value: string | null | undefined): string {
 @Injectable()
 export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
-  private readonly openai: OpenAI | null;
   private hasMetadataCache: boolean | null = null;
   constructor(
     @InjectRepository(ContentMetadata)
     private readonly metadataRepo: Repository<ContentMetadata>,
     @InjectRepository(Content)
     private readonly contentRepo: Repository<Content>,
-    private readonly configService: ConfigService,
+    private readonly openaiChat: OpenAIChatClient,
+    private readonly openaiEmbedding: OpenAIEmbeddingClient,
     private readonly dataSource: DataSource,
-  ) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY', '');
-    this.openai = apiKey ? new OpenAI({ apiKey }) : null;
-  }
+  ) {}
 
-  private ensureOpenAI(): OpenAI {
-    if (!this.openai) {
+  private ensureOpenAI(): void {
+    if (!this.openaiEmbedding.isAvailable()) {
       throw new Error('OpenAI API key가 설정되지 않았습니다.');
     }
-    return this.openai;
   }
 
   async hasAnyMetadata(): Promise<boolean> {
@@ -83,8 +79,8 @@ export class EmbeddingService {
     signal?: AbortSignal,
   ): Promise<number[]> {
     signal?.throwIfAborted();
-    const openai = this.ensureOpenAI();
-    const response = await openai.embeddings.create(
+    this.ensureOpenAI();
+    const response = await this.openaiEmbedding.createEmbedding(
       {
         model: 'text-embedding-3-small',
         input: text,
@@ -99,7 +95,7 @@ export class EmbeddingService {
     signal?: AbortSignal,
   ): Promise<string> {
     signal?.throwIfAborted();
-    const openai = this.ensureOpenAI();
+    this.ensureOpenAI();
 
     const genreNames = (content.genres || []).map((g) => g.name).join(', ');
     const cast = (content.credits || [])
@@ -130,7 +126,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 평점: ${content.voteAverage ?? '정보 없음'}
 러닝타임: ${content.runtime ? content.runtime + '분' : '정보 없음'}`;
 
-    const response = await openai.chat.completions.create(
+    const response = await this.openaiChat.createCompletion(
       {
         model: CONTENT_DESCRIPTION_MODEL,
         reasoning_effort: 'low',
@@ -195,7 +191,7 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
     precomputedEmbedding?: number[],
     signal?: AbortSignal,
   ): Promise<SimilarContent[]> {
-    if (!this.openai || signal?.aborted) return [];
+    if (!this.openaiEmbedding.isAvailable() || signal?.aborted) return [];
     const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
 
     const embedding =
