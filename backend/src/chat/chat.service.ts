@@ -1,8 +1,8 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
+import type OpenAI from 'openai';
 import { CHAT_MODEL } from './chat.constants';
 import {
   EmbeddingService,
@@ -60,8 +60,6 @@ type SseEmitter = (event: string, data: unknown) => void;
 
 @Injectable()
 export class ChatService {
-  private readonly openai: OpenAI | null;
-
   constructor(
     private readonly embeddingService: EmbeddingService,
     private readonly contentSearchService: ContentSearchService,
@@ -71,11 +69,8 @@ export class ChatService {
     private readonly chatResponseStreamService: ChatResponseStreamService,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-    private readonly configService: ConfigService,
-  ) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY', '');
-    this.openai = apiKey ? new OpenAI({ apiKey }) : null;
-  }
+    private readonly openai: OpenAIChatClient,
+  ) {}
 
   async sendMessageStream(
     userId: number | null,
@@ -87,7 +82,7 @@ export class ChatService {
     if (signal?.aborted) return;
     const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
 
-    if (!this.openai) {
+    if (!this.openai.isAvailable()) {
       throw new BadRequestException('AI 추천 기능이 현재 비활성화 상태입니다.');
     }
 
@@ -352,7 +347,7 @@ export class ChatService {
           ? systemPrompt
           : `${systemPrompt}${STRUCTURED_RESPONSE_RETRY_INSTRUCTION}`;
       const accumulator = new StructuredChatStreamAccumulator();
-      const stream = this.openai.chat.completions.stream(
+      const stream = this.openai.stream(
         {
           model: CHAT_MODEL,
           reasoning_effort: 'medium',

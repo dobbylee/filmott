@@ -1,5 +1,7 @@
 import type { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { ConfigService } from '@nestjs/config';
+import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
+import { OpenAISdkProvider } from '../integrations/openai/openai-sdk.provider';
 import type { Repository } from 'typeorm';
 import type { ContentDiscoveryService } from '../contents/services/content-discovery.service';
 import type { User } from '../users/user.entity';
@@ -115,7 +117,7 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         recommendationCandidateService,
         new ChatResponseStreamService(),
         userRepository,
-        configService,
+        new OpenAIChatClient(new OpenAISdkProvider(configService)),
       );
       mockStreamCreate.mockReturnValueOnce(createResponseStream());
 

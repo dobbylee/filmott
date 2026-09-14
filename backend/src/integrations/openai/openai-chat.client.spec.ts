@@ -6,10 +6,11 @@ import { OpenAISdkProvider } from './openai-sdk.provider';
 import { OpenAIChatClient } from './openai-chat.client';
 
 const mockCreate = jest.fn();
+const mockStream = jest.fn();
 jest.mock('openai', () => ({
   __esModule: true,
   default: jest.fn().mockImplementation(() => ({
-    chat: { completions: { create: mockCreate } },
+    chat: { completions: { create: mockCreate, stream: mockStream } },
   })),
 }));
 
@@ -74,5 +75,38 @@ describe('OpenAI 공통 구성과 completion 경계', () => {
       client.createCompletion({ model: 'fixture', messages: [] }),
     ).rejects.toBe(error);
     expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('stream과 요청 옵션을 즉시 그대로 전달하고 이벤트를 미리 소비하지 않아야 한다', () => {
+    const client = new OpenAIChatClient(
+      new OpenAISdkProvider(
+        new ConfigService({ OPENAI_API_KEY: 'fixture-key' }),
+      ),
+    );
+    const stream = { on: jest.fn(), [Symbol.asyncIterator]: jest.fn() };
+    const body = { model: 'fixture', messages: [] };
+    const options = { timeout: 30_000, signal: new AbortController().signal };
+    mockStream.mockReturnValueOnce(stream);
+    expect(client.stream(body, options)).toBe(stream);
+    expect(mockStream.mock.calls[0][0]).toBe(body);
+    expect(mockStream.mock.calls[0][1]).toBe(options);
+    expect(stream.on).not.toHaveBeenCalled();
+    expect(stream[Symbol.asyncIterator]).not.toHaveBeenCalled();
+  });
+
+  it('stream 생성의 동기 오류를 그대로 전달해야 한다', () => {
+    const client = new OpenAIChatClient(
+      new OpenAISdkProvider(
+        new ConfigService({ OPENAI_API_KEY: 'fixture-key' }),
+      ),
+    );
+    const error = new Error('stream 생성 실패');
+    mockStream.mockImplementationOnce(() => {
+      throw error;
+    });
+    expect(() => client.stream({ model: 'fixture', messages: [] })).toThrow(
+      error,
+    );
+    expect(mockStream).toHaveBeenCalledTimes(1);
   });
 });

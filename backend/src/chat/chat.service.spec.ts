@@ -2,6 +2,7 @@ import { ContentCatalogService } from '../contents/services/content-catalog.serv
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import { OpenAIModule } from '../integrations/openai/openai.module';
 import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatService } from './chat.service';
@@ -210,6 +211,7 @@ describe('ChatService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [OpenAIModule],
       providers: [
         ChatService,
         ChatContextService,
@@ -233,7 +235,10 @@ describe('ChatService', () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: ConfigService, useValue: mockConfigService },
       ],
-    }).compile();
+    })
+      .overrideProvider(ConfigService)
+      .useValue(mockConfigService)
+      .compile();
 
     service = module.get<ChatService>(ChatService);
     recommendationCandidateService = module.get<RecommendationCandidateService>(
@@ -1619,6 +1624,7 @@ describe('ChatService', () => {
     it('OPENAI_API_KEY가 없으면 BadRequestException을 던져야 한다', async () => {
       // API 키가 빈 문자열인 새 서비스 인스턴스 생성
       const module: TestingModule = await Test.createTestingModule({
+        imports: [OpenAIModule],
         providers: [
           ChatService,
           ChatContextService,
@@ -1651,7 +1657,10 @@ describe('ChatService', () => {
             useValue: { get: jest.fn().mockReturnValue('') },
           },
         ],
-      }).compile();
+      })
+        .overrideProvider(ConfigService)
+        .useValue({ get: jest.fn().mockReturnValue('') })
+        .compile();
 
       const noKeyService = module.get<ChatService>(ChatService);
 
