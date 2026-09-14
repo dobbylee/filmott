@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
+import { OpenAIModule } from '../integrations/openai/openai.module';
 import { Content } from '../contents/content.entity';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
@@ -19,6 +20,7 @@ import { ChatResponseStreamService } from './chat-response-stream.service';
   imports: [
     TypeOrmModule.forFeature([Content, Watchlist, Review, User]),
     ConfigModule,
+    OpenAIModule,
     ContentsModule,
     EmbeddingModule,
   ],

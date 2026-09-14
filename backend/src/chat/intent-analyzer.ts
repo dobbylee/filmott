@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
+import type OpenAI from 'openai';
 import { CHAT_MODEL } from './chat.constants';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 import { getKoreaDateString } from '../common/date.util';
@@ -242,26 +242,22 @@ const TV_GENRE_EXPANSION: Record<string, string> = {
 @Injectable()
 export class IntentAnalyzerService {
   private readonly logger = new Logger(IntentAnalyzerService.name);
-  private readonly openai: OpenAI | null;
 
-  constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY', '');
-    this.openai = apiKey ? new OpenAI({ apiKey }) : null;
-  }
+  constructor(private readonly openai: OpenAIChatClient) {}
 
   async analyzeIntent(
     userMessage: string,
     recentHistory?: ChatHistoryMessageDto[],
     signal?: AbortSignal,
   ): Promise<ParsedIntent> {
-    if (!this.openai) {
+    if (!this.openai.isAvailable()) {
       return { ...EMPTY_INTENT };
     }
 
     try {
       const historyMessages = sliceRecentHistory(recentHistory, 2);
 
-      const response = await this.openai.chat.completions.create(
+      const response = await this.openai.createCompletion(
         {
           model: CHAT_MODEL,
           reasoning_effort: 'medium',

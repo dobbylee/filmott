@@ -1,4 +1,6 @@
 import { ConfigService } from '@nestjs/config';
+import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
+import { OpenAISdkProvider } from '../integrations/openai/openai-sdk.provider';
 import { CHAT_QUALITY_CASES } from './chat-quality-cases';
 import { IntentAnalyzerService, type ParsedIntent } from './intent-analyzer';
 
@@ -28,7 +30,9 @@ async function runLiveEval(): Promise<void> {
   }
 
   const analyzer = new IntentAnalyzerService(
-    new ConfigService({ OPENAI_API_KEY: apiKey }),
+    new OpenAIChatClient(
+      new OpenAISdkProvider(new ConfigService({ OPENAI_API_KEY: apiKey })),
+    ),
   );
   let failedCount = 0;
 

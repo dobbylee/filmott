@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { OpenAIModule } from '../integrations/openai/openai.module';
 import {
   IntentAnalyzerService,
   ParsedIntent,
@@ -46,11 +47,15 @@ describe('IntentAnalyzerService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [OpenAIModule],
       providers: [
         IntentAnalyzerService,
         { provide: ConfigService, useValue: mockConfigService },
       ],
-    }).compile();
+    })
+      .overrideProvider(ConfigService)
+      .useValue(mockConfigService)
+      .compile();
 
     service = module.get<IntentAnalyzerService>(IntentAnalyzerService);
   });
@@ -177,6 +182,7 @@ describe('IntentAnalyzerService', () => {
 
     it('OPENAI_API_KEY가 없으면 빈 ParsedIntent를 반환해야 한다', async () => {
       const module: TestingModule = await Test.createTestingModule({
+        imports: [OpenAIModule],
         providers: [
           IntentAnalyzerService,
           {
@@ -184,7 +190,10 @@ describe('IntentAnalyzerService', () => {
             useValue: { get: jest.fn().mockReturnValue('') },
           },
         ],
-      }).compile();
+      })
+        .overrideProvider(ConfigService)
+        .useValue({ get: jest.fn().mockReturnValue('') })
+        .compile();
 
       const noKeyService = module.get<IntentAnalyzerService>(
         IntentAnalyzerService,
