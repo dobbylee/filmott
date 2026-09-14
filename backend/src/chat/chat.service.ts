@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
 import type OpenAI from 'openai';
-import { CHAT_MODEL } from './chat.constants';
+import {
+  AI_TEXT_MODEL,
+  AI_TEXT_REASONING_EFFORT,
+} from '../common/ai-text.constants';
 import {
   EmbeddingService,
   SimilarContent,
@@ -349,8 +352,8 @@ export class ChatService {
       const accumulator = new StructuredChatStreamAccumulator();
       const stream = this.openai.stream(
         {
-          model: CHAT_MODEL,
-          reasoning_effort: 'medium',
+          model: AI_TEXT_MODEL,
+          reasoning_effort: AI_TEXT_REASONING_EFFORT,
           max_completion_tokens: 4096,
           response_format: CHAT_RESPONSE_FORMAT,
           messages: [

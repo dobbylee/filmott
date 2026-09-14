@@ -622,8 +622,8 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
         );
         expect(descriptionCall?.signal?.aborted).toBe(false);
         expect(descriptionCall?.body).toMatchObject({
-          model: 'gpt-5.4-nano',
-          reasoning_effort: 'low',
+          model: 'gpt-5.6-luna',
+          reasoning_effort: 'medium',
           max_completion_tokens: 2048,
         });
         expect(batch).toHaveBeenCalledWith([candidate.id]);

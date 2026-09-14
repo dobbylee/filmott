@@ -5,9 +5,12 @@ import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
 import { OpenAIEmbeddingClient } from '../integrations/openai/openai-embedding.client';
 import { ContentMetadata } from './entities/content-metadata.entity';
 import { Content } from '../contents/content.entity';
+import {
+  AI_TEXT_MODEL,
+  AI_TEXT_REASONING_EFFORT,
+} from '../common/ai-text.constants';
 
 const OPENAI_EMBEDDING_TIMEOUT_MS = 10_000;
-const CONTENT_DESCRIPTION_MODEL = 'gpt-5.4-nano';
 const CHAT_QUERY_STATEMENT_TIMEOUT_MS = 5_000;
 export interface SimilarContent {
   contentId: number;
@@ -128,8 +131,8 @@ OTT 플랫폼: ${ottNames || '정보 없음'}
 
     const response = await this.openaiChat.createCompletion(
       {
-        model: CONTENT_DESCRIPTION_MODEL,
-        reasoning_effort: 'low',
+        model: AI_TEXT_MODEL,
+        reasoning_effort: AI_TEXT_REASONING_EFFORT,
         max_completion_tokens: 2048,
         messages: [{ role: 'user', content: prompt }],
       },

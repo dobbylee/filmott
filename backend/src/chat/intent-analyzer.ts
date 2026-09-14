@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
 import type OpenAI from 'openai';
-import { CHAT_MODEL } from './chat.constants';
+import {
+  AI_TEXT_MODEL,
+  AI_TEXT_REASONING_EFFORT,
+} from '../common/ai-text.constants';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 import { getKoreaDateString } from '../common/date.util';
 import { CHAT_INTENT_RESPONSE_FORMAT } from './intent-schema';
@@ -259,8 +262,8 @@ export class IntentAnalyzerService {
 
       const response = await this.openai.createCompletion(
         {
-          model: CHAT_MODEL,
-          reasoning_effort: 'medium',
+          model: AI_TEXT_MODEL,
+          reasoning_effort: AI_TEXT_REASONING_EFFORT,
           max_completion_tokens: 1024,
           response_format: CHAT_INTENT_RESPONSE_FORMAT,
           messages: [
