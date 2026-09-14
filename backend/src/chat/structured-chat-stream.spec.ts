@@ -1,5 +1,7 @@
 import type { SimilarContent } from '../embedding/embedding.service';
 import { StructuredChatStreamAccumulator } from './structured-chat-stream';
+import { getStructuredChatProgress } from './structured-chat-progress';
+import { partialParse } from 'openai/_vendor/partial-json-parser/parser';
 
 const candidates: SimilarContent[] = [
   {
@@ -32,317 +34,335 @@ const candidates: SimilarContent[] = [
   },
 ];
 
+const first = {
+  tmdbId: 496243,
+  contentType: 'movie' as const,
+  reason: '강렬해요.',
+};
+const second = {
+  tmdbId: 27205,
+  contentType: 'movie' as const,
+  reason: '꿈과 현실을 오가요.',
+};
+
+function consume(
+  accumulator: StructuredChatStreamAccumulator,
+  snapshot: unknown,
+  raw = JSON.stringify(snapshot),
+) {
+  return accumulator.consume(
+    snapshot,
+    candidates,
+    getStructuredChatProgress(raw),
+  );
+}
+
 describe('StructuredChatStreamAccumulator', () => {
-  it('다음 추천이 시작되면 첫 추천의 canonical 제목만 조기 출력해야 한다', () => {
+  it.each([false, true])(
+    '실제 SDK parser의 모든 글자 단위 snapshot에서 공백과 필드 순서를 처리해야 한다 (역순=%s)',
+    (reversed) => {
+      const recommendation = reversed
+        ? {
+            reason: '차분해요. 🎬 (OTT 정보 없음)',
+            contentType: 'movie',
+            tmdbId: 496243,
+          }
+        : {
+            tmdbId: 496243,
+            contentType: 'movie',
+            reason: '차분해요. 🎬 (OTT 정보 없음)',
+          };
+      const response = reversed
+        ? {
+            followUpQuestion: '더 원하세요?',
+            message: '',
+            recommendations: [recommendation],
+          }
+        : {
+            recommendations: [recommendation],
+            message: '',
+            followUpQuestion: '더 원하세요?',
+          };
+      const json = JSON.stringify(response, null, 2);
+      const accumulator = new StructuredChatStreamAccumulator();
+      for (let index = 1; index <= json.length; index++) {
+        const raw = json.slice(0, index);
+        const snapshot: unknown = partialParse(raw);
+        consume(accumulator, snapshot, raw);
+      }
+      expect(accumulator.getEmittedText()).toBe(
+        '**기생충** - 차분해요. 🎬\n\n더 원하세요?',
+      );
+    },
+  );
+
+  it('추천 이유가 생성되는 동안 제목 이후 본문을 계속 이어서 출력해야 한다', () => {
     const accumulator = new StructuredChatStreamAccumulator();
-
     expect(
-      accumulator.consume(
-        {
-          recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '한국 사회를 날카롭게 보여줘요.',
-            },
-          ],
-        },
-        candidates,
+      consume(
+        accumulator,
+        { recommendations: [{ ...first, reason: '강렬' }] },
+        '{"recommendations":[{"tmdbId":496243,"contentType":"movie","reason":"강렬',
       ),
-    ).toEqual([]);
-
+    ).toEqual(['**기생충** - 강렬']);
     expect(
-      accumulator.consume(
-        {
-          recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '한국 사회를 날카롭게 보여줘요.',
-            },
-            {
-              tmdbId: 27205,
-              contentType: 'movie',
-              reason: '꿈과 현실을 오가는',
-            },
-          ],
-        },
-        candidates,
+      consume(
+        accumulator,
+        { recommendations: [{ ...first, reason: '강렬해요.' }] },
+        '{"recommendations":[{"tmdbId":496243,"contentType":"movie","reason":"강렬해요.',
       ),
-    ).toEqual(['**기생충**']);
-
+    ).toEqual(['해요.']);
     expect(
-      accumulator.consume(
-        {
-          recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '한국 사회를 날카롭게 보여줘요.',
-            },
-            {
-              tmdbId: 27205,
-              contentType: 'movie',
-              reason: '꿈과 현실을 오가는 전개가 인상적이에요. 🎬',
-            },
-          ],
-          message: '',
-        },
-        candidates,
-        true,
-      ),
-    ).toEqual([]);
+      consume(accumulator, {
+        recommendations: [first, second],
+        message: '',
+        followUpQuestion: '더 원하세요?',
+      }),
+    ).toEqual(['\n\n**인셉션** - 꿈과 현실을 오가요.\n\n더 원하세요?']);
   });
 
-  it('추천 배열이 끝나기 전의 마지막 미완성 객체는 노출하지 않아야 한다', () => {
+  it('reason이 먼저 나와도 숫자 ID가 닫히기 전에는 후보를 선택하거나 출력하지 않아야 한다', () => {
     const accumulator = new StructuredChatStreamAccumulator();
-
     expect(
-      accumulator.consume(
+      consume(
+        accumulator,
         {
           recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '아직 생성 중인 이유',
-            },
+            { reason: '강렬해요.', contentType: 'movie', tmdbId: 496 },
           ],
         },
-        candidates,
+        '{"recommendations":[{"reason":"강렬해요.","contentType":"movie","tmdbId":496',
       ),
     ).toEqual([]);
-    expect(accumulator.getEmittedText()).toBe('');
+    expect(
+      consume(
+        accumulator,
+        { recommendations: [first] },
+        '{"recommendations":[{"reason":"강렬해요.","contentType":"movie","tmdbId":496243}',
+      ),
+    ).toEqual(['**기생충** - 강렬해요.']);
   });
 
-  it('추천이 없으면 finish_reason 확인 전 모델 생성 텍스트를 노출하지 않아야 한다', () => {
+  it('일반 message와 후속 질문도 생성 중 prefix를 이어서 출력해야 한다', () => {
     const accumulator = new StructuredChatStreamAccumulator();
-
     expect(
-      accumulator.consume(
+      consume(
+        accumulator,
+        { recommendations: [], message: '  조건에 맞는 후보' },
+        '{"recommendations":[],"message":"  조건에 맞는 후보',
+      ),
+    ).toEqual(['조건에 맞는 후보']);
+    expect(
+      consume(
+        accumulator,
         {
           recommendations: [],
-          message: '  조건에 맞는 후보',
+          message: '  조건에 맞는 후보가 부족해요.  ',
+          followUpQuestion: '선호 장르를',
         },
-        candidates,
+        '{"recommendations":[],"message":"  조건에 맞는 후보가 부족해요.  ","followUpQuestion":"선호 장르를',
       ),
+    ).toEqual(['가 부족해요.\n\n선호 장르를']);
+    expect(
+      consume(accumulator, {
+        recommendations: [],
+        message: '조건에 맞는 후보가 부족해요.',
+        followUpQuestion: '선호 장르를 알려주세요?',
+      }),
+    ).toEqual([' 알려주세요?']);
+  });
+
+  it('추천 배열보다 먼저 온 일반 message는 추천 여부가 확정될 때까지 보류해야 한다', () => {
+    const accumulator = new StructuredChatStreamAccumulator();
+    expect(
+      consume(
+        accumulator,
+        { message: '모델 서문', recommendations: [] },
+        '{"message":"모델 서문","recommendations":[',
+      ),
+    ).toEqual([]);
+    expect(
+      consume(accumulator, {
+        message: '모델 서문',
+        recommendations: [first],
+        followUpQuestion: '',
+      }),
+    ).toEqual(['**기생충** - 강렬해요.']);
+    expect(accumulator.getEmittedText()).not.toContain('모델 서문');
+  });
+
+  it('후속 질문이 먼저 생성돼도 추천 본문 다음 순서로 표시해야 한다', () => {
+    const accumulator = new StructuredChatStreamAccumulator();
+    expect(
+      consume(
+        accumulator,
+        {
+          followUpQuestion: '더 원하세요?',
+          message: '',
+          recommendations: [first],
+        },
+        '{"followUpQuestion":"더 원하세요?","message":"","recommendations":[{"contentType":"movie","reason":"강렬해요.","tmdbId":496243}',
+      ),
+    ).toEqual(['**기생충** - 강렬해요.']);
+    expect(
+      consume(accumulator, {
+        followUpQuestion: '더 원하세요?',
+        message: '',
+        recommendations: [first],
+      }),
+    ).toEqual(['\n\n더 원하세요?']);
+  });
+
+  it('정규화로 제거될 수 있는 괄호 suffix는 스트리밍 중 노출하지 않아야 한다', () => {
+    const accumulator = new StructuredChatStreamAccumulator();
+    const reason = '강렬해요.  (넷플릭스 시청 가능)';
+    expect(
+      consume(
+        accumulator,
+        { recommendations: [{ ...first, reason }] },
+        '{"recommendations":[{"tmdbId":496243,"contentType":"movie","reason":"강렬해요.  (넷플릭스 시청 가능)',
+      ),
+    ).toEqual(['**기생충** - 강렬해요.']);
+    expect(
+      consume(accumulator, {
+        recommendations: [{ ...first, reason }],
+        message: '',
+        followUpQuestion: '',
+      }),
     ).toEqual([]);
     expect(
       accumulator.finalize(
         {
-          recommendations: [],
-          message: '조건에 맞는 후보가 부족해요.',
-          followUpQuestion: '선호 장르를 알려주시겠어요?',
+          recommendations: [{ ...first, reason }],
+          message: '',
+          followUpQuestion: '',
         },
         candidates,
-      ),
-    ).toEqual({
-      remainingText:
-        '조건에 맞는 후보가 부족해요.\n\n선호 장르를 알려주시겠어요?',
-      text: '조건에 맞는 후보가 부족해요.\n\n선호 장르를 알려주시겠어요?',
-      recommendations: [],
-    });
+      ).remainingText,
+    ).toBe('');
   });
 
-  it('추천 뒤 모델 생성 reason과 follow-up은 최종 검증 전 노출하지 않아야 한다', () => {
+  it('제거 대상이 아닌 괄호와 이모지는 완성 후 유실 없이 출력해야 한다', () => {
     const accumulator = new StructuredChatStreamAccumulator();
+    const reason = '강렬해요. (가족 이야기) 🎬';
+    expect(
+      consume(
+        accumulator,
+        { recommendations: [{ ...first, reason }] },
+        '{"recommendations":[{"tmdbId":496243,"contentType":"movie","reason":"강렬해요. (가족 이야기) 🎬',
+      ),
+    ).toEqual(['**기생충** - 강렬해요.']);
+    expect(
+      consume(accumulator, {
+        recommendations: [{ ...first, reason }],
+        message: '',
+        followUpQuestion: '',
+      }),
+    ).toEqual([' (가족 이야기) 🎬']);
+  });
 
+  it('이모지의 상위 surrogate만 들어오면 다음 chunk까지 보류해야 한다', () => {
+    const accumulator = new StructuredChatStreamAccumulator();
     expect(
-      accumulator.consume(
-        {
-          recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '강렬해요.',
-            },
-          ],
-          message: '',
-          followUpQuestion: '다른 분위기도',
-        },
-        candidates,
-        true,
+      consume(
+        accumulator,
+        { recommendations: [], message: '안녕 \ud83c' },
+        '{"recommendations":[],"message":"안녕 \\ud83c',
       ),
-    ).toEqual(['**기생충**']);
+    ).toEqual(['안녕']);
     expect(
-      accumulator.consume(
-        {
-          recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '강렬해요.',
-            },
-          ],
-          message: '',
-          followUpQuestion: '다른 분위기도 원하세요?',
-        },
-        candidates,
-        true,
-      ),
-    ).toEqual([]);
+      consume(accumulator, {
+        recommendations: [],
+        message: '안녕 🎬',
+        followUpQuestion: '',
+      }),
+    ).toEqual([' 🎬']);
   });
 
   it('후보 밖 추천은 사용자에게 노출하기 전에 거부해야 한다', () => {
     const accumulator = new StructuredChatStreamAccumulator();
-
     expect(() =>
-      accumulator.consume(
-        {
-          recommendations: [
-            {
-              tmdbId: 999999,
-              contentType: 'movie',
-              reason: '후보 밖 작품이에요.',
-            },
-          ],
-          message: '',
-        },
-        candidates,
-        true,
-      ),
+      consume(accumulator, { recommendations: [{ ...first, tmdbId: 999999 }] }),
     ).toThrow('AI 응답 형식이 올바르지 않습니다');
     expect(accumulator.getEmittedText()).toBe('');
   });
 
-  it('이미 출력한 추천 snapshot이 바뀌면 append-only 위반으로 거부해야 한다', () => {
+  it('확정된 추천 snapshot이 바뀌면 append-only 위반으로 거부해야 한다', () => {
     const accumulator = new StructuredChatStreamAccumulator();
-    accumulator.consume(
-      {
-        recommendations: [
-          {
-            tmdbId: 496243,
-            contentType: 'movie',
-            reason: '처음 확정된 이유예요.',
-          },
-        ],
-        message: '',
-      },
-      candidates,
-      true,
-    );
-
+    consume(accumulator, { recommendations: [first] });
     expect(() =>
-      accumulator.consume(
-        {
-          recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '나중에 바뀐 이유예요.',
-            },
-          ],
-          message: '',
-        },
-        candidates,
-        true,
+      consume(accumulator, {
+        recommendations: [{ ...first, reason: '바뀐 이유' }],
+      }),
+    ).toThrow('AI 응답 형식이 올바르지 않습니다');
+  });
+
+  it('생성 중 이미 출력한 일반 본문 prefix가 바뀌면 거부해야 한다', () => {
+    const accumulator = new StructuredChatStreamAccumulator();
+    consume(
+      accumulator,
+      { recommendations: [], message: '처음' },
+      '{"recommendations":[],"message":"처음',
+    );
+    expect(() =>
+      consume(
+        accumulator,
+        { recommendations: [], message: '다른' },
+        '{"recommendations":[],"message":"다른',
       ),
     ).toThrow('AI 응답 형식이 올바르지 않습니다');
   });
 
   it('중복 추천은 두 번째 항목을 노출하기 전에 거부해야 한다', () => {
-    const accumulator = new StructuredChatStreamAccumulator();
-
     expect(() =>
-      accumulator.consume(
-        {
-          recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '첫 번째 이유예요.',
-            },
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '중복 이유예요.',
-            },
-          ],
-          message: '',
-        },
-        candidates,
-        true,
-      ),
+      consume(new StructuredChatStreamAccumulator(), {
+        recommendations: [first, first],
+      }),
     ).toThrow('AI 응답 형식이 올바르지 않습니다');
   });
 
   it('한번 닫힌 추천 배열의 길이가 바뀌면 거부해야 한다', () => {
     const accumulator = new StructuredChatStreamAccumulator();
-    accumulator.consume(
-      { recommendations: [], message: '일반 답변을 생성 중이에요.' },
-      candidates,
-      true,
+    consume(accumulator, { recommendations: [], message: '일반 답변' });
+    expect(() => consume(accumulator, { recommendations: [first] })).toThrow(
+      'AI 응답 형식이 올바르지 않습니다',
     );
-
-    expect(() =>
-      accumulator.consume(
-        {
-          recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '뒤늦게 추가된 추천이에요.',
-            },
-          ],
-          message: '',
-        },
-        candidates,
-        true,
-      ),
-    ).toThrow('AI 응답 형식이 올바르지 않습니다');
   });
 
-  it('추천 최대 개수를 넘긴 partial snapshot은 거부해야 한다', () => {
-    const accumulator = new StructuredChatStreamAccumulator();
-
+  it('추천 최대 개수와 본문 길이 제한을 유지해야 한다', () => {
     expect(() =>
-      accumulator.consume(
-        {
-          recommendations: Array.from({ length: 6 }, (_, index) => ({
-            tmdbId: index + 1,
-            contentType: 'movie',
-            reason: '추천 이유예요.',
-          })),
-        },
-        candidates,
-      ),
+      consume(new StructuredChatStreamAccumulator(), {
+        recommendations: Array.from({ length: 6 }, () => first),
+      }),
+    ).toThrow('AI 응답 형식이 올바르지 않습니다');
+    expect(() =>
+      consume(new StructuredChatStreamAccumulator(), {
+        recommendations: [{ ...first, reason: '가'.repeat(301) }],
+      }),
+    ).toThrow('AI 응답 형식이 올바르지 않습니다');
+    expect(() =>
+      consume(new StructuredChatStreamAccumulator(), {
+        recommendations: [],
+        message: '가'.repeat(501),
+      }),
     ).toThrow('AI 응답 형식이 올바르지 않습니다');
   });
 
   it('최종 검증 결과에서 이미 출력한 prefix를 제외한 나머지만 반환해야 한다', () => {
     const accumulator = new StructuredChatStreamAccumulator();
-    accumulator.consume(
-      {
-        recommendations: [
-          {
-            tmdbId: 496243,
-            contentType: 'movie',
-            reason: '강렬해요.',
-          },
-        ],
-        message: '',
-      },
-      candidates,
-      true,
-    );
-
+    consume(accumulator, { recommendations: [first] });
     expect(
       accumulator.finalize(
         {
-          recommendations: [
-            {
-              tmdbId: 496243,
-              contentType: 'movie',
-              reason: '강렬해요.',
-            },
-          ],
+          recommendations: [first],
           message: '',
-          followUpQuestion: '다른 분위기도 원하세요?',
+          followUpQuestion: '더 원하세요?',
         },
         candidates,
       ),
     ).toEqual({
-      remainingText: ' - 강렬해요.\n\n다른 분위기도 원하세요?',
-      text: '**기생충** - 강렬해요.\n\n다른 분위기도 원하세요?',
+      remainingText: '\n\n더 원하세요?',
+      text: '**기생충** - 강렬해요.\n\n더 원하세요?',
       recommendations: [
         {
           tmdbId: 496243,
@@ -354,22 +374,15 @@ describe('StructuredChatStreamAccumulator', () => {
     });
   });
 
-  it('추천이 없는 일반 message는 최종 검증에서 그대로 반환해야 한다', () => {
-    const accumulator = new StructuredChatStreamAccumulator();
-
+  it('partial 이벤트가 없는 일반 message도 최종 검증에서 그대로 반환해야 한다', () => {
     expect(
-      accumulator.finalize(
-        {
-          recommendations: [],
-          message: '조건에 맞는 후보가 부족해요.',
-          followUpQuestion: '선호 장르를 알려주시겠어요?',
-        },
+      new StructuredChatStreamAccumulator().finalize(
+        { recommendations: [], message: '일반 답변', followUpQuestion: '' },
         candidates,
       ),
     ).toEqual({
-      remainingText:
-        '조건에 맞는 후보가 부족해요.\n\n선호 장르를 알려주시겠어요?',
-      text: '조건에 맞는 후보가 부족해요.\n\n선호 장르를 알려주시겠어요?',
+      remainingText: '일반 답변',
+      text: '일반 답변',
       recommendations: [],
     });
   });

@@ -216,6 +216,178 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
     expect(await db.getRepository(ContentMetadata).count()).toBe(0);
   });
 
+  it.each([
+    {
+      name: '추천 이유와 후속 질문',
+      recommendation: true,
+      chunks: [
+        '{"recommendations":[{"tmdbId":101,"contentType":"movie","reason":"차분한',
+        ' 분위기예요.',
+        '"}],"message":"","followUpQuestion":"다른',
+        ' 작품도 원하세요?"}',
+      ],
+      prefixes: [
+        '**계약 드라마** - 차분한',
+        '**계약 드라마** - 차분한 분위기예요.',
+        '**계약 드라마** - 차분한 분위기예요.\n\n다른',
+        '**계약 드라마** - 차분한 분위기예요.\n\n다른 작품도 원하세요?',
+      ],
+    },
+    {
+      name: '일반 대화와 후속 질문',
+      recommendation: false,
+      chunks: [
+        '{"recommendations":[],"message":"안녕',
+        '하세요. 같이',
+        ' 골라봐요.","followUpQuestion":"어떤',
+        ' 장르를 원하세요?"}',
+      ],
+      prefixes: [
+        '안녕',
+        '안녕하세요. 같이',
+        '안녕하세요. 같이 골라봐요.\n\n어떤',
+        '안녕하세요. 같이 골라봐요.\n\n어떤 장르를 원하세요?',
+      ],
+    },
+    {
+      name: 'recommendations와 tmdbId가 마지막인 응답',
+      recommendation: true,
+      chunks: [
+        '{"followUpQuestion":"더 원하세요?","message":"","recommendations":[{"contentType":"movie","reason":"차분한 분위기예요.","tmdbId":101 ',
+        '}',
+        ']}',
+      ],
+      prefixes: [
+        '',
+        '**계약 드라마** - 차분한 분위기예요.',
+        '**계약 드라마** - 차분한 분위기예요.\n\n더 원하세요?',
+      ],
+    },
+  ])(
+    '$name 본문은 upstream 종료 전에 실제 HTTP로 계속 전달돼야 한다',
+    async ({ recommendation, chunks, prefixes }) => {
+      if (recommendation) await seedRecommendation();
+      let source: ReadableStreamDefaultController<Uint8Array> | undefined;
+      let ready!: () => void;
+      const upstreamReady = new Promise<void>((resolve) => {
+        ready = resolve;
+      });
+      respond = (call) => {
+        if (!call.body.stream) return knowledgeResponse(call);
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              source = controller;
+              ready();
+            },
+          }),
+          { headers: { 'Content-Type': 'text/event-stream' } },
+        );
+      };
+      const received: Event[] = [];
+      const watchers = new Set<() => void>();
+      let text = '';
+      let endedNormally = false;
+      let client: http.ClientRequest | undefined;
+      const observer = jest.spyOn(
+        harness.app.get(ChatService),
+        'sendMessageStream',
+      );
+      await harness.app.listen(0, '127.0.0.1');
+      const url = new URL('/api/chat/messages', await harness.app.getUrl());
+      const body = JSON.stringify({
+        content: recommendation ? '드라마 영화 추천해줘' : '안녕',
+      });
+      const closed = new Promise<void>((resolve, reject) => {
+        client = http.request(
+          url,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(body),
+            },
+          },
+          (response) => {
+            let buffer = '';
+            response.setEncoding('utf8');
+            response.on('data', (chunk: string) => {
+              buffer += chunk;
+              const frames = buffer.split('\n\n');
+              buffer = frames.pop() ?? '';
+              for (const frame of frames) {
+                for (const event of events(frame)) {
+                  received.push(event);
+                  if (event.event === 'text')
+                    text += (event.data as { content: string }).content;
+                }
+              }
+              for (const watcher of watchers) watcher();
+            });
+            response.on('end', () => {
+              endedNormally = true;
+            });
+            response.on('close', resolve);
+            response.on('error', reject);
+          },
+        );
+        client.on('error', reject);
+        client.end(body);
+      });
+      void closed.catch(() => undefined);
+      try {
+        await deadline(upstreamReady);
+        for (let index = 0; index < chunks.length; index++) {
+          const delivered = new Promise<void>((resolve) => {
+            const check = () => {
+              if (text === prefixes[index]) {
+                watchers.delete(check);
+                resolve();
+              }
+            };
+            watchers.add(check);
+            check();
+          });
+          source!.enqueue(new TextEncoder().encode(streamFrame(chunks[index])));
+          await deadline(delivered);
+          expect(endedNormally).toBe(false);
+          expect(received.every((event) => event.event === 'text')).toBe(true);
+        }
+        source!.enqueue(
+          new TextEncoder().encode(
+            streamFrame(null, 'stop') + 'data: [DONE]\n\n',
+          ),
+        );
+        source!.close();
+        await deadline(closed);
+        expect(endedNormally).toBe(true);
+        expect(text).toBe(prefixes.at(-1));
+        expect(received.filter((event) => event.event === 'text')).toHaveLength(
+          prefixes.filter((prefix) => prefix.length > 0).length,
+        );
+        expect(
+          received.filter((event) => event.event === 'recommendations'),
+        ).toHaveLength(recommendation ? 1 : 0);
+        expect(received.at(-1)).toEqual({ event: 'done', data: {} });
+        expect(calls).toHaveLength(recommendation ? 3 : 1);
+      } finally {
+        client?.destroy();
+        try {
+          source?.close();
+        } catch {
+          /* 종료된 fixture */
+        }
+        watchers.clear();
+        await Promise.allSettled(
+          observer.mock.results
+            .filter((result) => result.type === 'return')
+            .map((result) => result.value),
+        );
+        observer.mockRestore();
+      }
+    },
+  );
+
   it.each([false, true])(
     '부분 text 이후 reset과 재시도 종료 계약을 유지해야 한다 (최종 실패=%s)',
     async (failAgain) => {
@@ -252,9 +424,9 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
       }
       const result = events(response.text);
       expect(result).toEqual([
-        { event: 'text', data: { content: '**계약 드라마**' } },
+        { event: 'text', data: { content: '**계약 드라마** - 이전 이유' } },
         { event: 'reset', data: {} },
-        { event: 'text', data: { content: '**계약 드라마**' } },
+        { event: 'text', data: { content: '**계약 드라마** - 최종 이유' } },
         ...(failAgain
           ? [
               { event: 'reset', data: {} },
@@ -267,7 +439,6 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
               },
             ]
           : [
-              { event: 'text', data: { content: ' - 최종 이유' } },
               {
                 event: 'recommendations',
                 data: {

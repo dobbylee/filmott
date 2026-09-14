@@ -1184,7 +1184,6 @@ describe('ChatService', () => {
         'text',
         'reset',
         'text',
-        'text',
         'recommendations',
         'done',
       ]);
@@ -1192,7 +1191,10 @@ describe('ChatService', () => {
         emittedEvents
           .filter(({ event }) => event === 'text')
           .map(({ data }) => (data as { content: string }).content),
-      ).toEqual(['**청춘**', '**청춘**', ' - 두 번째 시도의 정상 이유입니다.']);
+      ).toEqual([
+        '**청춘** - 첫 시도에서 먼저 보인 이유입니다.',
+        '**청춘** - 두 번째 시도의 정상 이유입니다.',
+      ]);
     });
 
     it('두 번째 시도도 부분 출력 뒤 실패하면 reset하고 done 없이 종료해야 한다', async () => {
@@ -1272,7 +1274,7 @@ describe('ChatService', () => {
       expect(emittedEvents.some((event) => event.event === 'done')).toBe(false);
     });
 
-    it('content_filter 전 partial snapshot에서는 서버 canonical 제목만 노출하고 생성 텍스트는 차단해야 한다', async () => {
+    it('content_filter로 끝난 임시 본문은 reset하고 완료 처리하지 않아야 한다', async () => {
       setupEmptyUserContext();
       mockEmbeddingService.searchSimilar.mockResolvedValue([
         {
@@ -1332,8 +1334,9 @@ describe('ChatService', () => {
         .filter(({ event }) => event === 'text')
         .map(({ data }) => (data as { content: string }).content)
         .join('');
-      expect(exposedText).toBe('**청춘****청춘**');
-      expect(exposedText).not.toContain(filteredReason);
+      expect(exposedText).toBe(
+        `**청춘** - ${filteredReason}**청춘** - ${filteredReason}`,
+      );
       expect(emittedEvents.map(({ event }) => event)).toEqual([
         'text',
         'reset',

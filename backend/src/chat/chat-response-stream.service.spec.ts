@@ -161,7 +161,10 @@ describe('ChatResponseStreamService', () => {
     ).resolves.toBe(
       '{"followUpQuestion":"다른 분위기도 원하세요?","message":"","recommendations":[{"contentType":"movie","reason":"강렬해요.","tmdbId":496243}]}',
     );
-    expect(emitText).toHaveBeenCalledWith('**기생충**');
+    expect(emitText.mock.calls.map(([text]) => text)).toEqual([
+      '**기생충** - 강렬해요.',
+      '\n\n다른 분위기도 원하세요?',
+    ]);
   });
 
   it('finish_reason이 stop이 아니면 불완전 응답으로 거부해야 한다', async () => {

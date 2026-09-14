@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import type { SimilarContent } from '../embedding/embedding.service';
+import type { StructuredChatProgress } from './structured-chat-progress';
 import {
   resolveStructuredChatResponse,
   sanitizeRecommendationReason,
@@ -82,23 +83,51 @@ function findCandidate(
   return candidate;
 }
 
+function stableTextPrefix(value: string): string {
+  return value
+    .trim()
+    .replace(/[\uD800-\uDBFF]$/, '')
+    .trimEnd();
+}
+
+function reasonPrefix(value: string, complete: boolean): string {
+  if (complete) return sanitizeRecommendationReason(value);
+  // 최종 정규화에서 사라질 수 있는 괄호 suffix를 먼저 노출하지 않는다.
+  const opening = value.indexOf('(');
+  const stable = opening < 0 ? value : value.slice(0, opening);
+  return stableTextPrefix(stable.replace(/\s+/g, ' '));
+}
+
+function textField(
+  snapshot: Record<string, unknown>,
+  key: 'message' | 'followUpQuestion',
+  limit: number,
+): string {
+  if (!hasOwn(snapshot, key)) return '';
+  const value = snapshot[key];
+  if (typeof value !== 'string' || value.length > limit) invalidResponse();
+  return stableTextPrefix(value);
+}
+
 export class StructuredChatStreamAccumulator {
-  private readonly emittedRecommendations: StructuredChatRecommendation[] = [];
-  private readonly usedRecommendationKeys = new Set<string>();
+  private readonly completedRecommendations: StructuredChatRecommendation[] =
+    [];
+  private readonly selectedRecommendationKeys: string[] = [];
   private completedRecommendationCount: number | null = null;
   private emittedText = '';
 
   consume(
     snapshot: unknown,
     candidates: SimilarContent[],
-    isRecommendationArrayComplete = false,
+    progress: StructuredChatProgress,
   ): string[] {
     if (!isRecord(snapshot) || !hasOwn(snapshot, 'recommendations')) return [];
     if (!Array.isArray(snapshot.recommendations)) invalidResponse();
 
     const recommendations = snapshot.recommendations;
     if (recommendations.length > 5) invalidResponse();
-    if (isRecommendationArrayComplete) {
+    const arrayComplete = progress.isComplete('recommendations');
+    if (arrayComplete) {
       if (this.completedRecommendationCount === null) {
         this.completedRecommendationCount = recommendations.length;
       } else if (this.completedRecommendationCount !== recommendations.length) {
@@ -107,55 +136,98 @@ export class StructuredChatStreamAccumulator {
     } else if (this.completedRecommendationCount !== null) {
       invalidResponse();
     }
-    const completedCount = isRecommendationArrayComplete
-      ? recommendations.length
-      : Math.max(0, recommendations.length - 1);
-
-    if (completedCount < this.emittedRecommendations.length) invalidResponse();
-
-    for (
-      let index = 0;
-      index < this.emittedRecommendations.length;
-      index += 1
-    ) {
-      const current = parseCompletedRecommendation(recommendations[index]);
+    if (recommendations.length < this.completedRecommendations.length) {
+      invalidResponse();
+    }
+    for (let index = 0; index < this.completedRecommendations.length; index++) {
       if (
-        JSON.stringify(current) !==
-        JSON.stringify(this.emittedRecommendations[index])
+        !progress.isComplete('recommendations', index) ||
+        JSON.stringify(parseCompletedRecommendation(recommendations[index])) !==
+          JSON.stringify(this.completedRecommendations[index])
       ) {
         invalidResponse();
       }
     }
 
-    const deltas: string[] = [];
-    for (
-      let index = this.emittedRecommendations.length;
-      index < completedCount;
-      index += 1
-    ) {
-      const recommendation = parseCompletedRecommendation(
-        recommendations[index],
-      );
-      const key = `${recommendation.contentType}:${recommendation.tmdbId}`;
-      if (this.usedRecommendationKeys.has(key)) invalidResponse();
-
-      const candidate = findCandidate(recommendation, candidates);
-      if (!sanitizeRecommendationReason(recommendation.reason)) {
+    const sections: string[] = [];
+    const usedKeys = new Set<string>();
+    for (let index = 0; index < recommendations.length; index++) {
+      const value: unknown = recommendations[index];
+      if (!isRecord(value)) invalidResponse();
+      if (
+        !progress.isComplete('recommendations', index, 'tmdbId') ||
+        !progress.isComplete('recommendations', index, 'contentType')
+      ) {
+        return this.appendPrefix(sections.join('\n\n'));
+      }
+      if (
+        typeof value.tmdbId !== 'number' ||
+        !Number.isSafeInteger(value.tmdbId) ||
+        value.tmdbId <= 0 ||
+        (value.contentType !== 'movie' && value.contentType !== 'tv') ||
+        Object.keys(value).some(
+          (key) => !RECOMMENDATION_KEYS.some((allowed) => allowed === key),
+        )
+      ) {
         invalidResponse();
       }
-      this.emittedRecommendations.push(recommendation);
-      this.usedRecommendationKeys.add(key);
-
-      // finish_reason을 확인하기 전에는 모델이 생성한 reason/message를 노출하지 않는다.
-      // 첫 canonical 제목만 서버의 신뢰 가능한 후보 데이터에서 조기 출력한다.
-      if (this.emittedText.length === 0) {
-        const title = `**${candidate.title}**`;
-        this.emittedText = title;
-        deltas.push(title);
+      const key = `${value.contentType}:${value.tmdbId}`;
+      if (
+        usedKeys.has(key) ||
+        (this.selectedRecommendationKeys[index] !== undefined &&
+          this.selectedRecommendationKeys[index] !== key)
+      ) {
+        invalidResponse();
+      }
+      usedKeys.add(key);
+      this.selectedRecommendationKeys[index] = key;
+      const rawReason = hasOwn(value, 'reason') ? value.reason : '';
+      if (typeof rawReason !== 'string' || rawReason.length > 300)
+        invalidResponse();
+      const candidate = findCandidate(
+        {
+          tmdbId: value.tmdbId,
+          contentType: value.contentType,
+          reason: rawReason,
+        },
+        candidates,
+      );
+      const reasonComplete = progress.isComplete(
+        'recommendations',
+        index,
+        'reason',
+      );
+      const reason = reasonPrefix(rawReason, reasonComplete);
+      if (reasonComplete && !reason) invalidResponse();
+      sections.push(`**${candidate.title}**${reason ? ` - ${reason}` : ''}`);
+      if (!progress.isComplete('recommendations', index)) {
+        return this.appendPrefix(sections.join('\n\n'));
+      }
+      if (!reasonComplete) invalidResponse();
+      if (index === this.completedRecommendations.length) {
+        this.completedRecommendations.push(parseCompletedRecommendation(value));
       }
     }
 
-    return deltas;
+    if (!arrayComplete) return this.appendPrefix(sections.join('\n\n'));
+    if (recommendations.length === 0) {
+      const message = textField(snapshot, 'message', 500);
+      if (message) sections.push(message);
+      if (!progress.isComplete('message')) {
+        return this.appendPrefix(sections.join('\n\n'));
+      }
+    }
+    const followUp = textField(snapshot, 'followUpQuestion', 300);
+    if (followUp) sections.push(followUp);
+    return this.appendPrefix(sections.join('\n\n'));
+  }
+
+  private appendPrefix(prefix: string): string[] {
+    if (prefix.length > 2000 || !prefix.startsWith(this.emittedText))
+      invalidResponse();
+    const delta = prefix.slice(this.emittedText.length);
+    this.emittedText = prefix;
+    return delta ? [delta] : [];
   }
 
   finalize(
