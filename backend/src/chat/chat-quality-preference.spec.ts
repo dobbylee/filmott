@@ -109,8 +109,9 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         intentAnalyzer,
         chatContextService,
         recommendationCandidateService,
-        new ChatResponseStreamService(),
-        new OpenAIChatClient(new OpenAISdkProvider(configService)),
+        new ChatResponseStreamService(
+          new OpenAIChatClient(new OpenAISdkProvider(configService)),
+        ),
       );
       mockStreamCreate.mockReturnValueOnce(createResponseStream());
 

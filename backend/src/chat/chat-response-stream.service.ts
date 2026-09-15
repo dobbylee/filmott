@@ -4,6 +4,13 @@ import {
   Injectable,
 } from '@nestjs/common';
 import type OpenAI from 'openai';
+import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
+import {
+  AI_TEXT_MODEL,
+  AI_TEXT_REASONING_EFFORT,
+} from '../common/ai-text.constants';
+import type { ChatHistoryMessageDto } from './dto/send-message.dto';
+import { CHAT_RESPONSE_FORMAT } from './structured-chat-response';
 import {
   ContentFilterFinishReasonError,
   LengthFinishReasonError,
@@ -20,6 +27,37 @@ const INCOMPLETE_RESPONSE_MESSAGE =
 
 @Injectable()
 export class ChatResponseStreamService {
+  constructor(private readonly openai: OpenAIChatClient) {}
+
+  isAvailable(): boolean {
+    return this.openai.isAvailable();
+  }
+
+  startResponseStream(
+    systemPrompt: string,
+    history: readonly Pick<ChatHistoryMessageDto, 'role' | 'content'>[],
+    content: string,
+    signal?: AbortSignal,
+  ): ChatCompletionStream<StructuredChatResponse> {
+    return this.openai.stream(
+      {
+        model: AI_TEXT_MODEL,
+        reasoning_effort: AI_TEXT_REASONING_EFFORT,
+        max_completion_tokens: 4096,
+        response_format: CHAT_RESPONSE_FORMAT,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...(history || []).map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          { role: 'user', content },
+        ],
+      },
+      { timeout: 30_000, signal },
+    );
+  }
+
   async collectAndEmitStructuredResponse(
     stream: ChatCompletionStream<StructuredChatResponse>,
     accumulator: StructuredChatStreamAccumulator,

@@ -1,4 +1,7 @@
 import type OpenAI from 'openai';
+import type { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
+import { CHAT_RESPONSE_FORMAT } from './structured-chat-response';
+import type { ChatHistoryMessageDto } from './dto/send-message.dto';
 import { OpenAIError } from 'openai';
 import { LengthFinishReasonError } from 'openai/error';
 import type { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
@@ -132,7 +135,57 @@ const candidates: SimilarContent[] = [
 ];
 
 describe('ChatResponseStreamService', () => {
-  const service = new ChatResponseStreamService();
+  const client = { stream: jest.fn(), isAvailable: jest.fn() };
+  const service = new ChatResponseStreamService(
+    client as unknown as OpenAIChatClient,
+  );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it.each([true, false])(
+    '공용 client의 사용 가능 상태 %s를 그대로 반환해야 한다',
+    (available) => {
+      client.isAvailable.mockReturnValue(available);
+      expect(service.isAvailable()).toBe(available);
+      expect(client.stream).not.toHaveBeenCalled();
+    },
+  );
+
+  it('이력의 역할과 본문만 순서대로 넣고 기존 설정과 signal로 stream을 한 번 생성해야 한다', () => {
+    const signal = new AbortController().signal;
+    const history: ChatHistoryMessageDto[] = [
+      { role: 'user', content: '이전 질문' },
+      {
+        role: 'assistant',
+        content: '이전 답변',
+        recommendations: [
+          { tmdbId: 496243, contentType: 'movie', title: '기생충' },
+        ],
+      },
+    ];
+    const stream = createLunaOrderedStructuredStream();
+    client.stream.mockReturnValue(stream);
+    expect(
+      service.startResponseStream('시스템', history, '현재 질문', signal),
+    ).toBe(stream);
+    expect(client.stream).toHaveBeenCalledTimes(1);
+    expect(client.stream).toHaveBeenCalledWith(
+      {
+        model: 'gpt-5.6-luna',
+        reasoning_effort: 'medium',
+        max_completion_tokens: 4096,
+        response_format: CHAT_RESPONSE_FORMAT,
+        messages: [
+          { role: 'system', content: '시스템' },
+          { role: 'user', content: '이전 질문' },
+          { role: 'assistant', content: '이전 답변' },
+          { role: 'user', content: '현재 질문' },
+        ],
+      },
+      { timeout: 30_000, signal },
+    );
+    expect(history[1].recommendations).toHaveLength(1);
+  });
 
   it('구조화 JSON chunk를 client에 노출하지 않고 하나로 수집해야 한다', async () => {
     await expect(

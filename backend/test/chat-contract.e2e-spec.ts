@@ -3,6 +3,7 @@ import http from 'node:http';
 import { JwtService } from '@nestjs/jwt';
 import { ModulesContainer } from '@nestjs/core';
 import { DataSource } from 'typeorm';
+import { ChatResponseStreamService } from '../src/chat/chat-response-stream.service';
 import { ChatContextService } from '../src/chat/chat-context.service';
 import { ChatService } from '../src/chat/chat.service';
 import { RecommendationSearchService } from '../src/recommendation/recommendation-search.service';
@@ -127,6 +128,8 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
     for (const token of [
       OpenAISdkProvider,
       OpenAIChatClient,
+      ChatResponseStreamService,
+      ChatContextService,
       OpenAIEmbeddingClient,
       ContentMetadataService,
       RecommendationSearchService,
@@ -159,9 +162,9 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
     );
     expect(entities).toHaveLength(1);
     expect(entities[0].target).toBe(ContentMetadata);
-    expect(Reflect.get(harness.app.get(ChatService), 'openai')).toBe(
-      chatClient,
-    );
+    expect(
+      Reflect.get(harness.app.get(ChatResponseStreamService), 'openai'),
+    ).toBe(chatClient);
     expect(Reflect.get(harness.app.get(IntentAnalyzerService), 'openai')).toBe(
       chatClient,
     );

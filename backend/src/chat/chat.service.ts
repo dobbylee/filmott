@@ -1,11 +1,5 @@
 import { buildFiltersFromIntent } from './intent-filter.mapper';
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
-import type OpenAI from 'openai';
-import {
-  AI_TEXT_MODEL,
-  AI_TEXT_REASONING_EFFORT,
-} from '../common/ai-text.constants';
 import { ContentMetadataService } from '../recommendation/content-metadata.service';
 import { RecommendationSearchService } from '../recommendation/recommendation-search.service';
 import type { SimilarContent } from '../recommendation/recommendation.types';
@@ -22,7 +16,6 @@ import {
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { ChatHistoryMessageDto } from './dto/send-message.dto';
 import {
-  CHAT_RESPONSE_FORMAT,
   extractPreviouslyRecommendedTitles,
   parseStructuredChatResponse,
 } from './structured-chat-response';
@@ -32,7 +25,6 @@ import { RecommendationCandidateService } from '../recommendation/recommendation
 import type { RecommendationRerankContext } from '../recommendation/recommendation.types';
 import { ChatResponseStreamService } from './chat-response-stream.service';
 
-const OPENAI_CHAT_TIMEOUT_MS = 30_000;
 const OPENAI_CHAT_MAX_ATTEMPTS = 2;
 const STRUCTURED_RESPONSE_RETRY_INSTRUCTION = `
 
@@ -64,7 +56,6 @@ export class ChatService {
     private readonly chatContextService: ChatContextService,
     private readonly recommendationCandidateService: RecommendationCandidateService,
     private readonly chatResponseStreamService: ChatResponseStreamService,
-    private readonly openai: OpenAIChatClient,
   ) {}
 
   async sendMessageStream(
@@ -77,7 +68,7 @@ export class ChatService {
     if (signal?.aborted) return;
     const signalArgs: [] | [AbortSignal] = signal ? [signal] : [];
 
-    if (!this.openai.isAvailable()) {
+    if (!this.chatResponseStreamService.isAvailable()) {
       throw new BadRequestException('AI 추천 기능이 현재 비활성화 상태입니다.');
     }
 
@@ -298,17 +289,9 @@ export class ChatService {
       previouslyRecommended,
     );
 
-    // 11. 대화 이력 구성
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      ...(history || []).map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
-      { role: 'user' as const, content },
-    ];
     if (signal?.aborted) return;
 
-    // 12. GPT 구조화 응답 호출. 부분 응답 뒤 검증 실패 시 client를 reset하고 한 번 재생성한다.
+    // 11. GPT 구조화 응답 호출. 부분 응답 뒤 검증 실패 시 client를 reset하고 한 번 재생성한다.
     let resolvedResponse: {
       text: string;
       recommendations: ReturnType<
@@ -321,18 +304,11 @@ export class ChatService {
           ? systemPrompt
           : `${systemPrompt}${STRUCTURED_RESPONSE_RETRY_INSTRUCTION}`;
       const accumulator = new StructuredChatStreamAccumulator();
-      const stream = this.openai.stream(
-        {
-          model: AI_TEXT_MODEL,
-          reasoning_effort: AI_TEXT_REASONING_EFFORT,
-          max_completion_tokens: 4096,
-          response_format: CHAT_RESPONSE_FORMAT,
-          messages: [
-            { role: 'system', content: attemptSystemPrompt },
-            ...messages,
-          ],
-        },
-        { timeout: OPENAI_CHAT_TIMEOUT_MS, signal },
+      const stream = this.chatResponseStreamService.startResponseStream(
+        attemptSystemPrompt,
+        history,
+        content,
+        signal,
       );
 
       if (signal?.aborted) return;

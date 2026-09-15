@@ -1685,6 +1685,22 @@ describe('ChatService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('stream 생성의 동기 BadRequestException은 재시도나 reset 없이 전파해야 한다', async () => {
+      setupEmptyUserContext();
+      mockMetadataService.hasAnyMetadata.mockResolvedValue(false);
+      const error = new BadRequestException('stream 생성 실패');
+      mockStreamCreate.mockImplementation(() => {
+        throw error;
+      });
+      const emit = jest.fn();
+      await expect(service.sendMessageStream(1, '안녕', [], emit)).rejects.toBe(
+        error,
+      );
+      expect(mockStreamCreate).toHaveBeenCalledTimes(1);
+      expect(emit).not.toHaveBeenCalled();
+      expect(mockMetadataService.batchCacheByContentIds).not.toHaveBeenCalled();
+    });
+
     it('OpenAI 구조화 스트림 호출에 response format과 30초 timeout이 전달되어야 한다', async () => {
       setupEmptyUserContext();
       mockRecommendationSearchService.searchSimilar.mockResolvedValue([]);
