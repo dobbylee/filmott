@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nestjs';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadGatewayException, Logger, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, Logger } from '@nestjs/common';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { RankingsService } from './rankings.service';
 import { Ranking } from './ranking.entity';
@@ -1005,37 +1005,6 @@ describe('RankingsService', () => {
           message: 'KOBIS Weekly API error',
         }),
       );
-    });
-  });
-
-  describe('updatePosterUrl', () => {
-    it('존재하는 랭킹의 posterUrl을 업데이트해야 한다', async () => {
-      const ranking = { id: 1, title: 'Test Movie', posterUrl: undefined };
-      mockRankingRepo.findOneBy.mockResolvedValue(ranking);
-      mockRankingRepo.save.mockResolvedValue({
-        ...ranking,
-        posterUrl: 'https://example.com/poster.jpg',
-      });
-
-      const result = await service.updatePosterUrl(
-        1,
-        'https://example.com/poster.jpg',
-      );
-
-      expect(mockRankingRepo.findOneBy).toHaveBeenCalledWith({ id: 1 });
-      expect(mockRankingRepo.save).toHaveBeenCalledWith({
-        ...ranking,
-        posterUrl: 'https://example.com/poster.jpg',
-      });
-      expect(result.posterUrl).toBe('https://example.com/poster.jpg');
-    });
-
-    it('존재하지 않는 랭킹에 대해 NotFoundException을 던져야 한다', async () => {
-      mockRankingRepo.findOneBy.mockResolvedValue(null);
-
-      await expect(
-        service.updatePosterUrl(999, 'https://example.com/poster.jpg'),
-      ).rejects.toThrow(NotFoundException);
     });
   });
 

@@ -1,3 +1,4 @@
+import { RankingsManagementService } from './services/rankings-management.service';
 import { RankingsQueryService } from './services/rankings-query.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
@@ -17,18 +18,22 @@ describe('RankingsController', () => {
     getRankings: jest.fn(),
     getUnmatchedRankings: jest.fn(),
   };
+  const mockRankingsManagementService = { updatePosterUrl: jest.fn() };
   const mockRankingsService = {
     fetchDailyBoxOffice: jest.fn(),
     fetchWeeklyBoxOffice: jest.fn(),
     fetchTrending: jest.fn(),
     refreshTrending: jest.fn(),
-    updatePosterUrl: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [RankingsController],
       providers: [
+        {
+          provide: RankingsManagementService,
+          useValue: mockRankingsManagementService,
+        },
         { provide: RankingsQueryService, useValue: mockRankingsQueryService },
         { provide: RankingsService, useValue: mockRankingsService },
         Reflector,

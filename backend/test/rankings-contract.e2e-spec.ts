@@ -197,6 +197,30 @@ describe('랭킹 API 실제 HTTP·수집·DB 계약', () => {
     expect(harness.fetchCalls).toHaveLength(1);
   });
 
+  it('포스터 저장 실패는 DB와 revalidation을 변경하지 않아야 한다', async () => {
+    const ranking = await fixtures.ranking({ posterUrl: 'before' });
+    const before = await db
+      .getRepository(Ranking)
+      .findOneByOrFail({ id: ranking.id });
+    const save = jest
+      .spyOn(db.getRepository(Ranking), 'save')
+      .mockRejectedValueOnce(new Error('고정 DB 저장 실패'));
+    try {
+      await api()
+        .patch(`/api/rankings/${ranking.id}/poster`)
+        .auth(adminToken, { type: 'bearer' })
+        .send({ posterUrl: 'after' })
+        .expect(500);
+      expect(
+        await db.getRepository(Ranking).findOneByOrFail({ id: ranking.id }),
+      ).toEqual(before);
+      expect(harness.fetchCalls).toEqual([]);
+      expect(save).toHaveBeenCalledTimes(1);
+    } finally {
+      save.mockRestore();
+    }
+  });
+
   it.each([
     [
       'daily-box-office',

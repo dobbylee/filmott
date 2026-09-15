@@ -1,3 +1,4 @@
+import { RankingsManagementService } from './services/rankings-management.service';
 import { RankingsQueryService } from './services/rankings-query.service';
 import {
   Controller,
@@ -24,6 +25,7 @@ export class RankingsController {
   constructor(
     private readonly rankingsService: RankingsService,
     private readonly rankingsQueryService: RankingsQueryService,
+    private readonly rankingsManagementService: RankingsManagementService,
   ) {}
 
   private static readonly VALID_SOURCES = ['kobis', 'tmdb'];
@@ -81,7 +83,7 @@ export class RankingsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdatePosterUrlDto,
   ) {
-    return this.rankingsService.updatePosterUrl(id, dto.posterUrl);
+    return this.rankingsManagementService.updatePosterUrl(id, dto.posterUrl);
   }
 
   /**

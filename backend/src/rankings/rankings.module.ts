@@ -1,3 +1,4 @@
+import { RankingsManagementService } from './services/rankings-management.service';
 import { RankingsQueryService } from './services/rankings-query.service';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -20,6 +21,6 @@ import { CommonModule } from '../common/common.module';
     CommonModule,
   ],
   controllers: [RankingsController],
-  providers: [RankingsService, RankingsQueryService],
+  providers: [RankingsService, RankingsQueryService, RankingsManagementService],
 })
 export class RankingsModule {}
