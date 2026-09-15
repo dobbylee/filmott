@@ -114,7 +114,8 @@
     "testEnvironment": "node",
     "testMatch": [
       "<rootDir>/src/**/*.spec.ts",
-      "<rootDir>/test/chat-evals/**/*.spec.ts"
+      "<rootDir>/test/chat-evals/**/*.spec.ts",
+      "<rootDir>/test/architecture/**/*.spec.ts"
     ]
   }
 }

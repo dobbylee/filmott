@@ -32,6 +32,10 @@
 - 외부 fixture는 허용한 요청과 의도한 오류만 처리하고 미등록 호출은 거부·기록한다. `createContractApp`은 HTTP/fetch/S3 경계의 Jest/Node assertion 실패를 close에서 재전파한다. 반환된 stream의 후속 event/listener는 수집 경계 밖이므로 테스트 본문에서 확인한다.
 - catch/retry/취소/background 또는 내부 mock에 의존한 핵심 계약을 새로 고정할 때는 해당 회귀를 넣어 테스트가 실패하는지 확인한다. 정상 코드 통과와 변이의 assertion 실패를 함께 기록하며, 환경/컴파일 실패를 탐지 성공으로 세지 않는다. 변경 위험에 해당하는 작은 변이만 격리 snapshot에서 실행한다.
 
+## 구조 회귀 검사
+
+source 의존·module/provider/entity 등록을 변경할 때 적용한다. 기본 Jest의 `test/architecture` 검사는 recommendation→chat, contents→recommendation, integrations→업무 영역 및 production→test의 직접/경유 의존을 검사한다. 허용 entity/common 참조와 기존 업무 entity 순환은 유지한다. 분석하지 못한 로컬/동적 로딩은 명시적 검토 대상이며 조용히 통과시키지 않는다. 실제 provider/entity 소유권은 별도 architecture contract e2e와 기존 API/cron/singleton 검사로 확인한다.
+
 ## DB 검사
 
 - `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 현재 프로세스에 주입한다. `.env*`를 수정하지 않는다.
