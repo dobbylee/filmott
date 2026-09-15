@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import {
   sanitizeExternalApiError,
   summarizeExternalApiError,
-} from '../common/external-api-error.util';
+} from '../../common/external-api-error.util';
 
 export interface KobisBoxOfficeItem {
   rank: string;

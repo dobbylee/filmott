@@ -4,7 +4,7 @@ import { Logger } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { KobisService } from './kobis.service';
 import { AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
-import { SanitizedExternalApiError } from '../common/external-api-error.util';
+import { SanitizedExternalApiError } from '../../common/external-api-error.util';
 
 describe('KobisService', () => {
   let service: KobisService;
