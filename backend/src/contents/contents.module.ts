@@ -8,10 +8,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Content } from './content.entity';
 import { ContentsController } from './contents.controller';
 import { TmdbModule } from '../integrations/tmdb/tmdb.module';
-import { CommonModule } from '../common/common.module';
+import { FrontendCacheModule } from '../integrations/frontend-cache/frontend-cache.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Content]), TmdbModule, CommonModule],
+  imports: [
+    TypeOrmModule.forFeature([Content]),
+    TmdbModule,
+    FrontendCacheModule,
+  ],
   controllers: [ContentsController],
   providers: [
     PersonCatalogService,

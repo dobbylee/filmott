@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { Content } from './content.entity';
 import { TmdbService } from '../integrations/tmdb/tmdb.service';
-import { RevalidateService } from '../common/revalidate.service';
+import { RevalidateService } from '../integrations/frontend-cache/revalidate.service';
 import { AxiosError, AxiosHeaders } from 'axios';
 describe('콘텐츠 책임별 서비스 계약', () => {
   let catalogService: ContentCatalogService;

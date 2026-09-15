@@ -1,3 +1,10 @@
+import { RevalidateService } from '../src/integrations/frontend-cache/revalidate.service';
+import { WatchlistService } from '../src/watchlist/watchlist.service';
+import { ReviewsService } from '../src/reviews/reviews.service';
+import { ReviewCommentsService } from '../src/reviews/review-comments.service';
+import { AdultContentService } from '../src/contents/services/adult-content.service';
+import { RankingsManagementService } from '../src/rankings/services/rankings-management.service';
+import { RankingsSyncService } from '../src/rankings/services/rankings-sync.service';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { UsersService } from '../src/users/users.service';
 import { R2StorageService } from '../src/integrations/r2/r2-storage.service';
@@ -146,6 +153,63 @@ describe('외부 연동 실제 module 설정 계약', () => {
         Body: body,
         ContentType: 'image/webp',
       });
+      expect(harness.unexpected).toEqual([]);
+    } finally {
+      await harness.close();
+    }
+  });
+  it('캐시 연동은 실제 소비자들이 단일 instance를 공유하고 요청·중복 제거를 유지해야 한다', async () => {
+    const harness = await createContractApp();
+    try {
+      const service = harness.app.get(RevalidateService);
+      const providers = [...harness.app.get(ModulesContainer).values()].flatMap(
+        (module) =>
+          [...module.providers.values()].filter(
+            (provider) => provider.token === RevalidateService,
+          ),
+      );
+      expect(providers).toHaveLength(1);
+      expect(providers[0].instance).toBe(service);
+      for (const token of [
+        WatchlistService,
+        ReviewsService,
+        ReviewCommentsService,
+        AdultContentService,
+        RankingsManagementService,
+        RankingsSyncService,
+      ]) {
+        expect(Reflect.get(harness.app.get(token), 'revalidateService')).toBe(
+          service,
+        );
+      }
+      await service.revalidatePath('/contents/movie/101', ['contents']);
+      await service.revalidatePaths(['/', '', '/contents/movie/101', '/']);
+      expect(harness.fetchCalls.map((call) => call.url)).toEqual(
+        Array.from(
+          { length: 3 },
+          () => 'http://contract.filmott.local/internal/revalidate',
+        ),
+      );
+      expect(
+        harness.fetchCalls.map((call) =>
+          typeof call.body === 'string'
+            ? (JSON.parse(call.body) as unknown)
+            : call.body,
+        ),
+      ).toEqual([
+        { path: '/contents/movie/101', tags: ['contents'] },
+        { path: '/' },
+        { path: '/contents/movie/101' },
+      ]);
+      for (const [, init] of jest.mocked(globalThis.fetch).mock.calls) {
+        expect(init).toMatchObject({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer contract-revalidate-secret',
+          },
+        });
+      }
       expect(harness.unexpected).toEqual([]);
     } finally {
       await harness.close();

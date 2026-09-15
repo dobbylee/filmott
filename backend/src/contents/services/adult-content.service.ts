@@ -6,7 +6,7 @@ import {
   TmdbService,
   TmdbPersonCredit,
 } from '../../integrations/tmdb/tmdb.service';
-import { RevalidateService } from '../../common/revalidate.service';
+import { RevalidateService } from '../../integrations/frontend-cache/revalidate.service';
 import { ContentCatalogService } from './content-catalog.service';
 const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000;
 interface CacheEntry<T> {

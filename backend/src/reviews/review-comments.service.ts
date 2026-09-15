@@ -9,7 +9,7 @@ import { ReviewComment } from './review-comment.entity';
 import { Review } from './review.entity';
 import { CreateReviewCommentDto } from './dto/create-review-comment.dto';
 import { UserRole } from '../users/enums/user-role.enum';
-import { RevalidateService } from '../common/revalidate.service';
+import { RevalidateService } from '../integrations/frontend-cache/revalidate.service';
 
 const RECENT_REVIEWS_REVALIDATE_TAGS = ['recent-reviews'];
 

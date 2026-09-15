@@ -16,7 +16,7 @@ import { UserStatus } from '../users/enums/user-status.enum';
 import { UsersService } from '../users/users.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { Watchlist } from '../watchlist/watchlist.entity';
-import { RevalidateService } from '../common/revalidate.service';
+import { RevalidateService } from '../integrations/frontend-cache/revalidate.service';
 
 const RECENT_REVIEWS_REVALIDATE_TAGS = ['recent-reviews'];
 const contentReviewsTag = (contentId: number) => `content-reviews:${contentId}`;

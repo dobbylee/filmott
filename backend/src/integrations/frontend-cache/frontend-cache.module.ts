@@ -7,4 +7,4 @@ import { RevalidateService } from './revalidate.service';
   providers: [RevalidateService],
   exports: [RevalidateService],
 })
-export class CommonModule {}
+export class FrontendCacheModule {}

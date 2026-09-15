@@ -10,7 +10,7 @@ import { KobisService } from '../../integrations/kobis/kobis.service';
 import { TmdbService } from '../../integrations/tmdb/tmdb.service';
 import { ContentCatalogService } from '../../contents/services/content-catalog.service';
 import { ContentMetadataService } from '../../recommendation/content-metadata.service';
-import { RevalidateService } from '../../common/revalidate.service';
+import { RevalidateService } from '../../integrations/frontend-cache/revalidate.service';
 
 jest.mock('@sentry/nestjs', () => ({
   captureException: jest.fn(),

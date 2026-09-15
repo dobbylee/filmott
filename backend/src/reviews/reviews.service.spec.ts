@@ -14,7 +14,7 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
 import { UsersService } from '../users/users.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
-import { RevalidateService } from '../common/revalidate.service';
+import { RevalidateService } from '../integrations/frontend-cache/revalidate.service';
 
 describe('ReviewsService', () => {
   let service: ReviewsService;

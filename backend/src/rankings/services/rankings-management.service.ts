@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Ranking } from '../ranking.entity';
 import { RANKINGS_REVALIDATE_TAGS } from '../rankings.constants';
-import { RevalidateService } from '../../common/revalidate.service';
+import { RevalidateService } from '../../integrations/frontend-cache/revalidate.service';
 @Injectable()
 export class RankingsManagementService {
   constructor(

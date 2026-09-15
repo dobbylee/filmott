@@ -20,7 +20,7 @@ import { KobisService } from '../../integrations/kobis/kobis.service';
 import { TmdbService } from '../../integrations/tmdb/tmdb.service';
 import { ContentCatalogService } from '../../contents/services/content-catalog.service';
 import { ContentMetadataService } from '../../recommendation/content-metadata.service';
-import { RevalidateService } from '../../common/revalidate.service';
+import { RevalidateService } from '../../integrations/frontend-cache/revalidate.service';
 import { Content } from '../../contents/content.entity';
 import { TMDB_IMAGE_BASE } from '../../common/constants';
 import { summarizeExternalApiError } from '../../common/external-api-error.util';

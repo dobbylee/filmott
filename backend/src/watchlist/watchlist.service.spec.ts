@@ -9,7 +9,7 @@ import { WatchlistService } from './watchlist.service';
 import { Watchlist } from './watchlist.entity';
 import { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { Review } from '../reviews/review.entity';
-import { RevalidateService } from '../common/revalidate.service';
+import { RevalidateService } from '../integrations/frontend-cache/revalidate.service';
 
 describe('WatchlistService', () => {
   let service: WatchlistService;

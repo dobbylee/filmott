@@ -11,7 +11,7 @@ import { Review } from '../reviews/review.entity';
 import { ContentCatalogService } from '../contents/services/content-catalog.service';
 import { AddToWatchlistDto } from './dto/add-to-watchlist.dto';
 import { UpdateWatchlistDto } from './dto/update-watchlist.dto';
-import { RevalidateService } from '../common/revalidate.service';
+import { RevalidateService } from '../integrations/frontend-cache/revalidate.service';
 import {
   getKoreaDateString,
   normalizeKoreaDateInput,

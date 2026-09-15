@@ -5,7 +5,7 @@ import { ReviewCommentsService } from './review-comments.service';
 import { ReviewComment } from './review-comment.entity';
 import { Review } from './review.entity';
 import { UserRole } from '../users/enums/user-role.enum';
-import { RevalidateService } from '../common/revalidate.service';
+import { RevalidateService } from '../integrations/frontend-cache/revalidate.service';
 
 describe('ReviewCommentsService', () => {
   let service: ReviewCommentsService;

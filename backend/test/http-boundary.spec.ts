@@ -21,7 +21,7 @@ import type { Request, Response } from 'express';
 import { ContentsController } from '../src/contents/contents.controller';
 import { Content } from '../src/contents/content.entity';
 import { TmdbService } from '../src/integrations/tmdb/tmdb.service';
-import { RevalidateService } from '../src/common/revalidate.service';
+import { RevalidateService } from '../src/integrations/frontend-cache/revalidate.service';
 import { DataSource } from 'typeorm';
 import { RelatedContentsController } from '../src/recommendation/related-contents.controller';
 import { RelatedContentService } from '../src/recommendation/related-content.service';

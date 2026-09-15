@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { Ranking } from '../ranking.entity';
-import { RevalidateService } from '../../common/revalidate.service';
+import { RevalidateService } from '../../integrations/frontend-cache/revalidate.service';
 import { RankingsManagementService } from './rankings-management.service';
 describe('랭킹 포스터 관리', () => {
   let service: RankingsManagementService;

@@ -10,7 +10,7 @@ import { KobisModule } from '../integrations/kobis/kobis.module';
 import { TmdbModule } from '../integrations/tmdb/tmdb.module';
 import { ContentsModule } from '../contents/contents.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
-import { CommonModule } from '../common/common.module';
+import { FrontendCacheModule } from '../integrations/frontend-cache/frontend-cache.module';
 
 @Module({
   imports: [
@@ -19,7 +19,7 @@ import { CommonModule } from '../common/common.module';
     TmdbModule,
     ContentsModule,
     RecommendationModule,
-    CommonModule,
+    FrontendCacheModule,
   ],
   controllers: [RankingsController],
   providers: [

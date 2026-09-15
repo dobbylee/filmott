@@ -5,13 +5,13 @@ import { Review } from '../reviews/review.entity';
 import { WatchlistService } from './watchlist.service';
 import { WatchlistController } from './watchlist.controller';
 import { ContentsModule } from '../contents/contents.module';
-import { CommonModule } from '../common/common.module';
+import { FrontendCacheModule } from '../integrations/frontend-cache/frontend-cache.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Watchlist, Review]),
     ContentsModule,
-    CommonModule,
+    FrontendCacheModule,
   ],
   controllers: [WatchlistController],
   providers: [WatchlistService],
