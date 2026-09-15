@@ -1,3 +1,6 @@
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { UsersService } from '../src/users/users.service';
+import { R2StorageService } from '../src/integrations/r2/r2-storage.service';
 import { ModulesContainer } from '@nestjs/core';
 import { TmdbService } from '../src/integrations/tmdb/tmdb.service';
 import { KobisService } from '../src/integrations/kobis/kobis.service';
@@ -82,6 +85,67 @@ describe('외부 연동 실제 module 설정 계약', () => {
         { key: 'contract-kobis-key', targetDt: '20260914' },
         { key: 'contract-kobis-key', targetDt: '20260907', weekGb: '2' },
       ]);
+      expect(harness.unexpected).toEqual([]);
+    } finally {
+      await harness.close();
+    }
+  });
+  it('R2 설정과 singleton은 Users에 직접 연결되고 실제 command와 URL을 유지해야 한다', async () => {
+    const harness = await createContractApp({
+      s3: [
+        {
+          command: 'PutObjectCommand',
+          bucket: 'contract',
+          key: 'profiles/fixture.webp',
+        },
+        {
+          command: 'DeleteObjectCommand',
+          bucket: 'contract',
+          key: 'profiles/fixture.webp',
+        },
+      ],
+    });
+    try {
+      const storage = harness.app.get(R2StorageService);
+      const providers = [...harness.app.get(ModulesContainer).values()].flatMap(
+        (module) =>
+          [...module.providers.values()].filter(
+            (provider) => provider.token === R2StorageService,
+          ),
+      );
+      expect(providers).toHaveLength(1);
+      expect(providers[0].instance).toBe(storage);
+      expect(Reflect.get(harness.app.get(UsersService), 'r2Storage')).toBe(
+        storage,
+      );
+      const client = Reflect.get(storage, 's3') as S3Client;
+      expect(await client.config.region()).toBe('auto');
+      expect(await client.config.endpoint?.()).toMatchObject({
+        protocol: 'https:',
+        hostname: 'contract.r2.cloudflarestorage.com',
+      });
+      expect(await client.config.credentials()).toMatchObject({
+        accessKeyId: 'contract-access',
+        secretAccessKey: 'contract-secret',
+      });
+      const body = Buffer.from('fixture');
+      await expect(
+        storage.upload('profiles/fixture.webp', body, 'image/webp'),
+      ).resolves.toBe('https://images.contract.local/profiles/fixture.webp');
+      await expect(
+        storage.delete('profiles/fixture.webp'),
+      ).resolves.toBeUndefined();
+      expect(harness.s3Spy).toHaveBeenCalledTimes(2);
+      const command = harness.s3Spy.mock.calls[0][0];
+      expect(command).toBeInstanceOf(PutObjectCommand);
+      if (!(command instanceof PutObjectCommand))
+        throw new Error('잘못된 command');
+      expect(command.input).toEqual({
+        Bucket: 'contract',
+        Key: 'profiles/fixture.webp',
+        Body: body,
+        ContentType: 'image/webp',
+      });
       expect(harness.unexpected).toEqual([]);
     } finally {
       await harness.close();

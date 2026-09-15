@@ -7,7 +7,7 @@ import { DataSource } from 'typeorm';
 import { ReviewsModule } from '../../src/reviews/reviews.module';
 import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 import { RevalidateService } from '../../src/common/revalidate.service';
-import { R2StorageService } from '../../src/common/r2-storage.service';
+import { R2StorageService } from '../../src/integrations/r2/r2-storage.service';
 import type { JwtPayload } from '../../src/auth/decorators/current-user.decorator';
 import { Review } from '../../src/reviews/review.entity';
 import { ReviewLike } from '../../src/reviews/review-like.entity';

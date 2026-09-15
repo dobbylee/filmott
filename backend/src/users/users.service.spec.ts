@@ -6,7 +6,7 @@ import { User } from './user.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { Review } from '../reviews/review.entity';
 import { Watchlist } from '../watchlist/watchlist.entity';
-import { R2StorageService } from '../common/r2-storage.service';
+import { R2StorageService } from '../integrations/r2/r2-storage.service';
 import { AuthProvider } from './enums/auth-provider.enum';
 import { UserStatus } from './enums/user-status.enum';
 import { UserRole } from './enums/user-role.enum';

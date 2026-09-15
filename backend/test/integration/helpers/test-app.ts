@@ -10,7 +10,7 @@ import { AppModule } from '../../../src/app.module';
 import { ChatService } from '../../../src/chat/chat.service';
 import { ContentMetadataService } from '../../../src/recommendation/content-metadata.service';
 import { RecommendationSearchService } from '../../../src/recommendation/recommendation-search.service';
-import { R2StorageService } from '../../../src/common/r2-storage.service';
+import { R2StorageService } from '../../../src/integrations/r2/r2-storage.service';
 import { configureApp } from '../../../src/configure-app';
 import { KobisService } from '../../../src/integrations/kobis/kobis.service';
 import { TmdbService } from '../../../src/integrations/tmdb/tmdb.service';
