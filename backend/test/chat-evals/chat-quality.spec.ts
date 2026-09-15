@@ -1,16 +1,16 @@
-import { buildFiltersFromIntent } from './intent-filter.mapper';
-import type { ContentCatalogService } from '../contents/services/content-catalog.service';
+import { buildFiltersFromIntent } from '../../src/chat/intent-filter.mapper';
+import type { ContentCatalogService } from '../../src/contents/services/content-catalog.service';
 import { DataSource } from 'typeorm';
-import type { ContentDiscoveryService } from '../contents/services/content-discovery.service';
-import type { ContentSearchFilters } from '../recommendation/recommendation-search.types';
-import type { ContentMetadataService } from '../recommendation/content-metadata.service';
-import type { ParsedIntent } from './intent-analyzer';
+import type { ContentDiscoveryService } from '../../src/contents/services/content-discovery.service';
+import type { ContentSearchFilters } from '../../src/recommendation/recommendation-search.types';
+import type { ContentMetadataService } from '../../src/recommendation/content-metadata.service';
+import type { ParsedIntent } from '../../src/chat/intent-analyzer';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
-import { RecommendationCandidateService } from '../recommendation/recommendation-candidate.service';
+import { RecommendationCandidateService } from '../../src/recommendation/recommendation-candidate.service';
 import {
   extractPreviouslyRecommendedTitles,
   resolveStructuredChatResponse,
-} from './structured-chat-response';
+} from '../../src/chat/structured-chat-response';
 
 type FilterQualityCase = ChatQualityCase & {
   expectedFilters: ContentSearchFilters;

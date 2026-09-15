@@ -1,17 +1,17 @@
-import type { ContentCatalogService } from '../contents/services/content-catalog.service';
+import type { ContentCatalogService } from '../../src/contents/services/content-catalog.service';
 import { ConfigService } from '@nestjs/config';
-import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
-import { OpenAISdkProvider } from '../integrations/openai/openai-sdk.provider';
-import type { ContentDiscoveryService } from '../contents/services/content-discovery.service';
+import { OpenAIChatClient } from '../../src/integrations/openai/openai-chat.client';
+import { OpenAISdkProvider } from '../../src/integrations/openai/openai-sdk.provider';
+import type { ContentDiscoveryService } from '../../src/contents/services/content-discovery.service';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
-import { ChatContextService } from './chat-context.service';
-import { ChatResponseStreamService } from './chat-response-stream.service';
-import { ChatService } from './chat.service';
-import type { RecommendationSearchService } from '../recommendation/recommendation-search.service';
-import type { ContentMetadataService } from '../recommendation/content-metadata.service';
+import { ChatContextService } from '../../src/chat/chat-context.service';
+import { ChatResponseStreamService } from '../../src/chat/chat-response-stream.service';
+import { ChatService } from '../../src/chat/chat.service';
+import type { RecommendationSearchService } from '../../src/recommendation/recommendation-search.service';
+import type { ContentMetadataService } from '../../src/recommendation/content-metadata.service';
 
-import type { IntentAnalyzerService } from './intent-analyzer';
-import { RecommendationCandidateService } from '../recommendation/recommendation-candidate.service';
+import type { IntentAnalyzerService } from '../../src/chat/intent-analyzer';
+import { RecommendationCandidateService } from '../../src/recommendation/recommendation-candidate.service';
 
 const mockStreamCreate = jest.fn();
 

@@ -1,8 +1,11 @@
 import { ConfigService } from '@nestjs/config';
-import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
-import { OpenAISdkProvider } from '../integrations/openai/openai-sdk.provider';
+import { OpenAIChatClient } from '../../src/integrations/openai/openai-chat.client';
+import { OpenAISdkProvider } from '../../src/integrations/openai/openai-sdk.provider';
 import { CHAT_QUALITY_CASES } from './chat-quality-cases';
-import { IntentAnalyzerService, type ParsedIntent } from './intent-analyzer';
+import {
+  IntentAnalyzerService,
+  type ParsedIntent,
+} from '../../src/chat/intent-analyzer';
 
 const LIVE_EVAL_OPT_IN_ENV = 'RUN_CHAT_QUALITY_LIVE_EVAL';
 const MAX_LIVE_EVAL_CASES = 10;

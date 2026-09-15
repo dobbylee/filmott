@@ -1,9 +1,9 @@
-import type { ContentSearchFilters } from '../recommendation/recommendation-search.types';
-import type { ChatHistoryMessageDto } from './dto/send-message.dto';
-import type { SimilarContent } from '../recommendation/recommendation.types';
-import type { ParsedIntent } from './intent-analyzer';
-import type { UserContext } from './prompts/system-prompt';
-import type { RecommendationRerankContext } from '../recommendation/recommendation.types';
+import type { ContentSearchFilters } from '../../src/recommendation/recommendation-search.types';
+import type { ChatHistoryMessageDto } from '../../src/chat/dto/send-message.dto';
+import type { SimilarContent } from '../../src/recommendation/recommendation.types';
+import type { ParsedIntent } from '../../src/chat/intent-analyzer';
+import type { UserContext } from '../../src/chat/prompts/system-prompt';
+import type { RecommendationRerankContext } from '../../src/recommendation/recommendation.types';
 
 export interface ChatQualityCase {
   id: string;

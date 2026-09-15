@@ -28,7 +28,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:integration": "jest --config ./test/jest-integration.json --runInBand",
     "test:integration:optional": "INTEGRATION_TEST_OPTIONAL=true jest --config ./test/jest-integration.json --runInBand",
-    "test:chat-quality:live": "ts-node src/chat/chat-quality-live-eval.ts",
+    "test:chat-quality:live": "ts-node test/chat-evals/chat-quality-live-eval.ts",
     "test:all": "npm test -- --runInBand && npm run test:e2e && npm run test:integration",
     "migration:generate": "typeorm-ts-node-commonjs -d src/data-source.ts migration:generate",
     "migration:run": "typeorm-ts-node-commonjs -d src/data-source.ts migration:run",
@@ -103,15 +103,18 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
+    "rootDir": ".",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.(t|j)s"
     ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "coverageDirectory": "coverage",
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/src/**/*.spec.ts",
+      "<rootDir>/test/chat-evals/**/*.spec.ts"
+    ]
   }
 }

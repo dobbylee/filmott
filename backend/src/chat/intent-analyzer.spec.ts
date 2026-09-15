@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { OpenAIModule } from '../integrations/openai/openai.module';
 import { IntentAnalyzerService, ParsedIntent } from './intent-analyzer';
 import { GENRE_NAME_MAP } from '../common/constants';
-import { CHAT_QUALITY_CASES } from './chat-quality-cases';
+import { CHAT_QUALITY_CASES } from '../../test/chat-evals/chat-quality-cases';
 import { CHAT_INTENT_RESPONSE_FORMAT } from './intent-schema';
 import { GENRE_ALIAS_MAP } from './intent-genres';
 

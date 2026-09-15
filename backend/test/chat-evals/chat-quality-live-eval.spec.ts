@@ -114,4 +114,34 @@ describe('live eval 실행 경계', () => {
     );
     expect(process.exitCode).toBeUndefined();
   });
+  it('실제 의도가 기대값과 다르면 FAIL 출력과 exit1을 유지해야 한다', async () => {
+    process.env.RUN_CHAT_QUALITY_LIVE_EVAL = 'true';
+    process.env.OPENAI_API_KEY = 'fixture-key';
+    const recorded = CHAT_QUALITY_CASES[0];
+    const testCase = {
+      ...recorded,
+      expectedLiveIntent: {
+        ...recorded.recordedStructuredOutput,
+        countries: ['US'],
+      },
+    };
+    mockCreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify(recorded.recordedStructuredOutput),
+          },
+        },
+      ],
+    });
+    await execute([testCase]);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(stdout).toHaveBeenCalledWith(
+      expect.stringContaining(`FAIL ${testCase.id}`),
+    );
+    expect(stderr).toHaveBeenCalledWith(
+      '채팅 품질 live eval 1개 케이스가 실패했습니다.\n',
+    );
+    expect(process.exitCode).toBe(1);
+  });
 });
