@@ -7,7 +7,7 @@ import { AxiosError, AxiosHeaders } from 'axios';
 import { RankingsSyncService } from './rankings-sync.service';
 import { Ranking } from '../ranking.entity';
 import { KobisService } from '../../kobis/kobis.service';
-import { TmdbService } from '../../tmdb/tmdb.service';
+import { TmdbService } from '../../integrations/tmdb/tmdb.service';
 import { ContentCatalogService } from '../../contents/services/content-catalog.service';
 import { ContentMetadataService } from '../../recommendation/content-metadata.service';
 import { RevalidateService } from '../../common/revalidate.service';

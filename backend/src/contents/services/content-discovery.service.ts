@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TmdbService } from '../../tmdb/tmdb.service';
+import { TmdbService } from '../../integrations/tmdb/tmdb.service';
 import { DISCOVER_TMDB_PROVIDER_IDS } from '../../common/ott-providers';
 import { AdultContentService } from './adult-content.service';
 @Injectable()

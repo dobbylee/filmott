@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Content } from '../content.entity';
-import { TmdbService, TmdbItem } from '../../tmdb/tmdb.service';
+import { TmdbService, TmdbItem } from '../../integrations/tmdb/tmdb.service';
 import {
   TMDB_IMAGE_BASE,
   GENRE_NAME_MAP,

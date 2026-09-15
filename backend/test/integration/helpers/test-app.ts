@@ -13,7 +13,7 @@ import { RecommendationSearchService } from '../../../src/recommendation/recomme
 import { R2StorageService } from '../../../src/common/r2-storage.service';
 import { configureApp } from '../../../src/configure-app';
 import { KobisService } from '../../../src/kobis/kobis.service';
-import { TmdbService } from '../../../src/tmdb/tmdb.service';
+import { TmdbService } from '../../../src/integrations/tmdb/tmdb.service';
 import { createIntegrationTypeOrmOptions } from './database';
 
 interface IntegrationAppOptions {

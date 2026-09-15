@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Content } from '../content.entity';
-import { TmdbService, TmdbPersonCredit } from '../../tmdb/tmdb.service';
+import {
+  TmdbService,
+  TmdbPersonCredit,
+} from '../../integrations/tmdb/tmdb.service';
 import { RevalidateService } from '../../common/revalidate.service';
 import { ContentCatalogService } from './content-catalog.service';
 const BLOCKED_IDS_TTL_MS = 5 * 60 * 1000;

@@ -4,7 +4,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Content } from '../../src/contents/content.entity';
-import { TmdbService } from '../../src/tmdb/tmdb.service';
+import { TmdbService } from '../../src/integrations/tmdb/tmdb.service';
 import {
   createIntegrationDataSource,
   hasIntegrationDatabaseConfig,

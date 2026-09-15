@@ -7,7 +7,7 @@ import { Ranking } from './ranking.entity';
 import { RankingsSyncService } from './services/rankings-sync.service';
 import { RankingsController } from './rankings.controller';
 import { KobisModule } from '../kobis/kobis.module';
-import { TmdbModule } from '../tmdb/tmdb.module';
+import { TmdbModule } from '../integrations/tmdb/tmdb.module';
 import { ContentsModule } from '../contents/contents.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
 import { CommonModule } from '../common/common.module';

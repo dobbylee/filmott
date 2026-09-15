@@ -11,7 +11,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Content } from './content.entity';
-import { TmdbService } from '../tmdb/tmdb.service';
+import { TmdbService } from '../integrations/tmdb/tmdb.service';
 import { RevalidateService } from '../common/revalidate.service';
 import { AxiosError, AxiosHeaders } from 'axios';
 describe('콘텐츠 책임별 서비스 계약', () => {

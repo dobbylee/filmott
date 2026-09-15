@@ -11,7 +11,7 @@ import {
   TmdbService,
   TmdbPersonDetail,
   TmdbPersonCredit,
-} from '../../tmdb/tmdb.service';
+} from '../../integrations/tmdb/tmdb.service';
 import { AdultContentService } from './adult-content.service';
 const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
 interface CacheEntry<T> {

@@ -7,7 +7,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Content } from './content.entity';
 import { ContentsController } from './contents.controller';
-import { TmdbModule } from '../tmdb/tmdb.module';
+import { TmdbModule } from '../integrations/tmdb/tmdb.module';
 import { CommonModule } from '../common/common.module';
 
 @Module({
