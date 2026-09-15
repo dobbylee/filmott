@@ -1,3 +1,4 @@
+import { RankingsQueryService } from './services/rankings-query.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
 import { BadRequestException } from '@nestjs/common';
@@ -12,20 +13,23 @@ describe('RankingsController', () => {
   let controller: RankingsController;
   let reflector: Reflector;
 
-  const mockRankingsService = {
+  const mockRankingsQueryService = {
     getRankings: jest.fn(),
+    getUnmatchedRankings: jest.fn(),
+  };
+  const mockRankingsService = {
     fetchDailyBoxOffice: jest.fn(),
     fetchWeeklyBoxOffice: jest.fn(),
     fetchTrending: jest.fn(),
     refreshTrending: jest.fn(),
     updatePosterUrl: jest.fn(),
-    getUnmatchedRankings: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [RankingsController],
       providers: [
+        { provide: RankingsQueryService, useValue: mockRankingsQueryService },
         { provide: RankingsService, useValue: mockRankingsService },
         Reflector,
       ],
@@ -41,14 +45,14 @@ describe('RankingsController', () => {
 
   describe('GET /api/rankings', () => {
     it('기본 limit으로 랭킹을 반환해야 한다', async () => {
-      mockRankingsService.getRankings.mockResolvedValue([]);
+      mockRankingsQueryService.getRankings.mockResolvedValue([]);
 
       await controller.getRankings({
         source: 'kobis',
         category: 'daily-box-office',
       });
 
-      expect(mockRankingsService.getRankings).toHaveBeenCalledWith(
+      expect(mockRankingsQueryService.getRankings).toHaveBeenCalledWith(
         'kobis',
         'daily-box-office',
         10,
@@ -56,7 +60,7 @@ describe('RankingsController', () => {
     });
 
     it('사용자 지정 limit을 전달해야 한다', async () => {
-      mockRankingsService.getRankings.mockResolvedValue([]);
+      mockRankingsQueryService.getRankings.mockResolvedValue([]);
 
       await controller.getRankings({
         source: 'tmdb',
@@ -64,7 +68,7 @@ describe('RankingsController', () => {
         limit: '5',
       });
 
-      expect(mockRankingsService.getRankings).toHaveBeenCalledWith(
+      expect(mockRankingsQueryService.getRankings).toHaveBeenCalledWith(
         'tmdb',
         'trending-all-day',
         5,

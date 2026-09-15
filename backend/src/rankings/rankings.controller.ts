@@ -1,3 +1,4 @@
+import { RankingsQueryService } from './services/rankings-query.service';
 import {
   Controller,
   Get,
@@ -20,7 +21,10 @@ import { UpdatePosterUrlDto } from './dto/update-poster-url.dto';
 
 @Controller('rankings')
 export class RankingsController {
-  constructor(private readonly rankingsService: RankingsService) {}
+  constructor(
+    private readonly rankingsService: RankingsService,
+    private readonly rankingsQueryService: RankingsQueryService,
+  ) {}
 
   private static readonly VALID_SOURCES = ['kobis', 'tmdb'];
   private static readonly VALID_CATEGORIES = [
@@ -48,7 +52,11 @@ export class RankingsController {
 
     const parsedLimit = dto.limit ? parseInt(dto.limit, 10) : 10;
     const limit = Math.min(Math.max(parsedLimit, 1), 100);
-    return this.rankingsService.getRankings(dto.source, dto.category, limit);
+    return this.rankingsQueryService.getRankings(
+      dto.source,
+      dto.category,
+      limit,
+    );
   }
 
   /**
@@ -59,7 +67,7 @@ export class RankingsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   async getUnmatched() {
-    return this.rankingsService.getUnmatchedRankings();
+    return this.rankingsQueryService.getUnmatchedRankings();
   }
 
   /**

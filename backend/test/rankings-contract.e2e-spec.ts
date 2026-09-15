@@ -92,6 +92,12 @@ describe('랭킹 API 실제 HTTP·수집·DB 계약', () => {
       targetDate: '2026-01-03',
       fetchedAt: new Date('2026-01-03'),
     });
+    // targetDate가 더 최신이어도 fetchedAt이 오래된 묶음은 반환하지 않는다.
+    await fixtures.ranking({
+      rank: 4,
+      targetDate: '2026-01-03',
+      fetchedAt: new Date('2026-01-01'),
+    });
     const url = '/api/rankings?source=kobis&category=daily-box-office';
     const contentFixture = JSON.parse(
       JSON.stringify(
