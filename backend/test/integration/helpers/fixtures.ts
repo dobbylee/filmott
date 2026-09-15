@@ -155,3 +155,11 @@ export function createIntegrationFixtures(dataSource: DataSource) {
 export function createVectorLiteral(size = 1536, value = 0.01): string {
   return `[${Array.from({ length: size }, () => value).join(',')}]`;
 }
+
+// query=[1,0,...]와 지정한 cosine을 이루는1536차원 단위 벡터.
+export function createDirectionalEmbedding(cosine: number): number[] {
+  const values = Array.from({ length: 1536 }, () => 0);
+  values[0] = cosine;
+  values[1] = Math.sqrt(1 - cosine * cosine);
+  return values;
+}

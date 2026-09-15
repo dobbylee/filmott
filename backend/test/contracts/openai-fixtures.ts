@@ -42,8 +42,10 @@ export function streamResponse(content: string, finish = 'stop'): Response {
   );
 }
 
-export function embeddingResponse(encoding: unknown): Response {
-  const values = Array.from({ length: 1536 }, () => 0.01);
+export function embeddingResponse(
+  encoding: unknown,
+  values: number[] = Array.from({ length: 1536 }, () => 0.01),
+): Response {
   return Response.json({
     object: 'list',
     model: 'text-embedding-3-small',

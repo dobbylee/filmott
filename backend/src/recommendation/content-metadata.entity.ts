@@ -24,9 +24,9 @@ export class ContentMetadata {
   @Column({ type: 'text' })
   description!: string;
 
-  // pgvector 컬럼은 TypeORM에서 string으로 취급하고 raw query로 조회
+  // TypeORM vector 조회는 숫자 배열이며 기존 fixture/raw 저장은 문자열도 사용한다.
   @Column({ type: 'vector', length: 1536 })
-  embedding!: string;
+  embedding!: number[] | string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

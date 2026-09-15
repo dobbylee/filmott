@@ -10,6 +10,7 @@ import {
 import {
   createIntegrationFixtures,
   createVectorLiteral,
+  createDirectionalEmbedding,
 } from './helpers/fixtures';
 
 const describeWithDb = hasIntegrationDatabaseConfig()
@@ -32,6 +33,7 @@ describeWithDb('content search integration', () => {
   let moduleRef: TestingModule;
   let service: RecommendationSearchService;
   const metadataService = {
+    isEmbeddingAvailable: () => true,
     generateEmbedding: jest.fn<Promise<number[]>, [string]>(),
   };
 
@@ -266,4 +268,80 @@ describeWithDb('content search integration', () => {
       lowVoteContent.id,
     ]);
   });
+  it.each(['filtered', 'unfiltered'] as const)(
+    '%s 검색은 실제 벡터 거리와 인기도를 함께 반영하고 제외 조건과 limit을 유지해야 한다',
+    async (mode) => {
+      const fixtures = createIntegrationFixtures(dataSource);
+      const ids: number[] = [];
+      // cosine만 정렬하면 A>B>C, 인기도만 정렬하면 C>A/B다.
+      // 기존0.7*cosine + min(log(votes+1)/10,0.3)에서는 A>C>B다.
+      for (const [title, cosine, voteCount] of [
+        ['거리 우선', 1, 1],
+        ['중간 거리', 0.8, 1],
+        ['인기도 보정', 0.6, 10000],
+      ] as const) {
+        const content = await fixtures.content({
+          title,
+          voteCount,
+          posterUrl: '/poster.jpg',
+        });
+        await fixtures.contentMetadata({
+          contentId: content.id,
+          embedding: JSON.stringify(createDirectionalEmbedding(cosine)),
+        });
+        ids.push(content.tmdbId);
+      }
+      const adult = await fixtures.content({
+        title: '성인 제외',
+        adult: true,
+        voteCount: 10000,
+        posterUrl: '/adult.jpg',
+      });
+      const excluded = await fixtures.content({
+        title: '명시 제외',
+        voteCount: 10000,
+        posterUrl: '/excluded.jpg',
+      });
+      for (const content of [adult, excluded]) {
+        await fixtures.contentMetadata({
+          contentId: content.id,
+          embedding: JSON.stringify(createDirectionalEmbedding(1)),
+        });
+      }
+      const queryVector = createDirectionalEmbedding(1);
+      const search = (limit: number) =>
+        mode === 'filtered'
+          ? service.searchWithFilters(
+              '추천',
+              limit,
+              [excluded.tmdbId],
+              {},
+              queryVector,
+            )
+          : service.searchSimilar(
+              '추천',
+              limit,
+              [excluded.tmdbId],
+              queryVector,
+            );
+      const result = await search(10);
+      expect(result.map((item) => item.tmdbId)).toEqual([
+        ids[0],
+        ids[2],
+        ids[1],
+      ]);
+      expect((await search(2)).map((item) => item.tmdbId)).toEqual([
+        ids[0],
+        ids[2],
+      ]);
+      const expectedScores =
+        mode === 'filtered'
+          ? [0.7 + Math.log(2) / 10, 0.72, 0.56 + Math.log(2) / 10]
+          : [1, 0.6, 0.8];
+      result.forEach((item, index) =>
+        expect(item.similarity).toBeCloseTo(expectedScores[index], 5),
+      );
+      expect(metadataService.generateEmbedding).not.toHaveBeenCalled();
+    },
+  );
 });

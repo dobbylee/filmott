@@ -307,12 +307,14 @@ export class RecommendationCandidateService {
     return { embedding, tmdbId: content.tmdbId };
   }
 
-  private parseEmbedding(value: string): number[] | null {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value) as unknown;
-    } catch {
-      return null;
+  private parseEmbedding(value: unknown): number[] | null {
+    let parsed: unknown = value;
+    if (typeof value === 'string') {
+      try {
+        parsed = JSON.parse(value) as unknown;
+      } catch {
+        return null;
+      }
     }
 
     if (
