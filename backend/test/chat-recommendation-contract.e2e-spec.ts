@@ -6,6 +6,7 @@ import { Content } from '../src/contents/content.entity';
 import { ContentMetadata } from '../src/recommendation/content-metadata.entity';
 import { ContentMetadataService } from '../src/recommendation/content-metadata.service';
 import { RecommendationSearchService } from '../src/recommendation/recommendation-search.service';
+import { RecommendationCandidateService } from '../src/recommendation/recommendation-candidate.service';
 import { createContractApp } from './contracts/contract-app';
 import {
   completionResponse,
@@ -231,6 +232,62 @@ describe('추천 검색·참조 작품 실제 HTTP·DB 계약', () => {
       throw new Error(`미등록 fixture: ${config.url}`);
     };
   }
+
+  it.each([true, false])(
+    'KOBIS 이력은 작품당 한 후보만 차지하고 제외·limit·최종 후보수를 유지해야 한다 (metadata=%s)',
+    async (withMetadata) => {
+      for (let index = 0; index < 8; index++) {
+        const content = await fixtures.content({
+          tmdbId: 201 + index,
+          title: `서로 다른 후보 ${index}`,
+          posterUrl: '/candidate.jpg',
+          originCountry: 'US',
+          watchProviders: null,
+          voteCount: index === 0 ? 10000 : 10 + index,
+          adult: index === 7,
+        });
+        if (withMetadata)
+          await fixtures.contentMetadata({
+            contentId: content.id,
+            embedding: JSON.stringify(queryVector),
+          });
+        for (let day = 1; day <= (index === 0 ? 20 : 1); day++)
+          await fixtures.ranking({
+            contentId: content.id,
+            rank: index + 1,
+            targetDate: `2026-08-${String(day).padStart(2, '0')}`,
+          });
+      }
+      const search = harness.app.get(RecommendationSearchService);
+      const run = (limit: number) =>
+        withMetadata
+          ? search.searchSimilar('추천', limit, [207], queryVector)
+          : search.searchWithFilters(
+              '영화 추천',
+              limit,
+              [207],
+              { contentType: 'movie', relaxableFilterKeys: [] },
+              queryVector,
+            );
+      const results = await run(20);
+      expect(results).toHaveLength(6);
+      expect(results.map((item) => item.tmdbId).sort()).toEqual([
+        201, 202, 203, 204, 205, 206,
+      ]);
+      expect(results[0].tmdbId).toBe(201);
+      const limited = await run(3);
+      expect(limited).toHaveLength(3);
+      expect(new Set(limited.map((item) => item.tmdbId)).size).toBe(3);
+      expect(limited[0].tmdbId).toBe(201);
+      const confirmed = harness.app
+        .get(RecommendationCandidateService)
+        .selectConfirmedRecommendationCandidates(results, 'movie', []);
+      expect(confirmed).toHaveLength(5);
+      expect(new Set(confirmed.map((item) => item.tmdbId)).size).toBe(5);
+      expect(calls).toEqual([]);
+      expect(harness.httpCalls).toEqual([]);
+    },
+  );
 
   it('metadata가 있는 익명 저신뢰 요청은 실제 searchSimilar를 거쳐 후보와 SSE를 반환해야 한다', async () => {
     await candidate();

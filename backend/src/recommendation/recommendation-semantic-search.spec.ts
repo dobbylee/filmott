@@ -212,12 +212,11 @@ describe('RecommendationSearchService', () => {
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
       expect(query).toContain(
-        "LEFT JOIN rankings r ON r.content_id = c.id AND r.source = 'kobis'",
+        "EXISTS (SELECT 1 FROM rankings r WHERE r.content_id = c.id AND r.source = 'kobis')",
       );
       expect(query).toContain(
         'c.watch_providers IS NOT NULL OR c.origin_country LIKE',
       );
-      expect(query).toContain('r.id IS NOT NULL');
       expect(query).not.toContain('content_type =');
       expect(query).not.toContain('release_date >=');
     });

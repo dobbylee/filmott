@@ -689,7 +689,7 @@ describe('RecommendationSearchService', () => {
       expect(params).toContain('2024-01-01');
     });
 
-    it('2순위에서 rankings를 직접 JOIN으로 조회해야 한다', async () => {
+    it('2순위에서 KOBIS 존재 여부를 확인해 작품을 조회해야 한다', async () => {
       mockDataSource.query.mockResolvedValue(fiveRows);
 
       await service.searchWithFilters('영화 추천', 20, [], {
@@ -697,9 +697,9 @@ describe('RecommendationSearchService', () => {
       });
 
       const query = mockDataSource.query.mock.calls[0][0] as string;
-      // 2순위: FROM rankings r JOIN contents c
-      expect(query).toContain('FROM rankings r');
-      expect(query).toContain('JOIN contents c ON c.id = r.content_id');
+      expect(query).toContain(
+        "FROM contents c\n   WHERE EXISTS (SELECT 1 FROM rankings r WHERE r.content_id = c.id AND r.source = 'kobis')",
+      );
     });
 
     it('3순위에서 임베딩과 KOBIS 랭킹이 없는 캐시 콘텐츠를 조회해야 한다', async () => {
