@@ -31,19 +31,44 @@ describe('계약 검사 외부 통신 격리', () => {
     expect(globalThis.fetch).toBe(originalFetch);
   });
 
-  it('fixture가 등록되지 않은 경로를 거부하면 업무에서 잡아도 누락을 기록해야 한다', async () => {
-    const harness = await createContractApp({
-      http: () => {
-        throw new Error('미등록 fixture: /unknown');
-      },
-    });
-    try {
-      await axios.get('/unknown').catch(() => undefined);
-      expect(harness.unexpected).toEqual(['미등록 fixture: /unknown']);
-    } finally {
-      await harness.close();
-    }
-  });
+  it.each([
+    ['http', '미등록 fixture: /unknown'],
+    ['fetch-sync', '미등록 fixture: /unknown'],
+    ['fetch-async', '미등록 SDK fixture: /unknown'],
+    ['fetch-async', '미등록 OpenAI fixture URL'],
+    ['fetch-async', '미등록 intent 요청'],
+  ] as const)(
+    '%s에서 %s를 업무가 잡아도 teardown 누락 검사는 실패해야 한다',
+    async (boundary, message) => {
+      const originalFetch = globalThis.fetch;
+      const error = new Error(message);
+      const harness = await createContractApp({
+        http: () => {
+          throw error;
+        },
+        fetch:
+          boundary === 'fetch-sync'
+            ? () => {
+                throw error;
+              }
+            : async () => {
+                throw error;
+              },
+      });
+      try {
+        if (boundary === 'http')
+          await axios.get('/unknown').catch(() => undefined);
+        else
+          await fetch('https://fixture.local/unknown').catch(() => undefined);
+        expect(harness.unexpected).toEqual([message]);
+        // 계약 suite의 afterEach와 같은 검사: 업무 catch 뒤에도 실패해야 한다.
+        expect(() => expect(harness.unexpected).toEqual([])).toThrow();
+      } finally {
+        await harness.close();
+      }
+      expect(globalThis.fetch).toBe(originalFetch);
+    },
+  );
   it.each([
     'command',
     'bucket',
@@ -225,6 +250,7 @@ describe('계약 검사 외부 통신 격리', () => {
         if (boundary === 'http')
           await expect(axios.get('https://fixture.local')).rejects.toBe(error);
         else await expect(fetch('https://fixture.local')).rejects.toBe(error);
+        expect(harness.unexpected).toEqual([]);
       } finally {
         await expect(harness.close()).resolves.toBeUndefined();
       }

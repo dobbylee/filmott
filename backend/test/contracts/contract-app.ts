@@ -79,6 +79,13 @@ export async function createContractApp(transport: ContractTransport = {}) {
     }
   };
   const unexpected: string[] = [];
+  const recordTransportFailure = (error: unknown): void => {
+    recordAssertion(error);
+    // HTTP/SDK fixture는 미등록 경로를 이 접두어로 표시한다.
+    if (error instanceof Error && error.message.startsWith('미등록 ')) {
+      unexpected.push(error.message);
+    }
+  };
   const httpCalls: InternalAxiosRequestConfig[] = [];
   const fetchCalls: { url: string; body: unknown }[] = [];
   const originalAdapter = axios.defaults.adapter;
@@ -100,13 +107,7 @@ export async function createContractApp(transport: ContractTransport = {}) {
         config: request,
       };
     } catch (error) {
-      recordAssertion(error);
-      if (
-        error instanceof Error &&
-        error.message.startsWith('미등록 fixture')
-      ) {
-        unexpected.push(error.message);
-      }
+      recordTransportFailure(error);
       throw error;
     }
   };
@@ -122,7 +123,7 @@ export async function createContractApp(transport: ContractTransport = {}) {
         try {
           return await transport.fetch(input, init);
         } catch (error) {
-          recordAssertion(error);
+          recordTransportFailure(error);
           throw error;
         }
       }
