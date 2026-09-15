@@ -22,6 +22,16 @@
 - focused 테스트는 backend에서 `npm --prefix backend test -- --runInBand 파일패턴`, frontend에서 `npm --prefix frontend test -- 파일경로`로 실행한다.
 - 전체 gate와 focused 결과의 재사용 조건은 [workflow](workflow.md)를 따른다. 같은 입력을 다시 검사하는 자동 반복을 추가하지 않는다.
 
+## 테스트 품질
+
+동작 계약을 추가·변경하거나 DB/SDK/취소·재시도·background 경계를 옮길 때 적용한다. focused 검증과 독립 리뷰에서 다음을 확인한다.
+
+- 실제로 실행하는 경로와 mock/fixture로 대체한 경계를 명시한다. 단위 mock은 분기 검증에 사용하고, 변경 계약은 실제 업무 provider·DB query·SDK parser를 통과하는 대표 검사로 연결한다. DB/SDK 반환 형태는 선언 타입이나 mock만 믿지 않고 실제 경계에서 확인한다.
+- fixture는 위반을 구분할 수 있어야 한다. 순위에는 거리/인기도가 충돌하는 후보, 제외에는 포함/제외 후보, 조건 분기에는 임계값 양쪽을 넣고 관찰할 결과·저장·호출 횟수를 독립적으로 정한다. 테스트 수와 mock 호출 성공은 이 근거를 대신하지 않는다.
+- 업무 catch/retry/abort/background가 실행하는 callback 안의 assertion은 삼켜질 수 있다. 관찰값을 기록하고 테스트 본문에서 검사하거나, assertion 실패를 teardown에서 재전파하는 공통 fixture를 사용한다. 시작한 비동기 작업은 테스트 종료 전에 완료/실패를 관찰하고 정리한다. assertion 횟수 검사만으로 삼켜진 실패를 판정하지 않는다.
+- 외부 fixture는 허용한 요청과 의도한 오류만 처리하고 미등록 호출은 거부·기록한다. `createContractApp`은 HTTP/fetch/S3 경계의 Jest/Node assertion 실패를 close에서 재전파한다. 반환된 stream의 후속 event/listener는 수집 경계 밖이므로 테스트 본문에서 확인한다.
+- catch/retry/취소/background 또는 내부 mock에 의존한 핵심 계약을 새로 고정할 때는 해당 회귀를 넣어 테스트가 실패하는지 확인한다. 정상 코드 통과와 변이의 assertion 실패를 함께 기록하며, 환경/컴파일 실패를 탐지 성공으로 세지 않는다. 변경 위험에 해당하는 작은 변이만 격리 snapshot에서 실행한다.
+
 ## DB 검사
 
 - `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 현재 프로세스에 주입한다. `.env*`를 수정하지 않는다.

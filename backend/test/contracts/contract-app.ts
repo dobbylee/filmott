@@ -1,3 +1,5 @@
+import { isNativeError } from 'node:util/types';
+import { stripVTControlCharacters } from 'node:util';
 import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -60,6 +62,22 @@ export async function createContractApp(transport: ContractTransport = {}) {
     ),
   });
 
+  const assertionFailures: Error[] = [];
+  const recordAssertion = (error: unknown) => {
+    // Jest와 Node assert가 다른 VM realm에서 생성한 오류도 구분한다.
+    const message = isNativeError(error)
+      ? stripVTControlCharacters(error.message)
+      : '';
+    if (
+      isNativeError(error) &&
+      (error.constructor.name === 'JestAssertionError' ||
+        ('code' in error && error.code === 'ERR_ASSERTION') ||
+        (message.startsWith('expect(') &&
+          message.includes('\n\nMatcher error:')))
+    ) {
+      assertionFailures.push(error);
+    }
+  };
   const unexpected: string[] = [];
   const httpCalls: InternalAxiosRequestConfig[] = [];
   const fetchCalls: { url: string; body: unknown }[] = [];
@@ -82,6 +100,7 @@ export async function createContractApp(transport: ContractTransport = {}) {
         config: request,
       };
     } catch (error) {
+      recordAssertion(error);
       if (
         error instanceof Error &&
         error.message.startsWith('미등록 fixture')
@@ -99,7 +118,14 @@ export async function createContractApp(transport: ContractTransport = {}) {
       if (url === 'http://contract.filmott.local/internal/revalidate') {
         return new Response('{}', { status: 200 });
       }
-      if (transport.fetch) return transport.fetch(input, init);
+      if (transport.fetch) {
+        try {
+          return await transport.fetch(input, init);
+        } catch (error) {
+          recordAssertion(error);
+          throw error;
+        }
+      }
       unexpected.push(url);
       throw new Error('등록되지 않은 외부 fetch 요청');
     });
@@ -131,6 +157,7 @@ export async function createContractApp(transport: ContractTransport = {}) {
         return Promise.reject(new Error(message)) as never;
       }
       s3FixtureIndex++;
+      recordAssertion(expected.error);
       return (
         expected.error ? Promise.reject(expected.error) : Promise.resolve({})
       ) as never;
@@ -156,10 +183,19 @@ export async function createContractApp(transport: ContractTransport = {}) {
       s3Spy,
       unexpected,
       async close() {
+        const closeErrors: unknown[] = [];
         try {
           await app?.close();
+        } catch (error) {
+          closeErrors.push(error);
         } finally {
           restore();
+        }
+        if (assertionFailures.length > 0 || closeErrors.length > 0) {
+          throw new AggregateError(
+            [...assertionFailures, ...closeErrors],
+            '계약 fixture assertion 또는 앱 정리 실패',
+          );
         }
       },
     };

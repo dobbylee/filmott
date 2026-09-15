@@ -1,4 +1,5 @@
 import axios from 'axios';
+import assert from 'node:assert/strict';
 import {
   S3Client,
   PutObjectCommand,
@@ -120,6 +121,112 @@ describe('계약 검사 외부 통신 격리', () => {
       } finally {
         client.destroy();
         await harness.close();
+      }
+    },
+  );
+  it.each([
+    'http-sync',
+    'http-async',
+    'fetch-sync',
+    'fetch-async',
+    'node-assert',
+    'missing-array',
+    'missing-object',
+    's3',
+  ] as const)(
+    '%s assertion을 업무에서 잡아도 close가 실패하고 전역 fixture를 복구해야 한다',
+    async (boundary) => {
+      const originalAdapter = axios.defaults.adapter;
+      const originalFetch = globalThis.fetch;
+      const originalSend = S3Client.prototype.send;
+      const failure = () => {
+        if (boundary === 'node-assert') assert.equal(1, 2);
+        if (boundary === 'missing-array') expect(undefined).toHaveLength(1);
+        if (boundary === 'missing-object')
+          expect(undefined).toMatchObject({ ok: true });
+        expect('실제값').toBe('틀린 기대값');
+      };
+      let s3Error: Error | undefined;
+      if (boundary === 's3') {
+        try {
+          failure();
+        } catch (error) {
+          if (error instanceof Error) s3Error = error;
+          else throw error;
+        }
+      }
+      const harness = await createContractApp({
+        http:
+          boundary === 'http-async'
+            ? async () => {
+                await Promise.resolve();
+                failure();
+              }
+            : () => {
+                failure();
+              },
+        fetch:
+          boundary === 'fetch-async'
+            ? async () => {
+                await Promise.resolve();
+                failure();
+                return new Response('{}');
+              }
+            : () => {
+                failure();
+                return Promise.resolve(new Response('{}'));
+              },
+        s3: [
+          {
+            command: 'DeleteObjectCommand',
+            bucket: 'contract',
+            key: 'test',
+            error: s3Error,
+          },
+        ],
+      });
+      const client = new S3Client({ region: 'auto' });
+      try {
+        if (boundary.startsWith('fetch'))
+          await fetch('https://fixture.local').catch(() => undefined);
+        else if (boundary === 's3')
+          await client
+            .send(new DeleteObjectCommand({ Bucket: 'contract', Key: 'test' }))
+            .catch(() => undefined);
+        else await axios.get('https://fixture.local').catch(() => undefined);
+      } finally {
+        client.destroy();
+        await expect(harness.close()).rejects.toMatchObject({
+          message: '계약 fixture assertion 또는 앱 정리 실패',
+          errors: [expect.objectContaining({ message: expect.any(String) })],
+        });
+      }
+      expect(axios.defaults.adapter).toBe(originalAdapter);
+      expect(globalThis.fetch).toBe(originalFetch);
+      expect(S3Client.prototype.send).toBe(originalSend);
+      const clean = await createContractApp();
+      await expect(clean.close()).resolves.toBeUndefined();
+    },
+  );
+
+  it.each(['http', 'fetch'] as const)(
+    '%s의 의도한 외부 오류는 assertion 실패로 처리하지 않아야 한다',
+    async (boundary) => {
+      const error = new Error('의도한 외부 실패');
+      const harness = await createContractApp({
+        http: () => {
+          throw error;
+        },
+        fetch: async () => {
+          throw error;
+        },
+      });
+      try {
+        if (boundary === 'http')
+          await expect(axios.get('https://fixture.local')).rejects.toBe(error);
+        else await expect(fetch('https://fixture.local')).rejects.toBe(error);
+      } finally {
+        await expect(harness.close()).resolves.toBeUndefined();
       }
     },
   );
