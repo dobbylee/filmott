@@ -1,9 +1,10 @@
+import { RankingsSchedulerService } from './services/rankings-scheduler.service';
 import { RankingsManagementService } from './services/rankings-management.service';
 import { RankingsQueryService } from './services/rankings-query.service';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Ranking } from './ranking.entity';
-import { RankingsService } from './rankings.service';
+import { RankingsSyncService } from './services/rankings-sync.service';
 import { RankingsController } from './rankings.controller';
 import { KobisModule } from '../kobis/kobis.module';
 import { TmdbModule } from '../tmdb/tmdb.module';
@@ -21,6 +22,11 @@ import { CommonModule } from '../common/common.module';
     CommonModule,
   ],
   controllers: [RankingsController],
-  providers: [RankingsService, RankingsQueryService, RankingsManagementService],
+  providers: [
+    RankingsSchedulerService,
+    RankingsSyncService,
+    RankingsQueryService,
+    RankingsManagementService,
+  ],
 })
 export class RankingsModule {}

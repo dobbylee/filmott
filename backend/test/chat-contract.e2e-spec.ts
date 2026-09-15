@@ -8,7 +8,7 @@ import { ChatContextService } from '../src/chat/chat-context.service';
 import { ChatService } from '../src/chat/chat.service';
 import { RecommendationSearchService } from '../src/recommendation/recommendation-search.service';
 import { RecommendationCandidateService } from '../src/recommendation/recommendation-candidate.service';
-import { RankingsService } from '../src/rankings/rankings.service';
+import { RankingsSyncService } from '../src/rankings/services/rankings-sync.service';
 
 import type { ChatHistoryMessageDto } from '../src/chat/dto/send-message.dto';
 import { IntentAnalyzerService } from '../src/chat/intent-analyzer';
@@ -151,7 +151,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
       ChatService,
       RecommendationSearchService,
       RecommendationCandidateService,
-      RankingsService,
+      RankingsSyncService,
     ]) {
       expect(Reflect.get(harness.app.get(consumer), 'metadataService')).toBe(
         metadata,

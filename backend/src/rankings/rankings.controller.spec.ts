@@ -4,7 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
 import { BadRequestException } from '@nestjs/common';
 import { RankingsController } from './rankings.controller';
-import { RankingsService } from './rankings.service';
+import { RankingsSyncService } from './services/rankings-sync.service';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserRole } from '../users/enums/user-role.enum';
@@ -19,7 +19,7 @@ describe('RankingsController', () => {
     getUnmatchedRankings: jest.fn(),
   };
   const mockRankingsManagementService = { updatePosterUrl: jest.fn() };
-  const mockRankingsService = {
+  const mockRankingsSyncService = {
     fetchDailyBoxOffice: jest.fn(),
     fetchWeeklyBoxOffice: jest.fn(),
     fetchTrending: jest.fn(),
@@ -35,7 +35,7 @@ describe('RankingsController', () => {
           useValue: mockRankingsManagementService,
         },
         { provide: RankingsQueryService, useValue: mockRankingsQueryService },
-        { provide: RankingsService, useValue: mockRankingsService },
+        { provide: RankingsSyncService, useValue: mockRankingsSyncService },
         Reflector,
       ],
     }).compile();
@@ -83,19 +83,19 @@ describe('RankingsController', () => {
 
   describe('POST /api/rankings/refresh/:category', () => {
     it('daily-box-office에 대해 fetchDailyBoxOffice를 호출해야 한다', async () => {
-      mockRankingsService.fetchDailyBoxOffice.mockResolvedValue([]);
+      mockRankingsSyncService.fetchDailyBoxOffice.mockResolvedValue([]);
 
       await controller.refresh('daily-box-office');
 
-      expect(mockRankingsService.fetchDailyBoxOffice).toHaveBeenCalled();
+      expect(mockRankingsSyncService.fetchDailyBoxOffice).toHaveBeenCalled();
     });
 
     it('트렌딩 카테고리에 대해 refreshTrending을 호출해야 한다', async () => {
-      mockRankingsService.refreshTrending.mockResolvedValue([]);
+      mockRankingsSyncService.refreshTrending.mockResolvedValue([]);
 
       await controller.refresh('trending-all-day');
 
-      expect(mockRankingsService.refreshTrending).toHaveBeenCalledWith(
+      expect(mockRankingsSyncService.refreshTrending).toHaveBeenCalledWith(
         'all',
         'day',
       );
@@ -114,11 +114,11 @@ describe('RankingsController', () => {
     });
 
     it('all 타입과 week 윈도우로 refreshTrending을 호출해야 한다', async () => {
-      mockRankingsService.refreshTrending.mockResolvedValue([]);
+      mockRankingsSyncService.refreshTrending.mockResolvedValue([]);
 
       await controller.refresh('trending-all-week');
 
-      expect(mockRankingsService.refreshTrending).toHaveBeenCalledWith(
+      expect(mockRankingsSyncService.refreshTrending).toHaveBeenCalledWith(
         'all',
         'week',
       );

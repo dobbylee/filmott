@@ -12,7 +12,7 @@ import {
   BadRequestException,
   ParseIntPipe,
 } from '@nestjs/common';
-import { RankingsService } from './rankings.service';
+import { RankingsSyncService } from './services/rankings-sync.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -23,7 +23,7 @@ import { UpdatePosterUrlDto } from './dto/update-poster-url.dto';
 @Controller('rankings')
 export class RankingsController {
   constructor(
-    private readonly rankingsService: RankingsService,
+    private readonly rankingsSyncService: RankingsSyncService,
     private readonly rankingsQueryService: RankingsQueryService,
     private readonly rankingsManagementService: RankingsManagementService,
   ) {}
@@ -96,13 +96,13 @@ export class RankingsController {
   async refresh(@Param('category') category: string) {
     switch (category) {
       case 'daily-box-office':
-        return this.rankingsService.fetchDailyBoxOffice();
+        return this.rankingsSyncService.fetchDailyBoxOffice();
       case 'weekly-box-office':
-        return this.rankingsService.fetchWeeklyBoxOffice();
+        return this.rankingsSyncService.fetchWeeklyBoxOffice();
       case 'trending-all-day':
-        return this.rankingsService.refreshTrending('all', 'day');
+        return this.rankingsSyncService.refreshTrending('all', 'day');
       case 'trending-all-week':
-        return this.rankingsService.refreshTrending('all', 'week');
+        return this.rankingsSyncService.refreshTrending('all', 'week');
       default:
         throw new BadRequestException(`Unknown category: ${category}`);
     }
