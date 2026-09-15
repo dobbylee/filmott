@@ -3,6 +3,7 @@ import http from 'node:http';
 import { JwtService } from '@nestjs/jwt';
 import { ModulesContainer } from '@nestjs/core';
 import { DataSource } from 'typeorm';
+import { ChatContextService } from '../src/chat/chat-context.service';
 import { ChatService } from '../src/chat/chat.service';
 import { RecommendationSearchService } from '../src/recommendation/recommendation-search.service';
 import { RecommendationCandidateService } from '../src/recommendation/recommendation-candidate.service';
@@ -575,6 +576,135 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
       .send({ content: '안녕' })
       .expect(429);
     expect(calls).toHaveLength(15);
+  });
+
+  it('실제 개인화 조회는 로그인 7개와 익명 0개이며 OTT와 선호 결과를 유지해야 한다', async () => {
+    const user = await fixtures.user({ subscribedOtts: ['netflix'] });
+    const favorite = await fixtures.content({ title: '개인화 선호작' });
+    await fixtures.review({
+      userId: user.id,
+      contentId: favorite.id,
+      rating: 10,
+    });
+    await fixtures.watchlist({
+      userId: user.id,
+      contentId: favorite.id,
+      status: 'watched',
+    });
+    const context = harness.app.get(ChatContextService);
+    const query = jest.spyOn(db.logger, 'logQuery');
+    try {
+      const result = await context.buildChatContext(user.id);
+      expect(query).toHaveBeenCalledTimes(7);
+      expect(query.mock.calls.map((call) => call[1])).toEqual(
+        Array.from({ length: 7 }, () => [user.id]),
+      );
+      expect(result).toEqual({
+        subscribedOtts: ['netflix'],
+        userContext: {
+          favorites: [
+            {
+              title: '개인화 선호작',
+              year: '2026',
+              genres: '드라마',
+              rating: 10,
+              originCountry: 'KR',
+            },
+          ],
+          disliked: [],
+          genreStats: [{ genre: '드라마', avgRating: '10.0', count: 1 }],
+          watchedTmdbIds: [favorite.tmdbId],
+          wantToWatch: [],
+          watchedGenres: [],
+        },
+      });
+      query.mockClear();
+      const guest = await context.buildChatContext(null);
+      expect(query).not.toHaveBeenCalled();
+      expect(guest).toEqual({
+        subscribedOtts: [],
+        userContext: {
+          favorites: [],
+          disliked: [],
+          genreStats: [],
+          watchedTmdbIds: [],
+          wantToWatch: [],
+          watchedGenres: [],
+        },
+      });
+    } finally {
+      query.mockRestore();
+    }
+
+    const token = harness.app.get(JwtService).sign({ sub: user.id });
+    const authenticated = await request(harness.app.getHttpServer())
+      .post('/api/chat/messages')
+      .auth(token, { type: 'bearer' })
+      .send({ content: '안녕' })
+      .expect(201);
+    const guest = await request(harness.app.getHttpServer())
+      .post('/api/chat/messages')
+      .send({ content: '안녕' })
+      .expect(201);
+    expect(events(authenticated.text)).toEqual(events(guest.text));
+    expect(events(guest.text).at(-1)).toEqual({ event: 'done', data: {} });
+    expect(calls).toHaveLength(2);
+    const loggedInPrompt = JSON.stringify(calls[0].body.messages);
+    const guestPrompt = JSON.stringify(calls[1].body.messages);
+    expect(loggedInPrompt).toContain('개인화 선호작');
+    expect(loggedInPrompt).toContain('넷플릭스');
+    expect(guestPrompt).not.toContain('개인화 선호작');
+    expect(calls.map((call) => [call.path, call.body.stream])).toEqual([
+      ['/v1/chat/completions', true],
+      ['/v1/chat/completions', true],
+    ]);
+  });
+
+  it('로그인 OTT와 선호는 실제 검색과 prompt까지 한 번씩 전달되어야 한다', async () => {
+    const user = await fixtures.user({ subscribedOtts: ['netflix'] });
+    const favorite = await fixtures.content({ title: '개인화 기준 작품' });
+    await fixtures.review({
+      userId: user.id,
+      contentId: favorite.id,
+      rating: 10,
+    });
+    await fixtures.contentMetadata({ contentId: favorite.id });
+    respond = (call) =>
+      call.body.stream ? streamResponse(message) : knowledgeResponse(call);
+    const search = jest.spyOn(
+      harness.app.get(RecommendationSearchService),
+      'searchWithFilters',
+    );
+    try {
+      const token = harness.app.get(JwtService).sign({ sub: user.id });
+      const response = await request(harness.app.getHttpServer())
+        .post('/api/chat/messages')
+        .auth(token, { type: 'bearer' })
+        .send({ content: '안녕' })
+        .expect(201);
+      expect(events(response.text)).toEqual([
+        { event: 'text', data: { content: '안녕하세요.' } },
+        { event: 'done', data: {} },
+      ]);
+      expect(search).toHaveBeenCalledTimes(1);
+      expect(search.mock.calls[0][3]).toMatchObject({
+        genres: ['드라마'],
+        ottProviderNames: ['Netflix'],
+      });
+      expect(JSON.stringify(calls.at(-1)?.body.messages)).toContain(
+        '개인화 기준 작품',
+      );
+      expect(JSON.stringify(calls.at(-1)?.body.messages)).toContain('넷플릭스');
+      expect(
+        calls.map((call) => [call.path, call.body.stream ?? false]),
+      ).toEqual([
+        ['/v1/chat/completions', false],
+        ['/v1/embeddings', false],
+        ['/v1/chat/completions', true],
+      ]);
+    } finally {
+      search.mockRestore();
+    }
   });
 
   it('실제 intent·embedding·SQL 후보는 추천 event와 기존 metadata 재사용으로 연결되어야 한다', async () => {

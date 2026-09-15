@@ -2,9 +2,7 @@ import type { ContentCatalogService } from '../contents/services/content-catalog
 import { ConfigService } from '@nestjs/config';
 import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
 import { OpenAISdkProvider } from '../integrations/openai/openai-sdk.provider';
-import type { Repository } from 'typeorm';
 import type { ContentDiscoveryService } from '../contents/services/content-discovery.service';
-import type { User } from '../users/user.entity';
 import { CHAT_QUALITY_CASES, type ChatQualityCase } from './chat-quality-cases';
 import { ChatContextService } from './chat-context.service';
 import { ChatResponseStreamService } from './chat-response-stream.service';
@@ -85,9 +83,10 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         buildSemanticQuery: jest.fn().mockReturnValue(testCase.userMessage),
       } as unknown as IntentAnalyzerService;
       const chatContextService = {
-        buildUserContext: jest
-          .fn()
-          .mockResolvedValue(testCase.preferenceFixture.userContext),
+        buildChatContext: jest.fn().mockResolvedValue({
+          userContext: testCase.preferenceFixture.userContext,
+          subscribedOtts: testCase.preferenceFixture.subscribedOtts,
+        }),
       } as unknown as ChatContextService;
       const contentDiscoveryService = {} as ContentDiscoveryService;
       const dataSource = {
@@ -101,12 +100,6 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         dataSource,
         {} as ContentCatalogService,
       );
-      const userRepository = {
-        findOne: jest.fn().mockResolvedValue({
-          id: 1,
-          subscribedOtts: testCase.preferenceFixture.subscribedOtts,
-        }),
-      } as unknown as Repository<User>;
       const configService = {
         get: jest.fn().mockReturnValue('test-openai-key'),
       } as unknown as ConfigService;
@@ -117,7 +110,6 @@ describe('채팅 품질 개인화 merge/relaxation contract', () => {
         chatContextService,
         recommendationCandidateService,
         new ChatResponseStreamService(),
-        userRepository,
         new OpenAIChatClient(new OpenAISdkProvider(configService)),
       );
       mockStreamCreate.mockReturnValueOnce(createResponseStream());

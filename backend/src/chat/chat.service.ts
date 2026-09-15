@@ -1,7 +1,5 @@
 import { buildFiltersFromIntent } from './intent-filter.mapper';
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { OpenAIChatClient } from '../integrations/openai/openai-chat.client';
 import type OpenAI from 'openai';
 import {
@@ -15,8 +13,7 @@ import {
   ContentSearchFilters,
   type RelaxableFilterKey,
 } from '../recommendation/recommendation-search.types';
-import { User } from '../users/user.entity';
-import { buildSystemPrompt, UserContext } from './prompts/system-prompt';
+import { buildSystemPrompt } from './prompts/system-prompt';
 import { OTT_PROVIDERS } from '../common/ott-providers';
 import {
   extractUserPreference,
@@ -67,8 +64,6 @@ export class ChatService {
     private readonly chatContextService: ChatContextService,
     private readonly recommendationCandidateService: RecommendationCandidateService,
     private readonly chatResponseStreamService: ChatResponseStreamService,
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
     private readonly openai: OpenAIChatClient,
   ) {}
 
@@ -86,32 +81,9 @@ export class ChatService {
       throw new BadRequestException('AI 추천 기능이 현재 비활성화 상태입니다.');
     }
 
-    // 1. 사용자 컨텍스트 수집 + OTT 구독 정보
-    let userContext: UserContext;
-    let subscribedOtts: string[];
-
-    if (userId !== null) {
-      const [ctx, user] = await Promise.all([
-        this.chatContextService.buildUserContext(userId),
-        this.userRepo.findOne({
-          where: { id: userId },
-          select: ['id', 'subscribedOtts'],
-        }),
-      ]);
-      userContext = ctx;
-      subscribedOtts = user?.subscribedOtts ?? [];
-    } else {
-      // 비로그인: 빈 컨텍스트 (개인화 없이 범용 추천)
-      userContext = {
-        favorites: [],
-        disliked: [],
-        genreStats: [],
-        watchedTmdbIds: [],
-        wantToWatch: [],
-        watchedGenres: [],
-      };
-      subscribedOtts = [];
-    }
+    // 1. 사용자 컨텍스트와 OTT 구독 정보 수집
+    const { userContext, subscribedOtts } =
+      await this.chatContextService.buildChatContext(userId);
     if (signal?.aborted) return;
 
     // 2. 대화 맥락을 합쳐서 벡터 검색 (전체 user 메시지 + 현재 메시지)

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Watchlist } from '../watchlist/watchlist.entity';
 import { Review } from '../reviews/review.entity';
+import { User } from '../users/user.entity';
 import {
   FavoriteContent,
   GenreStat,
@@ -36,6 +37,11 @@ interface RawWatchedTmdbIdRow {
   tmdbId: number;
 }
 
+export interface ChatContextResult {
+  userContext: UserContext;
+  subscribedOtts: string[];
+}
+
 @Injectable()
 export class ChatContextService {
   constructor(
@@ -43,9 +49,25 @@ export class ChatContextService {
     private readonly watchlistRepo: Repository<Watchlist>,
     @InjectRepository(Review)
     private readonly reviewRepo: Repository<Review>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
-  async buildUserContext(userId: number): Promise<UserContext> {
+  async buildChatContext(userId: number | null): Promise<ChatContextResult> {
+    if (userId === null) {
+      return {
+        userContext: {
+          favorites: [],
+          disliked: [],
+          genreStats: [],
+          watchedTmdbIds: [],
+          wantToWatch: [],
+          watchedGenres: [],
+        },
+        subscribedOtts: [],
+      };
+    }
+
     const [
       favorites,
       disliked,
@@ -53,6 +75,7 @@ export class ChatContextService {
       watchedTmdbIds,
       wantToWatch,
       watchedGenres,
+      user,
     ] = await Promise.all([
       this.getFavorites(userId),
       this.getDisliked(userId),
@@ -60,15 +83,22 @@ export class ChatContextService {
       this.getWatchedTmdbIds(userId),
       this.getWantToWatch(userId),
       this.getWatchedGenres(userId),
+      this.userRepo.findOne({
+        where: { id: userId },
+        select: ['id', 'subscribedOtts'],
+      }),
     ]);
 
     return {
-      favorites,
-      disliked,
-      genreStats,
-      watchedTmdbIds,
-      wantToWatch,
-      watchedGenres,
+      userContext: {
+        favorites,
+        disliked,
+        genreStats,
+        watchedTmdbIds,
+        wantToWatch,
+        watchedGenres,
+      },
+      subscribedOtts: user?.subscribedOtts ?? [],
     };
   }
 
@@ -88,7 +118,7 @@ export class ChatContextService {
       .orderBy('r.rating', 'DESC')
       .addOrderBy('r.updatedAt', 'DESC')
       .limit(20)
-      .getRawMany();
+      .getRawMany<RawFavoriteRow>();
 
     return rows.map((row) => ({
       title: row.title,
@@ -118,7 +148,7 @@ export class ChatContextService {
       .orderBy('r.rating', 'ASC')
       .addOrderBy('r.updatedAt', 'DESC')
       .limit(10)
-      .getRawMany();
+      .getRawMany<RawFavoriteRow>();
 
     return rows.map((row) => ({
       title: row.title,
@@ -145,7 +175,7 @@ export class ChatContextService {
       .andWhere('r.rating IS NOT NULL')
       .groupBy('"genre"')
       .orderBy('"count"', 'DESC')
-      .getRawMany();
+      .getRawMany<RawGenreStatRow>();
 
     return rows.map((row) => ({
       genre: row.genre,
@@ -161,7 +191,7 @@ export class ChatContextService {
       .select('c.tmdb_id AS "tmdbId"')
       .where('w.userId = :userId', { userId })
       .andWhere("w.status = 'watched'")
-      .getRawMany();
+      .getRawMany<RawWatchedTmdbIdRow>();
 
     return rows.map((row) => row.tmdbId);
   }
@@ -180,7 +210,7 @@ export class ChatContextService {
       .andWhere("w.status = 'want_to_watch'")
       .orderBy('w.createdAt', 'DESC')
       .limit(20)
-      .getRawMany();
+      .getRawMany<RawWantToWatchRow>();
 
     return rows.map((row) => ({
       title: row.title,
@@ -211,7 +241,7 @@ export class ChatContextService {
       .andWhere('r.id IS NULL')
       .groupBy('"genre"')
       .orderBy('"count"', 'DESC')
-      .getRawMany();
+      .getRawMany<RawGenreStatRow>();
 
     return rows.map((row) => ({
       genre: row.genre,
