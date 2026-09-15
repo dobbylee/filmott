@@ -90,12 +90,14 @@ export class RankingsSyncService {
           audienceCount: parseInt(item.audiAcc, 10) || undefined,
           targetDate,
           fetchedAt,
+          contentId: null,
+          posterUrl: null,
         });
 
         const result = matchResults[idx];
         if (result.status === 'fulfilled' && result.value) {
           ranking.contentId = result.value.id;
-          ranking.posterUrl = result.value.posterUrl;
+          ranking.posterUrl = result.value.posterUrl ?? null;
         }
 
         return ranking;
@@ -122,7 +124,7 @@ export class RankingsSyncService {
 
       const contentIds = rankingsToUpsert
         .map((r) => r.contentId)
-        .filter((id): id is number => id !== undefined);
+        .filter((id): id is number => typeof id === 'number');
       if (contentIds.length > 0) {
         this.cacheMetadataInBackground(contentIds);
       }
@@ -205,12 +207,14 @@ export class RankingsSyncService {
           audienceCount: parseInt(item.audiAcc, 10) || undefined,
           targetDate,
           fetchedAt,
+          contentId: null,
+          posterUrl: null,
         });
 
         const result = matchResults[idx];
         if (result.status === 'fulfilled' && result.value) {
           ranking.contentId = result.value.id;
-          ranking.posterUrl = result.value.posterUrl;
+          ranking.posterUrl = result.value.posterUrl ?? null;
         }
 
         return ranking;
@@ -237,7 +241,7 @@ export class RankingsSyncService {
 
       const contentIds = rankingsToUpsert
         .map((r) => r.contentId)
-        .filter((id): id is number => id !== undefined);
+        .filter((id): id is number => typeof id === 'number');
       if (contentIds.length > 0) {
         this.cacheMetadataInBackground(contentIds);
       }
@@ -333,9 +337,9 @@ export class RankingsSyncService {
           const title = mediaType === 'movie' ? item.title : item.name;
           const posterUrl = item.poster_path
             ? `${TMDB_IMAGE_BASE}/w500${item.poster_path}`
-            : undefined;
+            : null;
 
-          let contentId: number | undefined;
+          let contentId: number | null = null;
           const cacheResult = cacheResults[i];
           if (cacheResult.status === 'fulfilled') {
             contentId = cacheResult.value.id;

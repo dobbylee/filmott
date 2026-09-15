@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { RankingsSchedulerService } from '../src/rankings/services/rankings-scheduler.service';
+import { RankingsQueryService } from '../src/rankings/services/rankings-query.service';
 import { RankingsSyncService } from '../src/rankings/services/rankings-sync.service';
 import { Ranking } from '../src/rankings/ranking.entity';
 import { Content } from '../src/contents/content.entity';
@@ -367,6 +368,120 @@ describe('랭킹 예약→수집 실제 업무·DB 계약', () => {
       );
       expect(Sentry.captureException).toHaveBeenCalledTimes(1);
       expect(await db.getRepository(Ranking).count()).toBe(0);
+      expect(revalidations()).toEqual([]);
+    },
+  );
+
+  it.each(['daily', 'weekly'] as const)(
+    '%s 재수집의 매칭→다른 작품 미매칭→재매칭은 DB 연결과 미매칭 목록을 갱신해야 한다',
+    async (kind) => {
+      allowOffice(kind, true);
+      const sync = harness.app.get(RankingsSyncService);
+      const run = () =>
+        kind === 'daily'
+          ? sync.fetchDailyBoxOffice()
+          : sync.fetchWeeklyBoxOffice();
+      const first = await run();
+      await settleBackground();
+      const category = `${kind}-box-office`;
+      const stored = await db
+        .getRepository(Ranking)
+        .findOneByOrFail({ category });
+      expect(stored.contentId).toBe(first[0].contentId);
+      expect(stored.contentId).toEqual(expect.any(Number));
+      expect(stored.posterUrl).toContain('/poster.jpg');
+      const endpoint = `/boxoffice/search${kind === 'daily' ? 'Daily' : 'Weekly'}BoxOfficeList.json`;
+      const key =
+        kind === 'daily' ? 'dailyBoxOfficeList' : 'weeklyBoxOfficeList';
+      allowOffice(kind, false);
+      responses.set(endpoint, {
+        boxOfficeResult: {
+          [key]: [{ ...officeItem, movieNm: '새 미매칭 작품', movieCd: '222' }],
+        },
+      });
+      const unmatchedResult = await run();
+      await settleBackground();
+      const saved = await db.getRepository(Ranking).findOneOrFail({
+        where: { id: stored.id },
+        relations: ['content'],
+      });
+      expect(saved).toMatchObject({
+        id: stored.id,
+        title: '새 미매칭 작품',
+        contentId: null,
+        posterUrl: null,
+        content: null,
+        targetDate: targetDates[kind],
+      });
+      expect(unmatchedResult[0]).toMatchObject({
+        contentId: null,
+        posterUrl: null,
+      });
+      const query = harness.app.get(RankingsQueryService);
+      expect(await query.getUnmatchedRankings()).toEqual([
+        expect.objectContaining({ id: stored.id, title: '새 미매칭 작품' }),
+      ]);
+      expect(
+        (await query.getRankings('kobis', category))[0].content,
+      ).toBeNull();
+      expect(batch).toHaveBeenCalledTimes(1);
+      expect(batch).toHaveBeenCalledWith([stored.contentId]);
+      allowOffice(kind, true);
+      await run();
+      await settleBackground();
+      expect(await query.getUnmatchedRankings()).toEqual([]);
+      expect(
+        await db.getRepository(Ranking).findOneByOrFail({ id: stored.id }),
+      ).toMatchObject({
+        contentId: stored.contentId,
+        posterUrl: stored.posterUrl,
+      });
+      expect(await db.getRepository(Ranking).count()).toBe(1);
+      expect(revalidations()).toHaveLength(3);
+    },
+  );
+
+  it.each(['day', 'week'] as const)(
+    'trending %s 재수집에서 새 작품 상세 실패는 이전 연결과 포스터를 지워야 한다',
+    async (period) => {
+      const first = await fixtures.content({ tmdbId: 101, title: '이전 작품' });
+      const payload = (id: number, title: string, poster: string | null) => ({
+        page: 1,
+        total_pages: 1,
+        total_results: 1,
+        results: [{ id, title, media_type: 'movie', poster_path: poster }],
+      });
+      responses.set(
+        `/trending/all/${period}`,
+        payload(101, '이전 작품', '/old.jpg'),
+      );
+      const sync = harness.app.get(RankingsSyncService);
+      await sync.fetchTrending('all', period);
+      const category = `trending-all-${period}`;
+      const stored = await db
+        .getRepository(Ranking)
+        .findOneByOrFail({ category });
+      expect(stored.contentId).toBe(first.id);
+      expect(stored.posterUrl).toContain('/old.jpg');
+      responses.set(`/trending/all/${period}`, payload(102, '새 작품', null));
+      responses.set('/movie/102', new Error('허용한 상세 조회 실패'));
+      const result = await sync.fetchTrending('all', period);
+      const saved = await db.getRepository(Ranking).findOneOrFail({
+        where: { id: stored.id },
+        relations: ['content'],
+      });
+      expect(saved).toMatchObject({
+        title: '새 작품',
+        contentId: null,
+        content: null,
+        posterUrl: null,
+      });
+      expect(result[0]).toMatchObject({ contentId: null, posterUrl: null });
+      expect(
+        await harness.app.get(RankingsQueryService).getUnmatchedRankings(),
+      ).toEqual([expect.objectContaining({ id: stored.id })]);
+      expect(await db.getRepository(Ranking).count()).toBe(1);
+      expect(batch).not.toHaveBeenCalled();
       expect(revalidations()).toEqual([]);
     },
   );

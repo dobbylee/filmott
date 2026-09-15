@@ -170,7 +170,7 @@ describe('랭킹 수집', () => {
       const result = await service.fetchDailyBoxOffice();
 
       expect(result).toHaveLength(1);
-      expect(result[0].contentId).toBeUndefined();
+      expect(result[0].contentId).toBeNull();
       expect(result[0].targetDate).toBeDefined();
     });
 

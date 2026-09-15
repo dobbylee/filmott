@@ -37,11 +37,11 @@ export class Ranking {
   @Column({ length: 500, nullable: true })
   title?: string;
 
-  @Column({ name: 'poster_url', length: 1000, nullable: true })
-  posterUrl?: string;
+  @Column({ name: 'poster_url', type: 'varchar', length: 1000, nullable: true })
+  posterUrl?: string | null;
 
   @Column({ name: 'content_id', type: 'integer', nullable: true })
-  contentId?: number;
+  contentId?: number | null;
 
   @ManyToOne(() => Content, { nullable: true, eager: false })
   @JoinColumn({ name: 'content_id' })
