@@ -10,7 +10,10 @@ import { UserStatus } from '../src/users/enums/user-status.enum';
 import { AuthService } from '../src/auth/auth.service';
 import { AuthProvider } from '../src/users/enums/auth-provider.enum';
 import { RefreshToken } from '../src/auth/entities/refresh-token.entity';
-import { createContractApp } from './contracts/contract-app';
+import {
+  createContractApp,
+  type ContractS3Fixture,
+} from './contracts/contract-app';
 import { createIntegrationFixtures } from './integration/helpers/fixtures';
 import { resetIntegrationDatabase } from './integration/helpers/database';
 
@@ -19,6 +22,8 @@ describe('사용자 API 실제 HTTP·DB 동작 계약', () => {
   let db: DataSource;
   let fixtures: ReturnType<typeof createIntegrationFixtures>;
   let user: User;
+  let s3Fixtures: ContractS3Fixture[];
+  let nowSpy: jest.SpyInstance<number, []> | undefined;
   let token: string;
   const password = 'contract-password-123';
   const createdAt = new Date('2026-01-02T03:04:05.000Z');
@@ -43,7 +48,9 @@ describe('사용자 API 실제 HTTP·DB 동작 계약', () => {
   }
 
   beforeEach(async () => {
-    harness = await createContractApp();
+    nowSpy = undefined;
+    s3Fixtures = [];
+    harness = await createContractApp({ s3: s3Fixtures });
     db = harness.app.get(DataSource);
     await resetIntegrationDatabase(db);
     fixtures = createIntegrationFixtures(db);
@@ -61,6 +68,7 @@ describe('사용자 API 실제 HTTP·DB 동작 계약', () => {
     try {
       expect(harness.unexpected).toEqual([]);
     } finally {
+      nowSpy?.mockRestore();
       await harness.close();
     }
   });
@@ -357,6 +365,14 @@ describe('사용자 API 실제 HTTP·DB 동작 계약', () => {
     })
       .png()
       .toBuffer();
+    nowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(new Date('2026-09-15T00:00:00Z').getTime());
+    s3Fixtures.push({
+      command: 'PutObjectCommand',
+      bucket: 'contract',
+      key: `profiles/profile-${user.id}-${Date.now()}.webp`,
+    });
     const response = await request(harness.app.getHttpServer())
       .post('/api/users/me/profile-image')
       .auth(token, { type: 'bearer' })
@@ -365,6 +381,7 @@ describe('사용자 API 실제 HTTP·DB 동작 계약', () => {
         contentType: 'image/png',
       })
       .expect(201);
+    nowSpy.mockRestore();
     expect(harness.s3Spy).toHaveBeenCalledTimes(1);
     const command = harness.s3Spy.mock.calls[0][0];
     expect(command).toBeInstanceOf(PutObjectCommand);
@@ -402,6 +419,11 @@ describe('사용자 API 실제 HTTP·DB 동작 계약', () => {
 
   it('이미지 삭제의 현재 응답과 DB 저장 결과 차이를 기록해야 한다', async () => {
     const profileImage = 'https://images.contract.local/profiles/existing.webp';
+    s3Fixtures.push({
+      command: 'DeleteObjectCommand',
+      bucket: 'contract',
+      key: 'profiles/existing.webp',
+    });
     await db.getRepository(User).update(user.id, { profileImage });
     const response = await request(harness.app.getHttpServer())
       .delete('/api/users/me/profile-image')
@@ -424,6 +446,64 @@ describe('사용자 API 실제 HTTP·DB 동작 계약', () => {
         .profileImage,
     ).toBe(profileImage);
   });
+
+  it.each(['upload', 'replace-delete', 'delete'] as const)(
+    'S3 %s 실패는 기존 오류 응답과 DB 이미지 URL을 유지해야 한다',
+    async (phase) => {
+      const profileImage =
+        'https://images.contract.local/profiles/existing.webp';
+      await db.getRepository(User).update(user.id, { profileImage });
+      const before = await db
+        .getRepository(User)
+        .findOneByOrFail({ id: user.id });
+      const now = new Date('2026-09-15T00:00:00Z').getTime();
+      nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+      const deletion = {
+        command: 'DeleteObjectCommand' as const,
+        bucket: 'contract',
+        key: 'profiles/existing.webp',
+      };
+      s3Fixtures.push({
+        ...deletion,
+        ...(phase !== 'upload'
+          ? { error: new Error('고정 S3 삭제 실패') }
+          : {}),
+      });
+      if (phase === 'upload')
+        s3Fixtures.push({
+          command: 'PutObjectCommand',
+          bucket: 'contract',
+          key: `profiles/profile-${user.id}-${now}.webp`,
+          error: new Error('고정 S3 업로드 실패'),
+        });
+      const api = request(harness.app.getHttpServer());
+      if (phase === 'delete') {
+        await api
+          .delete('/api/users/me/profile-image')
+          .auth(token, { type: 'bearer' })
+          .expect(500, { statusCode: 500, message: 'Internal server error' });
+      } else {
+        const image = await sharp({
+          create: { width: 3, height: 2, channels: 3, background: 'red' },
+        })
+          .png()
+          .toBuffer();
+        await api
+          .post('/api/users/me/profile-image')
+          .auth(token, { type: 'bearer' })
+          .attach('image', image, {
+            filename: 'fixture.png',
+            contentType: 'image/png',
+          })
+          .expect(500, { statusCode: 500, message: 'Internal server error' });
+      }
+      expect(harness.s3Spy).toHaveBeenCalledTimes(phase === 'upload' ? 2 : 1);
+      expect(
+        await db.getRepository(User).findOneByOrFail({ id: user.id }),
+      ).toEqual(before);
+      // 교체는 기존 파일 삭제 후 upload한다. upload 실패 때 원격 삭제를 되돌리는 동작은 현재 없다.
+    },
+  );
 
   it('탈퇴는 204와 익명화·refresh 폐기·기존 JWT 거부를 유지해야 한다', async () => {
     await harness.app.get(AuthService).generateTokens(user);

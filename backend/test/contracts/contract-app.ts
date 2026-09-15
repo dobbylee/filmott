@@ -1,13 +1,25 @@
 import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { S3Client } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
 import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/configure-app';
 import { getIntegrationDatabaseConfig } from '../integration/helpers/database';
 
+export interface ContractS3Fixture {
+  command: 'PutObjectCommand' | 'DeleteObjectCommand';
+  bucket: string;
+  key: string;
+  error?: Error;
+}
+
 export interface ContractTransport {
+  s3?: ContractS3Fixture[];
   http?: (config: InternalAxiosRequestConfig) => unknown;
   fetch?: typeof globalThis.fetch;
   openaiKey?: string;
@@ -91,9 +103,38 @@ export async function createContractApp(transport: ContractTransport = {}) {
       unexpected.push(url);
       throw new Error('등록되지 않은 외부 fetch 요청');
     });
+  let s3FixtureIndex = 0;
   const s3Spy = jest
     .spyOn(S3Client.prototype, 'send')
-    .mockResolvedValue({} as never);
+    .mockImplementation((command: unknown) => {
+      const kind =
+        command instanceof PutObjectCommand
+          ? 'PutObjectCommand'
+          : command instanceof DeleteObjectCommand
+            ? 'DeleteObjectCommand'
+            : null;
+      const input =
+        command instanceof PutObjectCommand ||
+        command instanceof DeleteObjectCommand
+          ? command.input
+          : undefined;
+      const expected = transport.s3?.[s3FixtureIndex];
+      if (
+        !kind ||
+        !expected ||
+        expected.command !== kind ||
+        expected.bucket !== input?.Bucket ||
+        expected.key !== input?.Key
+      ) {
+        const message = `미등록 S3 fixture: ${kind ?? 'unknown'} ${input?.Bucket ?? ''}/${input?.Key ?? ''}`;
+        unexpected.push(message);
+        return Promise.reject(new Error(message)) as never;
+      }
+      s3FixtureIndex++;
+      return (
+        expected.error ? Promise.reject(expected.error) : Promise.resolve({})
+      ) as never;
+    });
   let app: INestApplication | undefined;
   const restore = () => {
     axios.defaults.adapter = originalAdapter;
