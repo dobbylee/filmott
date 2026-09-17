@@ -65,26 +65,27 @@ Google, Kakao, Naver 계정으로 로그인할 수 있습니다. 작품을 `보�
 
 ## 시스템 구성
 
-```text
-Browser / Search crawler
-        |
-        v
-Cloudflare
-        |
-        v
-Nginx
-  ├── /api/* ───────────────> NestJS backend
-  │                              ├── PostgreSQL + pgvector
-  │                              └── TMDB / KOBIS / OpenAI / R2
-  │
-  └── pages / static assets ─> Next.js frontend
-                                 └── server-side API fetch
-                                       └── Nginx /api/*
-```
+![Filmott 전체 아키텍처: 공개 요청 라우팅, 애플리케이션·DB, 외부 연동과 배포 경로](assets/diagrams/system-architecture.svg)
+
+브라우저와 검색 크롤러의 요청은 Cloudflare를 거쳐 Nginx에 도달합니다. Nginx는
+페이지·정적 자산을 Next.js로, `/api/*` 요청을 NestJS로 전달합니다. 채팅 SSE
+경로는 프록시 버퍼링을 비활성화해 생성 중인 응답을 스트리밍합니다.
+
+NestJS는 인증·콘텐츠·추천·리뷰와 감상 기록을 처리하고, PostgreSQL과 pgvector를
+업무 데이터 저장과 추천 후보 검색에 사용합니다. OpenAI, TMDB·KOBIS, OAuth
+제공사, Cloudflare R2와의 연동도 backend에서 담당합니다.
+
+Next.js의 서버 측 API 조회도 공개 API 주소를 사용합니다. 반면 backend의
+프런트엔드 캐시 갱신은 같은 슬롯의 내부 주소를 사용하며, 해당 내부 경로는
+Nginx에서 외부 접근을 차단합니다.
 
 프로덕션에서는 frontend와 backend를 각각 blue/green 슬롯으로 운영합니다. CI를
 통과한 정확한 `main` 커밋만 배포 대상으로 사용하며, Nginx의 active upstream을
 전환한 뒤 외부 HTTP 응답과 배포 SHA를 검증합니다.
+
+그림은 활성 슬롯의 주요 요청·연동 경로를 나타냅니다. 점선은 서버 측 API 조회,
+내부 캐시 갱신과 배포 제어를 구분하며, 개별 응답·OAuth 리다이렉트·관측 신호는
+생략했습니다.
 
 ## 프로젝트 구조
 

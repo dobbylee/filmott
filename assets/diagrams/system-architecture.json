@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Filmott",
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "hidden"
+    },
+    "viewBox": [
+      1220,
+      650
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "브라우저 · 크롤러",
+      "sublabel": "작품 탐색 · 기록 · AI 추천",
+      "pos": [
+        45,
+        105
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "cloudflare",
+      "type": "cloud",
+      "label": "Cloudflare",
+      "sublabel": "filmott.kr",
+      "pos": [
+        45,
+        290
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "nginx",
+      "type": "cloud",
+      "label": "Nginx",
+      "sublabel": "HTTPS · 활성 슬롯 라우팅",
+      "tag": "SSE buffering off",
+      "pos": [
+        350,
+        290
+      ],
+      "size": [
+        175,
+        88
+      ]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "Next.js 16",
+      "sublabel": "React 19 · App Router",
+      "tag": "Blue / Green",
+      "pos": [
+        610,
+        90
+      ],
+      "size": [
+        210,
+        88
+      ]
+    },
+    {
+      "id": "backend",
+      "type": "backend",
+      "label": "NestJS 11",
+      "sublabel": "인증 · 콘텐츠 · 추천 · 기록",
+      "tag": "Node.js 24 · TypeORM · Blue/Green",
+      "pos": [
+        610,
+        290
+      ],
+      "size": [
+        210,
+        108
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL 18",
+      "sublabel": "관계형 데이터 · pgvector 0.8",
+      "pos": [
+        610,
+        515
+      ],
+      "size": [
+        210,
+        80
+      ]
+    },
+    {
+      "id": "openai",
+      "type": "external",
+      "label": "OpenAI",
+      "sublabel": "의도 분석 · 생성 · 임베딩",
+      "pos": [
+        950,
+        55
+      ],
+      "size": [
+        220,
+        82
+      ]
+    },
+    {
+      "id": "content-providers",
+      "type": "external",
+      "label": "TMDB · KOBIS",
+      "sublabel": "작품/인물 · 트렌드 · 박스오피스",
+      "pos": [
+        950,
+        210
+      ],
+      "size": [
+        220,
+        82
+      ]
+    },
+    {
+      "id": "oauth",
+      "type": "security",
+      "label": "OAuth 제공사",
+      "sublabel": "Google · Kakao · Naver",
+      "pos": [
+        950,
+        365
+      ],
+      "size": [
+        220,
+        82
+      ]
+    },
+    {
+      "id": "r2",
+      "type": "cloud",
+      "label": "Cloudflare R2",
+      "sublabel": "프로필 이미지 저장",
+      "pos": [
+        950,
+        520
+      ],
+      "size": [
+        220,
+        82
+      ]
+    },
+    {
+      "id": "github-actions",
+      "type": "external",
+      "label": "GitHub Actions",
+      "sublabel": "CI 통과 SHA만 배포",
+      "tag": "blue-green 전환",
+      "pos": [
+        45,
+        515
+      ],
+      "size": [
+        180,
+        80
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "운영 서버 · Docker Compose",
+      "wraps": [
+        "nginx",
+        "frontend",
+        "backend",
+        "postgres"
+      ],
+      "pad": 32
+    }
+  ],
+  "connections": [
+    {
+      "id": "public-entry",
+      "from": "browser",
+      "to": "cloudflare",
+      "label": "HTTPS",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        135,
+        235
+      ]
+    },
+    {
+      "id": "origin-entry",
+      "from": "cloudflare",
+      "to": "nginx",
+      "label": "HTTPS",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "pages",
+      "from": "nginx",
+      "to": "frontend",
+      "label": "페이지 · 정적 자산",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "api",
+      "from": "nginx",
+      "to": "backend",
+      "label": "/api/* · SSE",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        567,
+        373
+      ]
+    },
+    {
+      "id": "server-api",
+      "from": "frontend",
+      "to": "cloudflare",
+      "label": "서버 측 API 조회",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "revalidate",
+      "from": "backend",
+      "to": "frontend",
+      "label": "내부 캐시 갱신",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "persistence",
+      "from": "backend",
+      "to": "postgres",
+      "label": "SQL · 벡터 검색",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        715,
+        456
+      ]
+    },
+    {
+      "id": "ai-calls",
+      "from": "backend",
+      "to": "openai",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "catalog-calls",
+      "from": "backend",
+      "to": "content-providers",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "oauth-calls",
+      "from": "backend",
+      "to": "oauth",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "storage-calls",
+      "from": "backend",
+      "to": "r2",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "cutover",
+      "from": "github-actions",
+      "to": "nginx",
+      "label": "슬롯 전환",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "bottom"
+    }
+  ]
+}
