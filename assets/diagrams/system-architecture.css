@@ -1,5 +1,0 @@
-/* README presentation only; topology and component kinds are unchanged. */
-svg rect[fill="url(#grid)"] { display: none; }
-svg [data-node-id] > text[data-node-label] { font-size: 16px; }
-svg [data-node-id] > text.t-muted { font-size: 10.5px; }
-svg [data-node-id] > text:not([data-node-label]):not(.t-muted) { font-size: 9px; }

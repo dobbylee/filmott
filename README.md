@@ -4,7 +4,7 @@
 </h1>
 
 filmott는 영화와 TV/OTT 작품을 탐색하고, 감상 기록과 리뷰를 남기며,
-대화형 AI 추천으로 다음 작품을 찾는 서비스입니다.
+대화형 AI 추천으로 다음 작품을 찾는 서비스
 
 국내 박스오피스와 글로벌 트렌드, 작품·인물 정보, OTT 제공처를 한곳에서
 확인할 수 있습니다. 로그인한 사용자는 자신의 감상 이력과 구독 OTT를 바탕으로
@@ -76,7 +76,7 @@ NestJS는 인증·콘텐츠·추천·리뷰와 감상 기록을 처리하고, Po
 제공사, Cloudflare R2와의 연동도 backend에서 담당합니다.
 
 Next.js의 서버 측 API 조회도 공개 API 주소를 사용합니다. 반면 backend의
-프런트엔드 캐시 갱신은 같은 슬롯의 내부 주소를 사용하며, 해당 내부 경로는
+프론트엔드 캐시 갱신은 같은 슬롯의 내부 주소를 사용하며, 해당 내부 경로는
 Nginx에서 외부 접근을 차단합니다.
 
 프로덕션에서는 frontend와 backend를 각각 blue/green 슬롯으로 운영합니다. CI를
@@ -105,8 +105,6 @@ filmott/
 ## 더 보기
 
 - [filmott 서비스](https://filmott.kr)
-- [개인정보처리방침](https://filmott.kr/privacy)
-- [이용약관](https://filmott.kr/terms)
 - [Frontend](frontend)
 - [Backend](backend)
 
