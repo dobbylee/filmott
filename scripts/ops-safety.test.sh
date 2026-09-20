@@ -206,6 +206,25 @@ if [ "$(grep -c 'logging: \*json-logging' "${repo_root}/docker-compose.prod.yml"
   exit 1
 fi
 
+nginx_config="$(<"${repo_root}/nginx/nginx.conf")"
+for required_fragment in \
+  'resolver 127.0.0.11 valid=10s ipv6=off;' \
+  'resolver_timeout 5s;' \
+  'set $filmott_active_backend backend-$filmott_active_slot:3001;' \
+  'set $filmott_active_frontend frontend-$filmott_active_slot:3000;' \
+  'proxy_pass http://$filmott_active_backend;' \
+  'proxy_pass http://$filmott_active_frontend;'; do
+  if [[ "$nginx_config" != *"$required_fragment"* ]]; then
+    echo "Nginx Docker DNS 재해석 계약이 누락됐습니다: ${required_fragment}" >&2
+    exit 1
+  fi
+done
+if [[ "$nginx_config" == *'proxy_pass http://backend;'* ]] ||
+  [[ "$nginx_config" == *'proxy_pass http://frontend;'* ]]; then
+  echo 'Nginx가 정적으로 해석된 active upstream을 다시 사용합니다.' >&2
+  exit 1
+fi
+
 ci_workflow="$(<"${repo_root}/.github/workflows/ci.yml")"
 for required_fragment in \
   'production_config="$(docker compose --profile legacy --env-file /dev/null -f docker-compose.prod.yml config --format json)"' \
@@ -215,7 +234,8 @@ for required_fragment in \
   '.services[$service].logging.driver == "json-file"' \
   '.services[$service].logging.options["max-size"] == "20m"' \
   '.services[$service].logging.options["max-file"] == "5"' \
-  '.services.certbot.logging == null'; do
+  '.services.certbot.logging == null' \
+  'bash scripts/nginx-docker-dns.test.sh'; do
   if [[ "$ci_workflow" != *"$required_fragment"* ]]; then
     echo "CI resolved log rotation 검증이 누락됐습니다: ${required_fragment}" >&2
     exit 1

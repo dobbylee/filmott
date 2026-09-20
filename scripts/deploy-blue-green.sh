@@ -94,8 +94,6 @@ blue_green_write_upstream() {
     printf 'map $host $filmott_active_slot { default "%s"; }\n' "$slot"
     printf 'map $host $filmott_active_sha { default "%s"; }\n' "$sha"
     printf 'map $host $filmott_previous_frontend { default "frontend-%s:3000"; }\n' "$previous_slot"
-    printf 'upstream frontend { server frontend-%s:3000; }\n' "$slot"
-    printf 'upstream backend { server backend-%s:3001; }\n' "$slot"
   } > "$temporary" || return 1
   mv "$temporary" "$destination" || return 1
 }

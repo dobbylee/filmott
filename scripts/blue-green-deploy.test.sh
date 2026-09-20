@@ -67,22 +67,26 @@ assert_status 1 "$status" 'NUL release state'
 blue_green_write_release blue "$active_sha"
 blue_green_write_upstream "$FILMOTT_UPSTREAM_FILE" blue "$active_sha"
 upstream="$(<"$FILMOTT_UPSTREAM_FILE")"
+[[ "$upstream" != *'upstream '* ]] || {
+  echo 'runtime upstream 파일이 정적 Docker IP 해석을 다시 도입했습니다.' >&2
+  exit 1
+}
 for fragment in \
   'map $host $filmott_active_slot { default "blue"; }' \
   "map \$host \$filmott_active_sha { default \"${active_sha}\"; }" \
-  'map $host $filmott_previous_frontend { default "frontend-blue:3000"; }' \
-  'server frontend-blue:3000' \
-  'server backend-blue:3001'; do
+  'map $host $filmott_previous_frontend { default "frontend-blue:3000"; }'; do
   [[ "$upstream" == *"$fragment"* ]] || { echo "upstream missing: $fragment" >&2; exit 1; }
 done
 
 blue_green_write_upstream "$FILMOTT_CANDIDATE_FILE" green "$target_sha" blue
 green_upstream="$(<"$FILMOTT_CANDIDATE_FILE")"
+[[ "$green_upstream" != *'upstream '* ]] || {
+  echo 'candidate upstream 파일이 정적 Docker IP 해석을 다시 도입했습니다.' >&2
+  exit 1
+}
 for fragment in \
   'map $host $filmott_active_slot { default "green"; }' \
-  'map $host $filmott_previous_frontend { default "frontend-blue:3000"; }' \
-  'server frontend-green:3000' \
-  'server backend-green:3001'; do
+  'map $host $filmott_previous_frontend { default "frontend-blue:3000"; }'; do
   [[ "$green_upstream" == *"$fragment"* ]] || { echo "green upstream missing: $fragment" >&2; exit 1; }
 done
 
