@@ -3,7 +3,7 @@ export function completionResponse(content: string): Response {
     id: 'contract-completion',
     object: 'chat.completion',
     created: 1,
-    model: 'gpt-5.6-luna',
+    model: 'gpt-6-luna',
     choices: [
       {
         index: 0,
@@ -22,7 +22,7 @@ export function streamFrame(
     id: 'contract-stream',
     object: 'chat.completion.chunk',
     created: 1,
-    model: 'gpt-5.6-luna',
+    model: 'gpt-6-luna',
     choices: [
       {
         index: 0,

@@ -231,7 +231,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
     }
     expect(calls).toHaveLength(2);
     expect(calls[0].body).toMatchObject({
-      model: 'gpt-5.6-luna',
+      model: 'gpt-6-luna',
       reasoning_effort: 'medium',
       max_completion_tokens: 4096,
       stream: true,
@@ -1149,7 +1149,7 @@ describe('채팅 실제 SDK·업무·HTTP SSE 계약', () => {
         );
         expect(descriptionCall?.signal?.aborted).toBe(false);
         expect(descriptionCall?.body).toMatchObject({
-          model: 'gpt-5.6-luna',
+          model: 'gpt-6-luna',
           reasoning_effort: 'medium',
           max_completion_tokens: 2048,
         });

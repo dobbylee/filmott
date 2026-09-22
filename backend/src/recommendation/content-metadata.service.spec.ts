@@ -231,7 +231,7 @@ describe('ContentMetadataService', () => {
       expect(result).toBe('어두운 분위기의 범죄 스릴러입니다.');
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-5.6-luna',
+          model: 'gpt-6-luna',
           reasoning_effort: 'medium',
           max_completion_tokens: 2048,
         }),

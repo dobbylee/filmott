@@ -1709,7 +1709,7 @@ describe('ChatService', () => {
 
       const createParams = mockStreamCreate.mock.calls[0][0];
       expect(createParams).not.toHaveProperty('stream');
-      expect(createParams.model).toBe('gpt-5.6-luna');
+      expect(createParams.model).toBe('gpt-6-luna');
       expect(createParams.reasoning_effort).toBe('medium');
       expect(createParams.response_format).toEqual(CHAT_RESPONSE_FORMAT);
       expect(mockStreamCreate.mock.calls[0][1]).toEqual(

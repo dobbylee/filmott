@@ -171,7 +171,7 @@ describe('ChatResponseStreamService', () => {
     expect(client.stream).toHaveBeenCalledTimes(1);
     expect(client.stream).toHaveBeenCalledWith(
       {
-        model: 'gpt-5.6-luna',
+        model: 'gpt-6-luna',
         reasoning_effort: 'medium',
         max_completion_tokens: 4096,
         response_format: CHAT_RESPONSE_FORMAT,

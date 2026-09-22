@@ -103,7 +103,7 @@ describe('IntentAnalyzerService', () => {
       await service.analyzeIntent('영화 추천해줘');
 
       expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gpt-5.6-luna' }),
+        expect.objectContaining({ model: 'gpt-6-luna' }),
         expect.objectContaining({ timeout: 10_000 }),
       );
     });
@@ -136,14 +136,14 @@ describe('IntentAnalyzerService', () => {
       expect(result).toEqual<ParsedIntent>(EMPTY_INTENT);
     });
 
-    it('gpt-5.6-luna를 response_format json_schema로 호출해야 한다', async () => {
+    it('gpt-6-luna를 response_format json_schema로 호출해야 한다', async () => {
       mockIntent();
 
       await service.analyzeIntent('테스트');
 
       expect(mockCreate).toHaveBeenCalledWith(
         {
-          model: 'gpt-5.6-luna',
+          model: 'gpt-6-luna',
           reasoning_effort: 'medium',
           max_completion_tokens: 1024,
           response_format: CHAT_INTENT_RESPONSE_FORMAT,
@@ -643,7 +643,7 @@ describe('IntentAnalyzerService', () => {
 
       expect(mockCreate).toHaveBeenCalledWith(
         {
-          model: 'gpt-5.6-luna',
+          model: 'gpt-6-luna',
           reasoning_effort: 'medium',
           max_completion_tokens: 1024,
           response_format: CHAT_INTENT_RESPONSE_FORMAT,
