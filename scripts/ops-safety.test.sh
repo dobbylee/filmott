@@ -207,6 +207,7 @@ if [ "$(grep -c 'logging: \*json-logging' "${repo_root}/docker-compose.prod.yml"
 fi
 
 nginx_config="$(<"${repo_root}/nginx/nginx.conf")"
+bash "${repo_root}/scripts/nginx-checkout.test.sh"
 for required_fragment in \
   'resolver 127.0.0.11 valid=10s ipv6=off;' \
   'resolver_timeout 5s;' \

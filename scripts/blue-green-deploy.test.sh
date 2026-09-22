@@ -102,6 +102,51 @@ assert_status 1 "$status" 'uncertain preflight'
 assert_events '' 'uncertain preflight'
 rm -f "$FILMOTT_UNCERTAIN_FILE"
 
+# 기존 운영 파일과 새 파일 모두 release 전체 내용에 맞아야 하며 수정하지 않는다.
+(
+  blue_green_assert_slot() { printf 'slot:%s:%s\n' "$1" "$2" >> "$event_log"; }
+  blue_green_wait_for_identity() { printf 'identity:%s:%s\n' "$1" "$2" >> "$event_log"; }
+  for slot in blue green; do
+    blue_green_write_release "$slot" "$active_sha"
+    for format in current legacy; do
+      blue_green_write_upstream "$FILMOTT_UPSTREAM_FILE" "$slot" "$active_sha"
+      if [ "$format" = legacy ]; then
+        printf 'upstream frontend { server frontend-%s:3000; }\nupstream backend { server backend-%s:3001; }\n' \
+          "$slot" "$slot" >> "$FILMOTT_UPSTREAM_FILE"
+      fi
+      cp "$FILMOTT_UPSTREAM_FILE" "${test_root}/original-upstream"
+      : > "$event_log"
+      blue_green_preflight || { echo "구/신 운영 형식 검증 실패: $format/$slot" >&2; exit 1; }
+      cmp -s "$FILMOTT_UPSTREAM_FILE" "${test_root}/original-upstream"
+      assert_events "slot:${slot}:${active_sha}
+identity:${slot}:${active_sha}" '구/신 형식 이후에도 image/origin 검증 실행'
+
+      for corruption in slot sha previous backend frontend extra nul; do
+        case "$corruption" in
+          slot) sed "s/default \"${slot}\"/default \"$(blue_green_other_slot "$slot")\"/" "${test_root}/original-upstream" > "$FILMOTT_UPSTREAM_FILE" ;;
+          sha) sed "s/${active_sha}/${target_sha}/" "${test_root}/original-upstream" > "$FILMOTT_UPSTREAM_FILE" ;;
+          previous) sed "s/frontend-${slot}:3000/frontend-$(blue_green_other_slot "$slot"):3000/" "${test_root}/original-upstream" > "$FILMOTT_UPSTREAM_FILE" ;;
+          backend|frontend)
+            cp "${test_root}/original-upstream" "$FILMOTT_UPSTREAM_FILE"
+            printf 'upstream %s { server unexpected:9999; }\n' "$corruption" >> "$FILMOTT_UPSTREAM_FILE" ;;
+          extra) cp "${test_root}/original-upstream" "$FILMOTT_UPSTREAM_FILE"; printf '# unknown\n' >> "$FILMOTT_UPSTREAM_FILE" ;;
+          nul) cp "${test_root}/original-upstream" "$FILMOTT_UPSTREAM_FILE"; printf '\0' >> "$FILMOTT_UPSTREAM_FILE" ;;
+        esac
+        : > "$event_log"
+        cp "$FILMOTT_UPSTREAM_FILE" "${test_root}/corrupt-upstream"
+        if blue_green_preflight > /dev/null 2>&1; then
+          echo "불일치 파일을 허용했습니다: $format/$slot/$corruption" >&2
+          exit 1
+        fi
+        assert_events '' '불일치 파일은 runtime 검사 전에 거부'
+        cmp -s "$FILMOTT_UPSTREAM_FILE" "${test_root}/corrupt-upstream"
+      done
+    done
+  done
+)
+blue_green_write_release blue "$active_sha"
+blue_green_write_upstream "$FILMOTT_UPSTREAM_FILE" blue "$active_sha"
+
 # 200이어도 기대 slot/SHA header가 아니면 다음 응답까지 기다린다.
 : > "${test_root}/identity-count"
 blue_green_origin_headers() {
@@ -584,6 +629,8 @@ run_main_contract() (
     BLUE_GREEN_ACTIVE_SHA="$initial_active_sha"
     export BLUE_GREEN_ACTIVE_SLOT BLUE_GREEN_ACTIVE_SHA
   }
+  blue_green_assert_nginx_config_mounts() { record mounted_config; }
+  blue_green_checkout_target() { record reset; }
   blue_green_compose() { record compose_config; }
   blue_green_deploy() { record deploy; }
   blue_green_read_release() {
@@ -647,14 +694,19 @@ run_low_disk_main_contract
 
 run_main_contract 0 "$active_sha" "$active_sha" "$active_sha" 0 ''
 run_main_contract 1 "$active_sha" "$active_sha" "$active_sha" 1 ''
-run_main_contract 1 "$target_sha" "$target_sha" "$target_sha" 1 'preflight'
+run_main_contract 1 "$target_sha" "$target_sha" "$target_sha" 1 'preflight
+mounted_config'
 run_main_contract 1 "$target_sha" "$active_sha" "$target_sha" 0 'preflight
+mounted_config
 reset
+mounted_config
 compose_config
 deploy
 read_release'
 run_main_contract 1 "$target_sha" "$active_sha" "$active_sha" 1 'preflight
+mounted_config
 reset
+mounted_config
 compose_config
 deploy
 read_release'

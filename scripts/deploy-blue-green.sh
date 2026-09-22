@@ -176,9 +176,18 @@ blue_green_preflight() {
     return 1
   }
   if ! cmp -s "$expected" "$FILMOTT_UPSTREAM_FILE"; then
-    rm -f "$expected"
-    blue_green_error 'Release state and nginx upstream do not match'
-    return 1
+    # 최초 DNS 전환 배포는 이전 writer의 canonical 5줄 파일을 읽는다.
+    # 현재 release에서 생성한 전체 내용만 허용하며 운영 파일은 수정하지 않는다.
+    # 원본은 cutover 직전 그대로 snapshot되어 실패 시 rollback에 사용된다.
+    {
+      printf 'upstream frontend { server frontend-%s:3000; }\n' "$BLUE_GREEN_ACTIVE_SLOT"
+      printf 'upstream backend { server backend-%s:3001; }\n' "$BLUE_GREEN_ACTIVE_SLOT"
+    } >> "$expected" || { rm -f "$expected"; return 1; }
+    if ! cmp -s "$expected" "$FILMOTT_UPSTREAM_FILE"; then
+      rm -f "$expected"
+      blue_green_error 'Release state and nginx upstream do not match'
+      return 1
+    fi
   fi
   rm -f "$expected" || return 1
   blue_green_assert_slot "$BLUE_GREEN_ACTIVE_SLOT" "$BLUE_GREEN_ACTIVE_SHA" || return 1
@@ -552,6 +561,88 @@ blue_green_require_files() {
   done
 }
 
+# Nginx의 단일 파일 bind mount는 checkout이 unlink한 이전 inode를 계속 본다.
+# hard link로 기존 inode를 보존하고 checkout 후 같은 inode에 새 내용을 반영한다.
+# 실패/신호 시에도 mount와 호스트 경로를 다시 연결하며 reload는 기존 절차가 맡는다.
+blue_green_checkout_target() (
+  local target_sha="$1"
+  local checkout_dir
+  local file
+  local -a preserved=()
+
+  checkout_dir="$(mktemp -d "${FILMOTT_REPO_ROOT}/nginx/.checkout.XXXXXX")" || return 1
+  finish_checkout() {
+    local status=$?
+    local source
+    trap - EXIT
+    trap '' HUP INT TERM
+    if [ "$status" -eq 0 ]; then
+      for file in "${preserved[@]}"; do
+        source="${FILMOTT_REPO_ROOT}/nginx/${file}"
+        if [ ! -f "$source" ] || [ -L "$source" ]; then
+          status=1
+          break
+        fi
+        cp "$source" "${checkout_dir}/${file}.target" || { status=1; break; }
+      done
+    fi
+    for file in "${preserved[@]}"; do
+      source="${FILMOTT_REPO_ROOT}/nginx/${file}"
+      if [ "$source" -ef "${checkout_dir}/${file}.link" ]; then
+        rm -f "${checkout_dir}/${file}.link" || status=1
+      else
+        mv -f "${checkout_dir}/${file}.link" "$source" || status=1
+      fi
+    done
+    if [ "$status" -eq 0 ]; then
+      for file in "${preserved[@]}"; do
+        cat "${checkout_dir}/${file}.target" > "${FILMOTT_REPO_ROOT}/nginx/${file}" || { status=1; break; }
+      done
+    fi
+    if [ "$status" -ne 0 ]; then
+      for file in "${preserved[@]}"; do
+        cat "${checkout_dir}/${file}.backup" > "${FILMOTT_REPO_ROOT}/nginx/${file}" || status=1
+      done
+    fi
+    if [ "$status" -eq 0 ]; then
+      rm -f "${checkout_dir}"/*.backup "${checkout_dir}"/*.target
+      rmdir "$checkout_dir" || status=1
+    else
+      blue_green_error "Checkout failed; nginx recovery copies retained at ${checkout_dir}"
+    fi
+    exit "$status"
+  }
+  trap finish_checkout EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
+  for file in nginx.conf security-headers.conf; do
+    [ -f "${FILMOTT_REPO_ROOT}/nginx/${file}" ] &&
+      [ ! -L "${FILMOTT_REPO_ROOT}/nginx/${file}" ] || return 1
+    cp "${FILMOTT_REPO_ROOT}/nginx/${file}" "${checkout_dir}/${file}.backup" || return 1
+    ln "${FILMOTT_REPO_ROOT}/nginx/${file}" "${checkout_dir}/${file}.link" || return 1
+    preserved+=("$file")
+  done
+  git -C "$FILMOTT_REPO_ROOT" reset --hard "$target_sha"
+)
+
+blue_green_assert_nginx_config_mounts() {
+  local actual file
+  actual="$(mktemp "${FILMOTT_DEPLOY_STATE_DIR}/nginx-mounted.XXXXXX")" || return 1
+  for file in nginx.conf security-headers.conf; do
+    local mounted_path="/etc/nginx/${file}"
+    [ "$file" != nginx.conf ] || mounted_path=/etc/nginx/conf.d/default.conf
+    if ! blue_green_compose exec -T nginx cat "$mounted_path" > "$actual" ||
+      ! cmp -s "$actual" "${FILMOTT_REPO_ROOT}/nginx/${file}"; then
+      rm -f "$actual"
+      blue_green_error "Nginx mounted config differs from checkout: ${file}"
+      return 1
+    fi
+  done
+  rm -f "$actual"
+}
+
 blue_green_main() {
   local target_sha="$1"
   local latest_sha
@@ -575,6 +666,7 @@ blue_green_main() {
 
   blue_green_require_disk_headroom "$FILMOTT_REPO_ROOT" || return 1
   blue_green_preflight || return 1
+  blue_green_assert_nginx_config_mounts || return 1
   if [ "${FILMOTT_REQUIRE_CUTOVER:-0}" = 1 ] &&
     [ "$target_sha" = "$BLUE_GREEN_ACTIVE_SHA" ]; then
     blue_green_error "Manual cutover target is already active: ${target_sha}"
@@ -587,7 +679,8 @@ blue_green_main() {
   trap 'blue_green_on_signal 143 TERM' TERM
 
   # Checkout은 빌드 입력일 뿐 active release 상태가 아니다. 실패 시 실행 중 슬롯은 유지한다.
-  git -C "$FILMOTT_REPO_ROOT" reset --hard "$target_sha" || return 1
+  blue_green_checkout_target "$target_sha" || return 1
+  blue_green_assert_nginx_config_mounts || return 1
   blue_green_compose config > /dev/null || return 1
   blue_green_deploy || return 1
   if [ "${FILMOTT_REQUIRE_CUTOVER:-0}" = 1 ]; then
