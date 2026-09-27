@@ -15,7 +15,7 @@ import {
 import { AdultContentService } from './adult-content.service';
 import { PersonCache } from './person-cache';
 const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
-const PERSON_CACHE_MAX_ENTRIES = 1000;
+const PERSON_CACHE_MAX_ENTRIES = 10_000;
 const PERSON_DETAIL_CACHE_MAX_BYTES = 8 * 1024 * 1024;
 const PERSON_CREDITS_CACHE_MAX_BYTES = 32 * 1024 * 1024;
 @Injectable()

@@ -371,7 +371,7 @@ describe('콘텐츠 API 실제 HTTP·외부 응답·DB 계약', () => {
       .expect(404);
   });
 
-  it('고유 인물이 1000명을 넘으면 상세와 credits의 오래된 캐시를 퇴출하고 HTTP 응답은 보존한다', async () => {
+  it('작은 인물 응답은 10000명까지 보유하고 상한을 넘으면 상세와 credits의 LRU 항목을 퇴출한다', async () => {
     const service = harness.app.get(PersonCatalogService);
     const credits = {
       cast: [
@@ -387,26 +387,41 @@ describe('콘텐츠 API 실제 HTTP·외부 응답·DB 계약', () => {
       ],
       crew: [],
     };
-    for (let id = 1; id <= 1001; id++) {
+    for (let id = 1; id <= 10_000; id++) {
       responses.set(`/person/${id}`, { id, name: `인물 ${id}` });
       responses.set(`/person/${id}/combined_credits`, credits);
       await service.getPersonDetail(id);
       await service.getPersonCredits(id);
     }
-    expect(harness.httpCalls).toHaveLength(2002);
+    expect(harness.httpCalls).toHaveLength(20_000);
 
-    for (const id of [1001, 1]) {
+    // 기존 1000개 상한처럼 조기에 퇴출되지 않고 조회한 항목을 보호해야 한다.
+    await request(harness.app.getHttpServer())
+      .get('/api/contents/person/1')
+      .expect(200, { id: 1, name: '인물 1' });
+    await request(harness.app.getHttpServer())
+      .get('/api/contents/person/1/credits')
+      .expect(200, credits);
+    expect(harness.httpCalls).toHaveLength(20_000);
+
+    responses.set('/person/10001', { id: 10_001, name: '인물 10001' });
+    responses.set('/person/10001/combined_credits', credits);
+    await service.getPersonDetail(10_001);
+    await service.getPersonCredits(10_001);
+    expect(harness.httpCalls).toHaveLength(20_002);
+
+    for (const id of [1, 10_001, 2]) {
       await request(harness.app.getHttpServer())
         .get(`/api/contents/person/${id}`)
         .expect(200, { id, name: `인물 ${id}` });
       await request(harness.app.getHttpServer())
         .get(`/api/contents/person/${id}/credits`)
         .expect(200, credits);
-      expect(harness.httpCalls).toHaveLength(id === 1001 ? 2002 : 2004);
+      expect(harness.httpCalls).toHaveLength(id === 2 ? 20_004 : 20_002);
     }
     expect(harness.httpCalls.slice(-2).map((call) => call.url)).toEqual([
-      '/person/1',
-      '/person/1/combined_credits',
+      '/person/2',
+      '/person/2/combined_credits',
     ]);
   });
 
