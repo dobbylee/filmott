@@ -13,11 +13,11 @@ import {
   TmdbPersonCredit,
 } from '../../integrations/tmdb/tmdb.service';
 import { AdultContentService } from './adult-content.service';
+import { PersonCache } from './person-cache';
 const PERSON_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
-interface CacheEntry<T> {
-  data: T;
-  expiresAt: number;
-}
+const PERSON_CACHE_MAX_ENTRIES = 1000;
+const PERSON_DETAIL_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+const PERSON_CREDITS_CACHE_MAX_BYTES = 32 * 1024 * 1024;
 @Injectable()
 export class PersonCatalogService {
   private readonly logger = new Logger(PersonCatalogService.name);
@@ -26,14 +26,14 @@ export class PersonCatalogService {
     private readonly adultService: AdultContentService,
   ) {}
 
-  private readonly personDetailCache = new Map<
-    number,
-    CacheEntry<TmdbPersonDetail>
-  >();
-  private readonly personCreditsCache = new Map<
-    number,
-    CacheEntry<{ cast: TmdbPersonCredit[]; crew: TmdbPersonCredit[] }>
-  >();
+  private readonly personDetailCache = new PersonCache<TmdbPersonDetail>(
+    PERSON_CACHE_MAX_ENTRIES,
+    PERSON_DETAIL_CACHE_MAX_BYTES,
+  );
+  private readonly personCreditsCache = new PersonCache<{
+    cast: TmdbPersonCredit[];
+    crew: TmdbPersonCredit[];
+  }>(PERSON_CACHE_MAX_ENTRIES, PERSON_CREDITS_CACHE_MAX_BYTES);
 
   private canUseStalePersonCache(error: unknown): boolean {
     return (

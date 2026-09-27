@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { Content } from '../src/contents/content.entity';
 import { ContentCatalogService } from '../src/contents/services/content-catalog.service';
+import { PersonCatalogService } from '../src/contents/services/person-catalog.service';
 import { UserRole } from '../src/users/enums/user-role.enum';
 import { createContractApp } from './contracts/contract-app';
 import { createIntegrationFixtures } from './integration/helpers/fixtures';
@@ -368,6 +369,63 @@ describe('콘텐츠 API 실제 HTTP·외부 응답·DB 계약', () => {
     await request(harness.app.getHttpServer())
       .get('/api/contents/person/999')
       .expect(404);
+  });
+
+  it('고유 인물이 1000명을 넘으면 상세와 credits의 오래된 캐시를 퇴출하고 HTTP 응답은 보존한다', async () => {
+    const service = harness.app.get(PersonCatalogService);
+    const credits = {
+      cast: [
+        {
+          id: 101,
+          media_type: 'movie',
+          title: '캐시 계약 영화',
+          poster_path: null,
+          release_date: '2026-01-01',
+          vote_average: 8,
+          overview: 'TMDB 추가 응답 필드도 유지',
+        },
+      ],
+      crew: [],
+    };
+    for (let id = 1; id <= 1001; id++) {
+      responses.set(`/person/${id}`, { id, name: `인물 ${id}` });
+      responses.set(`/person/${id}/combined_credits`, credits);
+      await service.getPersonDetail(id);
+      await service.getPersonCredits(id);
+    }
+    expect(harness.httpCalls).toHaveLength(2002);
+
+    for (const id of [1001, 1]) {
+      await request(harness.app.getHttpServer())
+        .get(`/api/contents/person/${id}`)
+        .expect(200, { id, name: `인물 ${id}` });
+      await request(harness.app.getHttpServer())
+        .get(`/api/contents/person/${id}/credits`)
+        .expect(200, credits);
+      expect(harness.httpCalls).toHaveLength(id === 1001 ? 2002 : 2004);
+    }
+    expect(harness.httpCalls.slice(-2).map((call) => call.url)).toEqual([
+      '/person/1',
+      '/person/1/combined_credits',
+    ]);
+  });
+
+  it('인물 상세 byte 예산보다 큰 응답은 잘리지 않고 반환되지만 캐시에는 보유하지 않는다', async () => {
+    const person = {
+      id: 5,
+      name: '큰 응답',
+      biography: 'x'.repeat(8 * 1024 * 1024),
+    };
+    responses.set('/person/5', person);
+    const service = harness.app.get(PersonCatalogService);
+    expect(await service.getPersonDetail(5)).toEqual(person);
+    await request(harness.app.getHttpServer())
+      .get('/api/contents/person/5')
+      .expect(200, person);
+    expect(harness.httpCalls.map((call) => call.url)).toEqual([
+      '/person/5',
+      '/person/5',
+    ]);
   });
 
   it('사이트맵과 세 cohort는 실제 DB 신호·경계·lastModified를 보존해야 한다', async () => {
