@@ -18,7 +18,7 @@ describe('실제 module의 API·cron 등록 계약', () => {
     await harness?.close();
   });
 
-  it('60개 공개 route의 경로·method·guard·role을 중복 없이 유지해야 한다', () => {
+  it('60개 공개 route와 내부 계측 1개의 경로·method·guard·role을 중복 없이 유지해야 한다', () => {
     const discovery = harness.app.get(DiscoveryService);
     const scanner = new MetadataScanner();
     const routes: typeof expectedRoutes = [];
@@ -72,13 +72,21 @@ describe('실제 module의 API·cron 등록 계약', () => {
     routes.sort((a, b) =>
       `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.path}`, 'en'),
     );
-    const sortedExpected = [...expectedRoutes].sort((a, b) =>
+    const sortedExpected = [
+      ...expectedRoutes,
+      {
+        method: 'GET',
+        path: '/api/internal/metrics',
+        guards: [],
+        roles: [],
+      },
+    ].sort((a, b) =>
       `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.path}`, 'en'),
     );
     expect(routes).toEqual(sortedExpected);
     expect(
       new Set(routes.map((route) => `${route.method} ${route.path}`)).size,
-    ).toBe(60);
+    ).toBe(61);
   });
 
   it('cron의 이름·KST 예약 표현식과 단일 provider 등록을 유지해야 한다', () => {

@@ -125,6 +125,20 @@ expect_response() {
   return 1
 }
 
+expect_internal_metrics() {
+  local identity="$1" output
+  for attempt in $(seq 1 20); do
+    output="$(docker exec "$proxy" curl -fsS --max-time 3 http://127.0.0.1:9080/metrics)" || true
+    if [[ "$output" == *"\"identity\":\"$identity\""* &&
+          "$output" == *'"url":"/api/internal/metrics"'* && "$output" == *'"port":3001'* ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo '내부 계측 active backend 전달 실패' >&2
+  return 1
+}
+
 # 실제 reload·identity·rollback을 사용하고 Compose 대상만 격리 컨테이너로 치환한다.
 blue_green_compose() {
   if [ "$1" = exec ] && [ "$2" = -T ] && [ "$3" = nginx ]; then
@@ -150,6 +164,7 @@ blue_green_assert_nginx_config_mounts
 blue_green_write_upstream "$FILMOTT_UPSTREAM_FILE" green "$target_sha" blue
 blue_green_reload_nginx
 expect_response green /api/ green "$target_sha"
+expect_internal_metrics green
 fallback="$(request 'https://filmott.kr/_next/static/old.js?v=1')"
 [[ "$fallback" == *'200 OK'* && "$fallback" == *'"identity":"blue-first"'* && "$fallback" == *'"port":3000'* &&
    "$fallback" == *'"url":"/_next/static/old.js?v=1"'* ]] || {
@@ -159,6 +174,7 @@ BLUE_GREEN_ACTIVE_SLOT=blue
 BLUE_GREEN_ACTIVE_SHA="$active_sha"
 BLUE_GREEN_INACTIVE_SLOT=green
 blue_green_rollback
+expect_internal_metrics blue-first
 expect_response blue-first /api/ blue "$active_sha"
 cmp -s "$FILMOTT_UPSTREAM_FILE" "$FILMOTT_ROLLBACK_FILE"
 blue_green_preflight
@@ -180,6 +196,10 @@ for path in '/api/echo?q=a%2Fb&n=2' '/api/chat/messages?q=a%2Fb&n=2' '/discover?
     [[ "$output" == *'text/event-stream'* && "$output" == *'event: done'* ]]
   fi
 done
+for path in '/api/internal/metrics' '/api/INTERNAL/metrics' '/API/internal/metrics' '/api/internal/metrics/' '/api/%69nternal/metrics' '/api//internal/metrics' '/api/internal/metrics?x=1'; do
+  output="$(request "https://filmott.kr$path")"
+  [[ "$output" == *'403 Forbidden'* ]] || { echo "계측 외부 차단 실패: $path" >&2; exit 1; }
+done
 output="$(request https://filmott.kr/internal/revalidate)"
 [[ "$output" == *'403 Forbidden'* ]] || { echo '내부 경로 외부 차단 실패' >&2; exit 1; }
 
@@ -194,6 +214,7 @@ docker network disconnect "$network" "$first"
 
 # 여기부터 proxy reload/restart 없이 실제10초 TTL의 DNS 갱신을 확인한다.
 expect_response blue-second /api/ blue "$active_sha"
+expect_internal_metrics blue-second
 expect_response blue-second /api/chat/messages blue "$active_sha"
 expect_response blue-second / blue "$active_sha"
 output="$(request 'https://filmott.kr/_next/static/new.js?v=2')"

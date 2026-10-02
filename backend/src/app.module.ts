@@ -15,6 +15,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { WatchlistModule } from './watchlist/watchlist.module';
 import { ChatModule } from './chat/chat.module';
 import { RecommendationModule } from './recommendation/recommendation.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { RecommendationModule } from './recommendation/recommendation.module';
     WatchlistModule,
     ChatModule,
     RecommendationModule,
+    MonitoringModule,
   ],
   controllers: [AppController],
   providers: [
