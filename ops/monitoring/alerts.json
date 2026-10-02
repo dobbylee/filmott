@@ -1,0 +1,28 @@
+[
+  {
+    "uid": "filmott-heap-warning", "title": "Filmott heap 80% 이상", "severity": "warning", "for": "10m",
+    "expr": "max(filmott_node_heap_used_bytes{job=\"filmott-process\"} / filmott_node_heap_limit_bytes{job=\"filmott-process\"}) > bool 0.8",
+    "summary": "V8 heap 사용률이 80%를 10분 넘었습니다."
+  },
+  {
+    "uid": "filmott-heap-critical", "title": "Filmott heap 90% 이상", "severity": "critical", "for": "5m",
+    "expr": "max(filmott_node_heap_used_bytes{job=\"filmott-process\"} / filmott_node_heap_limit_bytes{job=\"filmott-process\"}) > bool 0.9",
+    "summary": "V8 heap 사용률이 90%를 5분 넘었습니다."
+  },
+  {
+    "uid": "filmott-scrape-failed", "title": "Filmott 내부 수집 실패", "severity": "warning", "for": "2m",
+    "expr": "min(up{job=~\"filmott-process|filmott-release\"}) < bool 1",
+    "summary": "active backend 또는 release endpoint scrape가 2분간 실패했습니다."
+  },
+  {
+    "uid": "filmott-telemetry-missing", "title": "Filmott 관측 데이터 누락", "severity": "critical", "for": "0s",
+    "expr": "max(absent_over_time(filmott_node_heap_used_bytes{job=\"filmott-process\"}[3m]) or absent_over_time(filmott_node_heap_limit_bytes{job=\"filmott-process\"}[3m]) or absent_over_time(filmott_process_resident_memory_bytes{job=\"filmott-process\"}[3m]) or absent_over_time(filmott_active_release_info{job=\"filmott-release\"}[3m])) or vector(0)",
+    "summary": "필수 관측값이 3분간 도착하지 않았습니다. 서비스 정상으로 판단하지 마세요."
+  },
+  {
+    "uid": "filmott-public-api-failed", "title": "Filmott 공개 API 도달 실패", "severity": "critical", "for": "3m",
+    "expr": "min(probe_success{job=\"filmott-public-api\"}) < bool 1",
+    "summary": "외부 probe가 API 상태/본문 조건에 3분간 실패했습니다. DB·업무 성공 여부는 별도입니다.",
+    "requiresSyntheticCheck": true
+  }
+]

@@ -164,3 +164,12 @@ jobs:
             -v "$RUNNER_TEMP/filmott-nginx-certs:/etc/letsencrypt:ro" \
             nginx:alpine nginx -t
           bash scripts/nginx-docker-dns.test.sh
+      - name: Validate monitoring transport and alert rules
+        run: |
+          set -Eeuo pipefail
+          output="$RUNNER_TEMP/filmott-monitoring-render"
+          node ops/monitoring/render.mjs --datasource filmott-prometheus --out "$output"
+          node ops/monitoring/test/rules-test.mjs "$output"
+          docker run --rm --network none -v "$output:/data:ro" -w /data \
+            --entrypoint /bin/promtool prom/prometheus:v3.13.3 test rules rule-tests.json
+          python3 ops/monitoring/test/integration.py

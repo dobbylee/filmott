@@ -126,12 +126,14 @@ expect_response() {
 }
 
 expect_internal_metrics() {
-  local identity="$1" output
+  local identity="$1" output release expected_slot=blue expected_sha="$active_sha"
+  if [[ "$identity" == green* ]]; then expected_slot=green; expected_sha="$target_sha"; fi
   for attempt in $(seq 1 20); do
     output="$(docker exec "$proxy" curl -fsS --max-time 3 http://127.0.0.1:9080/metrics)" || true
     if [[ "$output" == *"\"identity\":\"$identity\""* &&
           "$output" == *'"url":"/api/internal/metrics"'* && "$output" == *'"port":3001'* ]]; then
-      return 0
+      release="$(docker exec "$proxy" curl -fsS --max-time 3 http://127.0.0.1:9080/release)" || true
+      if [[ "$release" == "filmott_active_release_info{slot=\"$expected_slot\",sha=\"$expected_sha\"} 1" ]]; then return 0; fi
     fi
     sleep 1
   done

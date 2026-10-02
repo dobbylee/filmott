@@ -1,0 +1,96 @@
+logging {
+  level = "warn"
+}
+
+// 수집 주소는 active Nginx 경로로 고정한다. inactive slot을 별도 target으로 만들지 않는다.
+prometheus.scrape "process" {
+  targets = [{ "__address__" = "nginx:9080", "job" = "filmott-process", "instance" = "active-backend" }]
+  metrics_path = "/metrics"
+  scrape_interval = "30s"
+  scrape_timeout = "8s"
+  sample_limit = 16
+  body_size_limit = "16KiB"
+  forward_to = [prometheus.relabel.allowed.receiver]
+}
+
+prometheus.scrape "release" {
+  targets = [{ "__address__" = "nginx:9080", "job" = "filmott-release", "instance" = "active-router" }]
+  metrics_path = "/release"
+  scrape_interval = "30s"
+  scrape_timeout = "8s"
+  sample_limit = 4
+  body_size_limit = "4KiB"
+  forward_to = [prometheus.relabel.allowed.receiver]
+}
+
+prometheus.exporter.self "collector" {}
+prometheus.scrape "collector" {
+  targets = prometheus.exporter.self.collector.targets
+  job_name = "filmott-collector"
+  scrape_interval = "30s"
+  scrape_timeout = "8s"
+  forward_to = [prometheus.relabel.allowed.receiver]
+}
+
+// metric 이름과 label 이름을 모두 제한해 요청 URL·사용자·collector 원격 URL을 제외한다.
+prometheus.relabel "allowed" {
+  forward_to = [prometheus.remote_write.grafana.receiver]
+  rule {
+    source_labels = ["__name__"]
+    regex = "filmott_node_heap_used_bytes|filmott_node_heap_limit_bytes|filmott_process_resident_memory_bytes|filmott_active_release_info|up|prometheus_remote_storage_samples_pending|prometheus_remote_storage_samples_failed_total|prometheus_remote_storage_queue_highest_sent_timestamp_seconds"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["job"]
+    regex = "integrations/self"
+    target_label = "job"
+    replacement = "filmott-collector"
+  }
+  rule {
+    source_labels = ["job"]
+    regex = "filmott-collector"
+    target_label = "instance"
+    replacement = "alloy"
+  }
+  rule {
+    action = "labelkeep"
+    regex = "__name__|job|instance|slot|sha"
+  }
+  rule {
+    target_label = "service"
+    replacement = "filmott"
+  }
+  rule {
+    target_label = "environment"
+    replacement = "production"
+  }
+}
+
+prometheus.remote_write "grafana" {
+  endpoint {
+    url = sys.env("GRAFANA_METRICS_URL")
+    name = "filmott"
+    follow_redirects = false
+    remote_timeout = "10s"
+    send_exemplars = false
+    basic_auth {
+      username = sys.env("GRAFANA_METRICS_USERNAME")
+      password_file = "/run/secrets/grafana_metrics_token"
+    }
+    queue_config {
+      capacity = 1000
+      min_shards = 1
+      max_shards = 1
+      max_samples_per_send = 200
+      batch_send_deadline = "5s"
+      min_backoff = "1s"
+      max_backoff = "10s"
+      retry_on_http_429 = true
+    }
+  }
+  wal {
+    truncate_frequency = "15m"
+    min_keepalive_time = "5m"
+    max_keepalive_time = "1h"
+  }
+}

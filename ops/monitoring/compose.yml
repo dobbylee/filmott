@@ -1,0 +1,39 @@
+# 저장소 루트에서 production compose 다음에 overlay한다. 기본 배포는 이 파일을 사용하지 않는다.
+services:
+  alloy:
+    image: grafana/alloy:v1.20.0@sha256:f111cce835516c5f99166342be7038496b52ced16667be5a11e19258a3e4cd30
+    profiles: [monitoring]
+    user: '473:473'
+    command:
+      - run
+      - --disable-reporting
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --storage.path=/var/lib/alloy
+      - /etc/alloy/config.alloy
+    environment:
+      GRAFANA_METRICS_URL: https://prometheus-prod-49-prod-ap-northeast-0.grafana.net/api/prom/push
+      GRAFANA_METRICS_USERNAME: '3629559'
+    volumes:
+      - ./ops/monitoring/config.alloy:/etc/alloy/config.alloy:ro
+    secrets:
+      - grafana_metrics_token
+    tmpfs:
+      - /var/lib/alloy:size=256m,uid=473,gid=473,mode=0700
+      - /tmp:size=16m,uid=473,gid=473,mode=0700
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 0.5
+    pids_limit: 128
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+secrets:
+  grafana_metrics_token:
+    file: ${FILMOTT_GRAFANA_METRICS_TOKEN_FILE:-./.deploy-state/secrets/grafana-metrics-token}
